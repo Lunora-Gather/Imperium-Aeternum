@@ -124,6 +124,70 @@ export const LAWS: LawDef[] = [
     effects: { taxEffMod: 1.03, efficiencyMod: 2, corruptionMod: -2 },
     factionReaction: { merchants: 15, nobles: -3, commoners: 3 },
   },
+  // ── D4 扩充：+8 法律到 20 ──
+  // 民法 +3
+  {
+    id: 'law_marriage_reform', name: '婚姻改革法', category: 'civil',
+    description: '放宽婚姻限制，保护女性财产，提升民众认同。',
+    costGold: 90, allowedGovernments: [], prereqAdminLevel: 2,
+    effects: { stabilityMod: 4, legitimacyMod: 3, unrestReduction: 1 },
+    factionReaction: { commoners: 10, clergy: -8, nobles: -3 },
+  },
+  {
+    id: 'law_contract_enforcement', name: '契约执行法', category: 'civil',
+    description: '强化契约效力，商业纠纷有法可依。',
+    costGold: 110, allowedGovernments: [], prereqAdminLevel: 2,
+    effects: { taxEffMod: 1.04, corruptionMod: -3, efficiencyMod: 2 },
+    factionReaction: { merchants: 18, nobles: -5, commoners: 2 },
+  },
+  {
+    id: 'law_eminent_domain', name: '征收法', category: 'civil',
+    description: '国家可征用私地建公共设施，贵族反弹但行政升。',
+    costGold: 140, allowedGovernments: ['empire', 'republic', 'monarchy'], prereqAdminLevel: 3,
+    conflictsWith: ['law_noble_privilege'],
+    effects: { efficiencyMod: 6, taxEffMod: 1.03, stabilityMod: -2 },
+    factionReaction: { nobles: -18, commoners: 5, merchants: 3 },
+  },
+  // 刑法 +2
+  {
+    id: 'law_prison_reform', name: '狱政改革', category: 'criminal',
+    description: '改善狱政，减少冤狱，民心升但震慑降。',
+    costGold: 80, allowedGovernments: [], prereqAdminLevel: 2,
+    conflictsWith: ['law_strict_punishment'],
+    effects: { stabilityMod: 4, legitimacyMod: 4, rebellionReduction: -1 },
+    factionReaction: { commoners: 10, clergy: 6, military: -5 },
+  },
+  {
+    id: 'law_border_control', name: '边防管制法', category: 'criminal',
+    description: '严控边境，防间谍渗透，治安升但贸易降。',
+    costGold: 100, allowedGovernments: [], prereqAdminLevel: 2,
+    effects: { stabilityMod: 3, efficiencyMod: 3, rebellionReduction: 2 },
+    factionReaction: { military: 12, merchants: -10, nobles: 3 },
+  },
+  // 行政法 +3
+  {
+    id: 'law_census_registration', name: '编户齐民法', category: 'administrative',
+    description: '普查人口户籍，税收效率大升但贵族抵制。',
+    costGold: 160, allowedGovernments: ['empire', 'monarchy', 'republic'], prereqAdminLevel: 3,
+    effects: { taxEffMod: 1.08, efficiencyMod: 6, corruptionMod: -4 },
+    factionReaction: { nobles: -12, merchants: 5, commoners: 3 },
+  },
+  {
+    id: 'law_merchant_guild_charter', name: '商团特许法', category: 'administrative',
+    description: '授予商团专营特权，贸易升但小商户不满。',
+    costGold: 130, allowedGovernments: ['republic', 'monarchy', 'empire'], prereqAdminLevel: 2,
+    conflictsWith: ['law_equal_tax'],
+    effects: { taxEffMod: 1.05, corruptionMod: 3, efficiencyMod: 2 },
+    factionReaction: { merchants: 15, nobles: 5, commoners: -8 },
+  },
+  {
+    id: 'law_religious_tolerance', name: '宗教宽容法', category: 'administrative',
+    description: '宽容异教，降冲突但神职不满。',
+    costGold: 120, allowedGovernments: [], prereqAdminLevel: 2,
+    conflictsWith: ['law_strict_punishment'],
+    effects: { stabilityMod: 4, efficiencyMod: 3, unrestReduction: 2 },
+    factionReaction: { clergy: -18, commoners: 8, merchants: 5 },
+  },
 ];
 
 export const LAW_BY_ID: Record<string, LawDef> = Object.fromEntries(

@@ -13,6 +13,11 @@ export type NationalCharacterId =
   | 'revolutionary'
   | 'maritime'
   | 'centralization'
+  // ── D6 扩充：+4 性格到 15 ──
+  | 'isolationist'    // 孤立主义（海禁/锁国，稳定但贸易衰）
+  | 'expansionist'    // 扩张主义（高速扩张但治理压力）
+  | 'scholarly'       // 文治国家（科研文化强但军弱）
+  | 'mercantilist'    // 重商主义（囤金但民生低）
   | 'balanced'; // 玩家默认未定
 
 export interface NationalCharacterDef {
@@ -117,6 +122,31 @@ export const NATIONAL_CHARACTERS: Record<NationalCharacterId, NationalCharacterD
     bonuses: { efficiencyMod: 15, tradeMod: 1.10 },
     penalties: { rebellionMod: 1.15, merchantsSat: -5 },
   },
+  // ── D6 扩充：+4 性格到 15 ──
+  isolationist: {
+    id: 'isolationist', name: '孤立主义', description: '海禁锁国，稳定但贸易衰。',
+    threshold: 70,
+    bonuses: { stabilityMod: 12, legitimacyMod: 5 },
+    penalties: { tradeMod: 0.70, influenceMod: -10, sciPtMod: 0.85 },
+  },
+  expansionist: {
+    id: 'expansionist', name: '扩张主义', description: '高速扩张但治理压力剧增。',
+    threshold: 70,
+    bonuses: { conscriptionMod: 1.15, mobilizationMod: 1.15 },
+    penalties: { rebellionMod: 1.25, warExhaustionMod: 1.20, efficiencyMod: -8 },
+  },
+  scholarly: {
+    id: 'scholarly', name: '文治国家', description: '科研文化强但军力弱。',
+    threshold: 70,
+    bonuses: { sciPtMod: 1.30, assimilationMod: 5, legitimacyMod: 3 },
+    penalties: { combatMod: 0.85, moraleMod: 0.90, militarySat: -10 },
+  },
+  mercantilist: {
+    id: 'mercantilist', name: '重商主义', description: '囤金强国但民生低。',
+    threshold: 70,
+    bonuses: { goldMod: 20, tradeMod: 1.15 },
+    penalties: { commonersSat: -15, popGrowthMod: 0.95, stabilityMod: -5 },
+  },
   balanced: {
     id: 'balanced', name: '均衡发展', description: '无明显倾向，玩家默认。',
     threshold: 0,
@@ -144,6 +174,13 @@ export const BEHAVIOR_MAPPINGS: BehaviorMapping[] = [
   { actionId: 'build_farm', tendencyGain: { welfare: 1 } },
   { actionId: 'build_road', tendencyGain: { centralization: 1 } },
   { actionId: 'conscription', tendencyGain: { militarism: 1 } },
+  // ── D6 扩充：+4 性格行为映射 ──
+  { actionId: 'close_borders', tendencyGain: { isolationist: 3, authoritarian: 1 } },
+  { actionId: 'annex_province', tendencyGain: { expansionist: 2, militarism: 1 } },
+  { actionId: 'found_academy', tendencyGain: { scholarly: 2, technocracy: 1 } },
+  { actionId: 'hoard_gold', tendencyGain: { mercantilist: 2, commerce: 1 } },
+  { actionId: 'build_granary', tendencyGain: { mercantilist: 1, welfare: 1 } },
+  { actionId: 'censor_scholars', tendencyGain: { isolationist: 1, authoritarian: 1 } },
 ];
 
 export const BEHAVIOR_MAP_BY_ACTION: Record<string, BehaviorMapping> = Object.fromEntries(

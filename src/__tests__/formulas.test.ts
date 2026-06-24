@@ -204,6 +204,7 @@ describe('国家性格激活', () => {
     const r = activateTendency({
       militarism: 75, commerce: 50, religiosity: 70, technocracy: 30,
       authoritarian: 10, welfare: 0, feudal: 0, revolutionary: 0, maritime: 0, centralization: 0,
+      isolationist: 0, expansionist: 0, scholarly: 0, mercantilist: 0,
     });
     expect(r).toContain('militarism');
     expect(r).toContain('religiosity');

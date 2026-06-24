@@ -64,6 +64,7 @@ function buildTendency(): NationalTendency {
     militarism: 0, commerce: 0, religiosity: 0, technocracy: 0,
     authoritarian: 0, welfare: 0, feudal: 0, revolutionary: 0,
     maritime: 0, centralization: 0,
+    isolationist: 0, expansionist: 0, scholarly: 0, mercantilist: 0,
   };
 }
 

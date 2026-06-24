@@ -133,6 +133,11 @@ export interface NationalTendency {
   revolutionary: number;
   maritime: number;
   centralization: number;
+  // ── D6 扩充：+4 倾向到 14 ──
+  isolationist: number;
+  expansionist: number;
+  scholarly: number;
+  mercantilist: number;
 }
 
 // ── 政府与政策 ──

@@ -395,7 +395,7 @@ function judgeVictory(state: GameState, report: TurnReport): void {
         tier: 'D',
         government: { type: 'monarchy', legitimacy: 30, stability: 40, efficiency: 20, corruption: 60 },
         character: 'balanced',
-        tendency: { militarism: 50, commerce: 20, religiosity: 30, technocracy: 20, authoritarian: 60, welfare: 10, feudal: 40, revolutionary: 30, maritime: 10, centralization: 30 } as NationalTendency,
+        tendency: { militarism: 50, commerce: 20, religiosity: 30, technocracy: 20, authoritarian: 60, welfare: 10, feudal: 40, revolutionary: 30, maritime: 10, centralization: 30, isolationist: 20, expansionist: 40, scholarly: 10, mercantilist: 20 } as NationalTendency,
         activeCharacterBonuses: [],
         capital: rp.id,
         ruler: { name: '叛军首领', age: 35, ability: 2, reignYears: 0 },
