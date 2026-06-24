@@ -51,6 +51,24 @@ export default function ProvinceScreen() {
       setPendingProvince(null);
     }
   }, [pendingId, provs, setPendingProvince]);
+
+  // E3: [ / ] 切省——[ 上一个, ] 下一个
+  useEffect(() => {
+    if (provs.length < 2) return;
+    const onKey = (e: KeyboardEvent) => {
+      const t = e.target as HTMLElement;
+      if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return;
+      if (e.key !== '[' && e.key !== ']') return;
+      e.preventDefault();
+      const idx = provs.findIndex((p) => p.id === selected);
+      if (idx < 0) return;
+      const next = e.key === '[' ? (idx - 1 + provs.length) % provs.length : (idx + 1) % provs.length;
+      setSelected(provs[next].id);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [provs, selected]);
+
   const prov = state.provinces[selected];
 
   if (!prov) return <Panel title="省份管理"><p className="dim">无省份</p></Panel>;

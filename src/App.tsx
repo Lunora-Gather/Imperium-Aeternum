@@ -98,6 +98,11 @@ export default function App() {
   const onKey = useCallback((e: KeyboardEvent) => {
     const t = e.target as HTMLElement;
     if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return;
+    // E3: Esc 关帮助浮层（事件弹窗不拦，EventModal 自己处理 1/2/3）
+    if (e.key === 'Escape') {
+      if (showHelp) { e.preventDefault(); setShowHelp(false); return; }
+      return;
+    }
     // P0: 事件未处理时空格不推回合（避免误触），交由 EventModal 的 1/2/3 选
     const hasPending = state.pendingEvents.some((p) => p.nationId === pid);
     if (e.code === 'Space') {
@@ -108,7 +113,7 @@ export default function App() {
       const hit = ALL_TABS.find((x) => x.key === e.key);
       if (hit) { e.preventDefault(); setTab(hit.id); }
     }
-  }, [nextTurn, state.victory.type, state.pendingEvents, pid]);
+  }, [nextTurn, state.victory.type, state.pendingEvents, pid, showHelp]);
   useEffect(() => { window.addEventListener('keydown', onKey); return () => window.removeEventListener('keydown', onKey); }, [onKey]);
 
   return (
