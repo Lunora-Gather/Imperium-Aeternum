@@ -117,6 +117,27 @@ export function makePeace(state: GameState, war: War): void {
           desc: `${defender.name} 割让 ${targetProv.name}。`,
           actorId: attacker.id,
         });
+        // A3: 孤儿军队自动撤退——败方军队若 location 指已割省，撤回最近本国省；无本国省则 disbanded
+        const defenderArmies = defender.army.filter((a) => a.location === war.targetProvinceId);
+        for (const army of defenderArmies) {
+          const ownProvs = Object.values(state.provinces).filter((p) => p.ownerId === defender.id);
+          // 找邻接的己省，或首都，或任意己省
+          const adjOwn = ownProvs.find((p) => targetProv.adjacent.includes(p.id));
+          const fallback = adjOwn ?? ownProvs.find((p) => p.id === defender.capital) ?? ownProvs[0];
+          if (fallback) {
+            army.location = fallback.id;
+          } else {
+            // 无本国省，军队解散
+            defender.army = defender.army.filter((a) => a.id !== army.id);
+            addChronicle(state, {
+              id: `orphan_disband_${army.id}_${state.turn}`,
+              turn: state.turn, kind: 'milestone_war',
+              title: `残军溃散`,
+              desc: `${defender.name} 在 ${targetProv.name} 的驻军因无本土可撤，溃散消失。`,
+              actorId: defender.id,
+            });
+          }
+        }
       }
       // 赔款（败方付，按财力比例）
       const tribute = Math.min(defender.resources.gold, 100 + war.progress);

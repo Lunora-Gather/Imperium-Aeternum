@@ -7,7 +7,8 @@ import { createInitialState, createWorldState, getRelationObj } from '../engine/
 import { espionage as engineEspionage, dynasticMarriage as engineMarriage, culturalExport as engineCulturalExport } from '../engine/diplomacy';
 import { moveArmy as engineMoveArmy, makePeace as engineMakePeace } from '../engine/military';
 import { processTurn, recordPlayerAction } from '../engine/turn';
-import { saveGame, loadGame, hasSave, deleteSave } from './persistence';
+import { addChronicle } from '../engine/chronicle';
+import { saveGame, loadGame, hasSave, deleteSave, saveGameToSlot, loadGameFromSlot, deleteSlot, autoSave } from './persistence';
 import { PLAYER_ID } from '../data/nations';
 import { BUILDINGS } from '../data/buildings';
 import type { BuildingId } from '../data/buildings';
@@ -169,6 +170,10 @@ interface GameStore {
   save: () => void;
   clearSave: () => void;
   hasSave: () => boolean;
+  // B3: 多槽位
+  saveToSlot: (slot: number) => void;
+  loadFromSlot: (slot: number) => boolean;
+  deleteSlotSave: (slot: number) => void;
   nextTurn: () => TurnReport | null;
   clearTurnFlag: () => void;
   setTaxRate: (rate: number) => void;
@@ -188,6 +193,11 @@ interface GameStore {
   moveArmy: (armyId: string, toProvinceId: string) => boolean;   // E21: 战略军队调动
   makePeace: (warId: string) => boolean;                          // E21: 主动求和
   upgradeBuilding: (provinceId: string, buildingInstanceId: string) => boolean;
+  // B4: 建筑拆除——返还 30% 金，清除实例
+  demolishBuilding: (provinceId: string, buildingInstanceId: string) => boolean;
+  // A2: 内战操作——镇压（耗军队+金，胜则收复省+稳定-10）/谈判（割1省+合法性-15+稳定+15）
+  suppressRebellion: () => boolean;
+  negotiateRebellion: () => boolean;
   logMsg: (msg: string) => void;
 }
 
@@ -277,6 +287,28 @@ export const useGameStore = create<GameStore>((set, get) => ({
   clearSave: () => { deleteSave(); get().logMsg('已删档'); },
   hasSave: () => hasSave(),
 
+  // B3: 多槽位实现
+  saveToSlot: (slot) => {
+    const r = saveGameToSlot(get().state, slot);
+    if (r.ok && r.sizeKB) {
+      get().logMsg(slot === 0 ? `自动存档（${r.sizeKB}KB）` : `已存档到槽位 ${slot}（${r.sizeKB}KB）`);
+    } else if (r.error) {
+      get().logMsg(r.error);
+    }
+  },
+  loadFromSlot: (slot) => {
+    const s = loadGameFromSlot(slot);
+    if (s) {
+      s._relMap = undefined;
+      set({ state: s, scene: 'playing', log: [] });
+      get().logMsg(`已读取槽位 ${slot} 存档`);
+      return true;
+    }
+    get().logMsg('读档失败：存档不存在或损坏');
+    return false;
+  },
+  deleteSlotSave: (slot) => { deleteSlot(slot); get().logMsg(`已删除槽位 ${slot} 存档`); },
+
   nextTurn: () => {
     const cur = get().state;
     if (cur.victory.type) return null;
@@ -284,6 +316,10 @@ export const useGameStore = create<GameStore>((set, get) => ({
     set({ state: next, justProcessedTurn: true });
     if (report.warnings.length) get().logMsg(report.warnings.join('; '));
     get().logMsg(`进入第 ${next.turn + 1} 年`);
+    // B3: 每 10 回合自动存档到槽位 0
+    if (next.turn > 0 && next.turn % 10 === 0) {
+      autoSave(next);
+    }
     return report;
   },
 
@@ -657,4 +693,97 @@ export const useGameStore = create<GameStore>((set, get) => ({
   },
 
   logMsg: (msg) => set((s) => ({ log: [...s.log.slice(-30), msg] })),
+
+  // B4: 建筑拆除——返还 30% 金，清除实例
+  demolishBuilding: (provinceId, buildingInstanceId) => {
+    const s = get().state;
+    const player = s.nations[pid(s)];
+    const prov = s.provinces[provinceId];
+    if (!prov || prov.ownerId !== pid(s)) return false;
+    const inst = prov.buildings.find((b) => b.id === buildingInstanceId);
+    if (!inst) return false;
+    const def = BUILDINGS[inst.defId as BuildingId];
+    if (!def) return false;
+    // 返还 30% 建造成本（按当前等级累计）
+    const refund = Math.round(def.costGold * 0.3 * inst.level);
+    prov.buildings = prov.buildings.filter((b) => b.id !== buildingInstanceId);
+    player.resources.gold += refund;
+    set((st) => ({ state: { ...st.state } }));
+    get().logMsg(`拆除 ${prov.name} 的 ${def.name}，返还 ${refund} 金`);
+    return true;
+  },
+
+  // A2: 镇压叛乱——耗军队+金，胜则收复所有叛军省+稳定-10，内战结束
+  suppressRebellion: () => {
+    const s = get().state;
+    const player = s.nations[pid(s)];
+    if (!player.civilWar?.active) { get().logMsg('未处于内战'); return false; }
+    const commit = spendAP(player, 'enactPolicy');  // 耗 2 行动点
+    if (!commit) { get().logMsg('行动点不足（需 2）'); return false; }
+    const armySize = player.army.reduce((sum, a) => sum + a.size, 0);
+    if (armySize < 200) { get().logMsg('军队不足（需 200）'); return false; }
+    if (player.resources.gold < 150) { get().logMsg('金不足（需 150）'); return false; }
+    player.resources.gold -= 150;
+    // 收复所有叛军省
+    const rebelIds = player.civilWar.rebels;
+    for (const rid of rebelIds) {
+      for (const p of Object.values(s.provinces)) {
+        if (p.ownerId === rid) {
+          p.ownerId = pid(s);
+          p.loyalty = 30;
+          p.assimilation = 40;
+          p.unrest = 50;
+          p.rebellionRisk = 30;
+          p.garrison = 0;
+        }
+      }
+      delete s.nations[rid];
+    }
+    player.civilWar = { active: false, rebels: [] };
+    player.government.stability = Math.max(0, player.government.stability - 10);
+    addChronicle(s, { turn: s.turn, kind: 'milestone_rebellion', title: '内战平定（镇压）', desc: '玩家以武力镇压叛乱，收复失地，但国力受损。', actorId: pid(s) });
+    commit();
+    set((st) => ({ state: { ...st.state } }));
+    get().logMsg('镇压叛乱成功，收复失地（耗 2 行动点 + 150 金 + 稳定-10）');
+    return true;
+  },
+
+  // A2: 谈判——割 1 省给叛军+合法性-15+稳定+15，内战结束
+  negotiateRebellion: () => {
+    const s = get().state;
+    const player = s.nations[pid(s)];
+    if (!player.civilWar?.active) { get().logMsg('未处于内战'); return false; }
+    const commit = spendAP(player, 'enactPolicy');  // 耗 2 行动点
+    if (!commit) { get().logMsg('行动点不足（需 2）'); return false; }
+    const rebelIds = player.civilWar.rebels;
+    // 割第一块叛军省给叛军（承认独立），其余归顺
+    const firstRebel = rebelIds[0];
+    const cededProv = Object.values(s.provinces).find((p) => p.ownerId === firstRebel);
+    if (cededProv) {
+      // 叛军保留该省，叛军 Nation 转为正常国家（去 rebellionDecay/rebelOf）
+      const rebelNation = s.nations[firstRebel];
+      if (rebelNation) { rebelNation.rebellionDecay = undefined; rebelNation.rebelOf = undefined; rebelNation.name = cededProv.name + '政权'; }
+    }
+    // 其余叛军省归顺
+    for (const rid of rebelIds.slice(1)) {
+      for (const p of Object.values(s.provinces)) {
+        if (p.ownerId === rid) {
+          p.ownerId = pid(s);
+          p.loyalty = 40;
+          p.assimilation = 50;
+          p.unrest = 30;
+          p.rebellionRisk = 20;
+        }
+      }
+      delete s.nations[rid];
+    }
+    player.civilWar = { active: false, rebels: [] };
+    player.government.legitimacy = Math.max(0, player.government.legitimacy - 15);
+    player.government.stability = Math.min(100, player.government.stability + 15);
+    addChronicle(s, { turn: s.turn, kind: 'milestone_rebellion', title: '内战平定（谈判）', desc: '玩家让步，割地换取和平，合法性受损。', actorId: pid(s) });
+    commit();
+    set((st) => ({ state: { ...st.state } }));
+    get().logMsg('谈判成功，割 1 省换和平（耗 2 行动点 + 合法性-15 + 稳定+15）');
+    return true;
+  },
 }));

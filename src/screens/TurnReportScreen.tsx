@@ -120,6 +120,31 @@ export default function TurnReportScreen({ onContinue }: { onContinue?: () => vo
           </>
         )}
 
+        {/* A4: 天下大势——AI 重要行为可见 */}
+        {r.worldEvents.length > 0 && (
+          <>
+            <Divider label="天下大势" />
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginBottom: 12, padding: 10, background: 'rgba(42,90,140,0.06)', border: '1px solid var(--border)', borderRadius: 6 }}>
+              {r.worldEvents.map((w, i) => <div key={i} style={{ fontSize: 13, padding: '2px 0' }}>{w}</div>)}
+            </div>
+          </>
+        )}
+
+        {/* B2: 省份归属变化 */}
+        {r.provinceChanges.length > 0 && (
+          <>
+            <Divider label="疆域变动" />
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginBottom: 12 }}>
+              {r.provinceChanges.map((pc, i) => {
+                const gained = pc.to === state.playerNationId;
+                return <div key={i} style={{ fontSize: 13, color: gained ? 'var(--good)' : 'var(--war)' }}>
+                  {gained ? '获得' : '失去'} {pc.name}
+                </div>;
+              })}
+            </div>
+          </>
+        )}
+
         {r.warnings.length > 0 && (
           <>
             <Divider label="警告" />

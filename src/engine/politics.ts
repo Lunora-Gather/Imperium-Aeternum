@@ -43,15 +43,21 @@ export function settlePolitics(nation: Nation, state: GameState): PoliticsResult
   // W-fix v3 (A3): 调高分段回归力，让 A 级大国能爬到 60+
   // 旧 v2 在 stab<55 时 +2.5、55-70 时只 +1，导致 A 级卡在 55 平衡点上不去
   let finalDelta = dStab;
+  // A2: 内战期间先扣 -3（在回归力前，确保惩罚始终可见，不被回归力盖过）
+  if (nation.civilWar?.active) {
+    finalDelta -= 3;
+  }
   const stab = nation.government.stability;
+  // A2: 内战时回归力减弱（濒死保护从 +5 降到 +2，让内战惩罚有效但不致死）
+  const atWar = nation.civilWar?.active;
   if (stab < 40) {
-    finalDelta = Math.max(dStab, 5);        // 危殆：强回归 +5（v2 是 4）
+    finalDelta = Math.max(finalDelta, atWar ? 2 : 5);   // 危殆：内战 +2 / 平时 +5
   } else if (stab < 60) {
-    finalDelta = Math.max(dStab, 3);        // 低：回归 +3（v2 是 2.5，阈值 55→60）
+    finalDelta = Math.max(finalDelta, atWar ? 1 : 3);   // 低：内战 +1 / 平时 +3
   } else if (stab < 75) {
-    finalDelta = Math.max(dStab, 1.5);      // 中：温和回归 +1.5（v2 是 1，阈值 70→75）
+    finalDelta = Math.max(finalDelta, atWar ? 0 : 1.5); // 中：内战 +0 / 平时 +1.5
   } else {
-    finalDelta = Math.max(dStab, -2);       // 高：只防大跌
+    finalDelta = Math.max(finalDelta, -2);              // 高：只防大跌
   }
   nation.government.stability = clamp(nation.government.stability + finalDelta, 0, 100);
 
@@ -120,10 +126,15 @@ export function changeGovernment(nation: Nation, newGov: GovernmentId, state: Ga
   if (!def) return false;
   nation.resources.gold -= 100;
   nation.government.type = newGov;
-  // 派系满意度反应
+  // B8: 政体切换反弹——合法性一次性 -15（过渡冲击）+ 派系满意度反应
+  nation.government.legitimacy = clamp(nation.government.legitimacy - 15, 0, 100);
+  nation.government.stability = clamp(nation.government.stability - 10, 0, 100);
   for (const f of nation.factions) {
     f.satisfaction = clamp(f.satisfaction + def.factionSatMod[f.id], 0, 100);
   }
+  // B8: 标记反扑窗口——3 回合内可能触发反扑事件（events.ts 检测）
+  nation.civilWar = nation.civilWar ?? undefined;  // 保持 civilWar 不变
+  (nation as Nation & { govTransitionTurns?: number }).govTransitionTurns = 3;
   return true;
 }
 

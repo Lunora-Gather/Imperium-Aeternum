@@ -211,6 +211,10 @@ export interface TurnReport {
   warProgress: { target: string; progressDelta: number; outcome: string }[];  // 本回合玩家参与的战争进展
   factionDelta: { id: string; delta: number }[];   // 本回合派系满意度变化
   exhaustSnapshot: number;   // P2: 本回合结算时的厌战值快照（sparkline 用，避免历史填当前值导致平线）
+  // A4: 天下大势——本回合 AI 重要行为叙事（仅玩家邻国/相关，上限 10 条防溢出）
+  worldEvents: string[];
+  // B2: 省份归属变化——本回合玩家获得/失去的省份
+  provinceChanges: { id: string; name: string; from: string; to: string }[];
 }
 
 // ── 国家运行时状态 ──
@@ -238,6 +242,11 @@ export interface Nation {
   influence: number;
   atWar: boolean;
   defeated: boolean;
+  // A1: 叛军临时 Nation 字段——叛乱省创建临时 Nation，rebellionDecay 每回合递减，归 0 时省归顺原主
+  rebellionDecay?: number;          // 叛军剩余回合数（仅 rebel_* Nation 用，未定义=非叛军）
+  rebelOf?: string;                 // 叛军原主国 id（归顺时恢复 ownerId）
+  // A2: 内战状态——3-4 省叛乱时激活，玩家可镇压或谈判
+  civilWar?: { active: boolean; rebels: string[] };  // rebels=叛军 Nation id 列表
   // P-fix: 政策/法律的修正系数（引擎读取，弥补原 effects 静默忽略的漏洞）
   policyMods?: {
     combatMod?: number;          // 战斗力倍率（军事改革等）
@@ -292,4 +301,4 @@ export interface SaveGame {
   gameState: GameState;
 }
 
-export const SAVE_VERSION = 1;
+export const SAVE_VERSION = 3;

@@ -14,7 +14,7 @@ const factionLabel = (id: string): string => ({
 }[id] ?? id);
 
 export default function PoliticsScreen() {
-  const { state, enactPolicy, enactLaw } = useGameStore();
+  const { state, enactPolicy, enactLaw, suppressRebellion, negotiateRebellion } = useGameStore();
   const player = state.nations[state.playerNationId];
   const govDef = GOVERNMENTS[player.government.type];
   const [tab, setTab] = useState<'policy' | 'law'>('policy');
@@ -47,6 +47,24 @@ export default function PoliticsScreen() {
           </div>
         </div>
       </Panel>
+
+      {/* A2: 内战状态卡——3-4 省叛乱时显示镇压/谈判按钮 */}
+      {player.civilWar?.active && (
+        <Panel title="⚠ 内战爆发" accent>
+          <div className="ia-card" style={{ marginBottom: 12, borderColor: 'var(--danger, #c33)' }}>
+            <p style={{ color: 'var(--danger, #c33)', fontSize: 13, margin: '0 0 8px' }}>
+              {player.civilWar.rebels.length} 省叛乱，内战持续中。每回合稳定 -3、税收 ×0.7。叛军占首都则国家分裂。
+            </p>
+            <p className="dim" style={{ fontSize: 12, margin: '0 0 10px' }}>
+              当前军队 {player.army.reduce((s, a) => s + a.size, 0)} · 金 {player.resources.gold}
+            </p>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <Btn label="镇压（150金+200兵+稳定-10）" onClick={() => suppressRebellion()} variant="warn" />
+              <Btn label="谈判（割1省+合法-15+稳定+15）" onClick={() => negotiateRebellion()} />
+            </div>
+          </div>
+        </Panel>
+      )}
 
       {/* C2: 政策/法律 切换页签 */}
       <div style={{ display: 'flex', gap: 6, marginBottom: 12 }}>

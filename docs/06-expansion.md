@@ -1,5 +1,7 @@
 # Imperium Aeternum — 扩展设计 v1
 
+> **⚠️ ARCHIVED 2026-06-24** — 已收敛入 `MASTER-PLAN.md` Phase A/E/F。本文件保留为历史，不再作为执行依据。新工作以 MASTER-PLAN 为唯一指挥棒。
+>
 > **FROZEN v1** — v2 §2 表格标注的阶段 6 产出。每扩展项含：依赖钩子 + 优先级 + 实现路径 + 红线约束。
 > 所有扩展受 v2 §3.2 当前阶段红线约束（解锁需 DEC-NNN）。
 

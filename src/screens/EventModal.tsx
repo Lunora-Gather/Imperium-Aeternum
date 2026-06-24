@@ -30,7 +30,8 @@ function effectSummary(eff: EventEffect): { txt: string; tone: 'good' | 'warn' |
   push(eff.corruption ?? 0, '腐败', true);
   push(eff.warExhaustion ?? 0, '厌战', true);
   if (eff.factionSat && eff.factionSat.length > 0) {
-    eff.factionSat.forEach((f) => out.push({ txt: `${f.faction} ${f.delta >= 0 ? '+' : ''}${f.delta}`, tone: f.delta >= 0 ? 'good' : 'warn' }));
+    const factionLabel: Record<string, string> = { nobles: '贵族', merchants: '商人', military: '军方', commoners: '民众', clergy: '神职' };
+    eff.factionSat.forEach((f) => out.push({ txt: `${factionLabel[f.faction] ?? f.faction}满意 ${f.delta >= 0 ? '+' : ''}${f.delta}`, tone: f.delta >= 0 ? 'good' : 'warn' }));
   }
   return out;
 }

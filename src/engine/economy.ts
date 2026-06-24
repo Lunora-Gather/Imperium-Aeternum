@@ -134,6 +134,10 @@ export function settleEconomy(nation: Nation, state: GameState): EconomyResult {
 
   // 入库
   nation.resources.gold += netTax + tradeIncome + buildingIncome + routeIncome - militaryExpense;
+  // A2: 内战期间税收 ×0.7（治理混乱，税基萎缩）
+  if (nation.civilWar?.active) {
+    nation.resources.gold = Math.round(nation.resources.gold * 0.7);
+  }
   nation.resources.wood += wood;
   nation.resources.iron += iron;
   nation.resources.influence += routeInfluence;

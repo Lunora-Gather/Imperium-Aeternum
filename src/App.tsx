@@ -1,6 +1,7 @@
 // Imperium Aeternum — App v4（青铜铭文设计语言）
 import { useState, useEffect, useCallback } from 'react';
 import { useGameStore } from './store/gameStore';
+import ErrorBoundary from './components/ErrorBoundary';
 
 import { provincesOf } from './engine/init';
 import { ResourceStrip } from './components/ui';

@@ -2,7 +2,7 @@
 // 入口：processTurn(gameState) → 新 GameState + TurnReport
 // 接入 7 系统 engine + AI + 事件
 
-import type { GameState, Nation, TurnReport, Province } from '../types/game';
+import type { GameState, Nation, TurnReport, Province, NationalTendency } from '../types/game';
 import { clamp, avg } from '../utils/math';
 import { mulberry32, weightedPick } from '../utils/random';
 import { provincesOf } from './init';
@@ -167,8 +167,86 @@ export function processTurn(state: GameState): { state: GameState; report: TurnR
   // 无需额外操作，makePeace 已处理
 
   // 玩家回合报告
-  const report = buildReport(player, playerProvs, next, state, econ, pol, pop, cr, playerEventIds);
+  // A4: 收集 AI 重要行为——对比 prev/next 的 wars/nations/relations，仅玩家邻国或相关事件
+  const worldEvents: string[] = [];
+  const playerNeighbors = new Set<string>();
+  for (const pp of playerProvs) {
+    for (const adjId of pp.adjacent) {
+      const adj = next.provinces[adjId];
+      if (adj && adj.ownerId !== playerId) playerNeighbors.add(adj.ownerId);
+    }
+  }
+  // 新增战争（宣战）
+  for (const w of next.wars) {
+    const existed = state.wars.some((pw) => pw.id === w.id);
+    if (!existed) {
+      const attacker = next.nations[w.attackerId];
+      const defender = next.nations[w.defenderId];
+      const target = next.provinces[w.targetProvinceId];
+      // 仅玩家邻国或玩家相关
+      if (w.attackerId === playerId || w.defenderId === playerId || playerNeighbors.has(w.attackerId) || playerNeighbors.has(w.defenderId)) {
+        worldEvents.push(`⚔ ${attacker?.name ?? w.attackerId} 向 ${defender?.name ?? w.defenderId} 宣战，攻 ${target?.name ?? w.targetProvinceId}`);
+      }
+    }
+  }
+  // 灭国（defeated 变 true 或 nations 中消失）
+  for (const [nid, n] of Object.entries(next.nations)) {
+    const prevN = state.nations[nid];
+    if (prevN && !prevN.defeated && n.defeated && nid !== playerId) {
+      if (playerNeighbors.has(nid)) worldEvents.push(`☠ ${n.name} 灭亡`);
+    }
+  }
+  // 新结盟（treaty 变 alliance）
+  for (const r of next.relations) {
+    if (r.treaty === 'alliance') {
+      const prevR = state.relations.find((pr) => pr.from === r.from && pr.to === r.to);
+      if (!prevR || prevR.treaty !== 'alliance') {
+        if (r.from === playerId || r.to === playerId || playerNeighbors.has(r.from) || playerNeighbors.has(r.to)) {
+          worldEvents.push(`🤝 ${next.nations[r.from]?.name ?? r.from} 与 ${next.nations[r.to]?.name ?? r.to} 结盟`);
+        }
+      }
+    }
+  }
+  // B2: 省份归属变化（玩家获得/失去）
+  const provinceChanges: { id: string; name: string; from: string; to: string }[] = [];
+  for (const [pid_, p] of Object.entries(next.provinces)) {
+    const prevP = state.provinces[pid_];
+    if (prevP && prevP.ownerId !== p.ownerId) {
+      if (prevP.ownerId === playerId || p.ownerId === playerId) {
+        provinceChanges.push({ id: pid_, name: p.name, from: prevP.ownerId, to: p.ownerId });
+      }
+    }
+  }
+  const report = buildReport(player, playerProvs, next, state, econ, pol, pop, cr, playerEventIds, worldEvents);
+  report.provinceChanges = provinceChanges;  // B2: 填充省份变化
   judgeVictory(next, report);
+  // A1: 叛军衰减结算——每个 rebel_* Nation 的 rebellionDecay 递减，归 0 时省归顺原主
+  const decayedRebels: string[] = [];
+  for (const [nid, n] of Object.entries(next.nations)) {
+    if (n.rebellionDecay === undefined || !n.rebelOf) continue;
+    n.rebellionDecay -= 1;
+    if (n.rebellionDecay <= 0) {
+      for (const p of Object.values(next.provinces)) {
+        if (p.ownerId === nid) {
+          p.ownerId = n.rebelOf;
+          p.loyalty = 40;
+          p.assimilation = 50;
+          p.unrest = 30;
+          p.rebellionRisk = 20;
+        }
+      }
+      addChronicle(next, {
+        id: `rebel_return_${nid}_${next.turn}`,
+        turn: next.turn,
+        kind: 'milestone_rebellion',
+        title: `叛乱平定`,
+        desc: `${n.name.replace('叛军·', '')} 历经 5 年未镇压，自行归顺 ${next.nations[n.rebelOf]?.name ?? '原主'}。`,
+        actorId: n.rebelOf,
+      });
+      decayedRebels.push(nid);
+    }
+  }
+  for (const nid of decayedRebels) delete next.nations[nid];
   next.lastReport = report;
   // E10: 维护最近 10 回合历史（sparkline 用）
   next.history = [...next.history, report].slice(-10);
@@ -184,6 +262,7 @@ function buildReport(
   pop: { totalGrowth: number },
   cr: { rebellionTriggered: string[] },
   events: string[],
+  worldEvents: string[],
 ): TurnReport {
   const warnings: string[] = [];
   if (nation.resources.gold < 0) warnings.push('⚠ 国库赤字');
@@ -251,6 +330,8 @@ function buildReport(
     warProgress,
     factionDelta,
     exhaustSnapshot: Math.round(nation.warExhaustion),
+    worldEvents: worldEvents.slice(-10),  // A4: 上限 10 条防溢出
+    provinceChanges: [],  // B2: 在 buildReport 外计算（需对比 prev/next 省份归属）
   };
 }
 
@@ -285,12 +366,44 @@ function judgeVictory(state: GameState, report: TurnReport): void {
     return p.rebellionRisk - suppress >= 100;
   });
   if (rebelProvs.length >= 5) { state.victory.type = 'fail_split'; return; }  // P1-2: 5省分裂（原3省太严）
-  // P1-1: 叛乱执行——单省独立 + 纪事 + 剥离建筑
+  // A1: 叛乱执行——单省独立 + 临时 Nation + 连锁 + 归顺字段 + 纪事 + 剥离建筑
+  const rebellionRng = mulberry32(state.seed ^ (state.turn * 7919));
   for (const rp of rebelProvs) {
+    const rebelId = `rebel_${rp.id}`;
+    // 建临时叛军 Nation（若已存在则跳过，防重复）
+    if (!state.nations[rebelId]) {
+      state.nations[rebelId] = {
+        id: rebelId,
+        name: `叛军·${rp.name}`,
+        isPlayer: false,
+        tier: 'D',
+        government: { type: 'monarchy', legitimacy: 30, stability: 40, efficiency: 20, corruption: 60 },
+        character: 'balanced',
+        tendency: { militarism: 50, commerce: 20, religiosity: 30, technocracy: 20, authoritarian: 60, welfare: 10, feudal: 40, revolutionary: 30, maritime: 10, centralization: 30 } as NationalTendency,
+        activeCharacterBonuses: [],
+        capital: rp.id,
+        ruler: { name: '叛军首领', age: 35, ability: 2, reignYears: 0 },
+        taxRate: 0.1,
+        resources: { gold: 50, food: 100, wood: 0, iron: 0, adminPt: 1, sciPt: 0, influence: 0, supply: 0 },
+        factions: [],
+        tech: { agri: 0, mil: 1, admin: 0, culture: 0, researchProgress: null },
+        army: [],
+        activePolicies: [],
+        activeLaws: [],
+        activeTradeRoutes: [],
+        embargoedRoutes: [],
+        warExhaustion: 0,
+        influence: 0,
+        atWar: false,
+        defeated: false,
+        rebellionDecay: 6,        // A1: 6 回合（本回合末衰减结算减 1 → 实剩 5，5 回合后归顺）
+        rebelOf: playerId,        // A1: 记录原主国
+      };
+    }
     rp.assimilation = 30;
     rp.loyalty = 30;
     rp.unrest = 60;
-    rp.ownerId = `rebel_${rp.id}`;  // 从玩家剥离
+    rp.ownerId = rebelId;  // 从玩家剥离给叛军
     rp.garrison = 0;
     rp.buildings = rp.buildings.filter((b) => b.defId === 'farm');  // 仅留农田
     // 纪事记录
@@ -299,14 +412,36 @@ function judgeVictory(state: GameState, report: TurnReport): void {
       turn: state.turn,
       kind: 'milestone_rebellion',
       title: `${rp.name} 脱离独立`,
-      desc: `${rp.name} 叛乱成功，脱离 ${player.name}。`,
+      desc: `${rp.name} 叛乱成功，脱离 ${player.name}。5 年内未镇压将自动归顺。`,
       actorId: playerId,
     });
+    // A1: 相邻同文化省 30% 概率连锁（rebellionRisk>60 时）
+    for (const adjId of rp.adjacent) {
+      const adj = state.provinces[adjId];
+      if (!adj || adj.ownerId !== playerId) continue;
+      if (adj.culture !== rp.culture) continue;  // 仅同文化连锁
+      if (adj.rebellionRisk < 60) continue;
+      const roll = rebellionRng();
+      if (roll < 0.3) {
+        adj.rebellionRisk = Math.min(100, adj.rebellionRisk + 40);
+        adj.unrest = Math.min(100, adj.unrest + 20);
+      }
+    }
   }
-  // P1-2: 中级分裂警告（3-4省叛乱）——不直接判负，但合法性/稳定大跌
+  // P1-2: 中级分裂警告（3-4省叛乱）——不直接判负，但激活内战状态 + 合法性/稳定大跌
   if (rebelProvs.length >= 3 && rebelProvs.length < 5) {
     player.government.legitimacy = clamp(player.government.legitimacy - 25, 0, 100);
     player.government.stability = clamp(player.government.stability - 15, 0, 100);
+    // A2: 激活内战状态——玩家可镇压或谈判
+    player.civilWar = { active: true, rebels: rebelProvs.map((p) => `rebel_${p.id}`) };
+    addChronicle(state, {
+      id: `civilwar_${playerId}_${state.turn}`,
+      turn: state.turn,
+      kind: 'milestone_rebellion',
+      title: `${player.name} 陷入内战`,
+      desc: `${rebelProvs.length} 省叛乱，内战爆发。玩家可镇压或谈判。内战期间稳定度持续下降、税收减半。`,
+      actorId: playerId,
+    });
   }
 
   // 胜利
