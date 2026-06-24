@@ -28,7 +28,24 @@ export type BuildingId =
   | 'great_library'
   | 'arsenal'
   | 'granary_empire'
-  | 'cathedral';
+  | 'cathedral'
+  // ── D3 扩充：+16 建筑到 40 ──
+  | 'smithy'           // 铁匠铺：产铁+装备
+  | 'canal_wharf'      // 漕运码头：平原河流贸易
+  | 'city_wall'        // 城墙加固：高级防御
+  | 'scholar_academy'  // 书院：科研+同化
+  | 'post_house'       // 驿馆：行政+同化
+  | 'silo'             // 筒仓：粮储上限
+  | 'coin_workshop'    // 铸币工坊：金币产出
+  | 'apothecary'       // 药铺：疫病抵抗
+  | 'watchtower'       // 望楼：叛乱预警
+  | 'guild_hall'       // 会馆：商人满意度
+  | 'armory'           // 军械库：装备产出
+  | 'observatory'      // 观象台：科研+合法性
+  | 'granary_royal'    // 王家粮仓：高级储粮
+  | 'trade_post'       // 贸易站：边疆贸易
+  | 'monastery'        // 修道院：神职+稳定
+  | 'irrigation_works';// 水利工程：平原粮产翻倍
 
 export interface BuildingDef {
   id: BuildingId;
@@ -245,6 +262,87 @@ export const BUILDINGS: Record<BuildingId, BuildingDef> = {
     id: 'cathedral', name: '大圣堂', description: '行政 Lv6 解锁。合法性根基稳固，腐败大降，同化加速。',
     costGold: 600, costWood: 80, costIron: 60, costAction: 3,
     yield: { influence: 6, adminPt: 4 }, terrainMod: {}, prereqTech: 'admin_lv6', maxPerProvince: 1,
+  },
+  // ── D3 扩充：+16 建筑到 40，每建筑含前置/差异化效果/地形适配 ──
+  smithy: {
+    id: 'smithy', name: '铁匠铺', description: '锻铁为器，产铁与装备补给，军方依赖。',
+    costGold: 90, costWood: 20, costIron: 20, costAction: 1,
+    yield: { iron: 8, supply: 4 }, terrainMod: { mountain: 1.3, hill: 1.2 }, maxPerProvince: 2,
+  },
+  canal_wharf: {
+    id: 'canal_wharf', name: '漕运码头', description: '平原河流省份贸易枢纽，金币与影响力双升。',
+    costGold: 140, costWood: 50, costIron: 10, costAction: 2,
+    yield: { gold: 15, influence: 2 }, terrainMod: { plain: 1.4, coast: 1.3 }, prereqTech: 'admin_lv2', maxPerProvince: 1,
+  },
+  city_wall: {
+    id: 'city_wall', name: '城墙加固', description: '加固城防，叛乱与入侵抵抗大增。',
+    costGold: 180, costWood: 60, costIron: 50, costAction: 2,
+    yield: { supply: 8 }, terrainMod: {}, prereqTech: 'mil_lv2', maxPerProvince: 1,
+  },
+  scholar_academy: {
+    id: 'scholar_academy', name: '书院', description: '聚贤讲学，科研与同化双升，学者向往。',
+    costGold: 160, costWood: 40, costIron: 0, costAction: 2,
+    yield: { sciPt: 5, adminPt: 2 }, terrainMod: { plain: 1.1 }, prereqTech: 'admin_lv3', maxPerProvince: 1,
+  },
+  post_house: {
+    id: 'post_house', name: '驿馆', description: '通政令达边远，行政与同化加速。',
+    costGold: 70, costWood: 30, costIron: 5, costAction: 1,
+    yield: { adminPt: 2, influence: 1 }, terrainMod: { plain: 1.2, hill: 0.9 }, maxPerProvince: 2,
+  },
+  silo: {
+    id: 'silo', name: '筒仓', description: '深储粮，旱涝保收，稳定度升。',
+    costGold: 100, costWood: 50, costIron: 0, costAction: 1,
+    yield: { food: 8 }, terrainMod: { plain: 1.2 }, maxPerProvince: 2,
+  },
+  coin_workshop: {
+    id: 'coin_workshop', name: '铸币工坊', description: '私营铸币，金币产出但腐败略升。',
+    costGold: 130, costWood: 10, costIron: 30, costAction: 2,
+    yield: { gold: 10 }, terrainMod: {}, prereqTech: 'admin_lv2', maxPerProvince: 1,
+  },
+  apothecary: {
+    id: 'apothecary', name: '药铺', description: '防疫祛病，人口增长与稳定度升。',
+    costGold: 110, costWood: 20, costIron: 0, costAction: 1,
+    yield: { adminPt: 1, food: 3 }, terrainMod: {}, prereqTech: 'admin_lv2', maxPerProvince: 1,
+  },
+  watchtower: {
+    id: 'watchtower', name: '望楼', description: '预警叛乱与入侵，军方满意度升。',
+    costGold: 60, costWood: 30, costIron: 10, costAction: 1,
+    yield: { supply: 3 }, terrainMod: { hill: 1.3, mountain: 1.4 }, maxPerProvince: 2,
+  },
+  guild_hall: {
+    id: 'guild_hall', name: '会馆', description: '商团议事之所，金币与商人满意度升。',
+    costGold: 150, costWood: 40, costIron: 20, costAction: 2,
+    yield: { gold: 12, influence: 2 }, terrainMod: { plain: 1.2, coast: 1.3 }, prereqTech: 'admin_lv2', maxPerProvince: 1,
+  },
+  armory: {
+    id: 'armory', name: '军械库', description: '储兵器甲胄，装备与补给大升。',
+    costGold: 200, costWood: 50, costIron: 80, costAction: 2,
+    yield: { supply: 12 }, terrainMod: {}, prereqTech: 'mil_lv2', maxPerProvince: 1,
+  },
+  observatory: {
+    id: 'observatory', name: '观象台', description: '察星辰定历法，科研与合法性升。',
+    costGold: 180, costWood: 30, costIron: 10, costAction: 2,
+    yield: { sciPt: 4, influence: 3 }, terrainMod: { mountain: 1.3, hill: 1.2 }, prereqTech: 'admin_lv3', maxPerProvince: 1,
+  },
+  granary_royal: {
+    id: 'granary_royal', name: '王家粮仓', description: '王室直辖储粮，旱涝保收，合法升。',
+    costGold: 220, costWood: 80, costIron: 10, costAction: 2,
+    yield: { food: 15, adminPt: 1 }, terrainMod: { plain: 1.2 }, prereqTech: 'agri_lv2', maxPerProvince: 1,
+  },
+  trade_post: {
+    id: 'trade_post', name: '贸易站', description: '边疆互市，金币与影响力升但需驻军。',
+    costGold: 100, costWood: 30, costIron: 10, costAction: 1,
+    yield: { gold: 8, influence: 2 }, terrainMod: { hill: 1.2, desert: 0.8 }, maxPerProvince: 2,
+  },
+  monastery: {
+    id: 'monastery', name: '修道院', description: '清修之所，神职满意度与稳定度升。',
+    costGold: 120, costWood: 40, costIron: 0, costAction: 2,
+    yield: { influence: 3, adminPt: 1 }, terrainMod: { hill: 1.2, mountain: 1.3 }, maxPerProvince: 1,
+  },
+  irrigation_works: {
+    id: 'irrigation_works', name: '水利工程', description: '沟渠纵横，平原粮产翻倍，需农业 Lv3。',
+    costGold: 200, costWood: 80, costIron: 10, costAction: 2,
+    yield: { food: 25 }, terrainMod: { plain: 1.6, hill: 1.0 }, prereqTech: 'agri_lv3', maxPerProvince: 1,
   },
 };
 
