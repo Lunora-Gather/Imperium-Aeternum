@@ -1,5 +1,0 @@
-
-> imperium-aeternum@0.1.0 validate
-> tsx src/data/__validate__.ts
-
-✅ 数据自检通过（5 国 / 50 省 / 20 建筑 / 32 科技 / 25 政策 / 111 事件）

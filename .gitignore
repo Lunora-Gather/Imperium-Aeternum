@@ -5,6 +5,13 @@ node_modules/
 dist/
 dist-ssr/
 
+# TS build info
+*.tsbuildinfo
+
+# Vite 编译副产物
+vite.config.js
+vite.config.d.ts
+
 # Local env
 .env
 .env.local
@@ -23,37 +30,21 @@ Thumbs.db
 # Logs
 *.log
 npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
 
 # Test/coverage
 coverage/
 
-# Misc
-*.local
-.cache/
+# 临时诊断/审计输出（不进版本库）
+*.txt
+!docs/**/*.md
+scripts/diag-*.ts
+scripts/deep-diag.ts
+scripts/stab-*.ts
+scripts/world-audit.ts
+scripts/world-evidence.ts
 
-# 临时诊断/审计输出（audit*.txt / diag*.txt / r1*.txt 等）
-audit*.txt
-diag*.txt
-r1*.txt
-r2*.txt
-vitest*.txt
-tsc*.txt
-val*.txt
-test*.txt
-test_out.txt
-vfinal.txt
-build.txt
-commit.txt
-tsc_out.txt
-tsc_p0.txt
-tsc_p1.txt
-tsc_p2.txt
-tsc_p3.txt
-vitest_p0.txt
-vitest_p1.txt
-vitest_p2.txt
-vitest_p3.txt
-vite.config.d.ts
-vite.config.js
+# 临时脚本
+*.ps1
+*.bat
+commit_msg.txt
+c2msg.txt
