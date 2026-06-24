@@ -247,6 +247,8 @@ export interface Nation {
   rebelOf?: string;                 // 叛军原主国 id（归顺时恢复 ownerId）
   // A2: 内战状态——3-4 省叛乱时激活，玩家可镇压或谈判
   civilWar?: { active: boolean; rebels: string[] };  // rebels=叛军 Nation id 列表
+  // B8: 政体切换反扑窗口——changeGovernment 设 3，每回合递减，归 0 关闭；rollEvents 检测此字段触发反扑事件
+  govTransitionTurns?: number;
   // P-fix: 政策/法律的修正系数（引擎读取，弥补原 effects 静默忽略的漏洞）
   policyMods?: {
     combatMod?: number;          // 战斗力倍率（军事改革等）

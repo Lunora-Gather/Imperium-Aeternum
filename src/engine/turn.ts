@@ -102,6 +102,10 @@ export function processTurn(state: GameState): { state: GameState; report: TurnR
     if (opt) applyEffect(player, opt.effects, next);
     recordEvent(next, playerId, eid, optIdx);
   }
+  // B8: 政体切换反扑窗口递减——rollEvents 检测完反扑事件后递减，保证 3 回合窗口完整
+  if (player.govTransitionTurns && player.govTransitionTurns > 0) {
+    player.govTransitionTurns -= 1;
+  }
 
   // AI 国家回合
   processAITurn(next);
@@ -204,6 +208,18 @@ export function processTurn(state: GameState): { state: GameState; report: TurnR
         if (r.from === playerId || r.to === playerId || playerNeighbors.has(r.from) || playerNeighbors.has(r.to)) {
           worldEvents.push(`🤝 ${next.nations[r.from]?.name ?? r.from} 与 ${next.nations[r.to]?.name ?? r.to} 结盟`);
         }
+      }
+    }
+  }
+  // B5: 停战到期通知——prev 是 truce 且 truceTurns>0，next 是 none（diplomacy.ts L72 已递减到 0 改 none）
+  for (const r of next.relations) {
+    if (r.treaty !== 'none') continue;
+    const prevR = state.relations.find((pr) => pr.from === r.from && pr.to === r.to);
+    if (prevR?.treaty === 'truce' && prevR.truceTurns > 0) {
+      // 仅玩家相关（玩家本人或玩家邻国）
+      if (r.from === playerId || r.to === playerId) {
+        const other = r.from === playerId ? r.to : r.from;
+        worldEvents.push(`🕊 与 ${next.nations[other]?.name ?? other} 停战到期，可再宣战`);
       }
     }
   }

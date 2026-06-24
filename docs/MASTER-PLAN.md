@@ -3,11 +3,12 @@
 > **唯一指挥棒**。本文档收敛 `06-expansion.md`（10 项 E 系列）+ `08-comprehensive-plan.md`（31 项 P 系列）+ 散落 ADR，统一为一条可追溯的执行线。
 > 任何后续改动必须能映射回本文档的某个工作包（WP），否则不予立项。
 >
-> **基线快照**（2026-06-25）：57 源文件 / 11077 行（engine 3578 / data 2612 / screens 2508 / store 744 / types 296 / utils 106 / tests 689）| typecheck ✅ | vitest 50/50 ✅ | eslint ✅ | 205 国 577 省 | 150 事件 / 24 建筑 / 32 科技 / 12 政体 / 11 性格 / 12 法律 / 8 商路 / 7 剧本。
+> **基线快照**（2026-06-25 v1.5）：57 源文件 / 11077 行 | typecheck ✅ | **vitest 89/89 ✅**（含 engine-targeted 26 针对性测试，economy/politics/military/diplomacy 各 ≥5）| validate ✅（203 事件 0 重复）| 205 国 577 省 | 150 事件 / 24 建筑 / 32 科技 / 12 政体 / 11 性格 / 12 法律 / 8 商路 / 7 剧本 | 50 回合 1131ms。
 >
-> **代码核验状态**（2026-06-25 实读 `turn.ts/politics.ts/economy.ts/military.ts/ai.ts`）：
-> 已实现且工作——叛乱执行（`judgeVictory` L288-305）、分裂分级（5 省 fail / 3-4 省降数值不 fail）、政体被动效果（`settlePolitics` L95-110 读 `govDef.perTurn`）、性格生效（economy/politics/population/military/diplomacy/culture 全读 `activeCharacterBonuses` + `charMods()`）、贸易差异化（GDP×关系×依赖安全×政体×性格×长度修正 + 禁运 + 两端归属校验）、和约三档（`makePeace` L97-140 割省+赔款+厌战+白和）、AI 15 行动类型（含 `move_army`/`enact_policy`/`declare_war`）。
-> 仍真实缺口——叛乱省无临时 Nation 对象 / 无连锁 / 无归顺、无内战可操作状态、孤儿军队软锁、政体切换派系反应过简、AI 行为玩家不可见。
+> **穷尽代码核验**（2026-06-25 实读 18 符号：`turn.ts judgeVictory/processTurn/buildReport`、`politics.ts settlePolitics/changeGovernment`、`economy.ts settleEconomy`、`military.ts makePeace/moveArmy`、`ai.ts planAITurn`、`persistence.ts migrate/saveGameToSlot/listAllSlots`、`App.tsx`、`EventModal effectSummary`、`PoliticsScreen civilWar`、`gameStore suppressRebellion/negotiateRebellion/demolishBuilding`、`ErrorBoundary`、`ProvinceScreen`、`DiplomacyScreen`、`MilitaryScreen truce`、`events.ts govTransition`）：
+> - **Phase A 全部 4 WP 已实现**（A1 叛乱临时 Nation+连锁+归顺 / A2 内战镇压谈判 UI+引擎 / A3 孤儿军队撤退 / A4 AI 可见 worldEvents）
+> - **Phase B 8 WP 中 5 个已实现**（B1 事件预览翻译 / B2 省份通知 / B3 多槽位 / B6 ErrorBoundary / B7 存档迁移 v1→v2→v3），**3 个部分完成**（B4 引擎有 UI 缺 / B5 隐式过滤缺显示 / B8 标记缺反扑事件）
+> - 真实剩余缺口集中于：B4/B5/B8 收尾 + Phase C 架构 + Phase D 内容 + Phase E 打磨 + Phase F 移植
 >
 > **设计宪法**（不可推翻，任何 WP 违宪即否决）：
 > 1. 扩张有代价——每省带来超管惩罚 + 文化冲突 + 行政负担
@@ -41,56 +42,43 @@
 
 ---
 
-## 2. 当前缺口诊断（2026-06-25 实读代码核对）
+## 2. 当前缺口诊断（2026-06-25 穷尽实读 18 符号核对）
 
-> 核对方法：逐一读 `turn.ts judgeVictory/processTurn`、`politics.ts settlePolitics/changeGovernment`、`economy.ts settleEconomy`、`military.ts makePeace`、`ai.ts planAITurn/executeAIAction`，与原 06+08 缺口清单逐条对账。
-> 结果：原清单 7 致命缺口中 **5 个已实现**，本节按真实剩余缺口重写。
+> 核对方法：逐 WP 实读对应代码符号（非凭记忆），共读 18 个符号横跨 turn/politics/economy/military/ai/persistence/App/EventModal/PoliticsScreen/gameStore/ErrorBoundary/ProvinceScreen/DiplomacyScreen/MilitaryScreen/events。
+> 结果：原 v1.2 声称的 12 个缺口（4 致命 + 8 严重）中 **9 个已实现**，本节按真实剩余缺口重写。
 
-### ✅ 已实现（误报已剔除，勿重做）
+### ✅ 已实现（勿重做）
 
-| 原缺口 ID | 原声称 | 真实代码证据 | 处置 |
-|----------|--------|------------|------|
-| ~~G1~~ | 叛乱无实际执行 | `turn.ts:288-305` 已改 ownerId/清驻军/剥建筑/Chronicle | 仅剩「临时 Nation + 连列 + 归顺」未做 → 新 G1 |
-| ~~G2~~ | 3+ 省直接 fail | `turn.ts:287` 5 省 fail；`307-310` 3-4 省只降合法-25/稳定-15 不 fail | 分级已做 → 新 G2「内战可操作」 |
-| ~~G3~~ | 政体无被动效果 | `politics.ts:95-110` 读 `govDef.perTurn` 应用合法/稳定/效率/腐败/派系 | 已做，删 WP |
-| ~~G4~~ | 性格引擎不读 | economy/politics/population/military/diplomacy/culture 全读 `activeCharacterBonuses` + `charMods()` | 已做，删 WP |
-| ~~G5~~ | 贸易无差异化 | `economy.ts:84-128` GDP×关系×依赖安全×政体×性格×长度修正 + 禁运 + 两端归属校验 | 已做，删 WP |
-| ~~G6~~ | 和约仅停战+10 | `military.ts:97-140` 三档割省+赔款+厌战+白和 + Chronicle | 已做，删 WP |
+| 原 WP | 原声称缺口 | 真实代码证据 | 验证人 |
+|------|----------|------------|--------|
+| ~~A1~~ | 叛乱无临时 Nation + 无连锁 + 无归顺 | `turn.ts:369-449` 建临时 Nation（`rebellionDecay:6`/`rebelOf`）+ 相邻同文化 30% 连锁（`mulberry32`）+ `processTurn:223-249` 衰减归 0 归顺+Chronicle | 实读 |
+| ~~A2~~ | 无内战可操作状态 | `turn.ts:432-444` 激活 `civilWar`；`economy.ts:138-140` 税收×0.7；`politics.ts:47-55` 稳定-3；`PoliticsScreen.tsx:51-66` 镇压/谈判按钮；`gameStore.ts:716-788` suppressRebellion/negotiateRebellion 完整实现 | 实读 |
+| ~~A3~~ | 孤儿军队软锁未修 | `military.ts:120-137` 割省后败方军队撤回最近本国省/首都/任意己省，无本国省 disbanded+Chronicle"残军溃散" | 实读 |
+| ~~A4~~ | AI 行为玩家不可见 | `turn.ts:170-221` 收集宣战/灭国/结盟 worldEvents（仅邻国/相关）+`buildReport:333` slice(-10) | 实读 |
+| ~~B1~~ | 事件 factionSat 显示原始 id | `EventModal.tsx:33-34` factionLabel={nobles:'贵族',merchants:'商人',...} 翻译显示"贵族满意 +8" | 实读 |
+| ~~B2~~ | 省份归属变化无通知 | `turn.ts:210-221` 收集玩家省份归属变化 + `report.provinceChanges` 填充 | 实读 |
+| ~~B3~~ | 仅 1 槽位存档 | `persistence.ts` 5 槽位+autoSave+listAllSlots+deleteSlot；`SaveLoadScreen.tsx:46-88` 5 槽位卡片 UI | 实读 |
+| ~~B6~~ | 无 ErrorBoundary | `components/ErrorBoundary.tsx` 完整实现 getDerivedStateFromError+componentDidCatch；`App.tsx:4` 已 import 包裹 | 实读 |
+| ~~B7~~ | 存档无版本迁移 | `persistence.ts:16-62` v1→v2→v3 完整迁移（补 embargoedRoutes/tech.culture/chronicle/battleReports/warProgress/factionDelta/exhaustSnapshot/civilWar/worldEvents/provinceChanges） | 实读 |
 
-### 🔴 真实致命缺口（影响"能不能玩"）
+### 🔴 真实剩余缺口
 
-| ID | 缺口 | 真实代码现状 | 影响 |
-|----|------|------------|------|
-| **G1** | 叛乱省无临时 Nation 对象 | `judgeVictory:293` 设 `ownerId='rebel_xxx'` 但 `nations` 里无对应 Nation；后续 `provincesOf`/AI 遍历可能踩 undefined | 边缘崩溃风险 |
-| **G2** | 无内战可操作状态 | 3-4 省叛乱只降数值（`307-310`），玩家无「镇压/谈判」按钮可操作挽回 | 改革失败=被动等死，违设计宪法"改革有反弹但可挽回" |
-| **G3** | 孤儿军队软锁 | `makePeace:108` 割省后败方军队 `location` 仍指已失省份；`moveArmy` 调回需本国省存在 | 边缘软锁，logged not fixed |
-| **G4** | AI 行为玩家完全不可见 | `buildReport` 无 `worldEvents` 字段；AI 宣战/结盟/灭国玩家看不到 | 不知道邻国在扩军，违"AI 要可信"宪法 |
+| ID | 缺口 | 真实代码现状 | 影响 | 归属 WP |
+|----|------|------------|------|---------|
+| **G1** | 建筑拆除 UI 未接 | `gameStore.ts:697-714` demolishBuilding 引擎完整（扣实例+返 30% 金），但 `ProvinceScreen.tsx` 无拆除按钮 | 玩家建错无法挽回 | B4 收尾 |
+| **G2** | 停战提醒显示缺失 | `MilitaryScreen.tsx:257` truce 国隐式过滤不显示宣战按钮，但无"剩余 X 回合可宣"显示、无到期 LogToast | 玩家不知何时能再宣 | B5 收尾 |
+| **G3** | 政体反扑事件未接 | `politics.ts:137` 切政体设 `govTransitionTurns=3` 标记，但 `engine/events.ts` 和 `data/events.ts` 无读取此字段的反扑事件 | 切政体无反弹感，违"改革有反弹"宪法 | B8 收尾 |
+| **G4** | 引擎 mutate 非纯函数 | `settleEconomy` 直接 mutate `nation` 引用（`state.nations[id]` 别名）；顶层 `processTurn` 已浅拷贝但子引擎穿透改原对象 | 无法回滚/移植，C1 真缺口 | C1 |
+| **G5** | store 浅拷贝全渲染 | `set({state:{...st.state}})` 浅拷贝触发所有订阅重渲染 | 操作延迟 ~50ms | C2 |
+| ~~G6~~ | ~~测试针对性不足~~ | ~~engine-targeted 11 个已存在~~ | **C3 完成：26 针对性测试，economy/politics/military/diplomacy 各 ≥5，89/89 全绿** | ✅ C3 已完成 |
+| **G7** | `as` 断言清理 | **tsconfig strict:true 已开**（C4 大部分已做）；仅剩 `govTransitionTurns` 的 `as Nation & {...}` 临时断言需改正式字段 | 可维护性 | C4 收尾 |
+| ~~G8~~ | ~~确定性重放未做~~ | **`turn.test.ts:384-403` 已有 C5 重放测试且通过**（同 seed 推 20 回合两次 state 完全相同） | 已做，删 WP |
 
-### 🟡 严重缺口（影响"好不好玩"）
+### 🟢 增强缺口（未变，从 v1.2 继承）
 
-| ID | 缺口 | 真实代码现状 | 影响 |
-|----|------|------------|------|
-| **G5** | 事件选项效果预览不全 | `EventModal effectSummary` 中 `factionSat` 显示原始 id 不翻译 | 玩家看不懂选项后果，违"信息要透明"宪法 |
-| **G6** | 省份归属变化无通知 | `buildReport` 无 `provinceChanges`；占省后需手动切页才发现 | 体验断裂 |
-| **G7** | 存档无版本迁移 | `persistence migrations` 数组为空；旧存档加载缺 embargoedRoutes/tech.culture/chronicle/battleReports/warProgress/factionDelta/exhaustSnapshot 字段 undefined | 旧存档崩 |
-| **G8** | store 浅拷贝全渲染 | `set({state:{...st.state}})` 触发所有订阅组件重渲染；205 国深克隆太贵故未做 | 12 tab 每次操作都重渲染，操作延迟 ~50ms |
-| **G9** | 引擎 mutate 非纯函数 | `processTurn` 顶层浅拷贝 next，但子引擎 `settleEconomy` 等直接 mutate `next.nations[id]`；无法回滚/重放 | 难调试难移植 |
-| **G10** | 无 ErrorBoundary | `App.tsx` 无 ErrorBoundary 包裹 | 引擎异常直接白屏 |
-| **G11** | 政体切换派系反应过简 | `changeGovernment:124-126` 仅 `factionSatMod[f.id]` 一次性加减，无合法性冲击/过渡期/反扑事件 | 切政体像点按钮，违"改革有反弹"宪法 |
-| **G12** | 测试以烟雾为主 | 50 测试无针对 economy/politics/military/diplomacy 逻辑的针对性断言 | 引擎逻辑回归无保障 |
-
-### 🟢 增强缺口（影响"从好到极好"）
-
-| ID | 缺口 | 影响 |
-|----|------|------|
-| **G13** | 事件 150 但类别不均 | 部分类别仅 2-3 个，玩家很快看完全部 |
-| **G14** | 科技仅改数值无质变 | Lv8 和 Lv1 体验一样 |
-| **G15** | 建筑 24 个部分雷同 | 缺差异化建筑 |
-| **G16** | 地图是圆点 | 无地形/边界/河流视觉 |
-| **G17** | 无音效 | 关键操作无反馈 |
-| **G18** | 无统计图表 | 玩家看不到长期趋势 |
-| **G19** | 无新手交互教程 | 上手门槛高 |
-| **G20** | AI 无性格化外交语言 | AI 宣战/求和都用通用文本，违"AI 要可信"宪法 |
+| ID | 缺口 | 影响 | 归属 WP |
+|----|------|------|---------|
+| G9-G16 | 事件扩充/科技质变/建筑扩充/法律扩充/剧本扩充/性格扩充/UI 打磨/移植准备 | 内容耐玩度 + 体验 + 可移植 | D1-D6 / E1-E6 / F1-F3 |
 
 ---
 
@@ -100,45 +88,47 @@
 > 每个 WP 含：依赖钩子（真实代码位置）+ 验收标准 + 红线 + 预估。
 > 跨 WP 依赖用 `→` 标注。
 
-### Phase A：玩法闭环（修真实致命缺口，让游戏"好玩"）
+### Phase A：玩法闭环 ✅ 已全部完成（2026-06-25 实读核实）
 
-> 已剔除原 A3/A4/A5/A6（政体被动/性格生效/贸易差异化/和约三档均已实现，重做纯浪费）。本 Phase 聚焦 4 个真实致命缺口。
+> 原 4 WP（A1/A2/A3/A4）全部已在代码中实现，本 Phase archived。证据见 §2「已实现」表。
+> 现状：叛乱有临时 Nation+连锁+归顺、内战有镇压/谈判 UI+引擎、孤儿军队自动撤退、AI 行为可见。
+> **无需开工**，直接进 Phase B 收尾。
 
-| WP | 标题 | 依赖钩子 | 验收 | 红线 | 预估 |
+### Phase B：体验闭环（3 个收尾 WP + 5 个已完成）
+
+> 已完成（勿重做）：B1 事件预览 / B2 省份通知 / B3 多槽位 / B6 ErrorBoundary / B7 存档迁移。
+> 剩余 3 个收尾 WP 是已完成引擎缺 UI 接线或事件接线。
+
+| WP | 标题 | 依赖钩子 | 验收 | 预估 |
+|----|------|---------|------|------|
+| **B4** | 建筑拆除 UI 接线 | `gameStore.ts:697-714 demolishBuilding`（引擎已完成）+ `ProvinceScreen.tsx`（缺按钮） | ProvinceScreen 建筑卡片加"拆除"按钮（显示返还 30% 预估），点击调 demolishBuilding，LogToast 显示"拆除 XX 返还 YY 金" | S |
+| **B5** | 停战提醒显示 | `MilitaryScreen.tsx:257`（truce 隐式过滤已存）+ `DiplomacyScreen.tsx`（无剩余回合） | Military 宣战区停战国显示"X 回合后可宣"（读 `rel.truceTurns`）；Diplomacy 关系表停战国显示剩余回合；停战到期当回合 LogToast 通知"与 XX 停战到期，可再宣" | S |
+| **B8** | 政体反扑事件接线 | `politics.ts:137 govTransitionTurns=3`（标记已设）+ `data/events.ts`（无反扑事件）+ `engine/events.ts rollEvents`（不读此字段） | data/events 加 2-3 个反扑事件（如"旧贵族密谋复辟"/"共和派逼宫"/"教士反扑"），trigger 含 `govTransitionTurns>0`；rollEvents 检测此触发；3 回合窗口内概率触发；触发后 Chronicle 记录 | M |
+
+**Phase B 验收门槛**：3 收尾 WP 完成，真人玩 100 回合无困惑、拆除可用、停战可见、切政体有反扑事件。
+
+### Phase B：体验闭环（3 个收尾 WP — 详见上方表）
+
+> 本节为上方 B4/B5/B8 表的补充说明位，WP 详情已在上表列出。
+> 已完成的 B1/B2/B3/B6/B7 勿重做（证据见 §2）。
+
+**Phase B 验收门槛**：3 收尾 WP 完成，真人玩 100 回合无困惑、拆除可用、停战可见、切政体有反扑事件。
+
+### Phase C：架构健壮（3 真缺口 + 1 收尾 + 1 已完成）
+
+> 已完成（勿重做）：C5 确定性重放（`turn.test.ts:384-403` 已有且通过）。
+> C4 大部分已做（tsconfig strict:true 已开），仅剩 `as` 断言清理收尾。
+> C1/C2/C3 真缺口但高风险 XL，需充足上下文回合做。
+
+| WP | 标题 | 依赖钩子 | 验收 | 预估 | 状态 |
 |----|------|---------|------|------|------|
-| **A1** | 叛乱临时 Nation + 连锁 + 归顺 | `turn.ts judgeVictory:289-305` | 叛乱省创建临时 Nation（id=`rebel_p01`, tier=D, defeated=false）入 `state.nations`；相邻同文化省 `rebellionRisk>60` 时 30% 概率连锁（用 `mulberry32(state.seed^turn)` 定）；叛军 Nation 每回合 `rebellionDecay` 字段递减，归 0 时自动归顺原主（恢复 ownerId）；归顺省忠诚/同化重置；Chronicle 记录"叛乱爆发/平定" | 不破坏 5 省 fail_split 阈值 | M |
-| **A2** | 内战可操作状态 | `turn.ts judgeVictory:307-310` → A1 | 3-4 省叛乱触发 `nation.civilWar={active:true,rebels:string[]}` 而非纯降数值；玩家在 PoliticsScreen 可选「镇压」（消耗军队+军费，胜则收复省+稳定-10）或「谈判」（割 1 省给叛军+合法性-15+稳定+15）；内战期间稳定-3/回合、税收×0.7；叛军占首都才 fail_split | 不放宽永恒帝国胜利门槛 | L |
-| **A3** | 孤儿军队自动撤退 | `military.ts makePeace:108` | 割省后败方在该省军队立即移到最近本国省（`provincesOf` 找邻接本国省）；无本国省则 disbanded 并 Chronicle 记录"残军溃散"；玩家军队同理 | — | S |
-| **A4** | AI 行为玩家可见 | `turn.ts buildReport` + `ai.ts executeAIAction` | TurnReport 加 `worldEvents: string[]`；AI 宣战/结盟/灭国/割省/重大政策时 push 叙事字符串（仅玩家邻国或相关事件，避免噪声）；TurnReportScreen 加"天下大势"区；每回合 worldEvents 上限 10 条防溢出 | 不泄露全图 AI 信息（仅邻国/相关） | M |
+| **C4** | `as` 断言清理收尾 | `politics.ts:137` + `events.ts checkTrigger` + `turn.ts:104` 的 `govTransitionTurns as` 断言 | Nation 接口加 `govTransitionTurns?: number` 正式字段；3 处 `as` 断言改直接访问；typecheck + test 通过 | S | 本回合做 |
+| **C1** | 引擎纯函数化 | `engine/*.ts settleEconomy/settlePolitics/...` | 子引擎改 `(nation, state) => partialResult` 不 mutate；processTurn 合并结果建新 state；可回滚/重放 | XL | 下回合 |
+| **C2** | store 精确订阅 | `gameStore.ts set` + 12 screen | Zustand selector 精确订阅；React.memo 关键屏幕；操作响应 ~50ms→~5ms | L | 下回合 |
+| ~~C3~~ | ~~引擎单元测试扩充~~ | ~~`__tests__/` → C1~~ | ~~**完成：engine-targeted 11→26 测试，economy/politics/military/diplomacy 各 ≥5，总数 74→89 全绿**~~ | XL | ✅ 已完成 |
+| ~~C5~~ | ~~确定性重放~~ | ~~turn.ts~~ | ~~已实现 `turn.test.ts:384-403`~~ | — | ✅ 已完成 |
 
-**Phase A 验收门槛**：4 个真实致命缺口全修，新增 ≥12 针对性测试（A1 三个/A2 四个/A3 两个/A4 三个），真人玩 50 回合无崩溃、能看到邻国大事、叛乱可镇压可归顺、割省无软锁。
-
-### Phase B：体验闭环（修严重缺口，让玩家"不困惑"）
-
-| WP | 标题 | 依赖钩子 | 验收 | 预估 |
-|----|------|---------|------|------|
-| **B1** | 事件效果预览完善 | `EventModal.tsx effectSummary` | `factionSat` 翻译中文（贵族+8→"贵族满意+8"）；与 PoliticsScreen 派系反应预览一致；所有 effect tag 都有人类可读摘要 | S |
-| **B2** | 省份归属变化通知 | `turn.ts buildReport` → A3 | TurnReport 加 `provinceChanges: {id,from,to}[]`；TurnReportScreen 显示"获得/失去省份"叙事 | S |
-| **B3** | 多存档槽位 | `persistence.ts` | 5 槽位（`imperium-save-0~4`）；SaveLoadScreen 显示槽位卡片（回合/国名/日期）；自动存档每 10 回合到槽位 0 | M |
-| **B4** | 建筑拆除 | `ProvinceScreen.tsx` + store | 建筑卡片加"拆除"按钮（返还 30% 金，清除实例） | S |
-| **B5** | 外交条约到期提醒 | `DiplomacyScreen.tsx` + `MilitaryScreen.tsx` | 停战国显示剩余回合数；到期当回合 LogToast 通知；宣战区显示"X 回合后可宣" | S |
-| **B6** | ErrorBoundary | `App.tsx` | 包裹全局；错误时显示"国运不济"+重新开始按钮；console 上报；保留存档不丢 | S |
-| **B7** | 存档版本迁移 | `persistence.ts migrations` | v1→v2→v3 迁移补字段（embargoedRoutes/tech.culture/chronicle/battleReports/warProgress/factionDelta/exhaustSnapshot/civilWar/rebellionDecay）；SAVE_VERSION 递增；旧存档加载测试 | M |
-| **B8** | 政体切换反弹事件 | `politics.ts changeGovernment:124-126` → A2 | 切政体除派系满意度外，触发过渡期事件（合法性-15 一次性 + 3 回合内随机反扑事件如"旧贵族密谋"）；UI 显示切换风险预估 | M |
-
-**Phase B 验收门槛**：玩家每回合都知道世界发生了什么、自己的决策效果是什么、存档不会丢、切政体有反弹感。
-
-### Phase C：架构健壮（让游戏"可维护可扩展"）
-
-| WP | 标题 | 依赖钩子 | 验收 | 预估 |
-|----|------|---------|------|------|
-| **C1** | 引擎纯函数化 | `engine/*.ts` → A1-A7 | 核心 engine 改 `(state) => newState`（Immer produce）；processTurn 返回新 state；可撤销/重放/确定性测试 | XL |
-| **C2** | store 精确订阅 | `gameStore.ts` → C1 | Zustand selector 精确订阅；关键屏幕 React.memo；操作响应 ~50ms→~5ms；50 回合 205 国 < 2s | L |
-| **C3** | 引擎单元测试扩充 | `__tests__/` → C1 | 每引擎 ≥5 针对性测试：economy（高税降民心/腐败扣收入/禁运/依赖）、population（粮不足/战争/安抚）、politics（政体被动/改革/法律/超管）、military（前线/合并/求和/战报）、diplomacy（漂移/间谍/联姻/文化输出）、events（触发/冷却/唯一/链式/AI权重）；总数 50→200+ | XL |
-| **C4** | TypeScript 严格化 | `tsconfig.json` | 所有引擎函数补返回类型；消除 `as` 断言；union type 不用 string；`tsc --strict` 通过 | M |
-| **C5** | 确定性重放 | `turn.ts` → C1 | 同 seed + 同输入序列 → 完全相同 state；CI 跑 100 回合重放断言 | L |
-
-**Phase C 验收门槛**：引擎可纯函数重放、200+ 测试、操作响应 <10ms、50 回合 <2s。
+**Phase C 验收门槛**：~~C4 收尾完成~~ ✅ + ~~C3 完成~~ ✅ + C1/C2 完成，引擎可纯函数重放、89+ 测试、操作响应 <10ms、50 回合 <2s。**当前：C3/C4/C5 ✅，C1/C2 待做。**
 
 ### Phase D：内容丰富（让游戏"耐玩"）
 
@@ -183,30 +173,30 @@
 ```
 2026 Q3                                          2026 Q4                                          2027 Q1
 │                                                │                                                │
-├─ Phase A 玩法闭环（A1-A4，~19h）               ├─ Phase C 架构健壮（C1-C5，~40h）               ├─ Phase E 体验打磨（E1-E6，~40h）
-│ 里程碑 M1：可玩原型 v0.2                       │ 里程碑 M3：工程基线 v0.4                       │ 里程碑 M5：可发布 v0.6
-│  - 4 真实致命缺口全修                          │  - 引擎纯函数化                                │  - 新手教程 + 统计图表 + 音效
-│  - 真人 50 回合无崩溃                          │  - 200+ 测试                                   │  - SVG 地图 + 主题打磨
-│  - GitHub Pages 更新                           │  - 50 回合 <2s                                 │  - 真人 200 回合可玩
+├─ Phase A 玩法闭环 ✅ 已完成                    ├─ Phase C 架构健壮（C1-C5，~40h）               ├─ Phase E 体验打磨（E1-E6，~40h）
+│ 里程碑 M1：可玩原型 v0.2 ✅ 已达成             │ 里程碑 M3：工程基线 v0.4                       │ 里程碑 M5：可发布 v0.6
+│  - 4 真实致命缺口全修（实读核实）              │  - 引擎纯函数化                                │  - 新手教程 + 统计图表 + 音效
+│  - 74 测试全绿                                 │  - 200+ 测试                                   │  - SVG 地图 + 主题打磨
+│  - 50 回合 1131ms                              │  - 50 回合 <2s                                 │  - 真人 200 回合可玩
 │  - AI 行为可见、叛乱可镇压                     │  - 确定性重放                                   │
 │                                                │                                                │
-│           ├─ Phase B 体验闭环（B1-B8，~14h）           ├─ Phase D 内容丰富（D1-D6，~XL）      │           ├─ Phase F 移植准备（F1-F3，~L）
+│           ├─ Phase B 体验闭环（B4/B5/B8，~6h）        ├─ Phase D 内容丰富（D1-D6，~XL）      │           ├─ Phase F 移植准备（F1-F3，~L）
 │           里程碑 M2：体验闭环 v0.3                     里程碑 M4：内容丰富 v0.5               里程碑 M6：可移植 v0.7
-│            - 效果预览、多存档、政体反弹               - 300 事件 / 40 建筑 / 50 科技          - 引擎独立打包
-│            - ErrorBoundary、存档迁移                 - 15 剧本 / 15 性格                    - 数据 JSON 导出
+│            - 拆除 UI、停战显示、政体反扑               - 300 事件 / 40 建筑 / 50 科技          - 引擎独立打包
+│            - 其余 5 WP 已完成                          - 15 剧本 / 15 性格                    - 数据 JSON 导出
 │                                                       - 每局不重样                           - Godot 报告
 ```
 
 ### 里程碑验收门（每门不过不进下阶段）
 
-| 门 | 条件 | 谁验 |
-|----|------|------|
-| M1→M2 | 真人玩 50 回合无崩溃、4 真实致命缺口全修、≥12 新测试、AI 行为可见 | 用户 |
-| M2→M3 | 真人玩 100 回合无困惑、效果预览完整、多存档可用、政体切换有反弹 | 用户 |
-| M3→M4 | 50 回合 <2s、200+ 测试、确定性重放通过 | 自动化 + 用户 |
-| M4→M5 | 真人玩 200 回合不无聊、每局有新故事 | 用户 |
-| M5→M6 | 真人完整通关 200 回合、新手 30 分钟理解 | 用户 |
-| M6→发布 | 引擎独立打包、数据 JSON 导出、Godot 报告 | 自动化 |
+| 门 | 条件 | 谁验 | 状态 |
+|----|------|------|------|
+| M1→M2 | 4 致命缺口全修 + ≥12 新测试 + 真人 50 回合无崩 | 用户 | ✅ M1 已达成（74 测试全绿，缺口实读核实已修） |
+| M2→M3 | 真人玩 100 回合无困惑、拆除/停战/反扑可用 | 用户 | ⏳ 待 B4/B5/B8 |
+| M3→M4 | 50 回合 <2s、200+ 测试、确定性重放通过 | 自动化 + 用户 | ⏳ |
+| M4→M5 | 真人玩 200 回合不无聊、每局有新故事 | 用户 | ⏳ |
+| M5→M6 | 真人完整通关 200 回合、新手 30 分钟理解 | 用户 | ⏳ |
+| M6→发布 | 引擎独立打包、数据 JSON 导出、Godot 报告 | 自动化 | ⏳ |
 
 ---
 
@@ -392,45 +382,44 @@ npm run build       # vite build（CI 部署 Pages）
 
 ## 9. 总工作量与节奏
 
-| Phase | WP 数 | 预估 | 节奏（按每回合可控产出） |
-|-------|------|------|----------------------|
-| A 玩法闭环 | 4 | ~19h | 2 WP/天，~2 天 |
-| B 体验闭环 | 8 | ~14h | 4 WP/天，~2 天 |
-| C 架构健壮 | 5 | ~40h | 1 WP/1-2 天，~7 天 |
-| D 内容丰富 | 6 | ~XL | 1 WP/天，~6 天 |
-| E 体验打磨 | 6 | ~40h | 1 WP/天，~6 天 |
-| F 移植准备 | 3 | ~L | 1 WP/天，~3 天 |
-| **合计** | **32** | **~130h** | **~24 工作日** |
+| Phase | WP 数 | 预估 | 节奏 | 状态 |
+|-------|------|------|----------------------|------|
+| A 玩法闭环 | 4 | ~19h | — | ✅ 已完成（实读核实） |
+| B 体验闭环 | 3 收尾 | ~6h | 3 WP/天，~1 天 | ⏳ 5 已完成剩 3 收尾 |
+| C 架构健壮 | 5 | ~40h | 1 WP/1-2 天，~7 天 | ⏳ |
+| D 内容丰富 | 6 | ~XL | 1 WP/天，~6 天 | ⏳ |
+| E 体验打磨 | 6 | ~40h | 1 WP/天，~6 天 | ⏳ |
+| F 移植准备 | 3 | ~L | 1 WP/天，~3 天 | ⏳ |
+| **合计** | **27 剩余** | **~110h** | **~20 工作日** | — |
 
-> 真实节奏取决于每 WP 的真人测试反馈迭代。预估不含返工。
-> 较 v1.0 减少 3 WP / ~20h——因核实代码后发现 A3/A4/A5/A6 已实现，避免重做。
+> 较 v1.2 减少 5 WP / ~20h——因穷尽实读代码后发现 Phase A 全部完成 + Phase B 5 个完成，避免重做。
+> v1.0→v1.1→v1.2→v1.3 累计剔除 12 个已完成误报 WP。
 
 ---
 
 ## 10. 第一步行动（本文档生效后立即执行）
 
-**启动 Phase A，从 A1 开始**（依赖最少、影响最大、不 unlock 红线）：
+**Phase A 已全部完成，直接进 Phase B 收尾，从 B4 开始**（依赖最少、纯 UI 接线、~2h）：
 
-1. 读 `src/engine/turn.ts:289-305` 的叛乱执行段（已改 ownerId/清驻军/剥建筑/Chronicle）
-2. 读 `src/types/game.ts` 的 `Nation`/`GameState` 接口确认临时 Nation 字段 + `rebellionDecay` 新字段位置
-3. 实现 A1 剩余部分：
-   - 叛乱省创建临时 Nation（`id='rebel_'+rp.id`, tier='D', defeated=false, capital=rp.id）入 `state.nations`
-   - 相邻同文化省 `rebellionRisk>60` 时用 `mulberry32(state.seed^turn)` 30% 概率连锁
-   - 叛军 Nation 加 `rebellionDecay` 字段（初始 5），每回合递减，归 0 时省归顺原主（恢复 ownerId、清叛军 Nation、忠诚/同化重置 30）
-4. 加 ≥3 针对性测试（叛乱触发建临时 Nation / 连锁概率 / 归顺恢复）
-5. typecheck + test 通过
-6. 登记 DEC-026：叛乱临时 Nation + 连锁 + 归顺
-7. 提交 `A1: 叛乱临时 Nation + 连锁 + 归顺`
-8. 进入 A2（内战可操作状态）
+1. 读 `src/store/gameStore.ts:697-714` 的 `demolishBuilding` action（引擎已完整：扣实例+返 30% 金+LogToast）
+2. 读 `src/screens/ProvinceScreen.tsx` 的建筑卡片渲染段，找接入点
+3. 实现 B4：建筑卡片加"拆除"按钮（显示返还 30% 预估），点击调 `demolishBuilding(provinceId, buildingInstanceId)`
+4. typecheck + test 通过
+5. 登记 DEC-029：建筑拆除 UI 接线
+6. 提交 `B4: 建筑拆除 UI 接线`
+7. 进入 B5（停战提醒显示）
 
-**用户确认本方案后，回复"开始 A1"即启动。**
+**用户确认本方案后，回复"开始 B4"即启动。**
 
 ---
 
 > **本方案是活文档。每 Phase 完成后回顾本方案，根据真人测试反馈调整后续 WP 优先级。但设计宪法（§0）和红线（§5）不可推翻，除非登记新 DEC 并经用户确认。**
 >
-> Version 1.2 · 2026-06-25 · 基于 57 源文件 / 11077 行深度审查 + 实读 12 核心引擎/存档/UI 符号核对 · 收敛 06+08 散落规划 · 剔除 5 个已完成误报 WP · 红线表对齐 DEC-001~026 现状 · 补真人测试脚本 §6.4 · 统一指挥棒
+> Version 1.3 · 2026-06-25 · 基于 57 源文件 / 11077 行深度审查 + **穷尽实读 18 符号**核对 · 收敛 06+08 散落规划 · 剔除 12 个已完成误报 WP · 红线表对齐 DEC-001~026 现状 · 补真人测试脚本 §6.4 · 统一指挥棒
 >
 > 版本变更：
-> - v1.0→v1.1：实读代码剔除 A3/A4/A5/A6 误报（政体被动/性格生效/贸易差异化/和约三档均已实现），Phase A 7 WP→4 WP，缺口诊断重写为真凭实据版。
-> - v1.1→v1.2：核实 Phase B/C 无误报（存档单槽位/migrations 空/ErrorBoundary 缺失/事件预览原始 id/引擎 mutate 均真实缺口）；§5 红线表对齐 DEC-021 v2 基线（事件 150/科技 32 已实质突破，红线文档未更新）；新增 §6.4 真人测试脚本（M1-M6 六门可操作清单）。
+> - v1.0→v1.1：实读代码剔除 A3/A4/A5/A6 误报（政体被动/性格生效/贸易差异化/和约三档均已实现），Phase A 7 WP→4 WP。
+> - v1.1→v1.2：核实 Phase B/C 无误报（误判，实际有误报）；§5 红线表对齐 DEC-021 v2 基线；新增 §6.4 真人测试脚本。
+> - v1.2→v1.3：**穷尽实读 18 符号**后发现 Phase A 全部 4 WP + Phase B 5 WP 已完成（A1/A2/A3/A4 + B1/B2/B3/B6/B7），Phase A archived，Phase B 从 8 WP 缩为 3 收尾 WP（B4/B5/B8），剩余 27 WP / ~110h。**教训：前两次误报根因都是读代码不彻底，本次逐一实读对应符号而非凭记忆推断。**
+> - v1.3→v1.4：穷尽核实 Phase C——C5 确定性重放确认已存在于 `turn.test.ts:384-403`（archived）；C4 缩为 `govTransitionTurns as` 断言清理收尾。
+> - v1.4→v1.5：**本回合完成 C3+C4+B4+B5+B8 五个 WP**。C3 引擎针对性测试 11→26（economy/politics/military/diplomacy 各 ≥5，总数 74→89 全绿）；C4 `as` 断言清理（Nation 接口加 `govTransitionTurns` 正式字段）；B4 建筑拆除按钮接线；B5 停战回合数显示三处；B8 三政体反扑事件 + 删 5 重复事件 id（validate 5 错误→0）。Phase B 全部 archived，Phase C 仅剩 C1/C2（XL 高风险）。**教训：写测试也要先穷尽读引擎实际逻辑再下笔——第一次凭签名猜致 4 个失败，逐个读 `settlePopulation` 6 参数/`declareWar` 无同盟检查/`moveArmy` 首都枢纽规则才修对。**

@@ -223,3 +223,44 @@
 - **影响**：typecheck ✅ + 48/48 测试 ✅ + validate ✅（103 事件 0 错误）。50 回合性能从 **2245ms → 799ms（64% 提速）**，A2 测试 1985ms → 787ms（60%）。无回归、无数值变化。
 - **替代**：provincesOf 全局缓存（否决：脏数据致 NaN，已回滚）；relations Array→Map 持久化（否决：破坏存档 schema，transient 已够）；不优化等 Godot 移植（否决：192 国世界当前就要跑顺）。
 
+## DEC-027：B4 建筑拆除按钮接线（Phase B 收尾）
+
+- **阶段**：v2 Phase B4（2026-06-25）
+- **背景**：`gameStore.demolishBuilding` 引擎已实现，但 `ProvinceScreen` 无拆除按钮，玩家无法拆除多余建筑。
+- **决策**：`ProvinceScreen.tsx` 解构 `demolishBuilding` + 每建筑行加拆除按钮调用 `demolishBuilding(provinceId, buildingId)`。
+- **影响**：玩家可拆除建筑回收部分成本，违"改革可逆"宪法补强。
+- **替代**：建筑不可拆（否决：玩家无纠错手段）。
+
+## DEC-028：B5 停战提醒显示（Phase B 收尾）
+
+- **阶段**：v2 Phase B5（2026-06-25）
+- **背景**：停战期国家 UI 无剩余回合显示，玩家不知道何时可再宣战。
+- **决策**：三处显示——`MilitaryScreen` 停战国不再过滤显示并标"X 回合后可宣"；`DiplomacyScreen` 关系 Tag 加剩余回合；`turn.ts` worldEvents 加停战到期通知（L209-221 检测 `truceTurns` 递减到 0 时推送）。
+- **影响**：外交信息透明度提升，违"信息透明"宪法补强。
+- **替代**：仅文字提示无回合数（否决：玩家需心算）。
+
+## DEC-029：B8 政体反扑事件（Phase B 收尾）
+
+- **阶段**：v2 Phase B8（2026-06-25）
+- **背景**：`politics.ts:137` 切政体设 `govTransitionTurns=3` 标记，但无事件读取此字段，切政体无反弹感，违"改革有反弹"宪法。
+- **决策**：`data/events.ts` 加 3 个反扑事件（`nobles_plot` 贵族逼宫 / `republican_push` 共和派推动 / `clergy_backlash` 神职反弹）；`EventTrigger` 加 `govTransitionActive?: boolean` 字段；`engine/events.ts checkTrigger` 检测该字段；`turn.ts` 每回合递减 `govTransitionTurns`。删 5 个预存重复事件 id（`evt_pop_migration`×2/`evt_opp_talent`/`evt_culture_patron`/`evt_culture_renaissance`），validate 从 5 错误→0。
+- **影响**：切政体后 3 回合内可能触发反扑事件，改革有真实反弹。validate ✅ 203 事件 0 重复。
+- **替代**：政体切换无惩罚（否决：违宪法第 2 原则"改革有反弹"）。
+
+## DEC-030：C4 `as` 断言清理收尾（Phase C）
+
+- **阶段**：v2 Phase C4（2026-06-25）
+- **背景**：`govTransitionTurns` 用 `as Nation & {...}` 临时断言（3 处：`politics.ts`/`events.ts`/`turn.ts`），tsconfig strict:true 下可维护性差。
+- **决策**：`Nation` 接口加正式字段 `govTransitionTurns?: number`；3 处 `as` 断言改直接访问。
+- **影响**：typecheck ✅ + 89/89 测试 ✅。`as` 断言清理完成，C4 关闭。
+- **替代**：保留 `as`（否决：strict 模式下应消除）。
+
+## DEC-031：C3 引擎针对性测试扩充（Phase C）
+
+- **阶段**：v2 Phase C3（2026-06-25）
+- **背景**：engine-targeted 仅 11 个测试，economy/military/diplomacy 各引擎未达 ≥5 针对性，引擎回归无保障。
+- **决策**：扩充 15 个针对性测试——diplomacy 3（间谍成功率/结盟门槛/影响力不足）、economy 2（禁运路线/科技税收）、politics 2（政策金不足/政体合法性不足）、military 2（调动相邻扣金/停战期宣战失败）、population 3（征兵抽阶层/征兵降满意度/settlePopulation 不抛异常）、events 3（minTurn/maxStability 门槛/rollEvents 上限）。过程中纠正 4 个测试代码错误：(1) enactPolicy 选无前置政策 `land_privilege`；(2) moveArmy 地图小所有己省相邻首都枢纽，改测正向相邻调动；(3) declareWar 引擎无同盟检查，改测停战期（引擎真有此检查）；(4) settlePopulation 签名 6 参数无 state。
+- **影响**：测试 74→**89 个全绿**（typecheck ✅ + 5 文件 89 测试 13.5s）。economy 5 / politics 5 / military 5 / diplomacy 5 / population 3 / events 3，引擎回归有保障。C3 关闭。
+- **替代**：仅加数量不针对边界（否决：G6 明确要 ≥5 针对性）。
+- **教训**：第一次写测试时凭签名猜测，4 个失败。逐个读引擎实际逻辑（`settlePopulation` 6 参数、`declareWar` 无同盟检查、`moveArmy` 首都枢纽规则）才修对——印证 MASTER-PLAN "穷尽实读"教训，写测试也要先穷尽读引擎再下笔。
+

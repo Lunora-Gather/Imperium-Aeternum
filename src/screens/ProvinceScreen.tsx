@@ -37,7 +37,7 @@ function provStatus(p: Province): 'good' | 'warn' | 'danger' | 'neutral' {
 }
 
 export default function ProvinceScreen() {
-  const { state, build, recruit, upgradeBuilding, developProvince } = useGameStore();
+  const { state, build, recruit, upgradeBuilding, demolishBuilding, developProvince } = useGameStore();
   const pid = state.playerNationId;
   const player = state.nations[pid];
   const provs = provincesOf(pid, state.provinces);
@@ -123,6 +123,8 @@ export default function ProvinceScreen() {
                   const def = BUILDINGS[b.defId];
                   const upgCost = def ? Math.round(def.costGold * 0.6 * b.level) : 0;
                   const canUpg = b.level < 3 && (player?.resources.gold ?? 0) >= upgCost;
+                  // B4: 拆除返还 30% × 等级（与 gameStore demolishBuilding 公式一致）
+                  const demolishRefund = def ? Math.round(def.costGold * 0.3 * b.level) : 0;
                   return (
                     <div key={b.id} style={{ display: 'inline-flex', gap: 4, alignItems: 'center' }}>
                       <Tag text={`${def?.name ?? b.defId} Lv${b.level}`} tone={b.level >= 3 ? 'good' : 'info'} />
@@ -133,6 +135,8 @@ export default function ProvinceScreen() {
                           →{def.yield.gold ? `+${def.yield.gold}金` : ''}{def.yield.food ? `+${def.yield.food}粮` : ''}{def.yield.influence ? `+${def.yield.influence}影` : ''}{def.yield.sciPt ? `+${def.yield.sciPt}科` : ''}{def.yield.supply ? `+${def.yield.supply}补` : ''}
                         </span>
                       )}
+                      {/* B4: 拆除按钮——返还 30% × 等级金，清除实例 */}
+                      <Btn label={`拆除 +${demolishRefund}金`} variant="ghost" warn onClick={() => demolishBuilding(prov.id, b.id)} />
                     </div>
                   );
                 })}

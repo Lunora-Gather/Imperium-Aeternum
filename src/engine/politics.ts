@@ -134,7 +134,7 @@ export function changeGovernment(nation: Nation, newGov: GovernmentId, state: Ga
   }
   // B8: 标记反扑窗口——3 回合内可能触发反扑事件（events.ts 检测）
   nation.civilWar = nation.civilWar ?? undefined;  // 保持 civilWar 不变
-  (nation as Nation & { govTransitionTurns?: number }).govTransitionTurns = 3;
+  nation.govTransitionTurns = 3;
   return true;
 }
 

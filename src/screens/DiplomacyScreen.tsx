@@ -172,7 +172,7 @@ export default function DiplomacyScreen() {
                     <strong style={{ fontSize: 14 }}>{n.name}</strong>
                     <div style={{ fontSize: 11, color: 'var(--text-mute)' }}>{n.government.type} · {n.character} · {n.tier}级</div>
                   </div>
-                  <Tag text={TREATY_LABEL[rel.treaty] ?? rel.treaty} tone={treatyTone} />
+                  <Tag text={rel.treaty === 'truce' && rel.truceTurns > 0 ? `${TREATY_LABEL[rel.treaty]} ${rel.truceTurns}回` : TREATY_LABEL[rel.treaty] ?? rel.treaty} tone={treatyTone} />
                 </div>
                 {/* 三条关系 */}
                 <RelBar label="关系" value={relation} tone={relTone} />

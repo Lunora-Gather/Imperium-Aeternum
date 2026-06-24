@@ -254,7 +254,17 @@ export default function MilitaryScreen() {
             if (!adj || adj.ownerId === pid) return null;
             const rel = findRelationExplicit(pid, adj.ownerId, state);
             if (rel?.treaty === 'alliance') return null;
-            if (rel?.treaty === 'truce' && rel.truceTurns > 0) return null;
+            // B5: 停战期国家显示"X 回合后可宣"行（不再隐式过滤）
+            if (rel?.treaty === 'truce' && rel.truceTurns > 0) {
+              const enemy = state.nations[adj.ownerId];
+              return (
+                <div key={`${p.id}-${adjId}`} style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 60px', gap: 8, padding: '8px 0', borderBottom: '1px solid var(--border)', alignItems: 'center', opacity: 0.6 }}>
+                  <span style={{ fontSize: 12 }}>邻省 <strong>{adj.name}</strong> <span className="dim">属 {enemy?.name ?? adj.ownerId}</span></span>
+                  <span style={{ fontSize: 12, color: 'var(--warn)' }}>停战 {rel.truceTurns} 回合</span>
+                  <Tag text="停战" tone="warn" />
+                </div>
+              );
+            }
             const relation = rel?.relation ?? 0;
             const tone = relation < -30 ? 'danger' : relation < 30 ? 'warn' : 'good';
             // E11: 战力对比预览

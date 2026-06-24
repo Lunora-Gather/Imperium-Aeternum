@@ -51,6 +51,10 @@ export function checkTrigger(trigger: EventTrigger, nation: Nation, state: GameS
     const r = getRelationObj(nation.id, trigger.relationBelow!.target, state);
     if (!r || r.relation >= trigger.relationBelow.threshold) return false;
   }
+  // B8: 政体切换反扑窗口检测
+  if (trigger.govTransitionActive) {
+    if (!nation.govTransitionTurns || nation.govTransitionTurns <= 0) return false;
+  }
   return true;
 }
 
