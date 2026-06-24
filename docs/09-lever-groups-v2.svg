@@ -1,0 +1,274 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1400 1800" font-family="Microsoft YaHei, sans-serif">
+  <defs>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto"><path d="M0,0 L0,6 L9,3 z" fill="#444"/></marker>
+    <marker id="arrowRed" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto"><path d="M0,0 L0,6 L9,3 z" fill="#c0392b"/></marker>
+    <marker id="arrowGreen" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto"><path d="M0,0 L0,6 L9,3 z" fill="#27ae60"/></marker>
+    <marker id="arrowPurple" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto"><path d="M0,0 L0,6 L9,3 z" fill="#8e24aa"/></marker>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%"><feGaussianBlur in="SourceAlpha" stdDeviation="2"/><feOffset dx="1" dy="1" result="ob"/><feFlood flood-color="#000" flood-opacity="0.25"/><feComposite in2="ob" operator="in"/><feMerge><feMergeNode/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+  </defs>
+
+  <rect width="1400" height="1800" fill="#fafafa"/>
+
+  <!-- 总标题 -->
+  <text x="700" y="40" text-anchor="middle" font-size="30" font-weight="bold" fill="#2c3e50">Imperium Aeternum — 杆组耦合图集 v2</text>
+  <text x="700" y="65" text-anchor="middle" font-size="14" fill="#7f8c8d">分层配图 · 五大杆组 · 三种耦合形态 · 联军反制闭环</text>
+
+  <!-- ════════ 图 1：五大杆组总览（顶部） ════════ -->
+  <text x="700" y="100" text-anchor="middle" font-size="18" font-weight="bold" fill="#34495e">图 1 · 五大杆组总览</text>
+
+  <!-- 五大杆组色块横排 -->
+  <g transform="translate(80,120)">
+    <rect width="220" height="130" rx="8" fill="#fff8e1" stroke="#f39c12" stroke-width="2" filter="url(#shadow)"/>
+    <text x="110" y="25" text-anchor="middle" font-size="15" font-weight="bold" fill="#e67e22">① 财政杆组</text>
+    <text x="110" y="48" text-anchor="middle" font-size="11" fill="#555">主杆：税率 / 建设 / 贸易</text>
+    <line x1="20" y1="68" x2="200" y2="68" stroke="#f39c12" stroke-width="4" stroke-linecap="round"/>
+    <circle cx="20" cy="68" r="6" fill="#f39c12"/><circle cx="200" cy="68" r="6" fill="#f39c12"/>
+    <text x="110" y="90" text-anchor="middle" font-size="10" fill="#c0392b">联动：满意度↓ 腐败↑ 贸易↓</text>
+    <text x="110" y="108" text-anchor="middle" font-size="10" fill="#c0392b">阻尼：腐败吞收入</text>
+    <text x="110" y="123" text-anchor="middle" font-size="9" fill="#27ae60">✅ 闭环</text>
+  </g>
+  <g transform="translate(320,120)">
+    <rect width="220" height="130" rx="8" fill="#fce4ec" stroke="#e91e63" stroke-width="2" filter="url(#shadow)"/>
+    <text x="110" y="25" text-anchor="middle" font-size="15" font-weight="bold" fill="#c2185b">② 军事杆组</text>
+    <text x="110" y="48" text-anchor="middle" font-size="11" fill="#555">主杆：征兵 / 宣战 / 动员</text>
+    <line x1="20" y1="68" x2="200" y2="68" stroke="#e91e63" stroke-width="4" stroke-linecap="round"/>
+    <circle cx="20" cy="68" r="6" fill="#e91e63"/><circle cx="200" cy="68" r="6" fill="#e91e63"/>
+    <text x="110" y="90" text-anchor="middle" font-size="10" fill="#c0392b">联动：厌战↑ 粮耗↑ 人口↓</text>
+    <text x="110" y="108" text-anchor="middle" font-size="10" fill="#c0392b">阻尼：厌战→兵变 + 和约</text>
+    <text x="110" y="123" text-anchor="middle" font-size="9" fill="#27ae60">✅ 闭环</text>
+  </g>
+  <g transform="translate(560,120)">
+    <rect width="220" height="130" rx="8" fill="#e8f5e9" stroke="#27ae60" stroke-width="2" filter="url(#shadow)"/>
+    <text x="110" y="25" text-anchor="middle" font-size="15" font-weight="bold" fill="#1b5e20">③ 扩张杆组</text>
+    <text x="110" y="48" text-anchor="middle" font-size="11" fill="#555">主杆：占省 / 附庸 / 建设</text>
+    <line x1="20" y1="68" x2="200" y2="68" stroke="#27ae60" stroke-width="4" stroke-linecap="round"/>
+    <circle cx="20" cy="68" r="6" fill="#27ae60"/><circle cx="200" cy="68" r="6" fill="#27ae60"/>
+    <text x="110" y="90" text-anchor="middle" font-size="10" fill="#c0392b">联动：行政超载 文化冲突</text>
+    <text x="110" y="108" text-anchor="middle" font-size="10" fill="#c0392b">阻尼：overExtension + 分裂</text>
+    <text x="110" y="123" text-anchor="middle" font-size="9" fill="#27ae60">✅ 闭环</text>
+  </g>
+  <g transform="translate(800,120)">
+    <rect width="220" height="130" rx="8" fill="#e3f2fd" stroke="#1976d2" stroke-width="2" filter="url(#shadow)"/>
+    <text x="110" y="25" text-anchor="middle" font-size="15" font-weight="bold" fill="#0d47a1">④ 改革杆组</text>
+    <text x="110" y="48" text-anchor="middle" font-size="11" fill="#555">主杆：政策 / 法律 / 政体</text>
+    <line x1="20" y1="68" x2="200" y2="68" stroke="#1976d2" stroke-width="4" stroke-linecap="round"/>
+    <circle cx="20" cy="68" r="6" fill="#1976d2"/><circle cx="200" cy="68" r="6" fill="#1976d2"/>
+    <text x="110" y="90" text-anchor="middle" font-size="10" fill="#c0392b">联动：派系反弹 改革冲击</text>
+    <text x="110" y="108" text-anchor="middle" font-size="10" fill="#c0392b">阻尼：reformCost 倍率</text>
+    <text x="110" y="123" text-anchor="middle" font-size="9" fill="#27ae60">✅ 闭环</text>
+  </g>
+  <g transform="translate(1040,120)">
+    <rect width="220" height="130" rx="8" fill="#f3e5f5" stroke="#8e24aa" stroke-width="2" filter="url(#shadow)"/>
+    <text x="110" y="25" text-anchor="middle" font-size="15" font-weight="bold" fill="#4a148c">⑤ 外交杆组</text>
+    <text x="110" y="48" text-anchor="middle" font-size="11" fill="#555">主杆：结盟 / 制裁 / 间谍</text>
+    <line x1="20" y1="68" x2="200" y2="68" stroke="#8e24aa" stroke-width="4" stroke-linecap="round"/>
+    <circle cx="20" cy="68" r="6" fill="#8e24aa"/><circle cx="200" cy="68" r="6" fill="#8e24aa"/>
+    <text x="110" y="90" text-anchor="middle" font-size="10" fill="#c0392b">联动：信任↓ 威胁↑ 贸易依赖</text>
+    <text x="110" y="108" text-anchor="middle" font-size="10" fill="#c0392b">阻尼：联军反制</text>
+    <text x="110" y="123" text-anchor="middle" font-size="9" fill="#27ae60">✅ 闭环（本轮新增）</text>
+  </g>
+
+  <!-- ════════ 图 2：财政杆组深度配图 ════════ -->
+  <text x="700" y="300" text-anchor="middle" font-size="18" font-weight="bold" fill="#e67e22">图 2 · 财政杆组深度配图（环型自反馈）</text>
+
+  <!-- 税率杆居中 -->
+  <g transform="translate(700,400)">
+    <rect x="-90" y="-20" width="180" height="40" rx="6" fill="#fff3e0" stroke="#e67e22" stroke-width="2" filter="url(#shadow)"/>
+    <text x="0" y="6" text-anchor="middle" font-size="14" font-weight="bold" fill="#e67e22">税率 ↑（玩家拉杆）</text>
+  </g>
+
+  <!-- 左分支：金+ -->
+  <path d="M 610 400 Q 500 400 450 350" stroke="#27ae60" stroke-width="2" fill="none" marker-end="url(#arrowGreen)"/>
+  <g transform="translate(370,330)">
+    <rect width="160" height="40" rx="6" fill="#e8f5e9" stroke="#27ae60" stroke-width="2"/>
+    <text x="80" y="25" text-anchor="middle" font-size="12" font-weight="bold" fill="#1b5e20">国库金 +（短期收益）</text>
+  </g>
+
+  <!-- 右分支：满意度- -->
+  <path d="M 790 400 Q 900 400 950 350" stroke="#e67e22" stroke-width="2" fill="none" marker-end="url(#arrow)"/>
+  <g transform="translate(870,330)">
+    <rect width="160" height="40" rx="6" fill="#fff3e0" stroke="#e67e22" stroke-width="2"/>
+    <text x="80" y="25" text-anchor="middle" font-size="12" font-weight="bold" fill="#e65100">民众满意度 −（联动 1）</text>
+  </g>
+
+  <!-- 满意度→不满→叛乱 -->
+  <path d="M 950 370 L 950 420" stroke="#c0392b" stroke-width="2" fill="none" marker-end="url(#arrowRed)"/>
+  <g transform="translate(870,420)">
+    <rect width="160" height="40" rx="6" fill="#ffebee" stroke="#c0392b" stroke-width="2"/>
+    <text x="80" y="25" text-anchor="middle" font-size="12" fill="#b71c1c">不满度 + → 叛乱风险 +</text>
+  </g>
+
+  <!-- 左分支：人口增长- -->
+  <path d="M 450 370 L 450 420" stroke="#c0392b" stroke-width="2" fill="none" marker-end="url(#arrowRed)"/>
+  <g transform="translate(370,420)">
+    <rect width="160" height="40" rx="6" fill="#ffebee" stroke="#c0392b" stroke-width="2"/>
+    <text x="80" y="25" text-anchor="middle" font-size="12" fill="#b71c1c">人口增长 −（联动 3，跨回合）</text>
+  </g>
+
+  <!-- 环型反噬回路：人口→税基→金 -->
+  <path d="M 450 460 Q 300 500 300 560 Q 300 620 450 640" stroke="#c0392b" stroke-width="2" stroke-dasharray="5,3" fill="none" marker-end="url(#arrowRed)"/>
+  <g transform="translate(240,580)">
+    <rect width="120" height="40" rx="6" fill="#fce4ec" stroke="#c0392b" stroke-width="2"/>
+    <text x="60" y="25" text-anchor="middle" font-size="11" fill="#b71c1c">税基 ↓ → 金 ↓（反噬）</text>
+  </g>
+
+  <!-- 阻尼标注 -->
+  <g transform="translate(700,580)">
+    <rect x="-130" y="-20" width="260" height="50" rx="6" fill="#fff8e1" stroke="#f39c12" stroke-width="2" filter="url(#shadow)"/>
+    <text x="0" y="0" text-anchor="middle" font-size="13" font-weight="bold" fill="#e67e22">阻尼：腐败吞收入</text>
+    <text x="0" y="20" text-anchor="middle" font-size="10" fill="#555">corruptionLoss = tax × corruption/100</text>
+  </g>
+
+  <!-- ════════ 图 3：军事杆组深度配图（串型链式） ════════ -->
+  <text x="700" y="700" text-anchor="middle" font-size="18" font-weight="bold" fill="#c2185b">图 3 · 军事杆组深度配图（串型链式反噬）</text>
+
+  <!-- 链式节点 -->
+  <g transform="translate(100,750)">
+    <rect width="140" height="50" rx="6" fill="#fce4ec" stroke="#e91e63" stroke-width="2" filter="url(#shadow)"/>
+    <text x="70" y="30" text-anchor="middle" font-size="13" font-weight="bold" fill="#c2185b">宣战</text>
+  </g>
+  <path d="M 240 775 L 290 775" stroke="#e91e63" stroke-width="2" fill="none" marker-end="url(#arrow)"/>
+  <g transform="translate(290,750)">
+    <rect width="140" height="50" rx="6" fill="#fce4ec" stroke="#e91e63" stroke-width="2"/>
+    <text x="70" y="30" text-anchor="middle" font-size="13" fill="#c2185b">厌战 ↑</text>
+  </g>
+  <path d="M 430 775 L 480 775" stroke="#e91e63" stroke-width="2" fill="none" marker-end="url(#arrow)"/>
+  <g transform="translate(480,750)">
+    <rect width="140" height="50" rx="6" fill="#fce4ec" stroke="#e91e63" stroke-width="2"/>
+    <text x="70" y="30" text-anchor="middle" font-size="13" fill="#c2185b">稳定 ↓</text>
+  </g>
+  <path d="M 620 775 L 670 775" stroke="#e91e63" stroke-width="2" fill="none" marker-end="url(#arrow)"/>
+  <g transform="translate(670,750)">
+    <rect width="140" height="50" rx="6" fill="#fce4ec" stroke="#e91e63" stroke-width="2"/>
+    <text x="70" y="30" text-anchor="middle" font-size="13" fill="#c2185b">叛乱 ↑</text>
+  </g>
+  <path d="M 810 775 L 860 775" stroke="#e91e63" stroke-width="2" fill="none" marker-end="url(#arrow)"/>
+  <g transform="translate(860,750)">
+    <rect width="140" height="50" rx="6" fill="#fce4ec" stroke="#e91e63" stroke-width="2"/>
+    <text x="70" y="30" text-anchor="middle" font-size="13" fill="#c2185b">粮耗 ↑</text>
+  </g>
+  <path d="M 1000 775 L 1050 775" stroke="#e91e63" stroke-width="2" fill="none" marker-end="url(#arrow)"/>
+  <g transform="translate(1050,750)">
+    <rect width="140" height="50" rx="6" fill="#fce4ec" stroke="#e91e63" stroke-width="2"/>
+    <text x="70" y="30" text-anchor="middle" font-size="13" fill="#c2185b">人口 ↓</text>
+  </g>
+
+  <!-- 阻尼标注 -->
+  <g transform="translate(500,840)">
+    <rect x="-130" y="-20" width="260" height="50" rx="6" fill="#fff8e1" stroke="#f39c12" stroke-width="2" filter="url(#shadow)"/>
+    <text x="0" y="0" text-anchor="middle" font-size="13" font-weight="bold" fill="#e67e22">阻尼：厌战→兵变 + 和约条件</text>
+    <text x="0" y="20" text-anchor="middle" font-size="10" fill="#555">warExhaustion += warCostPerTurn(...)</text>
+  </g>
+
+  <!-- ════════ 图 4：对冲杆组配图（双杆博弈） ════════ -->
+  <text x="700" y="930" text-anchor="middle" font-size="18" font-weight="bold" fill="#1976d2">图 4 · 对冲杆组配图（双杆博弈）</text>
+
+  <!-- 左杆：安抚 -->
+  <g transform="translate(200,980)">
+    <rect width="240" height="140" rx="8" fill="#e3f2fd" stroke="#1976d2" stroke-width="2" filter="url(#shadow)"/>
+    <text x="120" y="25" text-anchor="middle" font-size="14" font-weight="bold" fill="#0d47a1">拉杆甲：安抚民众</text>
+    <text x="120" y="50" text-anchor="middle" font-size="11" fill="#27ae60">✓ 满意度 +</text>
+    <text x="120" y="70" text-anchor="middle" font-size="11" fill="#c0392b">成本：金 −</text>
+    <text x="120" y="90" text-anchor="middle" font-size="11" fill="#c0392b">副作用：腐败 +</text>
+    <text x="120" y="120" text-anchor="middle" font-size="10" fill="#7f8c8d">appease（gameStore）</text>
+  </g>
+
+  <!-- 右杆：镇压 -->
+  <g transform="translate(960,980)">
+    <rect width="240" height="140" rx="8" fill="#e3f2fd" stroke="#1976d2" stroke-width="2" filter="url(#shadow)"/>
+    <text x="120" y="25" text-anchor="middle" font-size="14" font-weight="bold" fill="#0d47a1">拉杆乙：镇压叛乱</text>
+    <text x="120" y="50" text-anchor="middle" font-size="11" fill="#27ae60">✓ 叛乱 −</text>
+    <text x="120" y="70" text-anchor="middle" font-size="11" fill="#c0392b">成本：粮 −</text>
+    <text x="120" y="90" text-anchor="middle" font-size="11" fill="#c0392b">副作用：军方↑ / 民众↓</text>
+    <text x="120" y="120" text-anchor="middle" font-size="10" fill="#7f8c8d">suppress（gameStore）</text>
+  </g>
+
+  <!-- 中间对冲符号 -->
+  <g transform="translate(700,1050)">
+    <circle cx="0" cy="0" r="40" fill="#fff" stroke="#1976d2" stroke-width="2" filter="url(#shadow)"/>
+    <text x="0" y="-5" text-anchor="middle" font-size="20" font-weight="bold" fill="#1976d2">vs</text>
+    <text x="0" y="15" text-anchor="middle" font-size="9" fill="#555">互斥预算</text>
+  </g>
+  <path d="M 440 1050 L 660 1050" stroke="#1976d2" stroke-width="2" fill="none" marker-end="url(#arrow)"/>
+  <path d="M 960 1050 L 740 1050" stroke="#1976d2" stroke-width="2" fill="none" marker-end="url(#arrow)"/>
+
+  <text x="700" y="1130" text-anchor="middle" font-size="12" fill="#555" font-style="italic">没有免费午餐 · 两杆方向相反 · 玩家选节奏而非选"对错"</text>
+
+  <!-- ════════ 图 5：联军反制配图（外交杆组闭环） ════════ -->
+  <text x="700" y="1200" text-anchor="middle" font-size="18" font-weight="bold" fill="#8e24aa">图 5 · 联军反制配图（外交杆组阻尼 · 本轮新增闭环）</text>
+
+  <!-- 中央威胁国 -->
+  <g transform="translate(700,1300)">
+    <circle cx="0" cy="0" r="55" fill="#f3e5f5" stroke="#8e24aa" stroke-width="3" filter="url(#shadow)"/>
+    <text x="0" y="-5" text-anchor="middle" font-size="13" font-weight="bold" fill="#4a148c">威胁国</text>
+    <text x="0" y="15" text-anchor="middle" font-size="11" fill="#4a148c">威胁值 ≥70</text>
+  </g>
+
+  <!-- 周围抵制邻国（≥3） -->
+  <g transform="translate(450,1240)">
+    <rect width="140" height="50" rx="6" fill="#fff" stroke="#8e24aa" stroke-width="2"/>
+    <text x="70" y="30" text-anchor="middle" font-size="12" fill="#4a148c">邻国 A · 抵制</text>
+  </g>
+  <g transform="translate(450,1360)">
+    <rect width="140" height="50" rx="6" fill="#fff" stroke="#8e24aa" stroke-width="2"/>
+    <text x="70" y="30" text-anchor="middle" font-size="12" fill="#4a148c">邻国 B · 抵制</text>
+  </g>
+  <g transform="translate(810,1240)">
+    <rect width="140" height="50" rx="6" fill="#fff" stroke="#8e24aa" stroke-width="2"/>
+    <text x="70" y="30" text-anchor="middle" font-size="12" fill="#4a148c">邻国 C · 抵制</text>
+  </g>
+  <g transform="translate(810,1360)">
+    <rect width="140" height="50" rx="6" fill="#fff" stroke="#8e24aa" stroke-width="2"/>
+    <text x="70" y="30" text-anchor="middle" font-size="12" fill="#4a148c">邻国 D · 抵制</text>
+  </g>
+
+  <!-- 邻国→威胁国的反制箭头 -->
+  <path d="M 590 1265 Q 640 1280 645 1290" stroke="#8e24aa" stroke-width="2" fill="none" marker-end="url(#arrowPurple)"/>
+  <path d="M 590 1385 Q 640 1370 645 1310" stroke="#8e24aa" stroke-width="2" fill="none" marker-end="url(#arrowPurple)"/>
+  <path d="M 810 1265 Q 760 1280 755 1290" stroke="#8e24aa" stroke-width="2" fill="none" marker-end="url(#arrowPurple)"/>
+  <path d="M 810 1385 Q 760 1370 755 1310" stroke="#8e24aa" stroke-width="2" fill="none" marker-end="url(#arrowPurple)"/>
+
+  <!-- 反制效果标注 -->
+  <g transform="translate(450,1430)">
+    <rect width="500" height="60" rx="6" fill="#ffebee" stroke="#c0392b" stroke-width="2" filter="url(#shadow)"/>
+    <text x="250" y="25" text-anchor="middle" font-size="13" font-weight="bold" fill="#b71c1c">⚠ 联军反制触发（≥3 邻国抵制）</text>
+    <text x="250" y="45" text-anchor="middle" font-size="11" fill="#555">稳定 −5 · 合法性 −3 · 所有抵制国对其关系再 −10 · 威胁值再 +5</text>
+  </g>
+
+  <!-- 代码溯源 -->
+  <g transform="translate(980,1430)">
+    <rect width="280" height="60" rx="6" fill="#f3e5f5" stroke="#8e24aa" stroke-width="2"/>
+    <text x="140" y="25" text-anchor="middle" font-size="12" font-weight="bold" fill="#4a148c">代码溯源</text>
+    <text x="140" y="45" text-anchor="middle" font-size="10" fill="#555">diplomacy.ts · settleDiplomacy() 末尾</text>
+  </g>
+
+  <!-- ════════ 图 6：螺旋上升进度图 ════════ -->
+  <text x="700" y="1540" text-anchor="middle" font-size="18" font-weight="bold" fill="#34495e">图 6 · 螺旋式上升进度图</text>
+
+  <!-- 螺旋曲线 -->
+  <path d="M 200 1700 Q 350 1600 500 1700 Q 650 1800 800 1700 Q 950 1600 1100 1700 Q 1250 1620 1300 1700" stroke="#1976d2" stroke-width="3" fill="none" stroke-dasharray="8,4"/>
+
+  <!-- 螺旋节点 -->
+  <g transform="translate(200,1700)">
+    <circle r="15" fill="#1976d2" filter="url(#shadow)"/>
+    <text x="0" y="-25" text-anchor="middle" font-size="11" font-weight="bold" fill="#0d47a1">认知层</text>
+    <text x="0" y="40" text-anchor="middle" font-size="9" fill="#555">杆组细讲文档</text>
+  </g>
+  <g transform="translate(500,1700)">
+    <circle r="15" fill="#27ae60" filter="url(#shadow)"/>
+    <text x="0" y="-25" text-anchor="middle" font-size="11" font-weight="bold" fill="#1b5e20">生效层</text>
+    <text x="0" y="40" text-anchor="middle" font-size="9" fill="#555">性格+政体加成</text>
+  </g>
+  <g transform="translate(800,1700)">
+    <circle r="15" fill="#e67e22" filter="url(#shadow)"/>
+    <text x="0" y="-25" text-anchor="middle" font-size="11" font-weight="bold" fill="#e65100">阻尼层</text>
+    <text x="0" y="40" text-anchor="middle" font-size="9" fill="#555">叛乱+分裂+和约+贸易</text>
+  </g>
+  <g transform="translate(1100,1700)">
+    <circle r="18" fill="#8e24aa" filter="url(#shadow)"/>
+    <text x="0" y="-28" text-anchor="middle" font-size="11" font-weight="bold" fill="#4a148c">闭环层</text>
+    <text x="0" y="45" text-anchor="middle" font-size="9" fill="#555">联军反制（本轮）</text>
+  </g>
+
+  <text x="700" y="1780" text-anchor="middle" font-size="13" fill="#95a5a6" font-style="italic">杆组三层闭环达成 · 拉杆 → 联动 → 阻尼 → 反噬 全链路生效</text>
+</svg>

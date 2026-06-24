@@ -1,0 +1,43 @@
+
+> imperium-aeternum@0.1.0 test
+> vitest run
+
+
+[1m[7m[36m RUN [39m[27m[22m [36mv2.1.9 [39m[90mD:/Wonderful/games/Imperium-Aeternum[39m
+
+ [32m✓[39m src/__tests__/formulas.test.ts [2m([22m[2m27 tests[22m[2m)[22m[90m 6[2mms[22m[39m
+ [32m✓[39m src/__tests__/worldgen.test.ts [2m([22m[2m7 tests[22m[2m)[22m[90m 53[2mms[22m[39m
+ [32m✓[39m src/__tests__/turn.test.ts [2m([22m[2m8 tests[22m[2m)[22m[90m 213[2mms[22m[39m
+ [31m❯[39m src/__tests__/world-smoke.test.ts [2m([22m[2m8 tests[22m[2m | [22m[31m1 failed[39m[2m)[22m[33m 3004[2mms[22m[39m
+   [33m[2m✓[22m[39m W4 世界级烟雾测试（192 国 / 600 省）[2m > [22m推进 10 回合无 NaN/Infinity/崩溃（192 国世界） [33m578[2mms[22m[39m
+   [33m[2m✓[22m[39m W4 世界级烟雾测试（192 国 / 600 省）[2m > [22m推进 50 回合性能 < 40s + 无 NaN [33m1027[2mms[22m[39m
+   [33m[2m✓[22m[39m W4 世界级烟雾测试（192 国 / 600 省）[2m > [22mA2 选非默认玩家国推进 50 回合无 NaN + 玩家国家正确 [33m1213[2mms[22m[39m
+[31m   [31m×[31m W4 世界级烟雾测试（192 国 / 600 省）[2m > [22mC1 事件链数据：5 条链各 3 事件，triggerEvent 引用合法[90m 14[2mms[22m[31m[39m
+[31m     → expected 29 to be 15 // Object.is equality[39m
+
+[31m⎯⎯⎯⎯⎯⎯⎯[1m[7m Failed Tests 1 [27m[22m⎯⎯⎯⎯⎯⎯⎯[39m
+
+[31m[1m[7m FAIL [27m[22m[39m src/__tests__/world-smoke.test.ts[2m > [22mW4 世界级烟雾测试（192 国 / 600 省）[2m > [22mC1 事件链数据：5 条链各 3 事件，triggerEvent 引用合法
+[31m[1mAssertionError[22m: expected 29 to be 15 // Object.is equality[39m
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[32m- 15[39m
+[31m+ 29[39m
+
+[36m [2m❯[22m src/__tests__/world-smoke.test.ts:[2m198:29[22m[39m
+    [90m196| [39m  [34mit[39m([32m'C1 事件链数据：5 条链各 3 事件，triggerEvent 引用合法'[39m[33m,[39m () [33m=>[39m {
+    [90m197| [39m    [35mconst[39m chainIds [33m=[39m [33mEVENTS[39m[33m.[39m[34mfilter[39m((e) [33m=>[39m e[33m.[39mid[33m.[39m[34mstartsWith[39m([32m'evt_chain_'[39m…
+    [90m198| [39m    [34mexpect[39m(chainIds[33m.[39mlength)[33m.[39m[34mtoBe[39m([34m15[39m)[33m;[39m  [90m// 5 链 × 3 事件[39m
+    [90m   | [39m                            [31m^[39m
+    [90m199| [39m    [90m// 每个 triggerEvent 引用必须在 EVENT_BY_ID 存在[39m
+    [90m200| [39m    [35mfor[39m ([35mconst[39m e [35mof[39m [33mEVENTS[39m) {
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯[22m[39m
+
+[2m Test Files [22m [1m[31m1 failed[39m[22m[2m | [22m[1m[32m3 passed[39m[22m[90m (4)[39m
+[2m      Tests [22m [1m[31m1 failed[39m[22m[2m | [22m[1m[32m49 passed[39m[22m[90m (50)[39m
+[2m   Start at [22m 21:14:09
+[2m   Duration [22m 3.66s[2m (transform 341ms, setup 0ms, collect 752ms, tests 3.28s, environment 0ms, prepare 369ms)[22m
+

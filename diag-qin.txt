@@ -1,0 +1,14 @@
+=== 秦初始 ===
+政体: empire 性格: authoritarian
+稳定: 50 法统: 55 腐败: 30 治能: 60
+厌战: 0 税率: 0.15
+派系: nobles(权25满60) merchants(权20满55) military(权20满60) commoners(权25满45) clergy(权10满50)
+省份数: 16 总人口: 11429
+省份 unrest avg: 0
+可管省上限: 53
+
+=== 20回合后秦 ===
+稳定: 100 法统: 100 腐败: 28
+派系: nobles(权25满72) merchants(权20满100) military(权20满58) commoners(权25满62) clergy(权10满58)
+省份数: 16 unrest avg: 0
+厌战: 0

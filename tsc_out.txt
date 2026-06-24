@@ -1,0 +1,15 @@
+src/data/events.ts(482,143): error TS2353: Object literal may only specify known properties, and 'minGold' does not exist in type 'EventTrigger'.
+src/data/events.ts(530,73): error TS2353: Object literal may only specify known properties, and 'assimilationMod' does not exist in type 'EventEffect'.
+src/data/events.ts(558,74): error TS2353: Object literal may only specify known properties, and 'assimilationMod' does not exist in type 'EventEffect'.
+src/data/events.ts(566,159): error TS2322: Type '"culture"' is not assignable to type '"agri" | "mil" | "admin"'.
+src/data/events.ts(581,150): error TS2353: Object literal may only specify known properties, and 'minGold' does not exist in type 'EventTrigger'.
+src/engine/ai.ts(258,25): error TS2345: Argument of type '{ id: string; attackerId: string; defenderId: string; targetProvinceId: string; progress: number; turns: number; }' is not assignable to parameter of type 'War'.
+  Property 'battleReports' is missing in type '{ id: string; attackerId: string; defenderId: string; targetProvinceId: string; progress: number; turns: number; }' but required in type 'War'.
+src/engine/ai.ts(333,38): error TS2322: Type 'string' is not assignable to type 'PolicyId'.
+src/engine/diplomacy.ts(141,27): error TS2322: Type '"milestone_diplomacy"' is not assignable to type '"trade" | "founding" | "expansion" | "population" | "victory" | "crisis" | "reform" | "tech" | "reign"'.
+src/engine/military.ts(115,29): error TS2322: Type '"milestone_war"' is not assignable to type '"trade" | "founding" | "expansion" | "population" | "victory" | "crisis" | "reform" | "tech" | "reign"'.
+src/engine/military.ts(133,27): error TS2322: Type '"milestone_war"' is not assignable to type '"trade" | "founding" | "expansion" | "population" | "victory" | "crisis" | "reform" | "tech" | "reign"'.
+src/engine/turn.ts(294,49): error TS2339: Property 'type' does not exist on type 'BuildingInstance'.
+src/engine/turn.ts(299,7): error TS2322: Type '"milestone_rebellion"' is not assignable to type '"trade" | "founding" | "expansion" | "population" | "victory" | "crisis" | "reform" | "tech" | "reign"'.
+src/store/gameStore.ts(613,7): error TS2339: Property 'legitimacy' does not exist on type 'Nation'.
+src/store/gameStore.ts(613,34): error TS2339: Property 'legitimacy' does not exist on type 'Nation'.

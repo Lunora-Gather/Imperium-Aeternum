@@ -1,0 +1,6 @@
+src/screens/Dashboard.tsx(284,11): error TS1005: ')' expected.
+src/screens/Dashboard.tsx(291,10): error TS1381: Unexpected token. Did you mean `{'}'}` or `&rbrace;`?
+src/screens/ProvinceScreen.tsx(55,8): error TS17008: JSX element 'Panel' has no corresponding closing tag.
+src/screens/ProvinceScreen.tsx(156,7): error TS1005: ')' expected.
+src/screens/ProvinceScreen.tsx(157,5): error TS1109: Expression expected.
+src/screens/ProvinceScreen.tsx(158,3): error TS1109: Expression expected.

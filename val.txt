@@ -1,0 +1,6 @@
+
+> imperium-aeternum@0.1.0 validate
+> tsx src/data/__validate__.ts
+
+ERRORS:
+  - 事件 id 重复 evt_pop_migration

@@ -1,0 +1,59 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+dist-ssr/
+
+# Local env
+.env
+.env.local
+.env.*.local
+
+# Editor
+.vscode/*
+!.vscode/extensions.json
+.idea/
+*.swp
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Test/coverage
+coverage/
+
+# Misc
+*.local
+.cache/
+
+# 临时诊断/审计输出（audit*.txt / diag*.txt / r1*.txt 等）
+audit*.txt
+diag*.txt
+r1*.txt
+r2*.txt
+vitest*.txt
+tsc*.txt
+val*.txt
+test*.txt
+test_out.txt
+vfinal.txt
+build.txt
+commit.txt
+tsc_out.txt
+tsc_p0.txt
+tsc_p1.txt
+tsc_p2.txt
+tsc_p3.txt
+vitest_p0.txt
+vitest_p1.txt
+vitest_p2.txt
+vitest_p3.txt
+vite.config.d.ts
+vite.config.js
