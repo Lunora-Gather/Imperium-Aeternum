@@ -1,4 +1,4 @@
-// TurnReport v2 — "今年发生了什么"叙事流 + 收支对比 + 警告聚合
+// TurnReport v3 — 年报加入优先级建议：先告诉玩家下一年该干什么
 import { useGameStore } from '../store/gameStore';
 import { Panel, Tag, Btn, Divider } from '../components/ui';
 
@@ -6,16 +6,39 @@ const FACTION_LABEL: Record<string, string> = {
   nobles: '贵族', merchants: '商人', military: '军方', commoners: '民众', clergy: '神职',
 };
 
+function adviceTone(level: number): 'good' | 'warn' | 'danger' | 'info' {
+  if (level >= 90) return 'danger';
+  if (level >= 60) return 'warn';
+  return 'info';
+}
+
 export default function TurnReportScreen({ onContinue }: { onContinue?: () => void }) {
-  const { state } = useGameStore();
+  const { state, jumpToTab } = useGameStore();
   const r = state.lastReport;
   if (!r) return <Panel title="回合报告"><p className="dim">尚无报告。点击「下一回合」开始。</p></Panel>;
 
+  const pid = state.playerNationId;
+  const player = state.nations[pid];
   const income = r.income.tax + r.income.trade + r.income.building;
   const expense = r.expense.military + r.expense.corruption;
   const net = income - expense;
+  const atWar = state.wars.some((w) => w.attackerId === pid || w.defenderId === pid);
 
-  // 叙事流：把数字翻译成"今年发生了什么"
+  const advice: { title: string; body: string; tab: string; level: number }[] = [];
+  if (player) {
+    if (player.resources.food < 0 || r.foodDelta < -80) advice.push({ title: '先稳粮食', body: '粮储或年产已经危险，优先降税、建农田、处理饥荒事件。', tab: 'economy', level: 100 });
+    if (player.resources.gold < 0 || net < -80) advice.push({ title: '止住赤字', body: '国库正在失血，先调税率、削减战争或补贸易路线。', tab: 'economy', level: 95 });
+    if (player.government.stability < 30 || r.unrestDelta > 15) advice.push({ title: '压住不满', body: '稳定过低会引发崩溃，去政治页处理派系或省份页驻军。', tab: 'politics', level: 90 });
+    if (player.government.legitimacy < 30) advice.push({ title: '修复合法性', body: '合法性过低会直接导致失败，优先选择加合法的政策、法律或事件。', tab: 'politics', level: 85 });
+    if (player.warExhaustion > 60) advice.push({ title: '战争疲惫', body: '厌战过高会拖垮财政和稳定，考虑求和或快速结束战事。', tab: 'military', level: 80 });
+    if (atWar && r.warProgress.length === 0) advice.push({ title: '检查前线', body: '正在战争中但本年没有明显战果，可能缺前线军队或补给不足。', tab: 'military', level: 70 });
+    if (player.resources.adminPt <= 1) advice.push({ title: '行政点紧张', body: '本年行动空间有限，优先处理最高危机，不要分散操作。', tab: 'dashboard', level: 60 });
+    if (player.resources.sciPt > 250) advice.push({ title: '可推进科技', body: '科研点已有积累，下一步可以解锁建筑、政策或治理效率。', tab: 'tech', level: 35 });
+    if (r.worldEvents.some((e) => e.includes('扩张战略') || e.includes('宣战'))) advice.push({ title: '关注邻国动向', body: '周边国家战略转向或战争变化，建议查看外交与军事页。', tab: 'diplomacy', level: 55 });
+  }
+  if (advice.length === 0) advice.push({ title: '局势尚稳', body: '可以按长期目标推进：发展经济、研发科技、扩展外交或准备下一场战争。', tab: 'dashboard', level: 20 });
+  advice.sort((a, b) => b.level - a.level);
+
   const stories: { txt: string; tone: 'good' | 'warn' | 'danger' | 'info' }[] = [];
   if (net > 0) stories.push({ txt: `国库净增 ${Math.round(net)} 金`, tone: 'good' });
   else if (net < 0) stories.push({ txt: `国库净减 ${Math.round(-net)} 金`, tone: 'danger' });
@@ -32,7 +55,21 @@ export default function TurnReportScreen({ onContinue }: { onContinue?: () => vo
       <Panel title={`第 ${r.turn} 年 · 年度报告`} accent actions={
         onContinue ? <Btn label="← 继续治理" variant="primary" onClick={onContinue} /> : undefined
       }>
-        {/* 叙事流置顶 */}
+        <div style={{ marginBottom: 12 }}>
+          <strong style={{ fontSize: 13, color: 'var(--text-mute)' }}>下一年优先级</strong>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))', gap: 8, marginTop: 8 }}>
+            {advice.slice(0, 3).map((a, i) => (
+              <button key={i} className="ia-card" onClick={() => jumpToTab(a.tab)} style={{ textAlign: 'left', padding: 10, cursor: 'pointer', border: `1px solid var(--${adviceTone(a.level) === 'danger' ? 'war' : adviceTone(a.level) === 'warn' ? 'warn' : 'border'})` }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, marginBottom: 4 }}>
+                  <strong style={{ fontSize: 13 }}>{a.title}</strong>
+                  <Tag text={a.level >= 80 ? '紧急' : a.level >= 55 ? '建议' : '规划'} tone={adviceTone(a.level)} />
+                </div>
+                <div style={{ fontSize: 11, color: 'var(--text-dim)', lineHeight: 1.5 }}>{a.body}</div>
+              </button>
+            ))}
+          </div>
+        </div>
+
         <div style={{ marginBottom: 12 }}>
           <strong style={{ fontSize: 13, color: 'var(--text-mute)' }}>今年发生了什么</strong>
           <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 8 }}>
@@ -61,7 +98,6 @@ export default function TurnReportScreen({ onContinue }: { onContinue?: () => vo
           </div>
         </div>
 
-        {/* 净收入条 */}
         <div style={{ marginBottom: 12 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, marginBottom: 4 }}>
             <span style={{ color: 'var(--text-mute)' }}>净收入</span>
@@ -80,79 +116,17 @@ export default function TurnReportScreen({ onContinue }: { onContinue?: () => vo
           <DeltaBox label="合法性" v={r.legitimacyDelta} />
         </div>
 
-        {r.events.length > 0 && (
-          <>
-            <Divider label="事件" />
-            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 12 }}>
-              {r.events.map((e, i) => <Tag key={i} text={e} tone="info" />)}
-            </div>
-          </>
-        )}
+        {r.events.length > 0 && <><Divider label="事件" /><div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 12 }}>{r.events.map((e, i) => <Tag key={i} text={e} tone="info" />)}</div></>}
 
-        {/* E23: 战争进展叙事 */}
-        {r.warProgress.length > 0 && (
-          <>
-            <Divider label="战事进展" />
-            <div className="ia-battle-in" style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 12, padding: 10, background: 'rgba(162,61,40,0.06)', border: '1px solid var(--war)', borderRadius: 6 }}>
-              {r.warProgress.map((w, i) => {
-                const tone = w.outcome === 'advance' ? 'good' : w.outcome === 'repelled' ? 'danger' : 'warn';
-                const icon = w.outcome === 'advance' ? '▲' : w.outcome === 'repelled' ? '▼' : '◆';
-                const txt = w.outcome === 'advance' ? `推进 ${w.target}（+${w.progressDelta}%）` :
-                  w.outcome === 'repelled' ? `受挫 ${w.target}（${w.progressDelta}%）` :
-                  `胶着 ${w.target}（${w.progressDelta >= 0 ? '+' : ''}${w.progressDelta}%）`;
-                return <Tag key={i} text={`${icon} ${txt}`} tone={tone} />;
-              })}
-            </div>
-          </>
-        )}
+        {r.warProgress.length > 0 && <><Divider label="战事进展" /><div className="ia-battle-in" style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 12, padding: 10, background: 'rgba(162,61,40,0.06)', border: '1px solid var(--war)', borderRadius: 6 }}>{r.warProgress.map((w, i) => { const tone = w.outcome === 'advance' ? 'good' : w.outcome === 'repelled' ? 'danger' : 'warn'; const icon = w.outcome === 'advance' ? '▲' : w.outcome === 'repelled' ? '▼' : '◆'; const txt = w.outcome === 'advance' ? `推进 ${w.target}（+${w.progressDelta}%）` : w.outcome === 'repelled' ? `受挫 ${w.target}（${w.progressDelta}%）` : `胶着 ${w.target}（${w.progressDelta >= 0 ? '+' : ''}${w.progressDelta}%）`; return <Tag key={i} text={`${icon} ${txt}`} tone={tone} />; })}</div></>}
 
-        {/* E23: 派系动态 */}
-        {r.factionDelta.length > 0 && (
-          <>
-            <Divider label="派系动向" />
-            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 12 }}>
-              {r.factionDelta.map((f, i) => {
-                const tone = f.delta > 0 ? 'good' : 'danger';
-                const label = FACTION_LABEL[f.id] ?? f.id;
-                return <Tag key={i} text={`${label} ${f.delta >= 0 ? '+' : ''}${f.delta}`} tone={tone} />;
-              })}
-            </div>
-          </>
-        )}
+        {r.factionDelta.length > 0 && <><Divider label="派系动向" /><div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 12 }}>{r.factionDelta.map((f, i) => { const tone = f.delta > 0 ? 'good' : 'danger'; const label = FACTION_LABEL[f.id] ?? f.id; return <Tag key={i} text={`${label} ${f.delta >= 0 ? '+' : ''}${f.delta}`} tone={tone} />; })}</div></>}
 
-        {/* A4: 天下大势——AI 重要行为可见 */}
-        {r.worldEvents.length > 0 && (
-          <>
-            <Divider label="天下大势" />
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginBottom: 12, padding: 10, background: 'rgba(42,90,140,0.06)', border: '1px solid var(--border)', borderRadius: 6 }}>
-              {r.worldEvents.map((w, i) => <div key={i} style={{ fontSize: 13, padding: '2px 0' }}>{w}</div>)}
-            </div>
-          </>
-        )}
+        {r.worldEvents.length > 0 && <><Divider label="天下大势" /><div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginBottom: 12, padding: 10, background: 'rgba(42,90,140,0.06)', border: '1px solid var(--border)', borderRadius: 6 }}>{r.worldEvents.map((w, i) => <div key={i} style={{ fontSize: 13, padding: '2px 0' }}>{w}</div>)}</div></>}
 
-        {/* B2: 省份归属变化 */}
-        {r.provinceChanges.length > 0 && (
-          <>
-            <Divider label="疆域变动" />
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginBottom: 12 }}>
-              {r.provinceChanges.map((pc, i) => {
-                const gained = pc.to === state.playerNationId;
-                return <div key={i} style={{ fontSize: 13, color: gained ? 'var(--good)' : 'var(--war)' }}>
-                  {gained ? '获得' : '失去'} {pc.name}
-                </div>;
-              })}
-            </div>
-          </>
-        )}
+        {r.provinceChanges.length > 0 && <><Divider label="疆域变动" /><div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginBottom: 12 }}>{r.provinceChanges.map((pc, i) => { const gained = pc.to === state.playerNationId; return <div key={i} style={{ fontSize: 13, color: gained ? 'var(--good)' : 'var(--war)' }}>{gained ? '获得' : '失去'} {pc.name}</div>; })}</div></>}
 
-        {r.warnings.length > 0 && (
-          <>
-            <Divider label="警告" />
-            <div className="ia-pulse" style={{ background: 'rgba(245,166,35,0.08)', border: '1px solid var(--warn)', borderRadius: 6, padding: 10 }}>
-              {r.warnings.map((w, i) => <div key={i} className="warn" style={{ fontSize: 13, padding: '2px 0' }}>⚠ {w}</div>)}
-            </div>
-          </>
-        )}
+        {r.warnings.length > 0 && <><Divider label="警告" /><div className="ia-pulse" style={{ background: 'rgba(245,166,35,0.08)', border: '1px solid var(--warn)', borderRadius: 6, padding: 10 }}>{r.warnings.map((w, i) => <div key={i} className="warn" style={{ fontSize: 13, padding: '2px 0' }}>⚠ {w}</div>)}</div></>}
       </Panel>
     </div>
   );
@@ -162,9 +136,7 @@ function Row({ k, v, neg }: { k: string; v: number; neg?: boolean }) {
   return (
     <div style={{ display: 'flex', justifyContent: 'space-between', padding: '3px 0', borderBottom: '1px solid rgba(42,58,90,0.3)' }}>
       <span style={{ color: 'var(--text-mute)' }}>{k}</span>
-      <span style={{ fontVariantNumeric: 'tabular-nums', color: neg ? 'var(--war)' : 'var(--good)', fontWeight: 600 }}>
-        {v >= 0 ? '+' : ''}{Math.round(v)}
-      </span>
+      <span style={{ fontVariantNumeric: 'tabular-nums', color: neg ? 'var(--war)' : 'var(--good)', fontWeight: 600 }}>{v >= 0 ? '+' : ''}{Math.round(v)}</span>
     </div>
   );
 }
@@ -174,9 +146,7 @@ function DeltaBox({ label, v }: { label: string; v: number }) {
   return (
     <div className="ia-card" style={{ textAlign: 'center' }}>
       <div style={{ fontSize: 11, color: 'var(--text-mute)', marginBottom: 4 }}>{label}</div>
-      <div style={{ fontSize: 18, fontWeight: 700, fontVariantNumeric: 'tabular-nums', color: good ? 'var(--good)' : 'var(--war)' }}>
-        {good ? '+' : ''}{Math.round(v)}
-      </div>
+      <div style={{ fontSize: 18, fontWeight: 700, fontVariantNumeric: 'tabular-nums', color: good ? 'var(--good)' : 'var(--war)' }}>{good ? '+' : ''}{Math.round(v)}</div>
     </div>
   );
 }
