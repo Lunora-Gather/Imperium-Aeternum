@@ -69,9 +69,9 @@
 | **G2** | 停战提醒显示缺失 | `MilitaryScreen.tsx:257` truce 国隐式过滤不显示宣战按钮，但无"剩余 X 回合可宣"显示、无到期 LogToast | 玩家不知何时能再宣 | B5 收尾 |
 | **G3** | 政体反扑事件未接 | `politics.ts:137` 切政体设 `govTransitionTurns=3` 标记，但 `engine/events.ts` 和 `data/events.ts` 无读取此字段的反扑事件 | 切政体无反弹感，违"改革有反弹"宪法 | B8 收尾 |
 | **G4** | 引擎 mutate 非纯函数 | `settleEconomy` 直接 mutate `nation` 引用（`state.nations[id]` 别名）；顶层 `processTurn` 已浅拷贝但子引擎穿透改原对象 | 无法回滚/移植，C1 真缺口 | C1 |
-| **G5** | store 浅拷贝全渲染 | `set({state:{...st.state}})` 浅拷贝触发所有订阅重渲染 | 操作延迟 ~50ms | C2 |
+| ~~G5~~ | ~~store 浅拷贝全渲染~~ | ~~`set({state:{...st.state}})` 浅拷贝触发所有订阅重渲染~~ | **C2 完成：12 screen pid/player 改 selector 精确订阅，减少非玩家国变化触发的全订阅重渲染；store 浅拷贝仍存但 selector 层过滤** | ✅ C2 已完成 |
 | ~~G6~~ | ~~测试针对性不足~~ | ~~engine-targeted 11 个已存在~~ | **C3 完成：26 针对性测试，economy/politics/military/diplomacy 各 ≥5，89/89 全绿** | ✅ C3 已完成 |
-| **G7** | `as` 断言清理 | **tsconfig strict:true 已开**（C4 大部分已做）；仅剩 `govTransitionTurns` 的 `as Nation & {...}` 临时断言需改正式字段 | 可维护性 | C4 收尾 |
+| ~~G7~~ | ~~`as` 断言清理~~ | ~~**C4 完成：tsconfig strict:true 已开；Nation 接口加 `govTransitionTurns?: number` 正式字段；3 处 `as` 断言改直接访问；全 src 已无 `as Nation &` 残留**~~ | 可维护性 | ✅ C4 已完成 |
 | ~~G8~~ | ~~确定性重放未做~~ | **`turn.test.ts:384-403` 已有 C5 重放测试且通过**（同 seed 推 20 回合两次 state 完全相同） | 已做，删 WP |
 
 ### 🟢 增强缺口（未变，从 v1.2 继承）
