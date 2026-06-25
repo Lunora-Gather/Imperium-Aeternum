@@ -1,0 +1,306 @@
+/* ============================================================
+   Imperium Aeternum — 克制版视觉覆盖层
+   目标：去炫光、去厚重、降低装饰，保留信息结构。
+   ============================================================ */
+
+:root {
+  --shell-max: 1240px;
+  --shell-pad-x: clamp(12px, 2vw, 22px);
+  --shell-pad-y: 10px;
+}
+
+/* 整体：少阴影、少渐变、留白更稳 */
+.ia-shell {
+  width: min(var(--shell-max), calc(100vw - 24px));
+  padding-top: 8px;
+}
+.ia-shell::before,
+.ia-ruler-card::before,
+.ia-content-shell::before,
+.ia-menu-hero::before {
+  display: none !important;
+}
+
+.ia-ruler-card,
+.ia-status-panel,
+.ia-main-nav,
+.ia-content-shell,
+.ia-menu-hero,
+.ia-scenario-card,
+.ia-choice-card,
+.ia-map-atlas,
+.ia-map-stat-grid div,
+.ia-map-detail,
+.ia-map-legend,
+.ia-lever-panel,
+.ia-lever {
+  box-shadow: none !important;
+  background: color-mix(in srgb, var(--bg-panel) 94%, transparent) !important;
+  border-color: color-mix(in srgb, var(--border) 84%, transparent) !important;
+}
+
+/* 顶部：压低高度，标题不那么压迫 */
+.ia-topbar {
+  grid-template-columns: minmax(0, 1fr) 250px;
+  gap: 8px;
+  position: sticky;
+  margin-bottom: 8px;
+}
+.ia-ruler-card {
+  padding: 10px 14px 9px !important;
+  border-radius: 10px !important;
+}
+.ia-ruler-kicker {
+  font-size: 9px !important;
+  margin-bottom: 2px !important;
+  color: color-mix(in srgb, var(--gold) 70%, var(--text-mute)) !important;
+}
+.ia-ruler-title {
+  font-size: clamp(24px, 2.35vw, 34px) !important;
+  letter-spacing: 0.045em !important;
+  text-shadow: none !important;
+}
+.ia-ruler-subline {
+  margin-top: 6px !important;
+  font-size: 10.5px !important;
+  gap: 4px 9px !important;
+}
+.ia-resource-dock {
+  margin-top: 8px !important;
+  padding-top: 7px !important;
+}
+.ia-icon-btn {
+  width: 30px !important;
+  height: 30px !important;
+  background: transparent !important;
+}
+.ia-status-panel {
+  padding: 8px !important;
+  gap: 7px !important;
+  border-radius: 10px !important;
+}
+.ia-status-row {
+  min-height: 48px !important;
+  padding: 7px 9px !important;
+  border-radius: 8px !important;
+  background: color-mix(in srgb, var(--bg-inset) 55%, transparent) !important;
+}
+
+/* 导航：按钮更轻，不像一排徽章 */
+.ia-main-nav {
+  top: 92px;
+  padding: 7px 9px !important;
+  border-radius: 10px !important;
+  gap: 7px 10px !important;
+  background: color-mix(in srgb, var(--bg-panel) 92%, transparent) !important;
+}
+.ia-tab-btn {
+  min-height: 28px !important;
+  padding: 4px 7px !important;
+  border-radius: 7px !important;
+  font-size: 11.5px !important;
+}
+.ia-tab-btn.is-active {
+  background: color-mix(in srgb, var(--gold) 8%, transparent) !important;
+  box-shadow: none !important;
+}
+.ia-tab-btn kbd {
+  opacity: .65;
+}
+.ia-nav-hint {
+  opacity: .65;
+}
+
+/* 内容画布：减少大面板感 */
+.ia-content-shell {
+  border-radius: 12px !important;
+  padding: 16px !important;
+  min-height: 52vh !important;
+}
+
+/* 开场页：四列保留，但不浮夸 */
+.ia-menu {
+  width: min(1180px, calc(100vw - 30px)) !important;
+  padding-top: 18px !important;
+}
+.ia-menu-toolbar {
+  margin-bottom: 12px !important;
+}
+.ia-theme-switch {
+  border-radius: 10px !important;
+  padding: 3px !important;
+  background: color-mix(in srgb, var(--bg-panel) 92%, transparent) !important;
+}
+.ia-theme-switch button {
+  height: 28px !important;
+  border-radius: 8px !important;
+  padding: 0 9px !important;
+}
+.ia-menu-hero {
+  padding: 20px 16px 16px !important;
+  border-radius: 14px !important;
+}
+.ia-menu-hero h1 {
+  font-size: clamp(32px, 4.2vw, 50px) !important;
+  letter-spacing: 0.08em !important;
+}
+.ia-menu-subtitle {
+  max-width: 560px !important;
+  font-size: 12.5px !important;
+}
+.ia-scenario-grid {
+  gap: 10px !important;
+}
+.ia-scenario-card,
+.ia-choice-card {
+  min-height: 156px !important;
+  padding: 14px !important;
+  border-radius: 11px !important;
+  transition: border-color .16s ease, background .16s ease !important;
+}
+.ia-scenario-card:hover,
+.ia-choice-card:hover {
+  transform: none !important;
+  box-shadow: none !important;
+  background: color-mix(in srgb, var(--bg-raised) 80%, transparent) !important;
+}
+.ia-scenario-card h3 {
+  font-size: 16px !important;
+}
+.ia-scenario-card p,
+.ia-choice-card p {
+  font-size: 11.5px !important;
+}
+.ia-scenario-foot {
+  color: color-mix(in srgb, var(--gold) 76%, var(--text-mute)) !important;
+}
+
+/* 杆组仪表：变成朴素管理表，不要炫彩仪表盘 */
+.ia-lever-panel {
+  padding: 12px !important;
+  border-radius: 10px !important;
+}
+.ia-lever-panel-head {
+  margin-bottom: 10px !important;
+}
+.ia-lever-grid {
+  gap: 8px !important;
+}
+.ia-lever {
+  padding: 8px 10px !important;
+  border-radius: 9px !important;
+}
+.ia-lever-name,
+.ia-lever-value {
+  font-size: 11px !important;
+}
+.ia-lever-track {
+  height: 12px !important;
+  border-radius: 6px !important;
+  box-shadow: none !important;
+  background: color-mix(in srgb, var(--bg-inset) 70%, transparent) !important;
+}
+.ia-lever-fill {
+  opacity: .72 !important;
+  box-shadow: none !important;
+}
+.ia-lever-threshold {
+  opacity: .45 !important;
+  width: 1px !important;
+}
+.ia-lever-threshold span {
+  display: none !important;
+}
+.ia-lever-danger {
+  opacity: .38 !important;
+}
+.ia-lever-foot {
+  margin-top: 7px !important;
+  font-size: 9.5px !important;
+}
+
+/* 舆图：不要炫彩战略图，改成淡色信息图 */
+.ia-map-page {
+  gap: 10px !important;
+}
+.ia-map-head {
+  padding-bottom: 10px !important;
+}
+.ia-map-head h2 {
+  font-size: 20px !important;
+}
+.ia-map-head p {
+  font-size: 11.5px !important;
+}
+.ia-map-layout {
+  grid-template-columns: minmax(0, 1fr) 260px !important;
+  gap: 12px !important;
+}
+.ia-map-atlas {
+  min-height: 500px !important;
+  border-radius: 11px !important;
+  background: color-mix(in srgb, var(--bg-inset) 92%, transparent) !important;
+}
+.ia-map-atlas::before {
+  inset: 10px !important;
+  border-color: color-mix(in srgb, var(--border) 50%, transparent) !important;
+  border-radius: 8px !important;
+}
+.ia-world-svg {
+  height: 500px !important;
+}
+.ia-map-compass {
+  width: 30px !important;
+  height: 30px !important;
+  left: 15px !important;
+  top: 14px !important;
+  background: color-mix(in srgb, var(--bg-panel) 90%, transparent) !important;
+  box-shadow: none !important;
+}
+.wm-capital-label {
+  font-size: 8px !important;
+  opacity: .72 !important;
+}
+.ia-map-stat-grid div {
+  min-height: 58px !important;
+  padding: 9px 10px !important;
+  border-radius: 9px !important;
+}
+.ia-map-stat-grid strong {
+  font-size: 18px !important;
+}
+.ia-map-detail,
+.ia-map-legend {
+  border-radius: 10px !important;
+}
+.ia-map-detail {
+  padding: 12px !important;
+  min-height: 220px !important;
+}
+.ia-map-detail-head h3 {
+  font-size: 16px !important;
+}
+.ia-map-detail-list div {
+  padding: 7px 8px !important;
+  border-radius: 7px !important;
+}
+.ia-map-controls button {
+  height: 30px !important;
+  padding: 0 11px !important;
+  border-radius: 7px !important;
+}
+
+/* 减少全局按钮和卡片的“跳动感” */
+.ia-card:hover,
+button:hover {
+  filter: none !important;
+}
+
+@media (max-width: 1160px) {
+  .ia-map-layout { grid-template-columns: 1fr !important; }
+}
+
+@media (max-width: 760px) {
+  .ia-content-shell { padding: 12px !important; }
+  .ia-world-svg, .ia-map-atlas { height: 430px !important; min-height: 430px !important; }
+}
