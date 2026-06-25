@@ -1,5 +1,4 @@
-// LogToast v2 — 操作即时反馈浮窗（右下角，队列最多 3 条，逐条淡出）
-// P1: 改队列——多操作不再丢消息；失败类（含「不足」「失败」）红色 + 停留更久
+// LogToast v3 — 轻量操作反馈（不再用厚重黑色浮窗）
 import { useEffect, useState } from 'react';
 import { useGameStore } from '../store/gameStore';
 
@@ -10,7 +9,6 @@ export default function LogToast() {
   const [queue, setQueue] = useState<ToastItem[]>([]);
   const [seenIdx, setSeenIdx] = useState(0);
 
-  // log 增长时把新条目入队（按 index 去重）
   useEffect(() => {
     if (log.length <= seenIdx) return;
     const newItems: ToastItem[] = [];
@@ -20,14 +18,13 @@ export default function LogToast() {
       newItems.push({ id: i, text: txt, tone: fail ? 'fail' : 'ok' });
     }
     setSeenIdx(log.length);
-    setQueue((q) => [...q, ...newItems].slice(-3));  // 最多 3 条
+    setQueue((q) => [...q, ...newItems].slice(-2));
   }, [log, seenIdx]);
 
-  // 每条按 tone 设定停留时长后逐条移除（失败 4s，正常 2.5s）
   useEffect(() => {
     if (queue.length === 0) return;
     const first = queue[0];
-    const ttl = first.tone === 'fail' ? 4000 : 2500;
+    const ttl = first.tone === 'fail' ? 3600 : 2000;
     const t = setTimeout(() => setQueue((q) => q.filter((x) => x.id !== first.id)), ttl);
     return () => clearTimeout(t);
   }, [queue]);
@@ -35,24 +32,13 @@ export default function LogToast() {
   if (queue.length === 0) return null;
 
   return (
-    <div style={{
-      position: 'fixed', bottom: 20, right: 20, zIndex: 1000,
-      display: 'flex', flexDirection: 'column', gap: 6, pointerEvents: 'none',
-    }}>
+    <div className="ia-toast-stack">
       {queue.map((item) => {
         const isFail = item.tone === 'fail';
         return (
-          <div key={item.id} className="ia-card" style={{
-            padding: '10px 16px', fontSize: 12, maxWidth: 340,
-            background: 'rgba(20,17,13,0.92)', backdropFilter: 'blur(6px)',
-            border: `1px solid ${isFail ? 'var(--war)' : 'var(--border-gold)'}`,
-            borderRadius: 'var(--radius)',
-            color: isFail ? 'var(--war)' : 'var(--text-soft)',
-            boxShadow: isFail ? '0 4px 16px rgba(162,61,40,0.3)' : '0 4px 16px rgba(0,0,0,0.4)',
-            animation: 'ia-slide-in 0.3s ease',
-          }}>
-            <span style={{ color: isFail ? 'var(--war)' : 'var(--gold)', marginRight: 8, fontSize: 10 }}>{isFail ? '⚠' : '◈'}</span>
-            {item.text}
+          <div key={item.id} className={`ia-toast ${isFail ? 'is-fail' : 'is-ok'}`}>
+            <span>{isFail ? '!' : '·'}</span>
+            <p>{item.text}</p>
           </div>
         );
       })}
