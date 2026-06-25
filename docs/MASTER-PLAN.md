@@ -123,7 +123,7 @@
 | WP | 标题 | 依赖钩子 | 验收 | 预估 | 状态 |
 |----|------|---------|------|------|------|
 | **C4** | `as` 断言清理收尾 | `politics.ts:137` + `events.ts checkTrigger` + `turn.ts:104` 的 `govTransitionTurns as` 断言 | Nation 接口加 `govTransitionTurns?: number` 正式字段；3 处 `as` 断言改直接访问；typecheck + test 通过 | S | 本回合做 |
-| **C1** | 引擎纯函数化 | `engine/*.ts settleEconomy/settlePolitics/...` | 子引擎改 `(nation, state) => partialResult` 不 mutate；processTurn 合并结果建新 state；可回滚/重放 | XL | 下回合 |
+| **C1** | 引擎纯函数化 | `engine/*.ts settleEconomy/settlePolitics/...` | 子引擎改 `(nation, state) => partialResult` 不 mutate；processTurn 合并结果建新 state；可回滚/重放 | XL | **第一步已完成：settleEconomyPure 纯函数版本 + 对照测试验证 delta 一致 + 不 mutate（91/91 全绿）；第二步 processTurn 迁移 + 其余 10 子引擎留下回合** |
 | ~~C2~~ | ~~store 精确订阅~~ | ~~`gameStore.ts` + 12 screen~~ | ~~**完成：gameStore 加 usePlayer/usePlayerId/usePlayerResources/useTurn selector hooks；12 screen pid/player 从整体订阅改为 selector 精确订阅；减少非玩家国变化触发的全订阅重渲染**~~ | L→完成 |
 | ~~C3~~ | ~~引擎单元测试扩充~~ | ~~`__tests__/` → C1~~ | ~~**完成：engine-targeted 11→26 测试，economy/politics/military/diplomacy 各 ≥5，总数 74→89 全绿**~~ | XL | ✅ 已完成 |
 | ~~C5~~ | ~~确定性重放~~ | ~~turn.ts~~ | ~~已实现 `turn.test.ts:384-403`~~ | — | ✅ 已完成 |
@@ -439,3 +439,4 @@ npm run build       # vite build（CI 部署 Pages）
 > - v2.8→v2.9：**完成 E5 一个 Phase E WP（简化版）**。E5 SVG 地形地图 WorldMap 省份圆点 fill 改地形色 + stroke 归属国色 + 相邻省边界线（同国深/异国浅）+ 悬停地形色块。不做真 Voronoi 避依赖，用现有 x/y+adjacent 画边界网络。Phase E 全部 archived。**教训：XL WP 可降级为简化版降风险——真 Voronoi 需 d3-delaunay 依赖，改用现有坐标+邻接画边界网络零依赖纯 SVG，回归风险低且满足"地形可见+边界着色"核心验收。**
 > - v2.9→v2.10：**完成 C2 第一步（基础设施）**。gameStore 加 usePlayer/usePlayerId/usePlayerResources/useTurn selector hooks，供 screen 按需迁移，零回归。
 > - v2.10→v2.11：**完成 C2 第二步（screen 迁移）**。12 screen（Dashboard/Province/Economy/Population/Politics/Military/Diplomacy/Technology/Chronicle/Stats/SaveLoad/WorldMap）pid/player 从 useGameStore() 整体订阅改为 useGameStore((s)=>...) selector 精确订阅。C2 完整 archived。**教训：selector 迁移只动最高频 pid/player，保留 state 整体订阅给 provinces/wars/history（总览页需大部分数据，selector 收益小）——分层迁移降风险。**
+> - v2.11→v2.12：**完成 C1 第一步（基础设施，零回归）**。settleEconomyPure 纯函数版本返回 delta 不 mutate，与原 settleEconomy 并存；+2 对照测试验证 delta 一致 + 不 mutate（91/91 全绿）。第二步 processTurn 迁移 + 其余 10 子引擎留下回合。**教训：纯函数化第一步先建并存版本 + 对照测试验证等价性，零回归铺路后续迁移——避免一次性改 11 子引擎高风险。**
