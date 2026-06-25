@@ -17,7 +17,6 @@ function clamp(v: number, min: number, max: number): number {
 function sanitizeState(state: GameState): GameState {
   const next = { ...state, nations: { ...state.nations }, provinces: { ...state.provinces }, relations: [...state.relations], wars: [...state.wars] };
 
-  // 玩家国兜底：避免读旧档/选国异常后玩家消失。
   if (!next.playerNationId || !next.nations[next.playerNationId]) {
     const fallback = Object.values(next.nations).find((n) => !n.defeated) ?? Object.values(next.nations)[0];
     if (fallback) next.playerNationId = fallback.id;
@@ -50,7 +49,6 @@ function sanitizeState(state: GameState): GameState {
     p.adjacent = Array.isArray(p.adjacent) ? p.adjacent.filter((id) => !!next.provinces[id] && id !== p.id) : [];
   }
 
-  // 军队不能停在不存在/非己方省份。优先撤到首都，其次任意己方省；无省则解散。
   for (const n of Object.values(next.nations)) {
     const owned = Object.values(next.provinces).filter((p) => p.ownerId === n.id);
     const fallback = owned.find((p) => p.id === n.capital) ?? owned[0];
@@ -74,7 +72,6 @@ function sanitizeState(state: GameState): GameState {
     if (owned.length === 0 && n.id !== next.playerNationId) n.defeated = true;
   }
 
-  // 战争双方/目标必须仍有效，重复反向战争只留一场。
   const seenWars = new Set<string>();
   next.wars = next.wars.filter((w) => {
     if (!next.nations[w.attackerId] || !next.nations[w.defenderId] || !next.provinces[w.targetProvinceId]) return false;
@@ -89,7 +86,6 @@ function sanitizeState(state: GameState): GameState {
   next.wars.forEach((w) => { activeWarNations.add(w.attackerId); activeWarNations.add(w.defenderId); });
   for (const n of Object.values(next.nations)) n.atWar = activeWarNations.has(n.id);
 
-  // 关系表只保留有效国家，数值夹紧。
   next.relations = next.relations.filter((r) => next.nations[r.from] && next.nations[r.to] && r.from !== r.to)
     .map((r) => ({
       ...r,
@@ -99,6 +95,27 @@ function sanitizeState(state: GameState): GameState {
       tradeDep: clamp(finite(r.tradeDep), 0, 100),
       truceTurns: Math.max(0, Math.round(finite(r.truceTurns))),
     }));
+
+  // 双向外交同步：战争/停战/同盟/贸易这种条约必须两边一致，否则 UI 和 AI 会判断不一致。
+  const byKey = new Map(next.relations.map((r) => [`${r.from}|${r.to}`, r]));
+  for (const r of next.relations) {
+    const rev = byKey.get(`${r.to}|${r.from}`);
+    if (!rev) continue;
+    if (r.treaty === 'war' || r.treaty === 'truce' || r.treaty === 'alliance' || r.treaty === 'trade') {
+      rev.treaty = r.treaty;
+      rev.truceTurns = Math.max(rev.truceTurns, r.truceTurns);
+      rev.relation = Math.min(rev.relation, r.relation);
+      rev.trust = Math.min(rev.trust, r.trust);
+    }
+  }
+
+  // 正在战争列表里的双方强制关系为 war，避免 AI 内联宣战只改一边。
+  for (const w of next.wars) {
+    const a = byKey.get(`${w.attackerId}|${w.defenderId}`);
+    const b = byKey.get(`${w.defenderId}|${w.attackerId}`);
+    if (a) { a.treaty = 'war'; a.relation = -100; }
+    if (b) { b.treaty = 'war'; b.relation = -100; }
+  }
 
   next._relMap = undefined;
   return next;
