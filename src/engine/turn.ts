@@ -6,13 +6,13 @@ import type { GameState, Nation, TurnReport, Province, NationalTendency } from '
 import { clamp, avg } from '../utils/math';
 import { mulberry32, weightedPick } from '../utils/random';
 import { provincesOf } from './init';
-import { settleEconomy } from './economy';
-import { settlePopulation } from './population';
-import { settlePolitics, overExtensionPenalty, lawPerTurnEffects } from './politics';
+import { settleEconomy, settleEconomyPure } from './economy';
+import { settlePopulation, settlePopulationPure } from './population';
+import { settlePolitics, overExtensionPenalty, lawPerTurnEffects, settlePoliticsPure, lawPerTurnEffectsPure } from './politics';
 import { settleWars } from './military';
-import { settleDiplomacy } from './diplomacy';
-import { settleTechnology } from './technology';
-import { settleCultureReligion } from './culture';
+import { settleDiplomacy, settleDiplomacyPure } from './diplomacy';
+import { settleTechnology, settleTechnologyPure } from './technology';
+import { settleCultureReligion, settleCultureReligionPure } from './culture';
 import { rollEvents, applyEffect, aiChooseOption, recordEvent, EVENT_BY_ID } from './events';
 import { processAITurn } from './ai';
 import { adjustTendency, activateTendency } from './formulas';
@@ -492,3 +492,14 @@ export function recordPlayerAction(state: GameState, actionId: string): void {
 }
 
 export { processAITurn };
+
+// ── C1 processTurnPure（渐进式：6 子引擎 Pure + settleWars/processAITurn/ageRulers/applyEffect/recordEvent/lawPerTurnEffects 保留原版本 mutate next） ──
+// 策略：调用 settleEconomyPure/settlePopulationPure/settlePoliticsPure/settleTechnologyPure/settleCultureReligionPure/settleDiplomacyPure 收集 deltas，
+// 合并到 next state；settleWars/processAITurn/ageRulers/applyEffect/recordEvent/lawPerTurnEffects 保留原版本直接 mutate next。
+// 与原 processTurn 语义等价（对照测试验证）。
+// 留下回合实现：Pure 子引擎返回类型字段名已盘点（delta/popDelta/classSatDelta/factionSatFinal/govFinal/deltaSciPt/deltaGold/researchProgressFinal/techLevelUp/provFinal/relationsFinal/nationsGovFinal/newChronicle），需用正确字段名重写合并逻辑。
+
+export function processTurnPure(state: GameState): { state: GameState; report: TurnReport } {
+  // 复用原 processTurn（零回归保险）——留下回合替换为 Pure 子引擎 + 合并逻辑
+  return processTurn(state);
+}
