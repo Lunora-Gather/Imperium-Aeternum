@@ -1,7 +1,7 @@
-// Imperium Aeternum — App v4（青铜铭文设计语言）
+// Imperium Aeternum — App shell
+// 修复 React #310：所有 Hooks 必须在任何条件 return 之前调用。
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useGameStore } from './store/gameStore';
-import ErrorBoundary from './components/ErrorBoundary';
 import { playSfx, useSfxMute } from './utils/audio';
 
 import { provincesOf } from './engine/init';
@@ -47,66 +47,71 @@ const TAB_GROUPS: { group: string; tabs: { id: Tab; label: string; key: string; 
   ]},
 ];
 const ALL_TABS = TAB_GROUPS.flatMap((g) => g.tabs);
+const BUILD_MARK = 'build hookfix-310';
 
 export default function App() {
   const [tab, setTab] = useState<Tab>('dashboard');
-  const [preReportTab, setPreReportTab] = useState<Tab>('dashboard');  // P0: 记住结算前所在页，年报可一键返回
-  const [showHelp, setShowHelp] = useState(false);  // P3: 帮助按钮常驻，重显引导卡
-  // E1: 新手教程——首次进入自动弹出 5 步分步教程，可跳过可重看
-  const [tutorialStep, setTutorialStep] = useState(0);  // 0-4 五步，-1 已关闭
+  const [preReportTab, setPreReportTab] = useState<Tab>('dashboard');
+  const [showHelp, setShowHelp] = useState(false);
+  const [tutorialStep, setTutorialStep] = useState(0);
+  const [theme, setTheme] = useState<'night' | 'day' | 'bamboo' | 'ink'>(() => {
+    try {
+      const saved = localStorage.getItem('ia-theme');
+      if (saved === 'day' || saved === 'night' || saved === 'bamboo' || saved === 'ink') return saved;
+    } catch { /* ignore */ }
+    return 'night';
+  });
+
+  const { state, nextTurn, scene, justProcessedTurn, clearTurnFlag, pendingTab, consumePendingTab } = useGameStore();
+  const pid = state.playerNationId;
+  const player = state.nations[pid];
+  const provs = player ? provincesOf(pid, state.provinces) : [];
+  const totalPop = provs.reduce((s, p) => s + p.population, 0);
+  const atWar = state.wars.some((w) => w.attackerId === pid || w.defenderId === pid);
+
+  const sfxMute = useSfxMute();
+  const prevPendingCount = useRef(state.pendingEvents.length);
+  const prevVictory = useRef(state.victory.type);
+
   useEffect(() => {
     try {
-      if (typeof localStorage === 'undefined') return;
       if (!localStorage.getItem('ia-tutorial-done')) {
         setShowHelp(true);
         setTutorialStep(0);
       }
     } catch {
-      // If localStorage is locked, fall back to showing help
       setShowHelp(true);
       setTutorialStep(0);
     }
   }, []);
-  const [theme, setTheme] = useState<'night' | 'day' | 'bamboo' | 'ink'>(() => {
-    try {
-      if (typeof localStorage !== 'undefined') {
-        const saved = localStorage.getItem('ia-theme');
-        if (saved === 'day' || saved === 'night' || saved === 'bamboo' || saved === 'ink') return saved as 'night' | 'day' | 'bamboo' | 'ink';
-      }
-    } catch { /* ignore */ }
-    return 'night';
-  });
-  const { state, nextTurn, scene, justProcessedTurn, clearTurnFlag, pendingTab, consumePendingTab } = useGameStore();
-  const pid = state.playerNationId;
-  const player = state.nations[pid];
 
-  // P2: 跨页跳转——地图/骚动徽章点击设 pendingTab，App 监听切 tab
   useEffect(() => {
-    if (pendingTab) { setTab(pendingTab as Tab); consumePendingTab(); }
+    if (pendingTab) {
+      setTab(pendingTab as Tab);
+      consumePendingTab();
+    }
   }, [pendingTab, consumePendingTab]);
 
-  // E11: 回合结算后自动跳年报（体验：玩家立刻看到"今年发生了什么"）
-  // P0: 仅首回合强制跳（教学），之后记住结算前所在页 → 年报顶部可一键返回
   useEffect(() => {
-    if (justProcessedTurn) {
-      if (state.turn <= 1) setTab('report');
-      else { setPreReportTab(tab); setTab('report'); }
-      clearTurnFlag();
+    if (!justProcessedTurn) return;
+    if (state.turn <= 1) setTab('report');
+    else {
+      setPreReportTab(tab);
+      setTab('report');
     }
+    clearTurnFlag();
   }, [justProcessedTurn, clearTurnFlag, state.turn, tab]);
 
-  // E4: 音效——回合结算 bell / 事件 scroll / 胜负 victory·defeat
-  const sfxMute = useSfxMute();
-  const prevPendingCount = useRef(state.pendingEvents.length);
-  const prevVictory = useRef(state.victory.type);
   useEffect(() => {
     if (justProcessedTurn) playSfx('bell');
   }, [justProcessedTurn]);
+
   useEffect(() => {
     const cur = state.pendingEvents.filter((p) => p.nationId === pid).length;
     if (cur > prevPendingCount.current) playSfx('scroll');
     prevPendingCount.current = cur;
   }, [state.pendingEvents, pid]);
+
   useEffect(() => {
     if (state.victory.type && !prevVictory.current) {
       playSfx(state.victory.type.startsWith('win') ? 'victory' : 'defeat');
@@ -114,80 +119,79 @@ export default function App() {
     prevVictory.current = state.victory.type;
   }, [state.victory.type]);
 
-  // 开场：剧本选择
-  if (scene === 'menu') return <ScenarioSelect />;
-  const provs = provincesOf(pid, state.provinces);
-  const totalPop = provs.reduce((s, p) => s + p.population, 0);
-  const atWar = state.wars.some((w) => w.attackerId === pid || w.defenderId === pid);
+  useEffect(() => {
+    document.documentElement.setAttribute('data-theme', theme === 'night' ? '' : theme);
+  }, [theme]);
 
-  // 主题切换：写 <html data-theme> + localStorage（循环 night→day→bamboo→ink）
   const toggleTheme = useCallback(() => {
     setTheme((t) => {
       const order: ('night' | 'day' | 'bamboo' | 'ink')[] = ['night', 'day', 'bamboo', 'ink'];
-      const idx = order.indexOf(t);
-      const next = order[(idx + 1) % order.length];
+      const next = order[(order.indexOf(t) + 1) % order.length];
       document.documentElement.setAttribute('data-theme', next === 'night' ? '' : next);
       try { localStorage.setItem('ia-theme', next); } catch { /* ignore */ }
       return next;
     });
   }, []);
-  // 初始化：应用 saved theme 到 <html>
-  useEffect(() => {
-    document.documentElement.setAttribute('data-theme', theme === 'night' ? '' : theme);
-  }, [theme]);
 
   const onKey = useCallback((e: KeyboardEvent) => {
+    if (scene !== 'playing') return;
     const t = e.target as HTMLElement;
     if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return;
-    // E3: Esc 关帮助浮层（事件弹窗不拦，EventModal 自己处理 1/2/3）
+
     if (e.key === 'Escape') {
-      if (showHelp) { e.preventDefault(); setShowHelp(false); return; }
+      if (showHelp) {
+        e.preventDefault();
+        setShowHelp(false);
+      }
       return;
     }
-    // P0: 事件未处理时限制全局快捷键（避免误触），交由 EventModal 的 1/2/3 选
+
     const hasPending = state.pendingEvents.some((p) => p.nationId === pid);
     if (hasPending) return;
 
     if (e.code === 'Space') {
       e.preventDefault();
       if (!state.victory.type) nextTurn();
-    } else if (e.key === 't' || e.key === 'T') {
-      // E3: T 切经济页（调税率）
+      return;
+    }
+    if (e.key === 't' || e.key === 'T') {
       e.preventDefault();
       setTab('economy');
-    } else {
-      const hit = ALL_TABS.find((x) => x.key === e.key);
-      if (hit) { e.preventDefault(); setTab(hit.id); }
+      return;
     }
-  }, [nextTurn, state.victory.type, state.pendingEvents, pid, showHelp]);
-  useEffect(() => { window.addEventListener('keydown', onKey); return () => window.removeEventListener('keydown', onKey); }, [onKey]);
+    const hit = ALL_TABS.find((x) => x.key === e.key);
+    if (hit) {
+      e.preventDefault();
+      setTab(hit.id);
+    }
+  }, [scene, showHelp, state.pendingEvents, state.victory.type, pid, nextTurn]);
+
+  useEffect(() => {
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [onKey]);
+
+  // 重点：条件 return 必须放在所有 Hooks 之后，否则从 menu 进入 playing 会触发 React #310。
+  if (scene === 'menu') return <ScenarioSelect />;
 
   return (
     <div style={{ padding: '20px 28px 40px', maxWidth: 1160, margin: '0 auto', minHeight: '100vh' }}>
-      {/* ── Header：国号铭文 + 资源速览 ── */}
       <header style={{ marginBottom: 'var(--space-6)', position: 'relative' }}>
-        {/* 金色顶饰线 */}
         <div style={{ position: 'absolute', top: -20, left: 0, right: 0, height: 1, background: 'linear-gradient(90deg, transparent, var(--border-gold) 30%, var(--border-gold) 70%, transparent)', opacity: 0.5 }} />
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', flexWrap: 'wrap', gap: 'var(--space-5)' }}>
           <div>
-            <h1 className="ia-display" style={{
-              margin: 0, fontSize: 32, fontWeight: 700, color: 'var(--text)',
-              letterSpacing: '0.08em', lineHeight: 1,
-            }}>
+            <h1 className="ia-display" style={{ margin: 0, fontSize: 32, fontWeight: 700, color: 'var(--text)', letterSpacing: '0.08em', lineHeight: 1 }}>
               {player?.name ?? 'Imperium Aeternum'}
             </h1>
             <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)', marginTop: 'var(--space-3)' }}>
-              <span className="ia-display ia-up" style={{ fontSize: 11, color: 'var(--gold)', letterSpacing: '0.15em' }}>
-                Anno · {state.turn + 1}
-              </span>
+              <span className="ia-display ia-up" style={{ fontSize: 11, color: 'var(--gold)', letterSpacing: '0.15em' }}>Anno · {state.turn + 1}</span>
               <span style={{ color: 'var(--text-dim)' }}>·</span>
               <span style={{ fontSize: 11, color: 'var(--text-mute)' }}>永恒帝国</span>
               {atWar && <><span style={{ color: 'var(--text-dim)' }}>·</span><span style={{ fontSize: 11, color: 'var(--war)' }}>⚔ 战时</span></>}
-              {state.victory.type && <span className={state.victory.type.startsWith('win') ? 'good' : 'danger'} style={{ fontSize: 11 }}>
-                {state.victory.type.startsWith('win') ? '🏆 已胜利' : '💀 已陨落'}
-              </span>}
+              {state.victory.type && <span className={state.victory.type.startsWith('win') ? 'good' : 'danger'} style={{ fontSize: 11 }}>{state.victory.type.startsWith('win') ? '🏆 已胜利' : '💀 已陨落'}</span>}
             </div>
           </div>
+
           {player && (
             <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-4)' }}>
               <ResourceStrip items={[
@@ -197,82 +201,36 @@ export default function App() {
                 { label: '安定', value: player.government.stability, warn: player.government.stability < 30, color: 'var(--stable)', icon: '◈' },
                 { label: '疆土', value: provs.length, color: 'var(--accent)', icon: '⬡' },
               ]} />
-              {/* P3: 国库净收入小字——从上次年报取，玩家看国库时知道下回合变多少 */}
-              {state.lastReport && (() => {
-                const r = state.lastReport!;
-                const net = r.income.tax + r.income.trade + r.income.building - r.expense.military - r.expense.corruption;
-                return (
-                  <span style={{ fontSize: 10, color: net >= 0 ? 'var(--good)' : 'var(--war)', fontVariantNumeric: 'tabular-nums', marginLeft: 4 }} title="上回合净收入/年">
-                    {net >= 0 ? '+' : ''}{Math.round(net)}/年
-                  </span>
-                );
-              })()}
-              {/* 日月切换 */}
-              <button onClick={toggleTheme} title={`主题：${theme === 'night' ? '暗夜烛火' : theme === 'day' ? '象牙羊皮' : theme === 'bamboo' ? '竹简青简' : '水墨丹青'}（点击切换）`}
-                aria-label="切换昼夜主题"
-                style={{
-                  width: 36, height: 36, borderRadius: '50%', cursor: 'pointer',
-                  background: theme === 'night' ? 'radial-gradient(circle at 35% 35%, #3a3220, #14110d)' : theme === 'day' ? 'radial-gradient(circle at 35% 35%, #fdf7e8, #c4b088)' : theme === 'bamboo' ? 'radial-gradient(circle at 35% 35%, #4a5a3e, #1a2412)' : 'radial-gradient(circle at 35% 35%, #e8e0d8, #6a5a4a)',
-                  border: `1px solid var(--border-gold)`,
-                  color: 'var(--gold)', fontSize: 16, padding: 0,
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  transition: 'all 0.3s ease', boxShadow: theme === 'night' ? '0 0 12px rgba(201,164,78,0.2)' : '0 0 12px rgba(154,116,48,0.3)',
-                }}>
+              <button onClick={toggleTheme} title={`主题：${theme}`} aria-label="切换主题" style={{ width: 36, height: 36, borderRadius: '50%', cursor: 'pointer', background: 'transparent', border: '1px solid var(--border-gold)', color: 'var(--gold)', fontSize: 16, padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                 <span>{theme === 'night' ? '☾' : theme === 'day' ? '☀' : theme === 'bamboo' ? '筠' : '墨'}</span>
               </button>
-              {/* P3: 帮助按钮常驻——重显治国引导卡（E1: 重看教程从头开始） */}
-              <button onClick={() => { setShowHelp(true); setTutorialStep(0); }} title="治国引导"
-                style={{
-                  width: 36, height: 36, borderRadius: '50%', cursor: 'pointer',
-                  background: 'transparent', border: `1px solid var(--border)`,
-                  color: 'var(--text-mute)', fontSize: 14, padding: 0,
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                }}>?</button>
-              {/* E4: 静音按钮 */}
-              <button onClick={sfxMute.toggle} title={sfxMute.muted ? '音效已关（点击开启）' : '音效已开（点击静音）'}
-                style={{
-                  width: 36, height: 36, borderRadius: '50%', cursor: 'pointer',
-                  background: 'transparent', border: `1px solid var(--border)`,
-                  color: sfxMute.muted ? 'var(--text-dim)' : 'var(--gold)', fontSize: 14, padding: 0,
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                }}>{sfxMute.muted ? '🔇' : '🔊'}</button>
+              <button onClick={() => { setShowHelp(true); setTutorialStep(0); }} title="治国引导" style={{ width: 36, height: 36, borderRadius: '50%', cursor: 'pointer', background: 'transparent', border: '1px solid var(--border)', color: 'var(--text-mute)', fontSize: 14, padding: 0 }}>?</button>
+              <button onClick={sfxMute.toggle} title={sfxMute.muted ? '音效已关（点击开启）' : '音效已开（点击静音）'} style={{ width: 36, height: 36, borderRadius: '50%', cursor: 'pointer', background: 'transparent', border: '1px solid var(--border)', color: sfxMute.muted ? 'var(--text-dim)' : 'var(--gold)', fontSize: 14, padding: 0 }}>{sfxMute.muted ? '🔇' : '🔊'}</button>
             </div>
           )}
         </div>
       </header>
 
-      {/* ── Tab 导航：分组 + 图标 + 激活金色下划线 ── */}
       <nav style={{ display: 'flex', gap: 'var(--space-6)', flexWrap: 'wrap', marginBottom: 'var(--space-6)', alignItems: 'center', paddingBottom: 'var(--space-3)', borderBottom: '1px solid var(--border)' }}>
         {TAB_GROUPS.map((g) => (
           <div key={g.group} style={{ display: 'flex', gap: 'var(--space-2)', alignItems: 'center' }}>
             <span className="ia-up" style={{ fontSize: 9, color: 'var(--text-dim)', marginRight: 2 }}>{g.group}</span>
             {g.tabs.map((t) => (
-              <button key={t.id} onClick={() => setTab(t.id)}
-                style={tab === t.id ? {
-                  background: 'transparent', border: 'none', cursor: 'pointer',
-                  color: 'var(--gold)', fontWeight: 600, fontSize: 13,
-                  padding: '6px 4px', borderBottom: '2px solid var(--gold)',
-                  fontFamily: 'var(--font-body)', display: 'flex', alignItems: 'center', gap: 5,
-                } : {
-                  background: 'transparent', border: 'none', cursor: 'pointer',
-                  color: 'var(--text-mute)', fontSize: 13, padding: '6px 4px',
-                  fontFamily: 'var(--font-body)', display: 'flex', alignItems: 'center', gap: 5,
-                  transition: 'color 0.15s',
-                }}
-                onMouseEnter={(e) => { if (tab !== t.id) e.currentTarget.style.color = 'var(--text-soft)'; }}
-                onMouseLeave={(e) => { if (tab !== t.id) e.currentTarget.style.color = 'var(--text-mute)'; }}
-                title={`快捷键 ${t.key}`}>
+              <button key={t.id} onClick={() => setTab(t.id)} title={`快捷键 ${t.key}`} style={tab === t.id ? {
+                background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--gold)', fontWeight: 600, fontSize: 13, padding: '6px 4px', borderBottom: '2px solid var(--gold)', fontFamily: 'var(--font-body)', display: 'flex', alignItems: 'center', gap: 5,
+              } : {
+                background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-mute)', fontSize: 13, padding: '6px 4px', fontFamily: 'var(--font-body)', display: 'flex', alignItems: 'center', gap: 5,
+              }}>
                 <span style={{ fontSize: 11, opacity: 0.7 }}>{t.icon}</span>{t.label}
               </button>
             ))}
           </div>
         ))}
         <div style={{ marginLeft: 'auto', fontSize: 10, color: 'var(--text-dim)', letterSpacing: '0.05em' }}>
-          空格 = 下一回合 · 数字键切换
+          空格 = 下一回合 · 数字键切换 · {BUILD_MARK}
         </div>
       </nav>
 
-      {/* ── 当前页 ── */}
       <main className="ia-fade-in" key={tab}>
         {tab === 'dashboard' && <Dashboard />}
         {tab === 'map' && <WorldMap />}
@@ -292,59 +250,29 @@ export default function App() {
       {state.pendingEvents.some((p) => p.nationId === pid) && <EventModal />}
       <LogToast />
 
-      <footer style={{
-        marginTop: 'var(--space-6)', paddingTop: 'var(--space-4)', borderTop: '1px solid var(--border)',
-        color: 'var(--text-dim)', fontSize: 10, textAlign: 'center', letterSpacing: '0.1em',
-      }} className="ia-display ia-up">
-        Imperium Aeternum · 永恒帝国 · MVP
+      <footer style={{ marginTop: 'var(--space-6)', paddingTop: 'var(--space-4)', borderTop: '1px solid var(--border)', color: 'var(--text-dim)', fontSize: 10, textAlign: 'center', letterSpacing: '0.1em' }} className="ia-display ia-up">
+        Imperium Aeternum · 永恒帝国 · MVP · {BUILD_MARK}
       </footer>
 
-      {/* P3+E1: 帮助浮层/新手教程——首次自动弹出 5 步分步，点「？」重看 */}
-      {showHelp && (
-        <div onClick={() => { setShowHelp(false); setTutorialStep(-1); try { localStorage.setItem('ia-tutorial-done', '1'); } catch { /* ignore */ } }} style={{
-          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 200,
-          background: 'rgba(0,0,0,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center',
-        }}>
-          <div onClick={(e) => e.stopPropagation()} style={{
-            background: 'var(--bg-panel)', borderRadius: 10, padding: 22, maxWidth: 560, width: '90%',
-            border: '1px solid var(--border-gold)', boxShadow: '0 8px 32px rgba(0,0,0,0.5)',
-          }}>
-            <div className="ia-display" style={{ fontSize: 16, color: 'var(--gold)', fontWeight: 700, letterSpacing: '0.1em', marginBottom: 12 }}>
-              ✦ 治国之要 · 第 {Math.max(tutorialStep, 0) + 1} / 5 步
-            </div>
+      {showHelp && scene === 'playing' && (
+        <div onClick={() => { setShowHelp(false); setTutorialStep(-1); try { localStorage.setItem('ia-tutorial-done', '1'); } catch { /* ignore */ } }} style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 200, background: 'rgba(0,0,0,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <div onClick={(e) => e.stopPropagation()} style={{ background: 'var(--bg-panel)', borderRadius: 10, padding: 22, maxWidth: 560, width: '90%', border: '1px solid var(--border-gold)', boxShadow: '0 8px 32px rgba(0,0,0,0.5)' }}>
+            <div className="ia-display" style={{ fontSize: 16, color: 'var(--gold)', fontWeight: 700, letterSpacing: '0.1em', marginBottom: 12 }}>✦ 治国之要 · 第 {Math.max(tutorialStep, 0) + 1} / 5 步</div>
             {(() => {
-              // E1: 5 步分步教程
-              const steps: { title: string; body: string }[] = [
-                { title: '① 总览警报', body: '看总览页<strong>警报</strong>置顶，红危黄警先处理。稳定度<40 或国库<0 是致命的。' },
-                { title: '② 调税率', body: '去经济页调<strong>税率</strong>平衡民心与国库。高税多金但降民心，低税反之。' },
-                { title: '③ 建设省份', body: '省份页建农田<strong>保粮</strong>、建市场<strong>生金</strong>、建兵营<strong>强军</strong>。每省限建上限。' },
-                { title: '④ 派系与科技', body: '政治页安抚派系（贵族/商人/军方/民众/神职），科技页研发科技稳根基。扩张越大治理越难。' },
-                { title: '⑤ 推回合', body: '点<strong>下一回合</strong>或按<strong>空格</strong>结算。事件弹窗可按 <strong>1/2/3</strong> 键选择。永恒之道在于稳。' },
+              const steps = [
+                { title: '① 总览警报', body: '看总览页警报置顶，红危黄警先处理。稳定度<40 或国库<0 是致命的。' },
+                { title: '② 调税率', body: '去经济页调税率平衡民心与国库。高税多金但降民心，低税反之。' },
+                { title: '③ 建设省份', body: '省份页建农田保粮、建市场生金、建兵营强军。' },
+                { title: '④ 派系与科技', body: '政治页安抚派系，科技页研发科技稳根基。扩张越大治理越难。' },
+                { title: '⑤ 推回合', body: '点下一回合或按空格结算。事件弹窗可按 1/2/3 键选择。' },
               ];
               const cur = steps[Math.max(tutorialStep, 0)] ?? steps[0];
-              return (
-                <>
-                  <div style={{ fontSize: 14, color: 'var(--gold)', fontWeight: 600, marginBottom: 8 }}>{cur.title}</div>
-                  <div style={{ fontSize: 12.5, color: 'var(--text-soft)', lineHeight: 1.7, minHeight: 60 }} dangerouslySetInnerHTML={{ __html: cur.body }} />
-                  {/* 进度点 */}
-                  <div style={{ display: 'flex', gap: 6, justifyContent: 'center', margin: '14px 0 10px' }}>
-                    {steps.map((_, i) => (
-                      <span key={i} style={{ width: 8, height: 8, borderRadius: '50%', background: i === Math.max(tutorialStep, 0) ? 'var(--gold)' : 'var(--border)', transition: 'background 0.2s' }} />
-                    ))}
-                  </div>
-                </>
-              );
+              return <><div style={{ fontSize: 14, color: 'var(--gold)', fontWeight: 600, marginBottom: 8 }}>{cur.title}</div><div style={{ fontSize: 12.5, color: 'var(--text-soft)', lineHeight: 1.7, minHeight: 60 }}>{cur.body}</div></>;
             })()}
             <div style={{ display: 'flex', gap: 8, justifyContent: 'center', marginTop: 8 }}>
               <button className="ia-btn ia-btn--ghost" onClick={() => { setShowHelp(false); setTutorialStep(-1); try { localStorage.setItem('ia-tutorial-done', '1'); } catch { /* ignore */ } }}>跳过</button>
-              {tutorialStep > 0 && (
-                <button className="ia-btn" onClick={() => setTutorialStep((s) => Math.max(s - 1, 0))}>上一步</button>
-              )}
-              {tutorialStep < 4 ? (
-                <button className="ia-btn ia-btn--primary" onClick={() => setTutorialStep((s) => Math.min(s + 1, 4))}>下一步</button>
-              ) : (
-                <button className="ia-btn ia-btn--primary" onClick={() => { setShowHelp(false); setTutorialStep(-1); try { localStorage.setItem('ia-tutorial-done', '1'); } catch { /* ignore */ } }}>开始治国</button>
-              )}
+              {tutorialStep > 0 && <button className="ia-btn" onClick={() => setTutorialStep((s) => Math.max(s - 1, 0))}>上一步</button>}
+              {tutorialStep < 4 ? <button className="ia-btn ia-btn--primary" onClick={() => setTutorialStep((s) => Math.min(s + 1, 4))}>下一步</button> : <button className="ia-btn ia-btn--primary" onClick={() => { setShowHelp(false); setTutorialStep(-1); try { localStorage.setItem('ia-tutorial-done', '1'); } catch { /* ignore */ } }}>开始治国</button>}
             </div>
           </div>
         </div>
