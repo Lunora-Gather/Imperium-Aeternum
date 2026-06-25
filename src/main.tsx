@@ -8,7 +8,7 @@ import './restraint.css';
 import './gameplay/strategyFocus.css';
 import { installStrategyFocus, StrategyFocusDock } from './gameplay/strategyFocus';
 
-const BUILD_MARK = '玩法扩展 v1 · strategic-focus';
+const BUILD_MARK = '精修 v2 · quiet-ui';
 
 installStrategyFocus();
 
