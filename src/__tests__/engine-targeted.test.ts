@@ -2,7 +2,7 @@
 import { describe, it, expect } from 'vitest';
 import { createInitialState } from '../engine/init';
 import { settleEconomy, establishTradeRoute, settleEconomyPure } from '../engine/economy';
-import { settlePolitics, changeGovernment, enactPolicy, enactLaw } from '../engine/politics';
+import { settlePolitics, settlePoliticsPure, changeGovernment, enactPolicy, enactLaw } from '../engine/politics';
 import { declareWar, makePeace, recruit, moveArmy } from '../engine/military';
 import { improveRelation, establishTrade, espionage, formAlliance } from '../engine/diplomacy';
 import { draftFromPopulation, settlePopulation, settlePopulationPure } from '../engine/population';
@@ -414,5 +414,32 @@ describe('C1 settlePopulationPure 纯函数对照', () => {
     const before = JSON.stringify({ nation: p, provs });
     settlePopulationPure(p, provs, false, true, false, false);
     expect(JSON.stringify({ nation: p, provs })).toBe(before);
+  });
+});
+
+// C1: settlePoliticsPure 纯函数对照测试——delta 与 settlePolitics mutate 结果一致
+describe('C1 settlePoliticsPure 纯函数对照', () => {
+  it('govFinal 与 settlePolitics mutate 后的 government 值一致', () => {
+    const state1 = createInitialState();
+    const state2 = createInitialState();
+    const p1 = state1.nations[PLAYER_ID];
+    const p2 = state2.nations[PLAYER_ID];
+    settlePolitics(p1, state1);
+    const pure = settlePoliticsPure(p2, state2);
+    expect(p1.government.stability).toBeCloseTo(pure.govFinal.stability, 0);
+    expect(p1.government.legitimacy).toBeCloseTo(pure.govFinal.legitimacy, 0);
+    expect(p1.government.corruption).toBeCloseTo(pure.govFinal.corruption, 0);
+    expect(p1.government.efficiency).toBeCloseTo(pure.govFinal.efficiency, 0);
+    p1.factions.forEach((f) => {
+      expect(f.satisfaction).toBeCloseTo(pure.factionSatFinal[f.id], 0);
+    });
+  });
+
+  it('settlePoliticsPure 不 mutate nation（调用前后 government/factions 不变）', () => {
+    const state = createInitialState();
+    const p = state.nations[PLAYER_ID];
+    const before = JSON.stringify({ gov: p.government, factions: p.factions });
+    settlePoliticsPure(p, state);
+    expect(JSON.stringify({ gov: p.government, factions: p.factions })).toBe(before);
   });
 });

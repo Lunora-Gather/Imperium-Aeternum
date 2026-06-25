@@ -253,3 +253,92 @@ export function overExtensionPenalty(nation: Nation, provinceCount: number): { t
 }
 
 export { reformSuccessRate };
+
+// ── C1: 纯函数版本 settlePoliticsPure ──
+// 不 mutate nation，返回 government delta + factionSatFinal，供 processTurn 合并建新 state
+// 与原 settlePolitics 并存（零回归），后续 processTurn 迁移到此纯函数后可删原函数
+export interface PoliticsPartial extends PoliticsResult {
+  // government 最终值（覆写，非增量——clamp 后值）
+  govFinal: {
+    stability: number;
+    legitimacy: number;
+    corruption: number;
+    efficiency: number;
+  };
+  // 每派系 satisfaction 最终值（覆写）
+  factionSatFinal: Record<string, number>;
+}
+export function settlePoliticsPure(nation: Nation, state: GameState): PoliticsPartial {
+  const provs = provincesOf(nation.id, state.provinces);
+  const fw = factionWeightedSat(nation.factions);
+  const avgUnrest = provs.length ? provs.reduce((s, p) => s + p.unrest, 0) / provs.length : 0;
+  const rebellionProvCount = provs.filter((p) => p.rebellionRisk >= 100).length;
+
+  const dStab = stabilityDelta(
+    nation.government.legitimacy, fw.weighted, fw.totalPower,
+    avgUnrest, nation.warExhaustion, rebellionProvCount,
+  );
+  let finalDelta = dStab;
+  if (nation.civilWar?.active) finalDelta -= 3;
+  const stab = nation.government.stability;
+  const atWar = nation.civilWar?.active;
+  if (stab < 40) finalDelta = Math.max(finalDelta, atWar ? 2 : 5);
+  else if (stab < 60) finalDelta = Math.max(finalDelta, atWar ? 1 : 3);
+  else if (stab < 75) finalDelta = Math.max(finalDelta, atWar ? 0 : 1.5);
+  else finalDelta = Math.max(finalDelta, -2);
+  // 用临时变量算 final，不 mutate
+  let finalStab = clamp(nation.government.stability + finalDelta, 0, 100);
+
+  const reformShockTurns = nation.activePolicies.filter((p) => state.turn - p.enactedTurn < 3).length > 0 ? 1 : 0;
+  const dLegit = legitimacyDelta(fw.avgSat, nation.government.corruption, nation.warExhaustion, reformShockTurns);
+  let finalLegit = clamp(nation.government.legitimacy + dLegit, 0, 100);
+  finalLegit = clamp(finalLegit + nation.tech.culture * 0.3, 0, 100);
+
+  // 腐败：用 finalStab 判断（等价原函数 mutate 后的 stability）
+  const hasAntiCorruption = nation.activePolicies.some((p) => p.policyId === 'anti_corruption');
+  let corruptionDelta: number;
+  if (hasAntiCorruption) corruptionDelta = -1;
+  else if (finalStab >= 70) corruptionDelta = -0.2;
+  else if (finalStab >= 50) corruptionDelta = 0.1;
+  else corruptionDelta = 0.4;
+  let finalCorruption = clamp(nation.government.corruption + corruptionDelta, 0, 100);
+
+  let finalEfficiency = nation.government.efficiency;
+  const cm = charMods(nation);
+  if (cm.stabilityMod) finalStab = clamp(finalStab + cm.stabilityMod, 0, 100);
+  if (cm.legitimacyMod) finalLegit = clamp(finalLegit + cm.legitimacyMod, 0, 100);
+  if (cm.efficiencyMod) finalEfficiency = clamp(finalEfficiency + cm.efficiencyMod, 0, 100);
+  if (cm.corruptionMod) finalCorruption = clamp(finalCorruption + cm.corruptionMod, 0, 100);
+
+  // 派系满意度：性格 + 政体 perTurn
+  const factionSatFinal: Record<string, number> = {};
+  const factionSatMap: Record<string, number | undefined> = { nobles: cm.noblesSat, merchants: cm.merchantsSat, military: cm.militarySat, commoners: cm.commonersSat, clergy: cm.clergySat };
+  for (const f of nation.factions) {
+    let sat = f.satisfaction;
+    const d = factionSatMap[f.id];
+    if (d) sat = clamp(sat + d * 0.1, 0, 100);
+    factionSatFinal[f.id] = sat;
+  }
+
+  const govDef = GOVERNMENTS[nation.government.type as GovernmentId];
+  if (govDef?.perTurn) {
+    const pt = govDef.perTurn;
+    if (pt.legitimacy) finalLegit = clamp(finalLegit + pt.legitimacy, 0, 100);
+    if (pt.stability) finalStab = clamp(finalStab + pt.stability, 0, 100);
+    if (pt.efficiency) finalEfficiency = clamp(finalEfficiency + pt.efficiency, 0, 100);
+    if (pt.corruption) finalCorruption = clamp(finalCorruption + pt.corruption, 0, 100);
+    if (pt.factionSat) {
+      const fsMap: Record<string, number | undefined> = pt.factionSat as Record<string, number | undefined>;
+      for (const f of nation.factions) {
+        const d = fsMap[f.id];
+        if (d) factionSatFinal[f.id] = clamp(factionSatFinal[f.id] + d, 0, 100);
+      }
+    }
+  }
+
+  return {
+    stabilityDelta: dStab, legitimacyDelta: dLegit,
+    govFinal: { stability: finalStab, legitimacy: finalLegit, corruption: finalCorruption, efficiency: finalEfficiency },
+    factionSatFinal,
+  };
+}
