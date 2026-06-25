@@ -298,3 +298,11 @@
 - **替代**：全做 B/R/T（否决：需深度改 ProvinceScreen 与 build/recruit/tax 操作联动，风险高，留后）；不做 Esc（否决：帮助浮层仅能点遮罩关，键盘用户不便）。
 - **教训**：E3 不是全做或全不做，按风险分层——零风险的先做，需深度改 UI 的留后。
 
+## DEC-036：D5 剧本扩充至 10（Phase D）
+
+- **阶段**：v2 Phase D5（2026-06-25）
+- **背景**：`gameStore.ts` 仅 7 剧本（classic/world/eastasia/w3_eastasia/w5_mediterranean/w6_americas/w7_random），剧本选择不足，违"每局有新故事"目标。
+- **决策**：+3 剧本到 10——`w4_europe` 欧洲封建（西欧/东欧/北欧/地中海 4 洲，法兰克/罗马/基辅罗斯/迦太基可选）、`w8_indianocean` 印度洋贸易（南亚/东非/中东/大洋洲 4 洲，孔雀/室利佛逝/埃及/波斯可选，海洋贸易国主题）、`challenge_survival` 生存挑战（全世界 205 国，玩家选 B 级边缘国对抗 S/A 霸主，硬核模式）。同步扩 ScenarioId type。
+- **影响**：剧本 7→10，玩家可选场景 +43%，涵盖欧洲封建/印度洋贸易/硬核生存三种新体验。typecheck ✅ + 89/89 测试 ✅。
+- **替代**：照搬 D5 旧描述的 w7_fantasy 奇幻（否决：需新数据集 supporting magic/fantasy，超 MVP 红线）；加更多区域剧本（否决：10 已足够，过多分散）。
+

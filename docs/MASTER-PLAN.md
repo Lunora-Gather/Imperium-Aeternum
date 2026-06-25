@@ -3,7 +3,7 @@
 > **唯一指挥棒**。本文档收敛 `06-expansion.md`（10 项 E 系列）+ `08-comprehensive-plan.md`（31 项 P 系列）+ 散落 ADR，统一为一条可追溯的执行线。
 > 任何后续改动必须能映射回本文档的某个工作包（WP），否则不予立项。
 >
-> **基线快照**（2026-06-25 v1.7）：57 源文件 / 11077 行 | typecheck ✅ | **vitest 89/89 ✅**（含 engine-targeted 26 针对性测试，economy/politics/military/diplomacy 各 ≥5）| validate ✅（203 事件 0 重复）| 205 国 577 省 | 150 事件 / **40 建筑** / 32 科技 / 12 政体 / **15 性格** / **20 法律** / 8 商路 / 7 剧本 | 50 回合 1131ms。
+> **基线快照**（2026-06-25 v1.8）：57 源文件 / 11077 行 | typecheck ✅ | **vitest 89/89 ✅**（含 engine-targeted 26 针对性测试，economy/politics/military/diplomacy 各 ≥5）| validate ✅（203 事件 0 重复）| 205 国 577 省 | 150 事件 / **40 建筑** / 32 科技 / 12 政体 / **15 性格** / **20 法律** / 8 商路 / **10 剧本** | 50 回合 1131ms。
 >
 > **穷尽代码核验**（2026-06-25 实读 18 符号：`turn.ts judgeVictory/processTurn/buildReport`、`politics.ts settlePolitics/changeGovernment`、`economy.ts settleEconomy`、`military.ts makePeace/moveArmy`、`ai.ts planAITurn`、`persistence.ts migrate/saveGameToSlot/listAllSlots`、`App.tsx`、`EventModal effectSummary`、`PoliticsScreen civilWar`、`gameStore suppressRebellion/negotiateRebellion/demolishBuilding`、`ErrorBoundary`、`ProvinceScreen`、`DiplomacyScreen`、`MilitaryScreen truce`、`events.ts govTransition`）：
 > - **Phase A 全部 4 WP 已实现**（A1 叛乱临时 Nation+连锁+归顺 / A2 内战镇压谈判 UI+引擎 / A3 孤儿军队撤退 / A4 AI 可见 worldEvents）
@@ -138,7 +138,7 @@
 | **D2** | 科技质变效果 | `data/technologies.ts` + `formulas.ts` | 高级科技解锁新能力（agri_lv5 轮作政策+15%粮；agri_lv8 化肥建筑×1.5；mil_lv5 要塞+50%防；mil_lv8 总动员×2征兵；admin_lv5 科举法-10腐败；admin_lv8 行省制+5省；culture_lv5 文化输出外交；culture_lv8 永恒文脉性格） | 需 DEC 解锁"科技不超 3×8"红线到质变 | L |
 | ~~D3~~ | ~~建筑扩充至 40+~~ | ~~`data/buildings.ts`~~ | ~~**完成：24→40 建筑，+16 含前置科技/地形适配/差异化产出（铁匠铺/漕运码头/城墙加固/书院/驿馆/筒仓/铸币工坊/药铺/望楼/会馆/军械库/观象台/王家粮仓/贸易站/修道院/水利工程）**~~ | — | ✅ 已完成 |
 | ~~D4~~ | ~~法律扩充至 20+~~ | ~~`data/laws.ts`~~ | ~~**完成：12→20 法律，+8 含互斥/前置/派系反应（民法+3/刑法+2/行政法+3）**~~ | S | ✅ 已完成 |
-| **D5** | 剧本扩充至 15+ | `data/scenarios.ts` | +3 剧本（w4_europe 中世纪封建/w7_fantasy 奇幻/challenge_survival 生存挑战） | — | M |
+| ~~D5~~ | ~~剧本扩充至 15+~~ | ~~`data/scenarios.ts`~~ | ~~**完成：7→10 剧本（+w4_europe 欧洲封建/w8_indianocean 印度洋贸易/challenge_survival 生存挑战）**~~ | — | M→完成 |
 | ~~D6~~ | ~~国家性格扩充至 15+~~ | ~~`data/national-characters.ts` → A4~~ | ~~**完成：11→15 性格（+isolationist/expansionist/scholarly/mercantilist），同步扩 NationalTendency/buildTendency/BEHAVIOR_MAPPINGS**~~ | S | ✅ 已完成 |
 
 **Phase D 验收门槛**：玩家两局不重样、每局都有新事件新选择新故事。
@@ -425,3 +425,4 @@ npm run build       # vite build（CI 部署 Pages）
 > - v1.4→v1.5：**本回合完成 C3+C4+B4+B5+B8 五个 WP**。C3 引擎针对性测试 11→26（economy/politics/military/diplomacy 各 ≥5，总数 74→89 全绿）；C4 `as` 断言清理（Nation 接口加 `govTransitionTurns` 正式字段）；B4 建筑拆除按钮接线；B5 停战回合数显示三处；B8 三政体反扑事件 + 删 5 重复事件 id（validate 5 错误→0）。Phase B 全部 archived，Phase C 仅剩 C1/C2（XL 高风险）。**教训：写测试也要先穷尽读引擎实际逻辑再下笔——第一次凭签名猜致 4 个失败，逐个读 `settlePopulation` 6 参数/`declareWar` 无同盟检查/`moveArmy` 首都枢纽规则才修对。**
 > - v1.5→v1.6：**本回合完成 D4+D6 两个 Phase D WP**。D4 法律 12→20（+8 含互斥/前置/派系反应，民法+3/刑法+2/行政法+3）；D6 国家性格 11→15（+isolationist 孤立主义/expansionist 扩张主义/scholarly 文治/mercantilist 重商，同步扩 NationalTendency/buildTendency/BEHAVIOR_MAPPINGS +6 行为映射/叛军 tendency/formulas tendency）。**教训：D6 旧描述指定 +4 性格中 3 个已存在（maritime/centralization/revolutionary），照搬会重复——穷尽实读现有 11 性格后选真正缺口，再次印证"不照搬旧规划，按现状补真缺口"。**
 > - v1.6→v1.7：**本回合完成 D3 一个 Phase D WP**。D3 建筑 24→40（+16 含前置科技/地形适配/差异化产出：铁匠铺/漕运码头/城墙加固/书院/驿馆/筒仓/铸币工坊/药铺/望楼/会馆/军械库/观象台/王家粮仓/贸易站/修道院/水利工程）。validate 动态计数 BUILDING_LIST.length 自动适配。Phase D 仅剩 D1/D2/D5。
+> - v1.7→v1.8：**本回合完成 D5 一个 Phase D WP + E3 部分**。D5 剧本 7→10（+w4_europe 欧洲封建 4 洲/w8_indianocean 印度洋贸易 4 洲/challenge_survival 生存挑战硬核模式）；E3 键盘快捷键部分（Esc 关帮助浮层 + [/] 切省，B/R/T 留后）。Phase D 仅剩 D1/D2（XL）。**教训：D5 旧描述指定 w7_fantasy 奇幻需新数据集超 MVP 红线，改做 challenge_survival 硬核模式更契合——再次印证"不照搬旧描述，按红线约束调整"。**

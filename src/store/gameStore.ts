@@ -49,7 +49,7 @@ function hasTechLevel(nation: Nation, techId: string): boolean {
 }
 
 // 剧本定义
-export type ScenarioId = 'classic' | 'world' | 'eastasia' | 'w3_eastasia' | 'w5_mediterranean' | 'w6_americas' | 'w7_random';
+export type ScenarioId = 'classic' | 'world' | 'eastasia' | 'w3_eastasia' | 'w5_mediterranean' | 'w6_americas' | 'w7_random' | 'w4_europe' | 'w8_indianocean' | 'challenge_survival';
 export interface ScenarioDef {
   id: ScenarioId;
   name: string;
@@ -139,6 +139,43 @@ export const SCENARIOS: ScenarioDef[] = [
     description: '随机抽取一洲开局，每次不同。考验适应力，适合老手。',
     nationCount: '~20-40 国', needsNationPick: false,
     // regionFilter 运行时随机选定（startScenario 中处理）
+  },
+  // ── D5 扩充：+3 剧本到 10 ──
+  {
+    id: 'w4_europe', name: '欧洲封建', subtitle: 'W4 · 欧洲 4 洲',
+    description: '西欧、东欧、北欧、地中海四洲角逐。法兰克、罗马、基辅罗斯同台，中世纪封建的骑士与教权之争。',
+    nationCount: '~60 国', needsNationPick: true,
+    playableNations: [
+      { id: 'n_we_frank', name: '法兰克', tier: 'A', desc: '欧洲新贵，封建骑士，军事传统' },
+      { id: 'n_med_rome', name: '罗马', tier: 'A', desc: '古典遗绪，政体稳定，潜力巨大' },
+      { id: 'n_ee_kievan', name: '基辅罗斯', tier: 'B', desc: '东欧新星，正教立国，商业兴起' },
+      { id: 'n_med_carthage', name: '迦太基', tier: 'A', desc: '商业共和，富甲一方，海军称雄' },
+    ],
+    regionFilter: ['europe_w', 'europe_e', 'europe_n', 'mediterranean'],
+  },
+  {
+    id: 'w8_indianocean', name: '印度洋贸易', subtitle: 'W8 · 印度洋 3 洲',
+    description: '南亚、东非、中东三洲围绕印度洋的贸易争霸。孔雀、室利佛逝、埃及同台，海洋贸易国的黄金时代。',
+    nationCount: '~40 国', needsNationPick: true,
+    playableNations: [
+      { id: 'n_sa_maurya', name: '孔雀帝国', tier: 'A', desc: '南亚霸主，福利倾向，民心稳固' },
+      { id: 'n_oc_srivijaya', name: '室利佛逝', tier: 'B', desc: '海贸城邦，商团特许，贸易辐射' },
+      { id: 'n_na_egypt', name: '埃及', tier: 'B', desc: '尼罗河粮仓，神权立国，古老文明' },
+      { id: 'n_me_persia', name: '波斯帝国', tier: 'S', desc: '东方霸主，高压帝国，军力最强' },
+    ],
+    regionFilter: ['asia_south', 'africa_n', 'middle_east', 'oceania'],
+  },
+  {
+    id: 'challenge_survival', name: '生存挑战', subtitle: '硬核 · 弱国求生',
+    description: '执掌一个 D 级城邦，资源匮乏，强敌环伺。能否在 200 年内崛起为帝国？硬核玩家专属。',
+    nationCount: '205 国', needsNationPick: true,
+    playableNations: [
+      { id: 'n_ee_kievan', name: '基辅罗斯', tier: 'B', desc: '边缘崛起，正教立国' },
+      { id: 'n_oc_srivijaya', name: '室利佛逝', tier: 'B', desc: '海贸求生，商团立国' },
+      { id: 'n_na_egypt', name: '埃及', tier: 'B', desc: '古老文明，神权维稳' },
+      { id: 'n_am_maya', name: '玛雅', tier: 'B', desc: '城邦联盟，天文发达，分裂内斗' },
+    ],
+    // 无 regionFilter = 全世界，玩家选 B 级边缘国对抗 S/A 级霸主
   },
 ];
 
