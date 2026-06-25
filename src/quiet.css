@@ -1,31 +1,16 @@
 /* ============================================================
-   Quiet UI cleanup — 对齐修正版
-   目标：统一外框、顶栏、导航、总览三栏的栅格，取消遮挡。
+   Quiet UI cleanup — 解决“丑、乱、像浮窗广告”的问题
+   只做覆盖，不改玩法逻辑。
    ============================================================ */
 
 :root {
   --shell-max: 1180px;
-  --ia-side-col: 280px;
-  --ia-gap: 12px;
 }
 
-/* 页面整体固定同一套外边界 */
+/* 页面整体更窄、更稳，不撑满成大白板 */
 .ia-shell {
-  width: min(var(--shell-max), calc(100vw - 40px)) !important;
-  padding: 8px 0 42px !important;
-}
-
-/* 顶部不再 sticky，避免压住导航和内容 */
-.ia-topbar {
-  position: relative !important;
-  top: auto !important;
-  z-index: auto !important;
-  display: grid !important;
-  grid-template-columns: minmax(0, 1fr) var(--ia-side-col) !important;
-  gap: var(--ia-gap) !important;
-  margin: 0 0 var(--ia-gap) !important;
-  padding: 0 !important;
-  align-items: stretch !important;
+  width: min(1180px, calc(100vw - 40px)) !important;
+  padding-bottom: 58px !important;
 }
 
 /* 顶部减少卡片感，只保留信息 */
@@ -43,7 +28,6 @@
 
 .ia-status-panel {
   grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
-  align-self: stretch !important;
 }
 
 .ia-status-row {
@@ -51,23 +35,23 @@
   background: transparent !important;
 }
 
-.ia-status-row span { font-size: 9.5px !important; }
-.ia-status-row strong { font-size: 12px !important; }
-
-/* 导航也不 sticky；宽度与顶栏/内容完全同边界 */
-.ia-main-nav {
-  position: relative !important;
-  top: auto !important;
-  z-index: auto !important;
-  border-radius: 9px !important;
-  padding: 6px 8px !important;
-  margin: 0 0 var(--ia-gap) !important;
-  display: flex !important;
-  align-items: center !important;
-  min-height: 44px !important;
+.ia-status-row span {
+  font-size: 9.5px !important;
 }
 
-.ia-nav-label { opacity: .65; }
+.ia-status-row strong {
+  font-size: 12px !important;
+}
+
+/* 导航不要像按钮墙 */
+.ia-main-nav {
+  border-radius: 9px !important;
+  padding: 6px 8px !important;
+}
+
+.ia-nav-label {
+  opacity: .65;
+}
 
 .ia-tab-btn {
   border: 0 !important;
@@ -81,18 +65,22 @@
   border: 1px solid color-mix(in srgb, var(--border-gold) 55%, transparent) !important;
 }
 
-.ia-tab-icon { opacity: .65; }
-.ia-tab-btn kbd { background: transparent !important; border-color: color-mix(in srgb, var(--border) 52%, transparent) !important; }
+.ia-tab-icon {
+  opacity: .65;
+}
 
-/* 内容区域与导航严格同宽，内部不再挤出错位 */
+.ia-tab-btn kbd {
+  background: transparent !important;
+  border-color: color-mix(in srgb, var(--border) 52%, transparent) !important;
+}
+
+/* 内容区域变成“纸面”，不是厚面板 */
 .ia-content-shell {
   border-radius: 10px !important;
   padding: 14px !important;
-  margin: 0 !important;
-  overflow: visible !important;
 }
 
-/* 总览页里的旧大提示覆盖 */
+/* 总览页里的大提示不要那么像广告横幅 */
 .ia-content-shell > div > .ia-fade-in:first-child {
   background: transparent !important;
   border: 1px solid color-mix(in srgb, var(--border) 72%, transparent) !important;
@@ -100,24 +88,76 @@
 }
 
 /* 杆图再收敛：像表格，不像仪表 */
-.ia-lever-panel { background: transparent !important; border-color: color-mix(in srgb, var(--border) 66%, transparent) !important; }
-.ia-lever-grid { grid-template-columns: 1fr !important; }
-.ia-lever { background: transparent !important; border-color: color-mix(in srgb, var(--border) 44%, transparent) !important; }
-.ia-lever-head { margin-bottom: 6px !important; }
-.ia-lever-track { height: 9px !important; background: color-mix(in srgb, var(--bg-inset) 62%, transparent) !important; }
-.ia-lever-fill { opacity: .55 !important; }
-.ia-lever-foot { display: none !important; }
+.ia-lever-panel {
+  background: transparent !important;
+  border-color: color-mix(in srgb, var(--border) 66%, transparent) !important;
+}
 
-/* 隐藏旧底部国策条：国策现在已经进入总览右侧栏 */
-.ia-focus-dock {
+.ia-lever-grid {
+  grid-template-columns: 1fr !important;
+}
+
+.ia-lever {
+  background: transparent !important;
+  border-color: color-mix(in srgb, var(--border) 44%, transparent) !important;
+}
+
+.ia-lever-head {
+  margin-bottom: 6px !important;
+}
+
+.ia-lever-track {
+  height: 9px !important;
+  background: color-mix(in srgb, var(--bg-inset) 62%, transparent) !important;
+}
+
+.ia-lever-fill {
+  opacity: .55 !important;
+}
+
+.ia-lever-foot {
   display: none !important;
 }
 
-/* 右下角日志：轻提示 */
+/* 国策焦点：底部细条，不抢视线 */
+.ia-focus-dock {
+  opacity: .72 !important;
+  background: color-mix(in srgb, var(--bg-panel) 72%, transparent) !important;
+  border-color: color-mix(in srgb, var(--border) 54%, transparent) !important;
+  height: 34px !important;
+  padding: 3px 6px 3px 10px !important;
+}
+
+.ia-focus-dock:hover,
+.ia-focus-dock:focus-within {
+  opacity: .96 !important;
+}
+
+.ia-focus-title span {
+  font-size: 9px !important;
+}
+
+.ia-focus-title strong {
+  font-size: 10px !important;
+}
+
+.ia-focus-options button {
+  height: 24px !important;
+  min-width: 42px !important;
+  padding: 0 7px !important;
+  color: color-mix(in srgb, var(--text-mute) 78%, transparent) !important;
+}
+
+.ia-focus-options button.is-active {
+  color: var(--gold) !important;
+  background: color-mix(in srgb, var(--gold) 6%, transparent) !important;
+}
+
+/* 右下角日志：从黑色大块变成轻提示 */
 .ia-toast-stack {
   position: fixed;
   right: 18px;
-  bottom: 30px;
+  bottom: 52px;
   z-index: 1000;
   display: flex;
   flex-direction: column;
@@ -143,20 +183,27 @@
   animation: ia-slide-in 0.18s ease;
 }
 
-.ia-toast p { margin: 0; }
-.ia-toast span { color: var(--gold); font-weight: 700; }
-.ia-toast.is-fail { color: var(--war); border-color: color-mix(in srgb, var(--war) 55%, var(--border)); }
-.ia-toast.is-fail span { color: var(--war); }
-
-/* 右下角版本号淡化 */
-body > div[style*="position:fixed"][style*="right:8px"] {
-  opacity: .24 !important;
+.ia-toast p {
+  margin: 0;
 }
 
-@media (max-width: 1040px) {
-  .ia-topbar {
-    grid-template-columns: 1fr !important;
-  }
+.ia-toast span {
+  color: var(--gold);
+  font-weight: 700;
+}
+
+.ia-toast.is-fail {
+  color: var(--war);
+  border-color: color-mix(in srgb, var(--war) 55%, var(--border));
+}
+
+.ia-toast.is-fail span {
+  color: var(--war);
+}
+
+/* 右下角版本号过于干扰，淡化 */
+body > div[style*="position:fixed"][style*="right:8px"] {
+  opacity: .32 !important;
 }
 
 @media (max-width: 760px) {
@@ -169,5 +216,7 @@ body > div[style*="position:fixed"][style*="right:8px"] {
     left: 10px;
     bottom: 10px;
   }
-  .ia-toast { max-width: none; }
+  .ia-toast {
+    max-width: none;
+  }
 }
