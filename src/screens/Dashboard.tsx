@@ -26,7 +26,7 @@ function Sparkline({ data, color, label }: { data: number[]; color: string; labe
 }
 
 // P1 杆组仪表盘——五根杆当前刻度 + 阻尼警告
-// 让玩家直观看到自己拉杆的代价，体现"扩张越大治理越难"
+// 让玩家直观看到自己拉杆的代价，体现“扩张越大治理越难”
 import type { Nation, Province, GameState } from '../types/game';
 import { overExtensionPenalty, maxManageableProvinces } from '../engine/politics';
 
@@ -39,24 +39,28 @@ interface LeverDef {
 
 function LeverBar({ def }: { def: LeverDef }) {
   const { name, icon, color, load, damping, threshold } = def;
-  const isOver = load >= threshold;
-  const isWarn = load >= threshold * 0.7;
+  const safeLoad = Math.max(0, Math.min(100, load));
+  const isOver = safeLoad >= threshold;
+  const isWarn = safeLoad >= threshold * 0.7;
   const tone = isOver ? 'var(--war)' : isWarn ? 'var(--warn)' : 'var(--good)';
+  const status = isOver ? '阻尼' : isWarn ? '接近' : '安全';
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: '90px 1fr 70px', gap: 'var(--space-2)', alignItems: 'center', padding: '4px 0' }}>
-      <span style={{ fontSize: 11, color, fontWeight: 600 }}>{icon} {name}</span>
-      <div style={{ position: 'relative', height: 14, background: 'var(--bg-inset)', borderRadius: 7, overflow: 'hidden' }}>
-        <div style={{ position: 'absolute', left: `${threshold}%`, top: 0, bottom: 0, width: 2, background: 'var(--war)', opacity: 0.5 }} />
-        <div style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: `${Math.min(100, load)}%`, background: `linear-gradient(90deg, ${color}66, ${tone})`, transition: 'width 0.3s' }} />
-        {isOver && (
-          <div style={{ position: 'absolute', left: `${threshold}%`, top: 0, bottom: 0, right: 0, background: 'repeating-linear-gradient(45deg, rgba(162,61,40,0.3), rgba(162,61,40,0.3) 4px, transparent 4px, transparent 8px)' }} />
-        )}
+    <div className={`ia-lever ${isOver ? 'is-over' : isWarn ? 'is-warn' : 'is-safe'}`}>
+      <div className="ia-lever-head">
+        <span className="ia-lever-name" style={{ color }}>{icon} {name}</span>
+        <span className="ia-lever-value" style={{ color: tone }}>{Math.round(safeLoad)} / 100 · {status}</span>
       </div>
-      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }}>
-        <span style={{ fontSize: 11, fontWeight: 700, color: tone }}>{Math.round(load)}</span>
-        <span style={{ fontSize: 8, color: isOver ? 'var(--war)' : 'var(--text-dim)' }}>{isOver ? '⚠ 阻尼' : isWarn ? '⚠ 接近' : '安全'}</span>
+      <div className="ia-lever-track" aria-label={`${name}负重 ${Math.round(safeLoad)}`}>
+        <div className="ia-lever-fill" style={{ width: `${safeLoad}%`, background: `linear-gradient(90deg, ${color}, ${tone})` }} />
+        <div className="ia-lever-threshold" style={{ left: `${threshold}%` }}>
+          <span>{threshold}</span>
+        </div>
+        {isOver && <div className="ia-lever-danger" style={{ left: `${threshold}%` }} />}
       </div>
-      {isOver && <div style={{ gridColumn: '1 / 4', fontSize: 9, color: 'var(--war)', paddingLeft: 90, marginTop: -2 }}>{damping}</div>}
+      <div className="ia-lever-foot">
+        <span>阈值 {threshold}</span>
+        <span>{isOver ? damping : isWarn ? '接近阈值，下一步扩张/改革需谨慎' : '当前负重可控'}</span>
+      </div>
     </div>
   );
 }
@@ -75,11 +79,17 @@ function LeverGauge({ player, provs, state }: { player: Nation; provs: Province[
     { name: '外交', icon: '⑤', color: '#8e24aa', load: Math.max(maxThreat, tradeDep), damping: '联军反制：≥3 邻国抵制则稳定 -5/合法性 -3', threshold: 70 },
   ];
   return (
-    <div style={{ background: 'var(--bg-inset)', borderRadius: 'var(--radius)', padding: 'var(--space-3)' }}>
-      <div style={{ fontSize: 10, color: 'var(--text-dim)', marginBottom: 'var(--space-2)', letterSpacing: '0.05em' }}>
-        拉杆即有代价 · 超阈值触发阻尼 · 杆不会断但越来越重
+    <div className="ia-lever-panel">
+      <div className="ia-lever-panel-head">
+        <div>
+          <div className="ia-up">五根杆仪表</div>
+          <p>负重越高，行动代价越重；超过阈值会触发阻尼。</p>
+        </div>
+        <Tag text="实时" tone="gold" />
       </div>
-      {levers.map((l) => <LeverBar key={l.name} def={l} />)}
+      <div className="ia-lever-grid">
+        {levers.map((l) => <LeverBar key={l.name} def={l} />)}
+      </div>
     </div>
   );
 }
@@ -100,7 +110,6 @@ function WinProgress({ label, cur, need, extra, ok, color }: { label: string; cu
 
 export default function Dashboard() {
   const { state, nextTurn, save, load, hasSave, newGame, log, setPendingProvince, jumpToTab } = useGameStore();
-  // C2: pid/player 用 selector 精确订阅（开场选国后稳定，减少整体订阅重渲染）
   const pid = useGameStore((s) => s.state.playerNationId);
   const player = useGameStore((s) => s.state.nations[pid]);
   const provs = provincesOf(pid, state.provinces);
@@ -110,17 +119,13 @@ export default function Dashboard() {
   const g = player.government;
   const hist = state.history;
 
-  // E10: 从历史提取趋势数据
   const goldTrend = hist.map((r: TurnReport) => r.income.tax + r.income.trade + r.income.building - r.expense.military - r.expense.corruption);
   const foodTrend = hist.map((r: TurnReport) => r.foodDelta);
   const stabTrend = hist.map((r: TurnReport) => r.stabilityDelta);
   const popTrend = hist.map((r: TurnReport) => r.popDelta);
-  // E23: 战争进展 + 厌战趋势
   const warTrend = hist.map((r: TurnReport) => r.warProgress.reduce((s, w) => s + w.progressDelta, 0));
-  // P2: 厌战用真实快照（exhaustSnapshot），不再填当前值导致平线
   const exhaustTrend = hist.map((r: TurnReport) => r.exhaustSnapshot);
 
-  // 警报聚合
   const alerts: { txt: string; tone: 'danger' | 'warn' }[] = [];
   if (player.resources.gold < 0) alerts.push({ txt: `国库赤字 ${Math.round(player.resources.gold)}`, tone: 'danger' });
   if (player.resources.food < 0) alerts.push({ txt: `粮储告竭 ${Math.round(player.resources.food)}`, tone: 'danger' });
@@ -131,14 +136,13 @@ export default function Dashboard() {
   const unrestProv = provs.filter((p) => p.rebellionRisk > 70 || p.unrest > 50);
   if (unrestProv.length > 0) alerts.push({ txt: `${unrestProv.length} 省骚动`, tone: 'warn' });
 
-  // E14: 危机等级——决定全屏紧迫反馈强度
   const crisisLevel: 'none' | 'warn' | 'critical' = (() => {
     const dangerCount = alerts.filter((a) => a.tone === 'danger').length;
     if (g.stability < 20 || dangerCount >= 3) return 'critical';
     if (g.stability < 30 || dangerCount >= 1) return 'warn';
     return 'none';
   })();
-  // E14: 连续赤字分级（从历史读）
+
   let deficitStreak = 0;
   for (let i = hist.length - 1; i >= 0; i--) {
     const r = hist[i];
@@ -146,7 +150,6 @@ export default function Dashboard() {
     if (net < 0) deficitStreak++; else break;
   }
 
-  // P1 失败临界警告——离社稷倾覆还差几回合
   const failWarns: { txt: string; turnsLeft: number }[] = [];
   if (state.bankruptTurns >= 1) failWarns.push({ txt: `国库破产 ${state.bankruptTurns} 年`, turnsLeft: 3 - state.bankruptTurns });
   if (state.lowStabilityTurns >= 1) failWarns.push({ txt: `安定崩落 ${state.lowStabilityTurns} 年`, turnsLeft: 3 - state.lowStabilityTurns });
@@ -157,7 +160,6 @@ export default function Dashboard() {
 
   return (
     <div>
-      {/* E11: 新手引导卡（仅首回合显示） */}
       {state.turn === 0 && (
         <div className="ia-fade-in" style={{
           background: 'linear-gradient(90deg, rgba(201,164,78,0.10), rgba(122,154,62,0.06))',
@@ -178,7 +180,6 @@ export default function Dashboard() {
         </div>
       )}
 
-      {/* E14: 危机全屏紧迫反馈——critical 红边脉冲、warn 黄边 */}
       {crisisLevel !== 'none' && (
         <div style={{
           position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, pointerEvents: 'none', zIndex: 50,
@@ -189,7 +190,6 @@ export default function Dashboard() {
         }} />
       )}
 
-      {/* P1 失败临界警告横幅——离社稷倾覆还差几回合 */}
       {failWarns.length > 0 && (
         <div className="ia-fade-in" style={{
           background: 'linear-gradient(90deg, rgba(162,61,40,0.35), rgba(162,61,40,0.18))',
@@ -198,38 +198,25 @@ export default function Dashboard() {
           display: 'flex', gap: 'var(--space-3)', flexWrap: 'wrap', alignItems: 'center',
           animation: 'ia-pulse 1s ease-in-out infinite',
         }}>
-          <span className="ia-display" style={{ color: 'var(--war)', fontWeight: 700, fontSize: 13, letterSpacing: '0.1em' }}>
-            ☠ 倾覆在即
-          </span>
-          {failWarns.map((w, i) => (
-            <Tag key={i} text={`${w.txt} · 仅余 ${w.turnsLeft} 年`} tone="danger" />
-          ))}
+          <span className="ia-display" style={{ color: 'var(--war)', fontWeight: 700, fontSize: 13, letterSpacing: '0.1em' }}>☠ 倾覆在即</span>
+          {failWarns.map((w, i) => <Tag key={i} text={`${w.txt} · 仅余 ${w.turnsLeft} 年`} tone="danger" />)}
         </div>
       )}
 
-      {/* ── 警报横幅 ── */}
       {alerts.length > 0 && (
         <div className="ia-fade-in" style={{
-          background: crisisLevel === 'critical'
-            ? 'linear-gradient(90deg, rgba(162,61,40,0.25), rgba(162,61,40,0.12))'
-            : 'linear-gradient(90deg, rgba(162,61,40,0.12), rgba(201,120,40,0.08))',
+          background: crisisLevel === 'critical' ? 'linear-gradient(90deg, rgba(162,61,40,0.25), rgba(162,61,40,0.12))' : 'linear-gradient(90deg, rgba(162,61,40,0.12), rgba(201,120,40,0.08))',
           border: crisisLevel === 'critical' ? '2px solid var(--war)' : '1px solid var(--war)',
-          borderRadius: 'var(--radius)',
-          padding: 'var(--space-3) var(--space-4)', marginBottom: 'var(--space-4)',
+          borderRadius: 'var(--radius)', padding: 'var(--space-3) var(--space-4)', marginBottom: 'var(--space-4)',
           display: 'flex', gap: 'var(--space-3)', flexWrap: 'wrap', alignItems: 'center',
           animation: crisisLevel === 'critical' ? 'ia-pulse 1.2s ease-in-out infinite' : 'none',
         }}>
-          <span className="ia-display" style={{ color: 'var(--war)', fontWeight: 700, fontSize: 12, letterSpacing: '0.1em' }}>
-            {crisisLevel === 'critical' ? '☠ 社稷危急' : '⚠ 警报'}
-          </span>
+          <span className="ia-display" style={{ color: 'var(--war)', fontWeight: 700, fontSize: 12, letterSpacing: '0.1em' }}>{crisisLevel === 'critical' ? '☠ 社稷危急' : '⚠ 警报'}</span>
           {alerts.map((w, i) => <Tag key={i} text={w.txt} tone={w.tone} />)}
-          {deficitStreak >= 2 && (
-            <Tag text={`连续 ${deficitStreak} 年赤字`} tone={deficitStreak >= 3 ? 'danger' : 'warn'} />
-          )}
+          {deficitStreak >= 2 && <Tag text={`连续 ${deficitStreak} 年赤字`} tone={deficitStreak >= 3 ? 'danger' : 'warn'} />}
         </div>
       )}
 
-      {/* P2 省份通知徽章——骚动省份清单，点击提示去省份页处理 */}
       {unrestProv.length > 0 && (
         <div style={{
           background: 'rgba(201,120,40,0.06)', border: '1px solid var(--warn)', borderRadius: 'var(--radius)',
@@ -238,20 +225,15 @@ export default function Dashboard() {
         }}>
           <span style={{ color: 'var(--warn)', fontWeight: 600, fontSize: 10, letterSpacing: '0.05em' }}>⚠ 骚动省份</span>
           {unrestProv.slice(0, 8).map((p) => {
-            const tone = p.rebellionRisk > 85 ? 'danger' : p.rebellionRisk > 70 ? 'warn' : 'warn';
+            const tone = p.rebellionRisk > 85 ? 'danger' : 'warn';
             const icon = p.rebellionRisk > 85 ? '☠' : '⚠';
             return (
-              <button key={p.id} onClick={() => { setPendingProvince(p.id); jumpToTab('province'); }}
-                title={`跳转至 ${p.name} 处理`}
-                style={{
-                  display: 'inline-flex', alignItems: 'center', gap: 3,
-                  padding: '2px 8px', borderRadius: 10, cursor: 'pointer',
-                  background: tone === 'danger' ? 'rgba(162,61,40,0.2)' : 'rgba(201,120,40,0.12)',
-                  color: tone === 'danger' ? 'var(--war)' : 'var(--warn)',
-                  border: `1px solid ${tone === 'danger' ? 'var(--war)' : 'var(--warn)'}`,
-                }}>
-                {icon} {p.name}
-                <span style={{ fontSize: 9, opacity: 0.8 }}>叛{Math.round(p.rebellionRisk)} 乱{Math.round(p.unrest)}</span>
+              <button key={p.id} onClick={() => { setPendingProvince(p.id); jumpToTab('province'); }} title={`跳转至 ${p.name} 处理`} style={{
+                display: 'inline-flex', alignItems: 'center', gap: 3, padding: '2px 8px', borderRadius: 10, cursor: 'pointer',
+                background: tone === 'danger' ? 'rgba(162,61,40,0.2)' : 'rgba(201,120,40,0.12)',
+                color: tone === 'danger' ? 'var(--war)' : 'var(--warn)', border: `1px solid ${tone === 'danger' ? 'var(--war)' : 'var(--warn)'}`,
+              }}>
+                {icon} {p.name}<span style={{ fontSize: 9, opacity: 0.8 }}>叛{Math.round(p.rebellionRisk)} 乱{Math.round(p.unrest)}</span>
               </button>
             );
           })}
@@ -260,7 +242,6 @@ export default function Dashboard() {
         </div>
       )}
 
-      {/* ── 国是总览：操作栏 + 四大核心 ── */}
       <Panel title="国是" icon="◈" accent actions={
         <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
           <Btn label="新局" variant="ghost" onClick={newGame} />
@@ -269,7 +250,6 @@ export default function Dashboard() {
           <Btn label="下一回合 →" variant="primary" onClick={() => nextTurn()} disabled={!!state.victory.type} />
         </div>
       }>
-        {/* 四大核心 —— 铭文大卡 */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 'var(--space-4)', marginBottom: 'var(--space-5)' }}>
           <Stat kind="core" accent="var(--gold)" icon="◉" label="国库" value={player.resources.gold} warn={player.resources.gold < 0} />
           <Stat kind="core" accent="var(--food)" icon="✦" label="粮储" value={player.resources.food} warn={player.resources.food < 0} />
@@ -277,26 +257,23 @@ export default function Dashboard() {
           <Stat kind="core" accent="var(--accent)" icon="◯" label="子民" value={totalPop} />
         </div>
 
-        {/* E10: 趋势 sparkline（≥2 回合才显示） */}
         {hist.length >= 2 && (
           <>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 'var(--space-3)', marginBottom: 'var(--space-4)', padding: 'var(--space-3)', background: 'var(--bg-inset)', borderRadius: 'var(--radius)' }}>
-            <Sparkline data={goldTrend} color="var(--gold)" label="金" />
-            <Sparkline data={foodTrend} color="var(--food)" label="粮" />
-            <Sparkline data={stabTrend} color="var(--stable)" label="稳" />
-            <Sparkline data={popTrend} color="var(--accent)" label="人" />
-          </div>
-          {/* E23: 战时趋势 */}
-          {warCount > 0 && (
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-3)', marginBottom: 'var(--space-4)', padding: 'var(--space-3)', background: 'rgba(162,61,40,0.06)', borderRadius: 'var(--radius)', border: '1px solid var(--war)' }}>
-              <Sparkline data={warTrend} color="var(--war)" label="战" />
-              <Sparkline data={exhaustTrend} color="var(--warn)" label="疲" />
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 'var(--space-3)', marginBottom: 'var(--space-4)', padding: 'var(--space-3)', background: 'var(--bg-inset)', borderRadius: 'var(--radius)' }}>
+              <Sparkline data={goldTrend} color="var(--gold)" label="金" />
+              <Sparkline data={foodTrend} color="var(--food)" label="粮" />
+              <Sparkline data={stabTrend} color="var(--stable)" label="稳" />
+              <Sparkline data={popTrend} color="var(--accent)" label="人" />
             </div>
-          )}
+            {warCount > 0 && (
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-3)', marginBottom: 'var(--space-4)', padding: 'var(--space-3)', background: 'rgba(162,61,40,0.06)', borderRadius: 'var(--radius)', border: '1px solid var(--war)' }}>
+                <Sparkline data={warTrend} color="var(--war)" label="战" />
+                <Sparkline data={exhaustTrend} color="var(--warn)" label="疲" />
+              </div>
+            )}
           </>
         )}
 
-        {/* 次要资源 */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 'var(--space-3)', marginBottom: 'var(--space-5)' }}>
           <Stat label="木材" value={player.resources.wood} />
           <Stat label="铁矿" value={player.resources.iron} />
@@ -305,8 +282,6 @@ export default function Dashboard() {
         </div>
 
         <Divider label="治术" />
-
-        {/* 治理仪表 —— 双栏 */}
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-6)' }}>
           <div>
             <StatRow label="安定" value={g.stability} kind="high" warn={g.stability < 30} />
@@ -320,15 +295,7 @@ export default function Dashboard() {
           </div>
         </div>
 
-        {/* P1 行动点闭环：显示剩余 adminPt，玩家直观看到本回合还能行动几次 */}
-        {/* P1-1: 不足时卡片红边脉冲闪烁，强提示 */}
-        <div style={{
-          display: 'flex', alignItems: 'center', gap: 'var(--space-3)', padding: 'var(--space-2) var(--space-3)',
-          background: player.resources.adminPt <= 1 ? 'rgba(162,61,40,0.10)' : 'var(--bg-inset)',
-          border: player.resources.adminPt <= 1 ? '1px solid var(--war)' : '1px solid transparent',
-          borderRadius: 'var(--radius)', marginTop: 'var(--space-2)',
-          animation: player.resources.adminPt <= 1 ? 'ia-pulse 1.2s ease-in-out infinite' : 'none',
-        }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)', padding: 'var(--space-2) var(--space-3)', background: player.resources.adminPt <= 1 ? 'rgba(162,61,40,0.10)' : 'var(--bg-inset)', border: player.resources.adminPt <= 1 ? '1px solid var(--war)' : '1px solid transparent', borderRadius: 'var(--radius)', marginTop: 'var(--space-2)', animation: player.resources.adminPt <= 1 ? 'ia-pulse 1.2s ease-in-out infinite' : 'none' }}>
           <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--accent)' }}>◈ 行动点</span>
           <span style={{ fontSize: 20, fontWeight: 800, color: player.resources.adminPt > 0 ? 'var(--good)' : 'var(--war)' }}>{Math.floor(player.resources.adminPt)}</span>
           <span style={{ fontSize: 10, color: 'var(--text-dim)' }}>本回合剩余（行动消耗 1-2 点，下回合补充 3-7 点）</span>
@@ -336,27 +303,15 @@ export default function Dashboard() {
           {player.resources.adminPt === 1 && <span style={{ fontSize: 10, color: 'var(--warn)', fontWeight: 600 }}>⚠ 仅余 1 点</span>}
         </div>
 
-        {/* P1 杆组仪表盘 —— 五根杆当前刻度 + 阻尼警告 */}
         <Divider label="杆组仪表 · 五根杆的实时负重" />
         <LeverGauge player={player} provs={provs} state={state} />
 
         <Divider label="邦国" />
-
-        {/* �邦国摘要 —— 政体/性格/疆土/军备 */}
         <div style={{ display: 'flex', gap: 'var(--space-4)', flexWrap: 'wrap', alignItems: 'center', marginBottom: 'var(--space-3)' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
-            <span className="ia-up" style={{ fontSize: 10, color: 'var(--text-dim)' }}>政体</span>
-            <Tag text={player.government.type} tone="gold" />
-          </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
-            <span className="ia-up" style={{ fontSize: 10, color: 'var(--text-dim)' }}>国性</span>
-            <Tag text={player.character} tone="info" />
-          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}><span className="ia-up" style={{ fontSize: 10, color: 'var(--text-dim)' }}>政体</span><Tag text={player.government.type} tone="gold" /></div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}><span className="ia-up" style={{ fontSize: 10, color: 'var(--text-dim)' }}>国性</span><Tag text={player.character} tone="info" /></div>
           {player.activeCharacterBonuses.length > 0 && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
-              <span className="ia-up" style={{ fontSize: 10, color: 'var(--text-dim)' }}>已启</span>
-              {player.activeCharacterBonuses.map((b) => <Tag key={b} text={b} tone="good" />)}
-            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}><span className="ia-up" style={{ fontSize: 10, color: 'var(--text-dim)' }}>已启</span>{player.activeCharacterBonuses.map((b) => <Tag key={b} text={b} tone="good" />)}</div>
           )}
         </div>
         <div style={{ display: 'flex', gap: 'var(--space-5)', fontSize: 12.5, color: 'var(--text-mute)' }}>
@@ -367,18 +322,13 @@ export default function Dashboard() {
           {player.ruler.heir && <span> · 储君 <strong style={{ color: 'var(--gold)' }}>{player.ruler.heir.name}</strong> {player.ruler.heir.age}岁 治能{player.ruler.heir.ability}</span>}
         </div>
 
-        {/* P1 胜利进度可视化——玩家看到离胜利还差多远 */}
         {!state.victory.type && (
           <div style={{ marginTop: 'var(--space-4)', padding: 'var(--space-3)', background: 'var(--bg-inset)', borderRadius: 'var(--radius)' }}>
             <div style={{ fontSize: 10, color: 'var(--text-dim)', marginBottom: 'var(--space-2)', letterSpacing: '0.05em' }}>◈ 万世之业 · 四道进度</div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-2)', fontSize: 11 }}>
-              {/* 征服：7省+稳定40 */}
               <WinProgress label="征服" cur={provs.length} need={7} extra={`稳定${Math.round(g.stability)}/40`} ok={provs.length >= 7 && g.stability >= 40} color="var(--war)" />
-              {/* 经济：金2000持续10回合 */}
               <WinProgress label="经济" cur={Math.min(10, state.highEconomyStableTurns)} need={10} extra={`金${Math.round(player.resources.gold)}/2000`} ok={state.highEconomyStableTurns >= 10} color="var(--gold)" />
-              {/* 文化：影响150+3国关系70 */}
               <WinProgress label="文化" cur={Math.min(150, Math.round(player.resources.influence))} need={150} extra={`${state.relations.filter((r) => r.from === pid && r.relation >= 70).length}/3盟`} ok={player.resources.influence >= 150 && state.relations.filter((r) => r.from === pid && r.relation >= 70).length >= 3} color="var(--accent)" />
-              {/* 永恒：稳定30+无战持续200回合 */}
               <WinProgress label="永恒" cur={Math.min(200, state.stableTurnsCount)} need={200} extra={`${warCount === 0 && g.stability >= 30 ? '✓' : '✗'}稳${Math.round(g.stability)}/30 无战`} ok={state.stableTurnsCount >= 200} color="var(--stable)" />
             </div>
           </div>
@@ -386,9 +336,7 @@ export default function Dashboard() {
 
         {state.victory.type && (
           <div className="ia-card--raised" style={{ marginTop: 'var(--space-5)', textAlign: 'center', padding: 'var(--space-5)' }}>
-            <div className="ia-display ia-victory-glow" style={{ fontSize: 20, fontWeight: 700 }} >
-              {state.victory.type.startsWith('win') ? '🏆 万世之业已成' : '💀 社稷倾覆'}
-            </div>
+            <div className="ia-display ia-victory-glow" style={{ fontSize: 20, fontWeight: 700 }} >{state.victory.type.startsWith('win') ? '🏆 万世之业已成' : '💀 社稷倾覆'}</div>
             <div style={{ fontSize: 12, color: 'var(--text-mute)', marginTop: 'var(--space-2)' }}>
               {state.victory.type === 'win_conquest' ? `征服胜利：疆土 ${provs.length} 省，安定 ${Math.round(g.stability)}`
                 : state.victory.type === 'win_economy' ? `经济胜利：国库 ${Math.round(player.resources.gold)} 金`
@@ -406,39 +354,24 @@ export default function Dashboard() {
         )}
       </Panel>
 
-      {/* ── 近事纪 + 史册 ── */}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-4)' }}>
         <Panel title="近事纪" icon="✶">
           <div style={{ maxHeight: 200, overflow: 'auto', fontSize: 12 }}>
-            {log.length === 0 ? <span className="dim">尚无纪事</span> :
-              log.slice(-20).reverse().map((l, i) => (
-                <div key={i} style={{
-                  padding: '5px 0', color: 'var(--text-mute)',
-                  borderBottom: i < 19 ? '1px solid rgba(61,51,36,0.4)' : 'none',
-                  display: 'flex', gap: 'var(--space-2)',
-                }}>
-                  <span style={{ color: 'var(--gold)', opacity: 0.6 }}>·</span>
-                  <span>{l}</span>
-                </div>
-              ))}
+            {log.length === 0 ? <span className="dim">尚无纪事</span> : log.slice(-20).reverse().map((l, i) => (
+              <div key={i} style={{ padding: '5px 0', color: 'var(--text-mute)', borderBottom: i < 19 ? '1px solid rgba(61,51,36,0.4)' : 'none', display: 'flex', gap: 'var(--space-2)' }}>
+                <span style={{ color: 'var(--gold)', opacity: 0.6 }}>·</span><span>{l}</span>
+              </div>
+            ))}
           </div>
         </Panel>
-        {/* E12: 本朝大事 — 史册叙事 */}
         <Panel title="本朝大事" icon="✦" accent>
           <div style={{ maxHeight: 200, overflow: 'auto', fontSize: 12 }}>
-            {state.chronicle.length === 0 ? <span className="dim">尚无大事</span> :
-              state.chronicle.slice().reverse().map((c, i) => (
-                <div key={i} style={{
-                  padding: '6px 0', borderBottom: i < state.chronicle.length - 1 ? '1px solid rgba(61,51,36,0.4)' : 'none',
-                  display: 'flex', gap: 'var(--space-3)',
-                }}>
-                  <span className="ia-display" style={{ color: 'var(--gold)', fontSize: 10, width: 28, flexShrink: 0 }}>Anno {c.turn + 1}</span>
-                  <div>
-                    <strong style={{ color: 'var(--text)', fontSize: 12 }}>{c.title}</strong>
-                    <div style={{ color: 'var(--text-mute)', fontSize: 11, marginTop: 2 }}>{c.desc}</div>
-                  </div>
-                </div>
-              ))}
+            {state.chronicle.length === 0 ? <span className="dim">尚无大事</span> : state.chronicle.slice().reverse().map((c, i) => (
+              <div key={i} style={{ padding: '6px 0', borderBottom: i < state.chronicle.length - 1 ? '1px solid rgba(61,51,36,0.4)' : 'none', display: 'flex', gap: 'var(--space-3)' }}>
+                <span className="ia-display" style={{ color: 'var(--gold)', fontSize: 10, width: 28, flexShrink: 0 }}>Anno {c.turn + 1}</span>
+                <div><strong style={{ color: 'var(--text)', fontSize: 12 }}>{c.title}</strong><div style={{ color: 'var(--text-mute)', fontSize: 11, marginTop: 2 }}>{c.desc}</div></div>
+              </div>
+            ))}
           </div>
         </Panel>
       </div>
