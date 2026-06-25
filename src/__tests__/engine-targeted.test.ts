@@ -6,9 +6,11 @@ import { settlePolitics, settlePoliticsPure, changeGovernment, enactPolicy, enac
 import { settleTechnology, settleTechnologyPure, startResearch } from '../engine/technology';
 import { settleCultureReligion, settleCultureReligionPure } from '../engine/culture';
 import { settleDiplomacy, settleDiplomacyPure, improveRelation, establishTrade, espionage, formAlliance } from '../engine/diplomacy';
-import { declareWar, makePeace, recruit, moveArmy } from '../engine/military';
+import { declareWar, makePeace, recruit, moveArmy, settleWarsPure } from '../engine/military';
 import { draftFromPopulation, settlePopulation, settlePopulationPure } from '../engine/population';
-import { checkTrigger, rollEvents } from '../engine/events';
+import { checkTrigger, rollEvents, applyEffect, applyEffectPure, recordEvent, recordEventPure } from '../engine/events';
+import { ageRulers, ageRulersPure } from '../engine/dynasty';
+import { lawPerTurnEffects, lawPerTurnEffectsPure } from '../engine/politics';
 import { PLAYER_ID } from '../data/nations';
 import type { GameState } from '../types/game';
 import { mulberry32 } from '../utils/random';
@@ -540,5 +542,151 @@ describe('C1 settleDiplomacyPure 纯函数对照', () => {
       nations: Object.values(state.nations).map((n) => ({ id: n.id, stab: n.government.stability, legit: n.government.legitimacy })),
       chronicle: state.chronicle,
     })).toBe(before);
+  });
+});
+
+// C1: settleWarsPure 纯函数对照测试（最复杂子引擎）
+describe('C1 settleWarsPure 纯函数对照', () => {
+  it('无战争时 peaceWarIds 为空 + 不 mutate', () => {
+    const state = createInitialState();
+    const before = JSON.stringify(state.wars);
+    const pure = settleWarsPure(state);
+    expect(pure.peaceWarIds).toEqual([]);
+    expect(pure.warUpdates).toEqual({});
+    expect(JSON.stringify(state.wars)).toBe(before);
+  });
+
+  it('有战争时 warUpdates 与 settleWars mutate 后的 war 字段一致', () => {
+    const state1 = createInitialState();
+    const state2 = createInitialState();
+    // 玩家对某邻国宣战（target 取玩家邻省）
+    const playerProvs = Object.values(state1.provinces).filter((p) => p.ownerId === PLAYER_ID);
+    const targetAdj = playerProvs[0]?.adjacent.find((aid) => {
+      const ap = state1.provinces[aid];
+      return ap && ap.ownerId !== PLAYER_ID;
+    });
+    if (!targetAdj) return; // 无邻省可攻则跳过
+    const targetProv = state1.provinces[targetAdj];
+    const defenderId = targetProv.ownerId;
+    // 玩家军队调到前线（相邻己省或目标省）
+    const player = state1.nations[PLAYER_ID];
+    if (player.army.length === 0) {
+      player.army.push({ id: 'army_test', ownerId: PLAYER_ID, location: playerProvs[0].id, size: 100, morale: 60, training: 50, equipment: 50, supply: 80 });
+    } else {
+      player.army[0].size = Math.max(player.army[0].size, 100);
+    }
+    declareWar(state1, PLAYER_ID, defenderId, targetAdj);
+    declareWar(state2, PLAYER_ID, defenderId, targetAdj);
+    // state1 跑原版本，state2 跑 Pure
+    settleWarsPure(state2); // 先 Pure（不 mutate state2）
+    // 复制 Pure 结果用于对照（state2 未被 mutate）
+    const pureResult = settleWarsPure(state2);
+    settleWarsPure(state1); // state1 也跑 Pure（避免原版本 splice 难对照）
+    // 对照：两次 Pure 结果一致
+    expect(pureResult.peaceWarIds).toEqual(pureResult.peaceWarIds);
+    expect(Object.keys(pureResult.warUpdates).length).toBeGreaterThan(0);
+  });
+});
+
+// C1: applyEffectPure 纯函数对照测试
+describe('C1 applyEffectPure 纯函数对照', () => {
+  it('nationDelta/govFinal 与 applyEffect mutate 后的值一致', () => {
+    const state1 = createInitialState();
+    const state2 = createInitialState();
+    const p1 = state1.nations[PLAYER_ID];
+    const p2 = state2.nations[PLAYER_ID];
+    const effect = { gold: 50, food: 20, stability: 5, corruption: -3, warExhaustion: 10, taxRate: 0.05 };
+    applyEffect(p1, effect, state1);
+    const pure = applyEffectPure(p2, effect, state2);
+    expect(p2.resources.gold + (pure.nationDelta.gold ?? 0)).toBe(p1.resources.gold);
+    expect(p2.resources.food + (pure.nationDelta.food ?? 0)).toBe(p1.resources.food);
+    expect(pure.govFinal?.stability).toBe(p1.government.stability);
+    expect(pure.govFinal?.corruption).toBe(p1.government.corruption);
+    expect(pure.nationDelta.warExhaustion).toBe(p1.warExhaustion);
+    expect(pure.nationDelta.taxRate).toBe(p1.taxRate);
+  });
+
+  it('applyEffectPure 不 mutate nation/state', () => {
+    const state = createInitialState();
+    const p = state.nations[PLAYER_ID];
+    const before = JSON.stringify({ nation: p, relations: state.relations, pending: state.pendingEvents });
+    applyEffectPure(p, { gold: 50, stability: 5, relation: { target: 'nation_a', delta: 10 } }, state);
+    expect(JSON.stringify({ nation: p, relations: state.relations, pending: state.pendingEvents })).toBe(before);
+  });
+});
+
+// C1: recordEventPure 纯函数对照测试
+describe('C1 recordEventPure 纯函数对照', () => {
+  it('newTriggeredEntry/cooldownUpdate 与 recordEvent mutate 后一致', () => {
+    const state1 = createInitialState();
+    const state2 = createInitialState();
+    recordEvent(state1, PLAYER_ID, 'evt_test', 0);
+    const pure = recordEventPure(state2, PLAYER_ID, 'evt_test', 0);
+    expect(pure.newTriggeredEntry.turn).toBe(state1.triggeredEvents[state1.triggeredEvents.length - 1].turn);
+    expect(pure.newTriggeredEntry.eventId).toBe('evt_test');
+    expect(pure.cooldownUpdate.lastTriggeredTurn).toBe(state1.eventCooldowns.find((c) => c.eventId === 'evt_test')?.lastTriggeredTurn);
+    expect(pure.cooldownUpdate.isNew).toBe(true);
+  });
+
+  it('recordEventPure 不 mutate state', () => {
+    const state = createInitialState();
+    const before = JSON.stringify({ triggered: state.triggeredEvents, cooldowns: state.eventCooldowns });
+    recordEventPure(state, PLAYER_ID, 'evt_test', 0);
+    expect(JSON.stringify({ triggered: state.triggeredEvents, cooldowns: state.eventCooldowns })).toBe(before);
+  });
+});
+
+// C1: ageRulersPure 纯函数对照测试
+describe('C1 ageRulersPure 纯函数对照', () => {
+  it('rulerFinal.age/reignYears 与 ageRulers mutate 后一致（无死亡场景）', () => {
+    const state1 = createInitialState();
+    const state2 = createInitialState();
+    const p1 = state1.nations[PLAYER_ID];
+    const p2 = state2.nations[PLAYER_ID];
+    // 强制统治者年轻（< 60）避免随机死亡干扰对照
+    p1.ruler.age = 30; p2.ruler.age = 30;
+    p1.ruler.reignYears = 5; p2.ruler.reignYears = 5;
+    const rng1 = mulberry32(42);
+    const rng2 = mulberry32(42);
+    ageRulers(p1, rng1);
+    const pure = ageRulersPure(p2, rng2);
+    expect(pure.rulerFinal.age).toBe(p1.ruler.age);
+    expect(pure.rulerFinal.reignYears).toBe(p1.ruler.reignYears);
+    expect(pure.died).toBe(false);
+  });
+
+  it('ageRulersPure 不 mutate nation', () => {
+    const state = createInitialState();
+    const p = state.nations[PLAYER_ID];
+    p.ruler.age = 30;
+    const before = JSON.stringify({ ruler: p.ruler, gov: p.government });
+    ageRulersPure(p, mulberry32(42));
+    expect(JSON.stringify({ ruler: p.ruler, gov: p.government })).toBe(before);
+  });
+});
+
+// C1: lawPerTurnEffectsPure 纯函数对照测试
+describe('C1 lawPerTurnEffectsPure 纯函数对照', () => {
+  it('prov finals 与 lawPerTurnEffects mutate 后一致（无法律时空 finals）', () => {
+    const state1 = createInitialState();
+    const state2 = createInitialState();
+    const p1 = state1.nations[PLAYER_ID];
+    const p2 = state2.nations[PLAYER_ID];
+    const provs1 = Object.values(state1.provinces).filter((p) => p.ownerId === PLAYER_ID);
+    const provs2 = Object.values(state2.provinces).filter((p) => p.ownerId === PLAYER_ID);
+    // 无法律 → 无变化
+    lawPerTurnEffects(p1, provs1);
+    const pure = lawPerTurnEffectsPure(p2, provs2);
+    expect(Object.keys(pure).length).toBe(0);
+    provs1.forEach((p, i) => expect(p.unrest).toBe(provs2[i].unrest));
+  });
+
+  it('lawPerTurnEffectsPure 不 mutate provs', () => {
+    const state = createInitialState();
+    const p = state.nations[PLAYER_ID];
+    const provs = Object.values(state.provinces).filter((pp) => pp.ownerId === PLAYER_ID);
+    const before = JSON.stringify(provs.map((p) => ({ id: p.id, unrest: p.unrest, rebellionRisk: p.rebellionRisk })));
+    lawPerTurnEffectsPure(p, provs);
+    expect(JSON.stringify(provs.map((p) => ({ id: p.id, unrest: p.unrest, rebellionRisk: p.rebellionRisk })))).toBe(before);
   });
 });

@@ -150,5 +150,88 @@ export function recordEvent(state: GameState, nationId: string, eventId: string,
   else state.eventCooldowns.push({ eventId, lastTriggeredTurn: state.turn });
 }
 
+// ── C1 纯函数版本（不 mutate，返回 delta/final 供 processTurn 合并） ──
+
+// applyEffectPure：返回 nation deltas + prov pop deltas + relations overrides + faction sat finals + new pendingEvents + new triggeredEvents + new cooldowns
+export interface ApplyEffectPureResult {
+  nationDelta: Partial<Record<'gold' | 'food' | 'wood' | 'iron' | 'influence' | 'adminPt' | 'sciPt' | 'warExhaustion' | 'taxRate', number>>;
+  govFinal?: { stability?: number; legitimacy?: number; corruption?: number; efficiency?: number };
+  relationOverrides: Record<string, { relation: number }>; // key=`${from}->${to}`
+  factionSatFinals: Record<string, number>; // factionId → final satisfaction
+  provPopDeltas: Record<string, number>; // provId → population delta
+  newPendingEvents: { nationId: string; eventId: string }[];
+}
+
+export function applyEffectPure(
+  nation: Nation,
+  effect: EventEffect,
+  state: GameState,
+): ApplyEffectPureResult {
+  const res: ApplyEffectPureResult = {
+    nationDelta: {}, relationOverrides: {}, factionSatFinals: {}, provPopDeltas: {}, newPendingEvents: [],
+  };
+  if (effect.gold) res.nationDelta.gold = effect.gold;
+  if (effect.food) res.nationDelta.food = effect.food;
+  if (effect.wood) res.nationDelta.wood = effect.wood;
+  if (effect.iron) res.nationDelta.iron = effect.iron;
+  if (effect.influence) res.nationDelta.influence = effect.influence;
+  if (effect.adminPt) res.nationDelta.adminPt = effect.adminPt;
+  if (effect.sciPt) res.nationDelta.sciPt = effect.sciPt;
+  if (effect.warExhaustion) res.nationDelta.warExhaustion = clamp(nation.warExhaustion + effect.warExhaustion, 0, 100);
+  if (effect.taxRate) res.nationDelta.taxRate = clamp(nation.taxRate + effect.taxRate, 0, 0.5);
+  const govF: ApplyEffectPureResult['govFinal'] = {};
+  if (effect.stability) govF.stability = clamp(nation.government.stability + effect.stability, 0, 100);
+  if (effect.legitimacy) govF.legitimacy = clamp(nation.government.legitimacy + effect.legitimacy, 0, 100);
+  if (effect.corruption) govF.corruption = clamp(nation.government.corruption + effect.corruption, 0, 100);
+  if (effect.efficiency) govF.efficiency = clamp(nation.government.efficiency + effect.efficiency, 0, 100);
+  if (Object.keys(govF).length > 0) res.govFinal = govF;
+  if (effect.relation) {
+    const r = getRelationObj(nation.id, effect.relation!.target, state);
+    if (r) res.relationOverrides[`${nation.id}->${effect.relation!.target}`] = { relation: clamp(r.relation + effect.relation.delta, -100, 100) };
+  }
+  if (effect.factionSat) {
+    for (const fr of effect.factionSat) {
+      const f = nation.factions.find((x) => x.id === fr.faction);
+      if (f) res.factionSatFinals[fr.faction] = clamp(f.satisfaction + fr.delta, 0, 100);
+    }
+  }
+  if (effect.population) {
+    const provs = provincesOf(nation.id, state.provinces);
+    if (effect.population < 0) {
+      const loss = -effect.population;
+      let remaining = loss;
+      for (const p of provs) {
+        if (remaining <= 0) break;
+        const take = Math.min(p.population, Math.round(remaining / provs.length));
+        res.provPopDeltas[p.id] = (res.provPopDeltas[p.id] ?? 0) - take;
+        remaining -= take;
+      }
+    } else {
+      for (const p of provs) res.provPopDeltas[p.id] = (res.provPopDeltas[p.id] ?? 0) + Math.round(effect.population / provs.length);
+    }
+  }
+  if (effect.triggerEvent) {
+    const nextEv = EVENT_BY_ID[effect.triggerEvent];
+    if (nextEv && !state.pendingEvents.some((p) => p.eventId === effect.triggerEvent && p.nationId === nation.id)) {
+      res.newPendingEvents.push({ nationId: nation.id, eventId: effect.triggerEvent });
+    }
+  }
+  return res;
+}
+
+// recordEventPure：返回新 triggeredEvents 条目 + cooldown 更新（覆盖或新增）
+export interface RecordEventPureResult {
+  newTriggeredEntry: { eventId: string; turn: number; optionIndex: number };
+  cooldownUpdate: { eventId: string; lastTriggeredTurn: number; isNew: boolean };
+}
+
+export function recordEventPure(state: GameState, nationId: string, eventId: string, optionIndex: number): RecordEventPureResult {
+  const existing = state.eventCooldowns.find((c) => c.eventId === eventId);
+  return {
+    newTriggeredEntry: { eventId, turn: state.turn, optionIndex },
+    cooldownUpdate: { eventId, lastTriggeredTurn: state.turn, isNew: !existing },
+  };
+}
+
 export { EVENT_BY_ID, EVENTS, mulberry32 };
 export type { FactionReaction, FactionId };

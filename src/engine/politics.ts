@@ -235,6 +235,29 @@ export function lawPerTurnEffects(nation: Nation, provs: Province[]): void {
   }
 }
 
+// ── C1 纯函数版本（不 mutate，返回每省 unrest/rebellionRisk final 供 processTurn 合并） ──
+export function lawPerTurnEffectsPure(nation: Nation, provs: Province[]): Record<string, { unrest?: number; rebellionRisk?: number }> {
+  const finals: Record<string, { unrest?: number; rebellionRisk?: number }> = {};
+  for (const al of nation.activeLaws) {
+    const def = LAWS.find((l) => l.id === al.lawId);
+    if (!def) continue;
+    const e = def.effects;
+    if (e.unrestReduction) {
+      for (const p of provs) {
+        const cur = finals[p.id]?.unrest ?? p.unrest;
+        finals[p.id] = { ...finals[p.id], unrest: clamp(cur - e.unrestReduction, 0, 100) };
+      }
+    }
+    if (e.rebellionReduction) {
+      for (const p of provs) {
+        const cur = finals[p.id]?.rebellionRisk ?? p.rebellionRisk;
+        finals[p.id] = { ...finals[p.id], rebellionRisk: clamp(cur - e.rebellionReduction, 0, 100) };
+      }
+    }
+  }
+  return finals;
+}
+
 // 可管理省份数
 export function maxManageableProvinces(nation: Nation): number {
   return maxProvinces(
