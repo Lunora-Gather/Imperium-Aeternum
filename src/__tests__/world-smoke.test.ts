@@ -192,10 +192,10 @@ describe('W4 世界级烟雾测试（192 国 / 600 省）', () => {
     expect(state.pendingEvents.length).toBe(beforeCount + 1);  // 仍只 1 个
   });
 
-  // C1: 事件链数据完整性——10 条链，triggerEvent 引用合法（P3 扩展至 10 链 + 继承内战支线）
-  it('C1 事件链数据：10 条链，triggerEvent 引用合法', () => {
+  // C1: 事件链数据完整性——15 条链，triggerEvent 引用合法（D1 扩展至 15 链 + 继承内战支线）
+  it('C1 事件链数据：15 条链，triggerEvent 引用合法', () => {
     const chainIds = EVENTS.filter((e) => e.id.startsWith('evt_chain_')).map((e) => e.id);
-    expect(chainIds.length).toBe(29);  // 10 链（含继承内战 2 支线）
+    expect(chainIds.length).toBe(44);  // 15 链（含继承内战 2 支线，D1 +5 链）
     // 每个 triggerEvent 引用必须在 EVENT_BY_ID 存在
     for (const e of EVENTS) {
       for (const opt of e.options) {
