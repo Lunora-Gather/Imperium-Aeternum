@@ -5,8 +5,8 @@ import { settleEconomy, establishTradeRoute, settleEconomyPure } from '../engine
 import { settlePolitics, settlePoliticsPure, changeGovernment, enactPolicy, enactLaw } from '../engine/politics';
 import { settleTechnology, settleTechnologyPure, startResearch } from '../engine/technology';
 import { settleCultureReligion, settleCultureReligionPure } from '../engine/culture';
+import { settleDiplomacy, settleDiplomacyPure, improveRelation, establishTrade, espionage, formAlliance } from '../engine/diplomacy';
 import { declareWar, makePeace, recruit, moveArmy } from '../engine/military';
-import { improveRelation, establishTrade, espionage, formAlliance } from '../engine/diplomacy';
 import { draftFromPopulation, settlePopulation, settlePopulationPure } from '../engine/population';
 import { checkTrigger, rollEvents } from '../engine/events';
 import { PLAYER_ID } from '../data/nations';
@@ -505,5 +505,40 @@ describe('C1 settleCultureReligionPure 纯函数对照', () => {
     const before = JSON.stringify({ nation: p, provs });
     settleCultureReligionPure(p, state);
     expect(JSON.stringify({ nation: p, provs })).toBe(before);
+  });
+});
+
+// C1: settleDiplomacyPure 纯函数对照测试
+describe('C1 settleDiplomacyPure 纯函数对照', () => {
+  it('relationsFinal 与 settleDiplomacy mutate 后的 relations 值一致', () => {
+    const state1 = createInitialState();
+    const state2 = createInitialState();
+    // 记录原 relation key 顺序
+    const keys1 = state1.relations.map((r) => `${r.from}_${r.to}`);
+    settleDiplomacy(state1);
+    const pure = settleDiplomacyPure(state2);
+    state1.relations.forEach((r, i) => {
+      const f = pure.relationsFinal[keys1[i]];
+      expect(f).toBeDefined();
+      expect(r.threat).toBeCloseTo(f.threat, 0);
+      expect(r.relation).toBeCloseTo(f.relation, 0);
+      expect(r.truceTurns).toBe(f.truceTurns);
+      expect(r.treaty).toBe(f.treaty);
+    });
+  });
+
+  it('settleDiplomacyPure 不 mutate state（relations/nations/chronicle 不变）', () => {
+    const state = createInitialState();
+    const before = JSON.stringify({
+      relations: state.relations,
+      nations: Object.values(state.nations).map((n) => ({ id: n.id, stab: n.government.stability, legit: n.government.legitimacy })),
+      chronicle: state.chronicle,
+    });
+    settleDiplomacyPure(state);
+    expect(JSON.stringify({
+      relations: state.relations,
+      nations: Object.values(state.nations).map((n) => ({ id: n.id, stab: n.government.stability, legit: n.government.legitimacy })),
+      chronicle: state.chronicle,
+    })).toBe(before);
   });
 });

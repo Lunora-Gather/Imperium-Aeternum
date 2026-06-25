@@ -281,3 +281,120 @@ export function culturalExport(nation: Nation, target: string, state: GameState)
 }
 
 export { relationDrift };
+
+// ── C1: 纯函数版本 settleDiplomacyPure ──
+// 不 mutate state，返回 relations 覆写值 + nations gov delta + chronicle entries
+// 与原 settleDiplomacy 并存（零回归）
+export interface DiplomacyPartial {
+  // 每条 relation 的覆写值（threat/relation/truceTurns/treaty 最终值）
+  relationsFinal: Record<string, { threat: number; relation: number; truceTurns: number; treaty: string }>;
+  // 联军反制影响的 nation gov 覆写值（stability/legitimacy 最终值）
+  nationsGovFinal: Record<string, { stability: number; legitimacy: number }>;
+  // 新增 chronicle 条目（processTurn 合并时 push）
+  newChronicle: Array<{ id: string; turn: number; kind: 'milestone_diplomacy'; title: string; desc: string; actorId: string }>;
+}
+export function settleDiplomacyPure(state: GameState): DiplomacyPartial {
+  const provsByOwner = new Map<string, ReturnType<typeof provincesOf>>();
+  const getProvs = (id: string): ReturnType<typeof provincesOf> => {
+    let arr = provsByOwner.get(id);
+    if (!arr) { arr = provincesOf(id, state.provinces); provsByOwner.set(id, arr); }
+    return arr;
+  };
+  const warOpponents = new Map<string, Set<string>>();
+  for (const w of state.wars) {
+    let s1 = warOpponents.get(w.attackerId);
+    if (!s1) { s1 = new Set(); warOpponents.set(w.attackerId, s1); }
+    s1.add(w.defenderId);
+    let s2 = warOpponents.get(w.defenderId);
+    if (!s2) { s2 = new Set(); warOpponents.set(w.defenderId, s2); }
+    s2.add(w.attackerId);
+  }
+
+  // 用 relation key `${from}_${to}` 索引
+  const relationsFinal: Record<string, { threat: number; relation: number; truceTurns: number; treaty: string }> = {};
+  // nationsGovFinal 延后联军反制填，先记原值
+  const nationsGovFinal: Record<string, { stability: number; legitimacy: number }> = {};
+  const newChronicle: DiplomacyPartial['newChronicle'] = [];
+
+  // 先建 relation key → relation 对象索引（纯函数不 mutate，用 key 引用原对象算 final）
+  const relKey = (r: { from: string; to: string }) => `${r.from}_${r.to}`;
+  const relByFromTo: Record<string, typeof state.relations[number]> = {};
+  for (const r of state.relations) relByFromTo[relKey(r)] = r;
+
+  // 第一遍：算每条 relation final
+  for (const r of state.relations) {
+    let finalTruceTurns = r.truceTurns;
+    let finalTreaty = r.treaty;
+    if (r.treaty === 'truce' && r.truceTurns > 0) {
+      finalTruceTurns = r.truceTurns - 1;
+      if (finalTruceTurns === 0) finalTreaty = 'none';
+    }
+    const fromProvs = getProvs(r.from);
+    const toProvs = getProvs(r.to);
+    const borderClash = fromProvs.some((p) => p.adjacent.some((adj) => state.provinces[adj]?.ownerId === r.to));
+    const fromOps = warOpponents.get(r.from);
+    const toOps = warOpponents.get(r.to);
+    const atWarWithEachOther = !!(fromOps?.has(r.to));
+    const commonEnemy = atWarWithEachOther ? false : !!(fromOps && toOps && [...fromOps].some((o) => toOps.has(o)));
+    const fromNation = state.nations[r.from];
+    const toNation = state.nations[r.to];
+    let finalThreat = r.threat;
+    if (fromNation && toNation) {
+      const fromMil = fromNation.army.reduce((s, a) => s + a.size, 0);
+      const toMil = toNation.army.reduce((s, a) => s + a.size, 0);
+      const toProvCount = toProvs.length;
+      finalThreat = computeThreat(fromMil, toMil, toProvCount, r.relation);
+    }
+    let finalRelation = r.relation;
+    if (finalTreaty !== 'war') {
+      const d = relationDrift(finalTreaty, borderClash, finalThreat, commonEnemy);
+      finalRelation = clamp(r.relation + d, -100, 100);
+    }
+    relationsFinal[relKey(r)] = { threat: finalThreat, relation: finalRelation, truceTurns: finalTruceTurns, treaty: finalTreaty };
+  }
+
+  // 第二遍：联军反制（用 relationsFinal 的 threat 判断，等价原函数 mutate 后值）
+  const threatThreshold = 70;
+  const coalitionMin = 3;
+  for (const nation of Object.values(state.nations)) {
+    if (nation.defeated) continue;
+    const nationProvs = getProvs(nation.id);
+    if (nationProvs.length === 0) continue;
+    const neighborIds = new Set<string>();
+    for (const p of nationProvs) {
+      for (const adj of p.adjacent) {
+        const adjProv = state.provinces[adj];
+        if (adjProv && adjProv.ownerId !== nation.id) neighborIds.add(adjProv.ownerId);
+      }
+    }
+    let resisters = 0;
+    const resisterIds: string[] = [];
+    for (const nid of neighborIds) {
+      if (nid === 'rebel' || nid.startsWith('rebel_')) continue;
+      const rf = relationsFinal[`${nid}_${nation.id}`];
+      if (rf && rf.threat >= threatThreshold) { resisters++; resisterIds.push(nid); }
+    }
+    if (resisters >= coalitionMin) {
+      nationsGovFinal[nation.id] = {
+        stability: clamp(nation.government.stability - 5, 0, 100),
+        legitimacy: clamp(nation.government.legitimacy - 3, 0, 100),
+      };
+      for (const nid of resisterIds) {
+        const rf = relationsFinal[`${nid}_${nation.id}`];
+        if (rf) {
+          rf.relation = clamp(rf.relation - 10, -100, 100);
+          rf.threat = clamp(rf.threat + 5, 0, 100);
+        }
+      }
+      newChronicle.push({
+        id: `coalition_${nation.id}_${state.turn}`,
+        turn: state.turn, kind: 'milestone_diplomacy',
+        title: `${nation.name} 遭联军反制`,
+        desc: `${resisters} 个邻国因威胁过大联合抵制，稳定 -5、合法性 -3。`,
+        actorId: nation.id,
+      });
+    }
+  }
+
+  return { relationsFinal, nationsGovFinal, newChronicle };
+}
