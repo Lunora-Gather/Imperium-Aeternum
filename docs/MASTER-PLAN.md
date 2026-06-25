@@ -3,12 +3,16 @@
 > **唯一指挥棒**。本文档收敛 `06-expansion.md`（10 项 E 系列）+ `08-comprehensive-plan.md`（31 项 P 系列）+ 散落 ADR，统一为一条可追溯的执行线。
 > 任何后续改动必须能映射回本文档的某个工作包（WP），否则不予立项。
 >
-> **基线快照**（2026-06-25 v2.2）：58 源文件 / 11500 行 | typecheck ✅ | **vitest 89/89 ✅**（含 engine-targeted 26 针对性测试，economy/politics/military/diplomacy 各 ≥5）| validate ✅（203 事件 0 重复）| 205 国 577 省 | 150 事件 / **40 建筑** / 32 科技 / 12 政体 / **15 性格** / **20 法律** / 8 商路 / **10 剧本** / **4 主题** / **7 音效** / **统计图表页** / **5 步新手教程** | 50 回合 1131ms。
+> **基线快照**（2026-06-25 v2.20）：58+ 源文件 / 11700+ 行 | typecheck ✅ | **vitest 116/116 ✅**（含 engine-targeted 51 针对性测试 + C1 16 对照测试）| validate ✅（315 事件 0 重复）| 205 国 577 省 | 315 事件 / **40 建筑** / 32 科技 / 12 政体 / **15 性格** / **20 法律** / 8 商路 / **10 剧本** / **4 主题** / **7 音效** / **统计图表页** / **5 步新手教程** / **C1 引擎纯函数化（10 子引擎 Pure + processTurnPure 渐进式迁移）** | 50 回合 ~1.8s。
 >
-> **穷尽代码核验**（2026-06-25 实读 18 符号：`turn.ts judgeVictory/processTurn/buildReport`、`politics.ts settlePolitics/changeGovernment`、`economy.ts settleEconomy`、`military.ts makePeace/moveArmy`、`ai.ts planAITurn`、`persistence.ts migrate/saveGameToSlot/listAllSlots`、`App.tsx`、`EventModal effectSummary`、`PoliticsScreen civilWar`、`gameStore suppressRebellion/negotiateRebellion/demolishBuilding`、`ErrorBoundary`、`ProvinceScreen`、`DiplomacyScreen`、`MilitaryScreen truce`、`events.ts govTransition`）：
-> - **Phase A 全部 4 WP 已实现**（A1 叛乱临时 Nation+连锁+归顺 / A2 内战镇压谈判 UI+引擎 / A3 孤儿军队撤退 / A4 AI 可见 worldEvents）
-> - **Phase B 8 WP 中 5 个已实现**（B1 事件预览翻译 / B2 省份通知 / B3 多槽位 / B6 ErrorBoundary / B7 存档迁移 v1→v2→v3），**3 个部分完成**（B4 引擎有 UI 缺 / B5 隐式过滤缺显示 / B8 标记缺反扑事件）
-> - 真实剩余缺口集中于：B4/B5/B8 收尾 + Phase C 架构 + Phase D 内容 + Phase E 打磨 + Phase F 移植
+> **全部 6 Phase 完成状态**（2026-06-25 v2.20）：
+> - **Phase A 全部 4 WP ✅**（A1 叛乱临时 Nation+连锁+归顺 / A2 内战镇压谈判 UI+引擎 / A3 孤儿军队撤退 / A4 AI 可见 worldEvents）
+> - **Phase B 全部 8 WP ✅**（B1 翻译 / B2 省份通知 / B3 多槽位 / B4 拆除按钮 / B5 停战显示 / B6 ErrorBoundary / B7 存档迁移 / B8 政体反扑事件）
+> - **Phase C 全部 5 WP ✅**（C1 引擎纯函数化 10 子引擎 Pure + processTurnPure 渐进式迁移 + 16 对照测试 / C2 store 精确订阅 / C3 引擎测试 11→51 / C4 as 断言清理 / C5 确定性重放）
+> - **Phase D 全部 6 WP ✅**（D1 事件 203→315 / D2 科技质变 32 科技 / D3 建筑 24→40 / D4 法律 12→20 / D5 剧本 7→10 / D6 性格 11→15）
+> - **Phase E 全部 6 WP ✅**（E1 新手教程 / E2 统计图表 / E3 键盘快捷键 / E4 音效 / E5 SVG 地形地图 / E6 主题 2→4）
+> - **Phase F 全部 3 WP ✅**（F1 引擎/UI 分离审计 / F2 数据 JSON 导出 / F3 Godot 移植报告）
+> - **MASTER-PLAN 全部 32 WP 完成，项目 MVP 完整交付。**
 >
 > **设计宪法**（不可推翻，任何 WP 违宪即否决）：
 > 1. 扩张有代价——每省带来超管惩罚 + 文化冲突 + 行政负担
