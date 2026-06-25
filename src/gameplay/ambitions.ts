@@ -46,21 +46,33 @@ function scaleOf(total: number): AmbitionSnapshot['worldScale'] {
   return 'world';
 }
 
-function ensureMeta(state: StateWithAmbition): AmbitionMeta {
+function makeMeta(state: GameState): AmbitionMeta {
   const pid = playerId(state);
-  const current = provinceCount(state, pid);
   const player = state.nations[pid];
+  return {
+    playerNationId: pid,
+    startTurn: state.turn,
+    startProvinces: Math.max(1, provinceCount(state, pid)),
+    startGold: Math.max(0, Math.round(player?.resources.gold ?? 0)),
+    worldProvinces: Object.keys(state.provinces).length,
+    economyTurns: 0,
+    peaceTurns: 0,
+  };
+}
+
+function getMetaForRead(state: StateWithAmbition): AmbitionMeta {
+  const pid = playerId(state);
+  const worldProvinces = Object.keys(state.provinces).length;
+  const meta = state.ambitionMeta;
+  if (!meta || meta.playerNationId !== pid || meta.worldProvinces !== worldProvinces) return makeMeta(state);
+  return meta;
+}
+
+function ensureMetaForWrite(state: StateWithAmbition): AmbitionMeta {
+  const pid = playerId(state);
   const worldProvinces = Object.keys(state.provinces).length;
   if (!state.ambitionMeta || state.ambitionMeta.playerNationId !== pid || state.ambitionMeta.worldProvinces !== worldProvinces) {
-    state.ambitionMeta = {
-      playerNationId: pid,
-      startTurn: state.turn,
-      startProvinces: Math.max(1, current),
-      startGold: Math.max(0, Math.round(player?.resources.gold ?? 0)),
-      worldProvinces,
-      economyTurns: 0,
-      peaceTurns: 0,
-    };
+    state.ambitionMeta = makeMeta(state);
   }
   return state.ambitionMeta;
 }
@@ -88,7 +100,7 @@ function targets(meta: AmbitionMeta) {
 
 export function getAmbitionSnapshot(state: GameState): AmbitionSnapshot {
   const s = state as StateWithAmbition;
-  const meta = ensureMeta(s);
+  const meta = getMetaForRead(s);
   const pid = playerId(s);
   const player = s.nations[pid];
   const t = targets(meta);
@@ -105,7 +117,7 @@ export function getAmbitionSnapshot(state: GameState): AmbitionSnapshot {
 
 function applyAmbitions(state: GameState): { state: GameState; note?: string } {
   const next = state as StateWithAmbition;
-  const meta = ensureMeta(next);
+  const meta = ensureMetaForWrite(next);
   const pid = playerId(next);
   const player = next.nations[pid];
   if (!player) return { state };
@@ -124,7 +136,6 @@ function applyAmbitions(state: GameState): { state: GameState; note?: string } {
 
   let note: string | undefined;
 
-  // 旧引擎可能已经给出过早胜利；动态目标不满足时撤销。
   if (next.victory.type?.startsWith('win')) {
     const premature =
       (next.victory.type === 'win_conquest' && !(provs >= t.conquestTarget && stable)) ||
