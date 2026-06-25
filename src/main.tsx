@@ -5,7 +5,7 @@ import { createRoot } from 'react-dom/client';
 import './index.css';
 import './layout.css';
 
-const BUILD_MARK = '布局优化 v1 · refined-shell';
+const BUILD_MARK = '布局优化 v2 · refined-map';
 
 function showFatalError(error: unknown) {
   const root = document.getElementById('root');
