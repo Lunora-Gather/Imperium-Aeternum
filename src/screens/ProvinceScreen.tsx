@@ -26,7 +26,7 @@ function techLabel(prereqTech?: string): string {
 }
 
 const CLASS_LABEL: Record<string, string> = {
-  farmers: '农民', workers: '工人', merchants: '商人', soldiers: '士兵', scholars: '学者', nobles: '贵族', clergy: '神职',
+  peasants: '农民', workers: '工人', merchants: '商人', soldiers: '士兵', scholars: '学者', nobles: '贵族', clergy: '神职',
 };
 
 function provStatus(p: Province): 'good' | 'warn' | 'danger' | 'neutral' {

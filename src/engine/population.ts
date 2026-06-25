@@ -112,7 +112,10 @@ export function draftFromPopulation(province: Province, count: number): { drafte
   for (let i = 0; i < candidates.length && drafted < count; i++) {
     const grp = province.classes.find((g) => g.classId === candidates[i]);
     if (!grp) continue;
-    const take = Math.min(grp.count, Math.round((count - drafted) * ratio[i] / (ratio[i] + (i === 2 ? 0 : 0))));
+    // 该阶层应承担的征兵份额 = 剩余需求 × (该比例 / 剩余比例和)，受该阶层现有人数上限约束
+    const remainingRatio = ratio.slice(i).reduce((s, x) => s + x, 0);
+    const share = remainingRatio > 0 ? (count - drafted) * (ratio[i] / remainingRatio) : 0;
+    const take = Math.min(grp.count, Math.round(share));
     grp.count -= take;
     drafted += take;
   }

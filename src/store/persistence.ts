@@ -43,10 +43,7 @@ const migrations: { from: number; to: number; apply: (s: SaveGame) => SaveGame }
     from: 2, to: 3,
     apply: (s) => {
       const gs = s.gameState;
-      // A1/A2 字段补全
-      for (const n of Object.values(gs.nations)) {
-        if (n.civilWar === undefined) n.civilWar = undefined;  // 可选字段，无需补
-      }
+      // A1/A2 字段：civilWar/rebellionDecay/rebelOf 均为可选字段，旧存档缺则按 undefined 处理（无需显式补）
       // TurnReport A4/B2 字段补全
       for (const r of gs.history ?? []) {
         if (!r.worldEvents) r.worldEvents = [];

@@ -269,15 +269,14 @@ export function executeAIAction(nation: Nation, action: AIAction, state: GameSta
       break;
     }
     case 'make_peace': {
-      // 结束所有该 AI 参与的战争
-      for (const w of [...state.wars]) {
-        if (w.attackerId === nation.id || w.defenderId === nation.id) {
-          state.wars.splice(state.wars.indexOf(w), 1);
-          for (const r of state.relations) {
-            if ((r.from === w.attackerId && r.to === w.defenderId) ||
-                (r.from === w.defenderId && r.to === w.attackerId)) {
-              r.treaty = 'truce'; r.truceTurns = 10;
-            }
+      // 结束所有该 AI 参与的战争（用 filter 替代 splice+indexOf，避免 indexOf 返回 -1 时 splice(-1,1) 误删末尾元素）
+      const endedWars = state.wars.filter((w) => w.attackerId === nation.id || w.defenderId === nation.id);
+      state.wars = state.wars.filter((w) => w.attackerId !== nation.id && w.defenderId !== nation.id);
+      for (const w of endedWars) {
+        for (const r of state.relations) {
+          if ((r.from === w.attackerId && r.to === w.defenderId) ||
+              (r.from === w.defenderId && r.to === w.attackerId)) {
+            r.treaty = 'truce'; r.truceTurns = 10;
           }
         }
       }

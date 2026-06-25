@@ -133,7 +133,7 @@ export function changeGovernment(nation: Nation, newGov: GovernmentId, state: Ga
     f.satisfaction = clamp(f.satisfaction + def.factionSatMod[f.id], 0, 100);
   }
   // B8: 标记反扑窗口——3 回合内可能触发反扑事件（events.ts 检测）
-  nation.civilWar = nation.civilWar ?? undefined;  // 保持 civilWar 不变
+  // 注：civilWar 为独立内战状态，政体切换不改变它
   nation.govTransitionTurns = 3;
   return true;
 }

@@ -4,7 +4,7 @@ import { provincesOf } from '../engine/init';
 import { Panel, Stat, Bar, Btn, Tag, Divider } from '../components/ui';
 
 const CLASS_LABEL: Record<string, string> = {
-  farmers: '农民', workers: '工人', merchants: '商人', soldiers: '士兵', scholars: '学者', nobles: '贵族', clergy: '神职',
+  peasants: '农民', workers: '工人', merchants: '商人', soldiers: '士兵', scholars: '学者', nobles: '贵族', clergy: '神职',
 };
 const FACTION_LABEL: Record<string, string> = {
   nobles: '贵族', merchants: '商人', military: '军方', commoners: '民众', clergy: '神职',
