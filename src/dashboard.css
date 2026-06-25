@@ -1,0 +1,383 @@
+/* Dashboard v5 — 三栏、克制、信息优先 */
+.ia-dash {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.ia-dash-command {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: flex-end;
+  padding: 10px 2px 14px;
+  border-bottom: 1px solid color-mix(in srgb, var(--border) 70%, transparent);
+}
+
+.ia-dash-command small,
+.ia-dash-section small {
+  display: block;
+  color: var(--text-dim);
+  font-size: 9px;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+  margin-bottom: 3px;
+}
+
+.ia-dash-command h2 {
+  margin: 0;
+  font-size: 24px;
+  color: var(--text);
+  letter-spacing: .04em;
+}
+
+.ia-dash-command p {
+  margin: 5px 0 0;
+  color: var(--text-mute);
+  font-size: 12px;
+}
+
+.ia-dash-command-actions {
+  display: flex;
+  gap: 7px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.ia-dash-grid {
+  display: grid;
+  grid-template-columns: 270px minmax(0, 1fr) 280px;
+  gap: 12px;
+  align-items: start;
+}
+
+.ia-dash-col,
+.ia-dash-main {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+}
+
+.ia-dash-section {
+  border: 1px solid color-mix(in srgb, var(--border) 66%, transparent);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--bg-panel) 78%, transparent);
+  padding: 12px;
+}
+
+.ia-dash-section header {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  align-items: flex-start;
+  margin-bottom: 10px;
+}
+
+.ia-dash-section h3 {
+  margin: 0;
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 650;
+  letter-spacing: .03em;
+}
+
+.ia-dash-muted,
+.ia-dash-note {
+  margin: 0;
+  color: var(--text-mute);
+  font-size: 11px;
+  line-height: 1.55;
+}
+
+.ia-dash-note {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid color-mix(in srgb, var(--border) 52%, transparent);
+}
+
+.ia-dash-metrics {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.ia-dash-metric {
+  min-height: 58px;
+  padding: 9px 10px;
+  border: 1px solid color-mix(in srgb, var(--border) 54%, transparent);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--bg-inset) 40%, transparent);
+}
+
+.ia-dash-metric span {
+  display: block;
+  color: var(--text-dim);
+  font-size: 10px;
+  margin-bottom: 5px;
+}
+
+.ia-dash-metric strong {
+  display: block;
+  color: var(--text);
+  font-size: 20px;
+  line-height: 1.1;
+  font-family: var(--font-mono);
+}
+
+.ia-dash-metric em {
+  display: block;
+  margin-top: 3px;
+  color: var(--text-dim);
+  font-size: 9px;
+  font-style: normal;
+}
+
+.ia-dash-metric.tone-gold strong { color: var(--gold); }
+.ia-dash-metric.tone-good strong { color: var(--good); }
+.ia-dash-metric.tone-warn strong { color: var(--warn); }
+.ia-dash-metric.tone-danger strong { color: var(--war); }
+
+.ia-dash-sep {
+  height: 1px;
+  background: color-mix(in srgb, var(--border) 56%, transparent);
+  margin: 11px 0;
+}
+
+.ia-dash-kv {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 6px 0;
+  border-bottom: 1px solid color-mix(in srgb, var(--border) 34%, transparent);
+  font-size: 11px;
+}
+
+.ia-dash-kv span { color: var(--text-dim); }
+.ia-dash-kv strong { color: var(--text-mute); font-weight: 600; text-align: right; }
+
+.ia-action-list {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.ia-action-list button {
+  text-align: left;
+  min-height: 66px;
+  border: 1px solid color-mix(in srgb, var(--border) 58%, transparent);
+  border-radius: 9px;
+  background: transparent;
+  color: var(--text);
+  cursor: pointer;
+  padding: 10px 11px;
+}
+
+.ia-action-list button:hover {
+  border-color: color-mix(in srgb, var(--border-gold) 55%, var(--border));
+  background: color-mix(in srgb, var(--gold) 5%, transparent);
+}
+
+.ia-action-list b {
+  display: block;
+  color: var(--text);
+  font-size: 13px;
+  margin-bottom: 5px;
+}
+
+.ia-action-list span {
+  display: block;
+  color: var(--text-mute);
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+.ia-action-list .tone-warn { border-color: color-mix(in srgb, var(--warn) 46%, var(--border)); }
+.ia-action-list .tone-danger { border-color: color-mix(in srgb, var(--war) 56%, var(--border)); }
+.ia-action-list .tone-warn b { color: var(--warn); }
+.ia-action-list .tone-danger b { color: var(--war); }
+
+.ia-dash-meter-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px 14px;
+}
+
+.ia-dash-meter > div {
+  display: flex;
+  justify-content: space-between;
+  color: var(--text-mute);
+  font-size: 11px;
+  margin-bottom: 5px;
+}
+
+.ia-dash-meter strong {
+  color: var(--text);
+  font-family: var(--font-mono);
+}
+
+.ia-dash-meter i {
+  position: relative;
+  display: block;
+  height: 7px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--bg-inset) 70%, transparent);
+  overflow: hidden;
+}
+
+.ia-dash-meter b {
+  position: absolute;
+  inset: 0 auto 0 0;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--gold) 62%, var(--text-mute));
+}
+
+.ia-dash-trends {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.ia-dash-spark {
+  display: grid;
+  grid-template-columns: 34px 1fr 42px;
+  align-items: center;
+  gap: 7px;
+  padding: 8px;
+  border: 1px solid color-mix(in srgb, var(--border) 46%, transparent);
+  border-radius: 8px;
+}
+
+.ia-dash-spark span,
+.ia-mini-empty {
+  color: var(--text-dim);
+  font-size: 10px;
+}
+
+.ia-dash-spark svg {
+  width: 100%;
+  height: 24px;
+}
+
+.ia-dash-spark polyline {
+  fill: none;
+  stroke: color-mix(in srgb, var(--gold) 70%, var(--text-mute));
+  stroke-width: 1.4;
+}
+
+.ia-dash-spark strong {
+  font-size: 10px;
+  text-align: right;
+}
+
+.ia-focus-inline {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+  margin-top: 10px;
+}
+
+.ia-focus-inline button {
+  height: 44px;
+  border: 1px solid color-mix(in srgb, var(--border) 55%, transparent);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-mute);
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1px;
+}
+
+.ia-focus-inline button:hover,
+.ia-focus-inline button.is-active {
+  border-color: color-mix(in srgb, var(--border-gold) 65%, transparent);
+  background: color-mix(in srgb, var(--gold) 6%, transparent);
+  color: var(--gold);
+}
+
+.ia-focus-inline span { font-size: 12px; font-weight: 700; }
+.ia-focus-inline em { font-size: 9px; font-style: normal; opacity: .78; }
+
+.ia-risk-list {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+
+.ia-risk-list > div {
+  min-height: 34px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 7px 9px;
+  border: 1px solid color-mix(in srgb, var(--border) 46%, transparent);
+  border-radius: 8px;
+  font-size: 11px;
+}
+
+.ia-risk-list span { color: var(--text-mute); }
+.ia-risk-list strong { font-family: var(--font-mono); }
+.ia-risk-list .tone-good strong { color: var(--good); }
+.ia-risk-list .tone-warn strong { color: var(--warn); }
+.ia-risk-list .tone-danger strong { color: var(--war); }
+.ia-risk-empty { color: var(--text-dim); }
+
+.ia-dash-log {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  max-height: 210px;
+  overflow: auto;
+}
+
+.ia-dash-log p {
+  margin: 0;
+  color: var(--text-mute);
+  font-size: 11px;
+  line-height: 1.5;
+  padding-bottom: 7px;
+  border-bottom: 1px solid color-mix(in srgb, var(--border) 32%, transparent);
+}
+
+.ia-dash-victory h3 {
+  margin: 0 0 6px;
+  color: var(--gold);
+}
+
+.ia-dash-victory p {
+  margin: 0;
+  color: var(--text-mute);
+  font-size: 12px;
+}
+
+@media (max-width: 1100px) {
+  .ia-dash-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+  .ia-dash-main {
+    grid-column: 1 / -1;
+    order: -1;
+  }
+}
+
+@media (max-width: 720px) {
+  .ia-dash-command {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .ia-dash-command-actions {
+    justify-content: flex-start;
+  }
+  .ia-dash-grid {
+    grid-template-columns: 1fr;
+  }
+  .ia-action-list,
+  .ia-dash-meter-grid,
+  .ia-dash-trends {
+    grid-template-columns: 1fr;
+  }
+}
