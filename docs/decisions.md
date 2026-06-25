@@ -351,3 +351,12 @@
 - **替代**：继续 React 加 PixiJS（否决：上限显现）；Unity 移植（否决：2D 不如 Godot 轻量 + 授权成本）；Web Godot（否决：已是 Web 无优势）。
 - **教训**：移植报告基于实读架构比例（58% 引擎友好 / 29% UI 重写）而非空泛推测，引擎层友好度是核心依据。
 
+## DEC-042：F1 引擎/UI 完全分离审计
+
+- **阶段**：v2 Phase F1（2026-06-25）
+- **背景**：F1 验收要求引擎零 React 依赖、零 DOM 依赖、可独立打包为 `imperium-engine` npm 包。需穷尽实读确认。
+- **决策**：输出 `docs/13-engine-ui-separation-audit.md`——穷尽实读 15 引擎文件 + 13 数据文件搜索 `react`/`react-dom`/`document`/`window`/`localStorage`/`store`/`components`/`screens`/`App`/`console` 依赖标志。结果：引擎层 3578 行零 React/DOM/UI 反向依赖，导出完整（processTurn/settleEconomy 等 25+ 核心函数全 export），可独立打包。数据/类型/工具层同样独立（utils/audio.ts 用 React hook 但非 engine 不影响）。
+- **影响**：F1 验收通过，引擎可独立打包为 npm 包。唯一非 F1 范畴缺口是 C1 mutate 模式（引擎 mutate 入参 nation 引用），不影响独立打包，是 C1 独立优化目标。
+- **教训**：穷尽实读搜索依赖标志而非凭印象——15 文件逐一 grep 确认零反向依赖，比抽样可靠。
+- **替代**：仅抽样几文件（否决：穷尽实读才可靠）；改 mutate 模式为纯函数（否决：那是 C1 范畴非 F1）。
+
