@@ -7,9 +7,10 @@ import './layout.css';
 import './restraint.css';
 import './quiet.css';
 import './dashboard.css';
+import './palette.css';
 import { installStrategyFocus } from './gameplay/strategyFocus';
 
-const BUILD_MARK = '总览重排 v1 · dashboard-grid';
+const BUILD_MARK = '配色与回退 v1 · palette-safe-nav';
 
 installStrategyFocus();
 
