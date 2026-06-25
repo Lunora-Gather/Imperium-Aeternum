@@ -3,8 +3,9 @@
 
 import { createRoot } from 'react-dom/client';
 import './index.css';
+import './layout.css';
 
-const BUILD_MARK = '优化版 v4 · hookfix-310 · save-normalize';
+const BUILD_MARK = '布局优化 v1 · refined-shell';
 
 function showFatalError(error: unknown) {
   const root = document.getElementById('root');
