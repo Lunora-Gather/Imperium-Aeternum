@@ -1,93 +1,112 @@
-/* 国策焦点：轻量玩法浮层，保持克制、不抢主界面 */
+/* 国策焦点 v2：从“大浮窗”改成不打扰的轻薄条 */
 .ia-focus-dock {
   position: fixed;
-  left: 14px;
-  bottom: 14px;
+  left: 50%;
+  bottom: 10px;
+  transform: translateX(-50%);
   z-index: 120;
-  width: min(420px, calc(100vw - 28px));
-  border: 1px solid color-mix(in srgb, var(--border) 88%, transparent);
-  border-radius: 12px;
-  background: color-mix(in srgb, var(--bg-panel) 94%, transparent);
-  backdrop-filter: blur(10px);
-  padding: 10px;
-  box-shadow: 0 8px 22px rgba(0,0,0,0.10);
+  width: min(720px, calc(100vw - 48px));
+  border: 1px solid color-mix(in srgb, var(--border) 70%, transparent);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--bg-panel) 88%, transparent);
+  backdrop-filter: blur(8px);
+  padding: 5px 7px 5px 12px;
+  box-shadow: none;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 10px;
+  align-items: center;
+  opacity: .88;
+}
+
+.ia-focus-dock:hover,
+.ia-focus-dock:focus-within {
+  opacity: 1;
 }
 
 .ia-focus-title {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  margin-bottom: 4px;
+  gap: 6px;
+  margin: 0;
+  white-space: nowrap;
 }
 
 .ia-focus-title span {
   color: var(--text-dim);
   font-size: 10px;
-  letter-spacing: 0.1em;
+  letter-spacing: 0.08em;
 }
 
 .ia-focus-title strong {
   color: var(--gold);
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 700;
 }
 
 .ia-focus-dock p {
-  margin: 0 0 8px;
-  color: var(--text-mute);
-  font-size: 11px;
-  line-height: 1.45;
+  display: none;
 }
 
 .ia-focus-options {
-  display: grid;
-  grid-template-columns: repeat(6, minmax(0, 1fr));
-  gap: 5px;
+  display: flex;
+  gap: 4px;
+  min-width: 0;
+  overflow-x: auto;
+  justify-content: flex-end;
+  scrollbar-width: none;
 }
 
+.ia-focus-options::-webkit-scrollbar { display: none; }
+
 .ia-focus-options button {
-  min-width: 0;
-  height: 44px;
-  border: 1px solid color-mix(in srgb, var(--border) 78%, transparent);
-  border-radius: 9px;
-  background: color-mix(in srgb, var(--bg-inset) 52%, transparent);
+  min-width: 48px;
+  height: 28px;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  background: transparent;
   color: var(--text-mute);
   cursor: pointer;
-  display: flex;
-  flex-direction: column;
+  display: inline-flex;
+  flex-direction: row;
   align-items: center;
   justify-content: center;
-  gap: 2px;
+  gap: 3px;
+  padding: 0 8px;
   transition: border-color .15s ease, background .15s ease, color .15s ease;
 }
 
 .ia-focus-options button:hover {
   color: var(--text);
-  border-color: color-mix(in srgb, var(--border-gold) 70%, var(--border));
+  border-color: color-mix(in srgb, var(--border) 85%, transparent);
+  background: color-mix(in srgb, var(--bg-inset) 42%, transparent);
 }
 
 .ia-focus-options button.is-active {
   color: var(--gold);
-  border-color: var(--border-gold);
-  background: color-mix(in srgb, var(--gold) 8%, transparent);
+  border-color: color-mix(in srgb, var(--border-gold) 80%, transparent);
+  background: color-mix(in srgb, var(--gold) 7%, transparent);
 }
 
 .ia-focus-options span {
   font-size: 11px;
-  font-weight: 700;
+  font-weight: 600;
 }
 
 .ia-focus-options em {
-  font-style: normal;
-  font-size: 9px;
-  opacity: .78;
+  display: none;
 }
 
 @media (max-width: 760px) {
   .ia-focus-dock {
     position: static;
+    transform: none;
     width: auto;
     margin: 8px 10px 0;
+    border-radius: 10px;
+    grid-template-columns: 1fr;
+  }
+  .ia-focus-options {
+    justify-content: flex-start;
   }
 }
