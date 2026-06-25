@@ -3,7 +3,7 @@
 
 import { describe, it, expect } from 'vitest';
 import { createInitialState } from '../engine/init';
-import { processTurn } from '../engine/turn';
+import { processTurn, processTurnPure } from '../engine/turn';
 import { saveGame, loadGame } from '../store/persistence';
 import { PLAYER_ID } from '../data/nations';
 import { moveArmy, declareWar, makePeace } from '../engine/military';
@@ -408,5 +408,57 @@ describe('C5 确定性重放', () => {
   it('C4 strict 模式已开启（tsconfig strict=true）', () => {
     // 静态断言：若 tsconfig strict=false 此测试仍过，但 typecheck 会暴露
     expect(true).toBe(true);
+  });
+});
+
+// C1 processTurnPure 50 回合对照测试（验证长回合下与原 processTurn 等价）
+describe('C1 processTurnPure 50 回合对照', () => {
+  it('processTurnPure 推进 50 回合无 NaN/崩溃', () => {
+    let state = createInitialState();
+    for (let i = 0; i < 50; i++) {
+      const { state: next } = processTurnPure(state);
+      state = next;
+      const p = state.nations[PLAYER_ID];
+      expect(Number.isFinite(p.resources.gold)).toBe(true);
+      expect(Number.isFinite(p.resources.food)).toBe(true);
+      expect(Number.isFinite(p.government.stability)).toBe(true);
+      expect(Number.isFinite(p.government.legitimacy)).toBe(true);
+    }
+    expect(state.turn).toBe(50);
+  });
+
+  it('processTurnPure 与 processTurn 50 回合后 player 关键字段一致（同种子）', () => {
+    let s1 = createInitialState();
+    let s2 = createInitialState();
+    s2.seed = s1.seed;
+    for (let i = 0; i < 50; i++) {
+      const r1 = processTurn(s1);
+      const r2 = processTurnPure(s2);
+      s1 = r1.state;
+      s2 = r2.state;
+    }
+    const p1 = s1.nations[PLAYER_ID];
+    const p2 = s2.nations[PLAYER_ID];
+    // 关键字段对照（容浮点误差，渐进式迁移 6 子引擎 Pure + 6 保留原版本应严格等价）
+    expect(p2.resources.gold).toBeCloseTo(p1.resources.gold, 0);
+    expect(p2.resources.food).toBeCloseTo(p1.resources.food, 0);
+    expect(p2.government.stability).toBeCloseTo(p1.government.stability, 0);
+    expect(p2.government.legitimacy).toBeCloseTo(p1.government.legitimacy, 0);
+    expect(p2.government.corruption).toBeCloseTo(p1.government.corruption, 0);
+    expect(p2.government.efficiency).toBeCloseTo(p1.government.efficiency, 0);
+    expect(p2.taxRate).toBeCloseTo(p1.taxRate, 2);
+    expect(p2.warExhaustion).toBeCloseTo(p1.warExhaustion, 0);
+    // 省份对照
+    const provs1 = Object.values(s1.provinces).filter((p) => p.ownerId === PLAYER_ID);
+    const provs2 = Object.values(s2.provinces).filter((p) => p.ownerId === PLAYER_ID);
+    expect(provs2.length).toBe(provs1.length);
+    provs1.forEach((pp1) => {
+      const pp2 = provs2.find((x) => x.id === pp1.id);
+      if (!pp2) return;
+      expect(pp2.population).toBe(pp1.population);
+      expect(pp2.assimilation).toBeCloseTo(pp1.assimilation, 0);
+      expect(pp2.loyalty).toBeCloseTo(pp1.loyalty, 0);
+      expect(pp2.unrest).toBeCloseTo(pp1.unrest, 0);
+    });
   });
 });
