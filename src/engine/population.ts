@@ -126,4 +126,83 @@ export function draftFromPopulation(province: Province, count: number): { drafte
   return { drafted };
 }
 
+// ── C1: 纯函数版本 settlePopulationPure ──
+// 不 mutate nation/provinces，返回 delta，供 processTurn 合并建新 state
+// 与原 settlePopulation 并存（零回归），后续 processTurn 迁移到此纯函数后可删原函数
+export interface PopPartial extends PopSettleResult {
+  // 每省 population 增量（按 province.id 索引）
+  popDelta: Record<string, number>;
+  // 每省每阶层 satisfaction 增量（按 province.id → classId 索引）
+  classSatDelta: Record<string, Record<string, number>>;
+  // 每派系 satisfaction 最终值（覆写，非增量——原函数是向均值靠拢）
+  factionSatFinal: Record<string, number>;
+}
+export function settlePopulationPure(
+  nation: Nation,
+  provinces: Province[],
+  foodShortage: boolean,
+  tradeFree: boolean,
+  atWar: boolean,
+  warWonRecent: boolean,
+): PopPartial {
+  let totalGrowth = 0;
+  const classSatChanges = {} as Record<ClassId, number>;
+  const popDelta: Record<string, number> = {};
+  const classSatDelta: Record<string, Record<string, number>> = {};
+  // 记录每省每阶层 satisfaction 新值（用于 avgSat 计算，保持与原函数 mutate 后语义等价）
+  const classSatNew: Record<string, Record<string, number>> = {};
+
+  for (const p of provinces) {
+    const totalPop = p.population;
+    const delta = popGrowth({
+      population: totalPop, baseGrowth: 0.01,
+      food: nation.resources.food, foodNeed: totalPop * 0.8,
+      stability: nation.government.stability,
+      atWar, plague: false,
+      welfareActive: nation.activeCharacterBonuses.includes('welfare'),
+    }) * (charMods(nation).popGrowthMod ?? 1) * (nation.policyMods?.popGrowthMod ?? 1);
+    const newPop = Math.max(10, Math.round(p.population + delta));
+    popDelta[p.id] = newPop - p.population;  // delta（原函数 p.population = newPop）
+    totalGrowth += delta;
+
+    const satDelta: Record<string, number> = {};
+    const satNew: Record<string, number> = {};
+    for (const grp of p.classes) {
+      const interest = CLASS_INTEREST[grp.classId];
+      const taxPressure = (nation.taxRate - 0.15) * 100 * interest.tax;
+      const foodPressure = foodShortage ? -15 * interest.food : 0;
+      const warPressure = atWar ? -5 * interest.war : (warWonRecent ? 5 * interest.war : 0);
+      const tradePressure = tradeFree ? 3 * interest.trade : -3 * interest.trade;
+      const religionPressure = 0;
+      const d = -taxPressure + foodPressure + warPressure + tradePressure + religionPressure;
+      const newSat = clamp(grp.satisfaction + d, 0, 100);
+      satDelta[grp.classId] = newSat - grp.satisfaction;  // delta（原函数 grp.satisfaction = newSat）
+      satNew[grp.classId] = newSat;
+      classSatChanges[grp.classId] = (classSatChanges[grp.classId] ?? 0) + d;
+    }
+    classSatDelta[p.id] = satDelta;
+    classSatNew[p.id] = satNew;
+  }
+
+  // 派系满意度：用 satNew（等价于原函数 mutate 后的 grp.satisfaction）算 avgSat
+  const factionSatFinal: Record<string, number> = {};
+  for (const fid of CLASS_IDS) {
+    const factionId = mapClassToFaction(fid);
+    const faction = nation.factions.find((f) => f.id === factionId);
+    if (!faction) continue;
+    const allGrps = provinces.flatMap((p) => p.classes.filter((c) => c.classId === fid));
+    if (allGrps.length === 0) continue;
+    // avgSat 用 satNew（等价原函数 mutate 后值）
+    let avgSum = 0, cnt = 0;
+    for (const p of provinces) {
+      const newSat = classSatNew[p.id]?.[fid];
+      if (newSat !== undefined) { avgSum += newSat; cnt++; }
+    }
+    const avgSat = cnt > 0 ? avgSum / cnt : 0;
+    factionSatFinal[factionId] = clamp(faction.satisfaction + (avgSat - faction.satisfaction) * 0.3, 0, 100);
+  }
+
+  return { totalGrowth, classSatChanges, popDelta, classSatDelta, factionSatFinal };
+}
+
 export { classRebellionRisk };

@@ -5,7 +5,7 @@ import { settleEconomy, establishTradeRoute, settleEconomyPure } from '../engine
 import { settlePolitics, changeGovernment, enactPolicy, enactLaw } from '../engine/politics';
 import { declareWar, makePeace, recruit, moveArmy } from '../engine/military';
 import { improveRelation, establishTrade, espionage, formAlliance } from '../engine/diplomacy';
-import { draftFromPopulation, settlePopulation } from '../engine/population';
+import { draftFromPopulation, settlePopulation, settlePopulationPure } from '../engine/population';
 import { checkTrigger, rollEvents } from '../engine/events';
 import { PLAYER_ID } from '../data/nations';
 import type { GameState } from '../types/game';
@@ -365,5 +365,54 @@ describe('C1 settleEconomyPure 纯函数对照', () => {
     const before = JSON.stringify(p.resources);
     settleEconomyPure(p, state);
     expect(JSON.stringify(p.resources)).toBe(before);
+  });
+});
+
+// C1: settlePopulationPure 纯函数对照测试——delta 与 settlePopulation mutate 结果一致
+import { provincesOf } from '../engine/init';
+describe('C1 settlePopulationPure 纯函数对照', () => {
+  it('delta 与 settlePopulation mutate 后的增量一致', () => {
+    const state1 = createInitialState();
+    const state2 = createInitialState();
+    const p1 = state1.nations[PLAYER_ID];
+    const p2 = state2.nations[PLAYER_ID];
+    const provs1 = provincesOf(PLAYER_ID, state1.provinces);
+    const provs2 = provincesOf(PLAYER_ID, state2.provinces);
+    // 记录原值
+    const origPop: Record<string, number> = {};
+    const origSat: Record<string, Record<string, number>> = {};
+    const origFactionSat: Record<string, number> = {};
+    provs1.forEach((p) => {
+      origPop[p.id] = p.population;
+      origSat[p.id] = {};
+      p.classes.forEach((c) => { origSat[p.id][c.classId] = c.satisfaction; });
+    });
+    p1.factions.forEach((f) => { origFactionSat[f.id] = f.satisfaction; });
+
+    // mutate 版
+    settlePopulation(p1, provs1, false, true, false, false);
+    // 纯函数版
+    const pure = settlePopulationPure(p2, provs2, false, true, false, false);
+
+    // 对照：mutate 后值 - 原值 == pure.delta
+    provs1.forEach((p) => {
+      expect(p.population - origPop[p.id]).toBe(pure.popDelta[p.id]);
+      p.classes.forEach((c) => {
+        expect(c.satisfaction - origSat[p.id][c.classId]).toBeCloseTo(pure.classSatDelta[p.id][c.classId], 5);
+      });
+    });
+    p1.factions.forEach((f) => {
+      expect(f.satisfaction).toBeCloseTo(pure.factionSatFinal[f.id], 0);
+    });
+    expect(pure.totalGrowth).toBeGreaterThanOrEqual(0);
+  });
+
+  it('settlePopulationPure 不 mutate nation/provinces（调用前后不变）', () => {
+    const state = createInitialState();
+    const p = state.nations[PLAYER_ID];
+    const provs = provincesOf(PLAYER_ID, state.provinces);
+    const before = JSON.stringify({ nation: p, provs });
+    settlePopulationPure(p, provs, false, true, false, false);
+    expect(JSON.stringify({ nation: p, provs })).toBe(before);
   });
 });
