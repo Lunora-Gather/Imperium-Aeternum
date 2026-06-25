@@ -168,7 +168,7 @@ export interface ActiveTradeRoute {
 
 // ── 科技状态 ──
 export interface TechState {
-  agri: number;              // 1-5
+  agri: number;              // 1-8
   mil: number;
   admin: number;
   culture: number;           // E18: 文化科技 1-8
@@ -284,7 +284,7 @@ export interface GameState {
   playerNationId: string;           // 玩家国家 id（替代硬编码 PLAYER_ID）
   nations: Record<string, Nation>;  // W1.1: Record<NationId,Nation> → Record<string,Nation>（支持 192 国数据驱动）
   provinces: Record<string, Province>;
-  relations: DiplomaticRelation[];  // 双向都存（from<to 唯一）
+  relations: DiplomaticRelation[];  // 双向都存，便于 UI 和外交行动 O(1) 查询
   _relMap?: Map<string, DiplomaticRelation>;  // E9: transient 索引，key=`${from}|${to}`，不序列化
   wars: War[];
   triggeredEvents: TriggeredEvent[];
@@ -308,4 +308,5 @@ export interface SaveGame {
   gameState: GameState;
 }
 
-export const SAVE_VERSION = 3;
+// v4：存档加载时规范化世界状态，补双向外交关系、缺失数组和无效玩家国兜底。
+export const SAVE_VERSION = 4;
