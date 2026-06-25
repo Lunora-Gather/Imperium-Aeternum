@@ -1,0 +1,167 @@
+// 动态国运目标：按剧本体量缩放胜利条件。
+// 解决：世界剧本/大国开局时，旧的“7省征服胜利、2000金经济胜利”过于固定。
+
+import { useGameStore } from '../store/gameStore';
+import type { GameState } from '../types/game';
+
+export interface AmbitionMeta {
+  playerNationId: string;
+  startTurn: number;
+  startProvinces: number;
+  startGold: number;
+  worldProvinces: number;
+  economyTurns: number;
+  peaceTurns: number;
+  warnedPremature?: boolean;
+}
+
+export interface AmbitionSnapshot {
+  conquest: { current: number; target: number; done: boolean };
+  economy: { current: number; target: number; turns: number; needTurns: number; done: boolean };
+  diplomacy: { influence: number; influenceTarget: number; goodRelations: number; goodTarget: number; done: boolean };
+  eternal: { turns: number; target: number; done: boolean };
+  worldScale: 'local' | 'regional' | 'world';
+}
+
+type StateWithAmbition = GameState & { ambitionMeta?: AmbitionMeta };
+
+let installed = false;
+
+function playerId(state: GameState): string {
+  if (state.playerNationId && state.nations[state.playerNationId]) return state.playerNationId;
+  return Object.values(state.nations).find((n) => n.isPlayer && !n.defeated)?.id ?? Object.keys(state.nations)[0];
+}
+
+function provinceCount(state: GameState, id: string): number {
+  return Object.values(state.provinces).filter((p) => p.ownerId === id).length;
+}
+
+function goodRelationCount(state: GameState, id: string): number {
+  return state.relations.filter((r) => r.from === id && r.relation >= 70 && r.treaty !== 'war').length;
+}
+
+function scaleOf(total: number): AmbitionSnapshot['worldScale'] {
+  if (total <= 40) return 'local';
+  if (total <= 180) return 'regional';
+  return 'world';
+}
+
+function ensureMeta(state: StateWithAmbition): AmbitionMeta {
+  const pid = playerId(state);
+  const current = provinceCount(state, pid);
+  const player = state.nations[pid];
+  const worldProvinces = Object.keys(state.provinces).length;
+  if (!state.ambitionMeta || state.ambitionMeta.playerNationId !== pid || state.ambitionMeta.worldProvinces !== worldProvinces) {
+    state.ambitionMeta = {
+      playerNationId: pid,
+      startTurn: state.turn,
+      startProvinces: Math.max(1, current),
+      startGold: Math.max(0, Math.round(player?.resources.gold ?? 0)),
+      worldProvinces,
+      economyTurns: 0,
+      peaceTurns: 0,
+    };
+  }
+  return state.ambitionMeta;
+}
+
+function targets(meta: AmbitionMeta) {
+  const worldScale = scaleOf(meta.worldProvinces);
+  const conquestTarget = worldScale === 'local'
+    ? Math.max(7, meta.startProvinces + 3)
+    : worldScale === 'regional'
+      ? Math.min(meta.worldProvinces, Math.max(meta.startProvinces + 6, Math.ceil(meta.worldProvinces * 0.16), Math.ceil(meta.startProvinces * 1.8)))
+      : Math.min(meta.worldProvinces, Math.max(meta.startProvinces + 10, Math.ceil(meta.worldProvinces * 0.12), Math.ceil(meta.startProvinces * 1.7)));
+
+  const economyTarget = worldScale === 'local'
+    ? Math.max(2000, meta.startGold + 1700)
+    : worldScale === 'regional'
+      ? Math.max(3200, meta.startGold + 2600)
+      : Math.max(5000, meta.startGold + 4200);
+
+  const influenceTarget = worldScale === 'local' ? 150 : worldScale === 'regional' ? 190 : 240;
+  const goodTarget = worldScale === 'local' ? 3 : worldScale === 'regional' ? 5 : 8;
+  const economyNeedTurns = worldScale === 'local' ? 6 : worldScale === 'regional' ? 8 : 10;
+  const eternalTarget = worldScale === 'local' ? 80 : worldScale === 'regional' ? 100 : 120;
+  return { conquestTarget, economyTarget, influenceTarget, goodTarget, economyNeedTurns, eternalTarget, worldScale };
+}
+
+export function getAmbitionSnapshot(state: GameState): AmbitionSnapshot {
+  const s = state as StateWithAmbition;
+  const meta = ensureMeta(s);
+  const pid = playerId(s);
+  const player = s.nations[pid];
+  const t = targets(meta);
+  const currentProvs = provinceCount(s, pid);
+  const good = goodRelationCount(s, pid);
+  return {
+    conquest: { current: currentProvs, target: t.conquestTarget, done: currentProvs >= t.conquestTarget && (player?.government.stability ?? 0) >= 40 },
+    economy: { current: Math.round(player?.resources.gold ?? 0), target: t.economyTarget, turns: meta.economyTurns, needTurns: t.economyNeedTurns, done: meta.economyTurns >= t.economyNeedTurns },
+    diplomacy: { influence: Math.round(player?.resources.influence ?? 0), influenceTarget: t.influenceTarget, goodRelations: good, goodTarget: t.goodTarget, done: (player?.resources.influence ?? 0) >= t.influenceTarget && good >= t.goodTarget && s.wars.length === 0 },
+    eternal: { turns: meta.peaceTurns, target: t.eternalTarget, done: meta.peaceTurns >= t.eternalTarget },
+    worldScale: t.worldScale,
+  };
+}
+
+function applyAmbitions(state: GameState): { state: GameState; note?: string } {
+  const next = state as StateWithAmbition;
+  const meta = ensureMeta(next);
+  const pid = playerId(next);
+  const player = next.nations[pid];
+  if (!player) return { state };
+
+  const t = targets(meta);
+  const provs = provinceCount(next, pid);
+  const atWar = next.wars.some((w) => w.attackerId === pid || w.defenderId === pid);
+  const stable = player.government.stability >= 40;
+  const good = goodRelationCount(next, pid);
+
+  if (player.resources.gold >= t.economyTarget && stable) meta.economyTurns += 1;
+  else meta.economyTurns = 0;
+
+  if (!atWar && player.government.stability >= 45 && player.government.legitimacy >= 35) meta.peaceTurns += 1;
+  else meta.peaceTurns = 0;
+
+  let note: string | undefined;
+
+  // 旧引擎可能已经给出过早胜利；动态目标不满足时撤销。
+  if (next.victory.type?.startsWith('win')) {
+    const premature =
+      (next.victory.type === 'win_conquest' && !(provs >= t.conquestTarget && stable)) ||
+      (next.victory.type === 'win_economy' && meta.economyTurns < t.economyNeedTurns) ||
+      (next.victory.type === 'win_culture' && !((player.resources.influence >= t.influenceTarget) && good >= t.goodTarget && !atWar)) ||
+      (next.victory.type === 'win_eternal' && meta.peaceTurns < t.eternalTarget);
+    if (premature) {
+      next.victory.type = null;
+      if (!meta.warnedPremature) {
+        meta.warnedPremature = true;
+        note = '国运目标已按剧本体量重算，旧式过早胜利已延后。';
+      }
+    }
+  }
+
+  if (!next.victory.type) {
+    if (provs >= t.conquestTarget && stable) next.victory.type = 'win_conquest';
+    else if (meta.economyTurns >= t.economyNeedTurns) next.victory.type = 'win_economy';
+    else if (player.resources.influence >= t.influenceTarget && good >= t.goodTarget && !atWar) next.victory.type = 'win_culture';
+    else if (meta.peaceTurns >= t.eternalTarget) next.victory.type = 'win_eternal';
+  }
+
+  return { state: next, note };
+}
+
+export function installAmbitionSystem(): void {
+  if (installed) return;
+  installed = true;
+  const originalNextTurn = (useGameStore.getState() as unknown as { nextTurn?: () => unknown }).nextTurn;
+  useGameStore.setState({
+    nextTurn: () => {
+      const result = originalNextTurn?.();
+      const cur = useGameStore.getState() as unknown as { state: GameState; logMsg?: (msg: string) => void };
+      const applied = applyAmbitions(cur.state);
+      useGameStore.setState({ state: applied.state } as never);
+      if (applied.note) cur.logMsg?.(applied.note);
+      return result;
+    },
+  } as never);
+}
