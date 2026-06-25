@@ -105,15 +105,17 @@ export default function ScenarioSelect() {
 
       <div style={{ textAlign: 'center', display: 'flex', gap: 'var(--space-3)', justifyContent: 'center', alignItems: 'center' }}>
         {hasSave() && <Btn label="读取存档" variant="ghost" onClick={() => { if (load()) { /* scene 切换由 store 处理 */ } }} />}
-        {/* P3: menu 页主题切换（开场前调主题） */}
+        {/* P3: menu 页主题切换（开场前调主题，循环 night→day→bamboo→ink） */}
         <button onClick={() => {
+          const order = ['night', 'day', 'bamboo', 'ink'];
           const cur = (typeof localStorage !== 'undefined' && localStorage.getItem('ia-theme')) || 'night';
-          const next = cur === 'night' ? 'day' : 'night';
+          const idx = order.indexOf(cur);
+          const next = order[(idx + 1) % order.length];
           document.documentElement.setAttribute('data-theme', next === 'night' ? '' : next);
           try { localStorage.setItem('ia-theme', next); } catch { /* ignore */ }
           // 强制重渲本组件
           setSelected((x) => x);
-        }} title="切换昼夜主题" style={{
+        }} title="切换主题（暗夜/象牙/竹简/水墨）" style={{
           width: 36, height: 36, borderRadius: '50%', cursor: 'pointer',
           background: 'radial-gradient(circle at 35% 35%, #3a3220, #14110d)',
           border: '1px solid var(--border-gold)', color: 'var(--gold)', fontSize: 16, padding: 0,

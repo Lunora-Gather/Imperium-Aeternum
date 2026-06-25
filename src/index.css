@@ -102,6 +102,100 @@
   --bar-bad:  #8a2e1c;
 }
 
+/* ============================================================
+   竹简主题 —— 青简墨字 / 竹林夜读
+   深竹青底 + 浅竹简文字，古朴书卷气
+   ============================================================ */
+:root[data-theme="bamboo"] {
+  --bg-void:    #1a2412;          /* 深竹青 */
+  --bg-deep:    #243018;
+  --bg-panel:   #2e3a1e;          /* 竹简面板 */
+  --bg-raised:  #384628;
+  --bg-inset:   #1e2810;
+
+  --border:        #3a4a28;
+  --border-bright: #6a7a48;
+  --border-gold:   #a8b870;       /* 竹青金 */
+
+  --text:        #e8e0c8;          /* 竹简米 */
+  --text-soft:   #c8c0a0;
+  --text-mute:   #8a8a6a;
+  --text-dim:    #4a5a3a;
+
+  --gold:    #a8b870;             /* 竹青 */
+  --food:    #6a8a3e;
+  --stable:  #3a6a5a;
+  --war:     #8a3e28;
+  --faith:   #7a5a3a;
+  --power:   #6a4a2a;
+  --warn:    #b87a28;
+  --good:    #6a8a3e;
+  --danger:  #8a3e28;
+  --accent:  #5a7a6a;
+
+  --bar-good: #6a8a3e;
+  --bar-mid:  #a8b870;
+  --bar-warn: #b87a28;
+  --bar-bad:  #8a3e28;
+
+  --btn-primary-top: #3a4a1e; --btn-primary-bot: #243012; --btn-primary-top-h: #4a5a28; --btn-primary-bot-h: #2e3a16; --btn-primary-fg: #e8e0c4;
+  --btn-warn-top: #5a2818; --btn-warn-bot: #2e1408; --btn-warn-fg: #e8c0a8;
+  --btn-good-top: #2e3e16; --btn-good-bot: #181e08; --btn-good-fg: #c0d8a0;
+  --shadow-card: 0 4px 16px rgba(0,0,0,0.3); --shadow-card-inset: inset 0 1px 0 rgba(168,184,112,0.05);
+}
+:root[data-theme="bamboo"] body {
+  background-image:
+    radial-gradient(ellipse 80% 50% at 50% 0%, rgba(168,184,112,0.04) 0%, transparent 60%),
+    radial-gradient(ellipse 100% 100% at 50% 50%, var(--bg-deep) 0%, var(--bg-void) 100%);
+}
+
+/* ============================================================
+   水墨主题 —— 宣纸淡墨 / 丹青留白
+   浅灰宣纸底 + 浓墨文字，文人写意
+   ============================================================ */
+:root[data-theme="ink"] {
+  --bg-void:    #e8e0d8;          /* 宣纸灰 */
+  --bg-deep:    #dcd4cc;
+  --bg-panel:   #f0eae2;          /* 宣纸面板 */
+  --bg-raised:  #f8f2ea;
+  --bg-inset:   #d8d0c8;
+
+  --border:        #b8b0a8;
+  --border-bright: #6a5a4a;
+  --border-gold:   #4a3a2a;       /* 浓墨 */
+
+  --text:        #2a241e;          /* 浓墨 */
+  --text-soft:   #4a3e34;
+  --text-mute:   #6a5a4a;
+  --text-dim:    #9a8a7a;
+
+  --gold:    #4a3a2a;
+  --food:    #3a5a28;
+  --stable:  #2a5a5a;
+  --war:     #6a2e1c;
+  --faith:   #5a4a2a;
+  --power:   #4a2a1e;
+  --warn:    #8a4a1e;
+  --good:    #3a5a28;
+  --danger:  #6a2e1c;
+  --accent:  #3a3a5a;
+
+  --bar-good: #3a5a28;
+  --bar-mid:  #4a3a2a;
+  --bar-warn: #8a4a1e;
+  --bar-bad:  #6a2e1c;
+
+  --btn-primary-top: #6a5a4a; --btn-primary-bot: #4a3a2a; --btn-primary-top-h: #7a6a5a; --btn-primary-bot-h: #5a4a3a; --btn-primary-fg: #f0eae2;
+  --btn-warn-top: #b8644a; --btn-warn-bot: #8a3e28; --btn-warn-fg: #f0eae2;
+  --btn-good-top: #7a9a3e; --btn-good-bot: #5a7a28; --btn-good-fg: #f0eae2;
+  --shadow-card: 0 4px 16px rgba(74,58,42,0.12); --shadow-card-inset: inset 0 1px 0 rgba(255,255,255,0.5);
+}
+:root[data-theme="ink"] body {
+  background-image:
+    radial-gradient(ellipse 80% 50% at 50% 0%, rgba(74,58,42,0.04) 0%, transparent 60%),
+    radial-gradient(ellipse 100% 100% at 50% 50%, var(--bg-deep) 0%, var(--bg-void) 100%);
+}
+
 html, body, #root { height: 100%; }
 
 body {

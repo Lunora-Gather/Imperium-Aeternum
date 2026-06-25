@@ -49,10 +49,10 @@ export default function App() {
   const [tab, setTab] = useState<Tab>('dashboard');
   const [preReportTab, setPreReportTab] = useState<Tab>('dashboard');  // P0: 记住结算前所在页，年报可一键返回
   const [showHelp, setShowHelp] = useState(false);  // P3: 帮助按钮常驻，重显引导卡
-  const [theme, setTheme] = useState<'night' | 'day'>(() => {
+  const [theme, setTheme] = useState<'night' | 'day' | 'bamboo' | 'ink'>(() => {
     if (typeof localStorage !== 'undefined') {
       const saved = localStorage.getItem('ia-theme');
-      if (saved === 'day' || saved === 'night') return saved;
+      if (saved === 'day' || saved === 'night' || saved === 'bamboo' || saved === 'ink') return saved as 'night' | 'day' | 'bamboo' | 'ink';
     }
     return 'night';
   });
@@ -81,10 +81,12 @@ export default function App() {
   const totalPop = provs.reduce((s, p) => s + p.population, 0);
   const atWar = state.wars.some((w) => w.attackerId === pid || w.defenderId === pid);
 
-  // 主题切换：写 <html data-theme> + localStorage
+  // 主题切换：写 <html data-theme> + localStorage（循环 night→day→bamboo→ink）
   const toggleTheme = useCallback(() => {
     setTheme((t) => {
-      const next = t === 'night' ? 'day' : 'night';
+      const order: ('night' | 'day' | 'bamboo' | 'ink')[] = ['night', 'day', 'bamboo', 'ink'];
+      const idx = order.indexOf(t);
+      const next = order[(idx + 1) % order.length];
       document.documentElement.setAttribute('data-theme', next === 'night' ? '' : next);
       try { localStorage.setItem('ia-theme', next); } catch { /* ignore */ }
       return next;
@@ -162,17 +164,17 @@ export default function App() {
                 );
               })()}
               {/* 日月切换 */}
-              <button onClick={toggleTheme} title={theme === 'night' ? '切至白昼' : '切至夜阑'}
+              <button onClick={toggleTheme} title={`主题：${theme === 'night' ? '暗夜烛火' : theme === 'day' ? '象牙羊皮' : theme === 'bamboo' ? '竹简青简' : '水墨丹青'}（点击切换）`}
                 aria-label="切换昼夜主题"
                 style={{
                   width: 36, height: 36, borderRadius: '50%', cursor: 'pointer',
-                  background: theme === 'night' ? 'radial-gradient(circle at 35% 35%, #3a3220, #14110d)' : 'radial-gradient(circle at 35% 35%, #fdf7e8, #c4b088)',
+                  background: theme === 'night' ? 'radial-gradient(circle at 35% 35%, #3a3220, #14110d)' : theme === 'day' ? 'radial-gradient(circle at 35% 35%, #fdf7e8, #c4b088)' : theme === 'bamboo' ? 'radial-gradient(circle at 35% 35%, #4a5a3e, #1a2412)' : 'radial-gradient(circle at 35% 35%, #e8e0d8, #6a5a4a)',
                   border: `1px solid var(--border-gold)`,
                   color: 'var(--gold)', fontSize: 16, padding: 0,
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
                   transition: 'all 0.3s ease', boxShadow: theme === 'night' ? '0 0 12px rgba(201,164,78,0.2)' : '0 0 12px rgba(154,116,48,0.3)',
                 }}>
-                <span>{theme === 'night' ? '☾' : '☀'}</span>
+                <span>{theme === 'night' ? '☾' : theme === 'day' ? '☀' : theme === 'bamboo' ? '筠' : '墨'}</span>
               </button>
               {/* P3: 帮助按钮常驻——重显治国引导卡 */}
               <button onClick={() => setShowHelp(true)} title="治国引导"
