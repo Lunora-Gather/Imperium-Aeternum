@@ -20,9 +20,13 @@ export default class ErrorBoundary extends Component<Props, State> {
       return (
         <div style={{ padding: 40, textAlign: 'center', color: '#c33', fontFamily: 'serif' }}>
           <h2 style={{ fontSize: 22, marginBottom: 12 }}>国运不济，天下崩乱</h2>
-          <p style={{ fontSize: 13, color: '#666', marginBottom: 20 }}>
+          <p style={{ fontSize: 13, color: '#666', marginBottom: 8 }}>
             引擎遭遇异常：{this.state.error?.message ?? '未知错误'}
           </p>
+          <details style={{ fontSize: 11, color: '#999', marginBottom: 16, textAlign: 'left', maxWidth: 700, margin: '0 auto 16px', wordBreak: 'break-all' }}>
+            <summary style={{ cursor: 'pointer', marginBottom: 8 }}>查看详情</summary>
+            <pre style={{ fontSize: 10, color: '#888', whiteSpace: 'pre-wrap' }}>{this.state.error?.stack}</pre>
+          </details>
           <p style={{ fontSize: 12, color: '#999', marginBottom: 16 }}>
             存档已保留，可重新开始或读档恢复。
           </p>

@@ -26,6 +26,7 @@ import ChronicleScreen from './screens/ChronicleScreen';
 import SaveLoadScreen from './screens/SaveLoadScreen';
 import EventModal from './screens/EventModal';
 import LogToast from './components/LogToast';
+import ErrorBoundary from './components/ErrorBoundary';
 
 type Tab = NavigationTab;
 
@@ -209,6 +210,13 @@ export default function App() {
   }, [onKey]);
 
   if (scene === 'menu') return <ScenarioSelect />;
+  if (!player) {
+    return (
+      <div className="ia-shell" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh' }}>
+        <div className="ia-display" style={{ color: 'var(--gold)', fontSize: 18 }}>载入中...</div>
+      </div>
+    );
+  }
 
   const helpProgress = onboardingProgress(tutorialStep);
   const helpStep = getOnboardingStep(tutorialStep);
@@ -285,19 +293,21 @@ export default function App() {
       </nav>
 
       <main className="ia-content-shell ia-fade">
-        {tab === 'dashboard' && <Dashboard />}
-        {tab === 'map' && <WorldMap />}
-        {tab === 'province' && <ProvinceScreen />}
-        {tab === 'economy' && <EconomyScreen />}
-        {tab === 'population' && <PopulationScreen />}
-        {tab === 'politics' && <PoliticsScreen />}
-        {tab === 'military' && <MilitaryScreen />}
-        {tab === 'diplomacy' && <DiplomacyScreen />}
-        {tab === 'tech' && <TechnologyScreen />}
-        {tab === 'stats' && <StatsScreen />}
-        {tab === 'report' && <TurnReportScreen onContinue={() => goToTab(preReportTab, false)} />}
-        {tab === 'chronicle' && <ChronicleScreen />}
-        {tab === 'save' && <SaveLoadScreen />}
+        <ErrorBoundary onReset={() => goToTab('dashboard', false)}>
+          {tab === 'dashboard' && <Dashboard />}
+          {tab === 'map' && <WorldMap />}
+          {tab === 'province' && <ProvinceScreen />}
+          {tab === 'economy' && <EconomyScreen />}
+          {tab === 'population' && <PopulationScreen />}
+          {tab === 'politics' && <PoliticsScreen />}
+          {tab === 'military' && <MilitaryScreen />}
+          {tab === 'diplomacy' && <DiplomacyScreen />}
+          {tab === 'tech' && <TechnologyScreen />}
+          {tab === 'stats' && <StatsScreen />}
+          {tab === 'report' && <TurnReportScreen onContinue={() => goToTab(preReportTab, false)} />}
+          {tab === 'chronicle' && <ChronicleScreen />}
+          {tab === 'save' && <SaveLoadScreen />}
+        </ErrorBoundary>
       </main>
 
       {state.pendingEvents.some((p) => p.nationId === pid) && <EventModal />}

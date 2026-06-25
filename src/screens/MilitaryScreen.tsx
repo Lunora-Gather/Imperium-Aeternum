@@ -129,12 +129,20 @@ export default function MilitaryScreen() {
   const { state, recruit, makePeace, declareWar: storeDeclareWar, logMsg } = useGameStore();
   const pid = useGameStore((s) => s.state.playerNationId);
   const player = useGameStore((s) => s.state.nations[pid]);
-  const provs = provincesOf(pid, state.provinces);
+  const provs = player ? provincesOf(pid, state.provinces) : [];
   const myWars = state.wars.filter((w) => w.attackerId === pid || w.defenderId === pid);
-  const armyTotal = player.army.reduce((s, a) => s + a.size, 0);
+  const armyTotal = player?.army.reduce((s, a) => s + a.size, 0) ?? 0;
   const [reportWar, setReportWar] = useState<War | null>(null);
   const [moveTarget, setMoveTarget] = useState<Army | null>(null);
   const [previewTarget, setPreviewTarget] = useState<{ defenderId: string; provinceId: string } | null>(null);
+
+  const selectedWarPreview = useMemo(() => {
+    if (!previewTarget) return null;
+    if (!state.nations[previewTarget.defenderId] || !state.provinces[previewTarget.provinceId]) return null;
+    return buildWarPreview(assessWar(state, pid, previewTarget.defenderId, previewTarget.provinceId));
+  }, [previewTarget, state, pid]);
+
+  if (!player) return <div className="dim" style={{ padding: 40, textAlign: 'center' }}>载入中...</div>;
 
   const frontierProvinceIds = new Set<string>();
   for (const p of provs) if (p.adjacent.some((id) => state.provinces[id] && state.provinces[id].ownerId !== pid)) frontierProvinceIds.add(p.id);
@@ -147,12 +155,6 @@ export default function MilitaryScreen() {
     if (rel?.treaty === 'alliance') return null;
     return { p, adj, rel };
   })).filter((x): x is NonNullable<typeof x> => !!x);
-
-  const selectedWarPreview = useMemo(() => {
-    if (!previewTarget) return null;
-    if (!state.nations[previewTarget.defenderId] || !state.provinces[previewTarget.provinceId]) return null;
-    return buildWarPreview(assessWar(state, pid, previewTarget.defenderId, previewTarget.provinceId));
-  }, [previewTarget, state, pid]);
 
   const guidance: { title: string; body: string; tone: 'good' | 'warn' | 'danger' | 'info' }[] = [];
   if (myWars.length > 0 && frontierArmies.length === 0) guidance.push({ title: '先调兵到前线', body: '你在战争中，但军队没有部署在边境省。先点“调动”，把军队移到敌省相邻的己省。', tone: 'danger' });
