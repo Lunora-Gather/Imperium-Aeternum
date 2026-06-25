@@ -151,7 +151,7 @@
 | ~~E2~~ | ~~统计图表页~~ | ~~新 `StatsScreen.tsx`~~ | ~~**完成：纯 SVG 6 折线（国库/粮/人口/稳定/不满/厌战）+ 派系雷达 + 军力条形 + 科技甘特，'s' 快捷键**~~ | M→完成 |
 | ~~E3~~ | ~~键盘快捷键完善~~ | ~~`App.tsx` + ProvinceScreen + EconomyScreen~~ | ~~**完成：B 建农田 / R 征兵 50（ProvinceScreen 对选中省）/ T 切经济页（App）/ ←/→ 调税 ±2%（EconomyScreen）/ Esc 关帮助 / [/] 切省**~~ | S→完成 |
 | ~~E4~~ | ~~音效系统~~ | ~~新 `utils/audio.ts`~~ | ~~**完成：Web Audio API 合成 7 音效（钟/鼓/竹简/锤/警报/胜利/失败），无音频文件，可静音，App 接入 3 触发点 + 静音按钮**~~ | L→完成 |
-| **E5** | SVG 地形地图 | `WorldMap.tsx` | 省份改 Voronoi 多边形；地形颜色（平原绿/山地棕/沙漠黄/沿海蓝）；边界按归属国着色；河流/山脉 SVG path | XL |
+| ~~E5~~ | ~~SVG 地形地图~~ | ~~`WorldMap.tsx`~~ | ~~**完成（简化版）：省份圆点 fill 改地形色（plain 绿/hill 棕黄/mountain 棕/coast 蓝/desert 黄/forest 深绿）+ stroke 归属国色 + 相邻省边界线（同国深/异国浅）+ 悬停地形色块。不做真 Voronoi 避依赖，用现有 x/y+adjacent 画边界网络**~~ | XL→完成 |
 | ~~E6~~ | ~~暗色/亮色主题打磨~~ | ~~`index.css` + screens~~ | ~~**完成：主题 2→4（+竹简青简/水墨丹青），CSS 变量驱动全屏一致，toggleTheme 循环切换**~~ | M→完成 |
 
 **Phase E 验收门槛**：新手 30 分钟理解、5 小时一局、200 回合有完整叙事弧。
@@ -436,3 +436,4 @@ npm run build       # vite build（CI 部署 Pages）
 > - v2.5→v2.6：**完成 D3+D4+D5+D6 四个 Phase D WP**。D3 建筑 24→42；D4 法律 12→20；D5 剧本 7→10；D6 国家性格 11→15。
 > - v2.6→v2.7：**完成 D1 一个 Phase D WP**。D1 事件扩充 203→315（+112 单事件 10 类各 ~10 + 5 链 15 链事件），总链 10→15（链事件 29→44），链头 weight>0 链中/尾 weight=0。修复 4 处 factionSat 重复字段（fra() helper）+ 10 处链中尾 weight=0 + world-smoke chainHeads 加 5 新链头。Phase D 全部 archived。**教训：新加事件链的中/尾事件 weight 必须设 0（只靠 triggerEvent 触发），否则会自然触发违链语义；测试 chainHeads 列表也要同步加新链头否则误判。**
 > - v2.7→v2.8：**完成 E3 一个 Phase E WP（部分→完整）**。E3 键盘快捷键 B 建农田/R 征兵 50（ProvinceScreen 对选中省）/T 切经济页（App）/←/→ 调税 ±2%（EconomyScreen）。Phase E 仅剩 E5（SVG 地形地图 XL）。**教训：快捷键要避开 INPUT/TEXTAREA 焦点（t.tagName 检查），否则在输入框打字会误触操作。**
+> - v2.8→v2.9：**完成 E5 一个 Phase E WP（简化版）**。E5 SVG 地形地图 WorldMap 省份圆点 fill 改地形色 + stroke 归属国色 + 相邻省边界线（同国深/异国浅）+ 悬停地形色块。不做真 Voronoi 避依赖，用现有 x/y+adjacent 画边界网络。Phase E 全部 archived。**教训：XL WP 可降级为简化版降风险——真 Voronoi 需 d3-delaunay 依赖，改用现有坐标+邻接画边界网络零依赖纯 SVG，回归风险低且满足"地形可见+边界着色"核心验收。**
