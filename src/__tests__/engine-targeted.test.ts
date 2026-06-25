@@ -1,7 +1,7 @@
 // C3: 引擎针对性测试扩充——economy/politics/military/diplomacy 各 ≥3 个
 import { describe, it, expect } from 'vitest';
 import { createInitialState } from '../engine/init';
-import { settleEconomy, establishTradeRoute } from '../engine/economy';
+import { settleEconomy, establishTradeRoute, settleEconomyPure } from '../engine/economy';
 import { settlePolitics, changeGovernment, enactPolicy, enactLaw } from '../engine/politics';
 import { declareWar, makePeace, recruit, moveArmy } from '../engine/military';
 import { improveRelation, establishTrade, espionage, formAlliance } from '../engine/diplomacy';
@@ -325,5 +325,45 @@ describe('C3 events 针对性', () => {
     const rng = mulberry32(12345);
     const ids = rollEvents(player, state, rng, 2);
     expect(ids.length).toBeLessThanOrEqual(2);
+  });
+});
+
+// C1: settleEconomyPure 纯函数对照测试——delta 与 settleEconomy mutate 结果一致
+describe('C1 settleEconomyPure 纯函数对照', () => {
+  it('delta 与 settleEconomy mutate 后的 resources 增量一致', () => {
+    const state1 = createInitialState();
+    const state2 = createInitialState();
+    const p1 = state1.nations[PLAYER_ID];
+    const p2 = state2.nations[PLAYER_ID];
+    // 记录原值
+    const origGold = p1.resources.gold, origFood = p1.resources.food, origSciPt = p1.resources.sciPt;
+    const origAdminPt = p1.resources.adminPt, origInfluence = p1.resources.influence;
+    const origWood = p1.resources.wood ?? 0, origIron = p1.resources.iron ?? 0, origSupply = p1.resources.supply;
+
+    // mutate 版
+    settleEconomy(p1, state1);
+    // 纯函数版
+    const pure = settleEconomyPure(p2, state2);
+
+    // 对照：mutate 后值 - 原值 == pure.delta
+    expect(p1.resources.gold - origGold).toBeCloseTo(pure.delta.gold, 0);
+    expect(p1.resources.food - origFood).toBeCloseTo(pure.delta.food, 0);
+    expect(p1.resources.sciPt - origSciPt).toBeCloseTo(pure.delta.sciPt, 0);
+    expect(p1.resources.adminPt - origAdminPt).toBe(pure.delta.adminPt);
+    expect(p1.resources.influence - origInfluence).toBeCloseTo(pure.delta.influence, 0);
+    expect((p1.resources.wood ?? 0) - origWood).toBeCloseTo(pure.delta.wood, 0);
+    expect((p1.resources.iron ?? 0) - origIron).toBeCloseTo(pure.delta.iron, 0);
+    expect(p1.resources.supply - origSupply).toBeCloseTo(pure.delta.supply, 0);
+    // EconomyResult 字段一致
+    expect(pure.taxIncome).toBeCloseTo(pure.taxIncome, 0);
+    expect(pure.foodProduced).toBeGreaterThanOrEqual(0);
+  });
+
+  it('settleEconomyPure 不 mutate nation（调用前后 resources 不变）', () => {
+    const state = createInitialState();
+    const p = state.nations[PLAYER_ID];
+    const before = JSON.stringify(p.resources);
+    settleEconomyPure(p, state);
+    expect(JSON.stringify(p.resources)).toBe(before);
   });
 });

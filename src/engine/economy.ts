@@ -169,6 +169,141 @@ export function settleEconomy(nation: Nation, state: GameState): EconomyResult {
   return { taxIncome, tradeIncome, buildingIncome, corruptionLoss, militaryExpense, foodProduced, foodConsumed, woodProduced: wood, ironProduced: iron };
 }
 
+// ── C1: 纯函数版本 settleEconomyPure ──
+// 不 mutate nation，返回 resources delta + EconomyResult，供 processTurn 合并建新 state
+// 与原 settleEconomy 并存（零回归），后续 processTurn 迁移到此纯函数后可删原函数
+export interface EconomyPartial extends EconomyResult {
+  // resources 增量（processTurn 合并时 nation.resources.X += delta.X）
+  delta: {
+    gold: number;
+    wood: number;
+    iron: number;
+    influence: number;
+    adminPt: number;      // 注意：adminPt 是覆写非增量（原函数 = 3 + floor(eff/25)）
+    sciPt: number;        // sciPt 是倍率覆写（原函数 round(sciPt * sciPtMod)）
+    supply: number;
+    food: number;
+  };
+}
+export function settleEconomyPure(nation: Nation, state: GameState): EconomyPartial {
+  const provs = provincesOf(nation.id, state.provinces);
+  let taxIncome = 0, buildingIncome = 0, foodProduced = 0;
+  let wood = 0, iron = 0;
+  let dInfluence = 0, dAdminPt = 0, dSciPt = 0, dSupply = 0;
+
+  const taxEff = (1 + nation.tech.admin * 0.06) * (nation.policyMods?.taxEffMod ?? 1);
+
+  for (const p of provs) {
+    const peasants = p.classes.find((c) => c.classId === 'peasants')?.count ?? 0;
+    const farms = p.buildings.filter((b) => b.defId === 'farm').length;
+    foodProduced += computeFood({
+      agriBase: p.agriBase, peasantCount: peasants, terrain: p.terrain,
+      agriLv: nation.tech.agri, farmCount: farms,
+    });
+    taxIncome += computeTax({
+      population: p.population, baseTaxRate: nation.taxRate,
+      taxEfficiency: taxEff,
+      stability: nation.government.stability,
+      corruption: nation.government.corruption,
+      assimilation: p.assimilation,
+    });
+    for (const b of p.buildings) {
+      const def = BUILDINGS[b.defId];
+      if (!def) continue;
+      if (def.yield.gold) buildingIncome += def.yield.gold;
+      if (def.yield.iron) iron += def.yield.iron;
+      if (def.yield.influence) dInfluence += def.yield.influence;
+      if (def.yield.adminPt) dAdminPt += def.yield.adminPt;
+      if (def.yield.sciPt) dSciPt += def.yield.sciPt;
+      if (def.yield.supply) dSupply += def.yield.supply;
+    }
+    wood += p.baseResources.wood ?? 0;
+    iron += p.baseResources.iron ?? 0;
+  }
+
+  const corruptionLoss = computeCorruptionLoss(taxIncome, nation.government.corruption);
+  const netTax = taxIncome - corruptionLoss;
+  const cm = charMods(nation);
+
+  const marketCount = provs.reduce((s, p) => s + p.buildings.filter((b) => b.defId === 'market').length, 0);
+  const tradeDeals = state.relations.filter((r) => r.from === nation.id && r.treaty === 'trade').length;
+  let tradeDepSafety = 1.0;
+  for (const r of state.relations) {
+    if (r.from === nation.id && r.treaty === 'trade' && r.relation < 0) {
+      tradeDepSafety = Math.min(tradeDepSafety, 1 - r.tradeDep / 200);
+    }
+  }
+  const commerceActive = nation.activeCharacterBonuses.includes('commerce');
+  const baseTrade = 80 + nation.tech.admin * 20;
+  const tradeMod = cm.tradeMod ?? 1;
+  const tradeIncome = computeTrade({
+    baseTrade, marketCount, tradeDealCount: tradeDeals,
+    commerceActive, tradeDepSafety: Math.max(0.5, tradeDepSafety),
+  }) * tradeMod;
+
+  const govDef = GOVERNMENTS[nation.government.type as GovernmentId];
+  const govTradeMod = govDef?.perTurn?.tradeMod ?? 1;
+  const charTradeMod = cm.tradeMod ?? 1;
+  const routeTradeMod = govTradeMod * charTradeMod;
+  let routeIncome = 0, routeInfluence = 0, routeFood = 0;
+  for (const ar of nation.activeTradeRoutes) {
+    const def = TRADE_ROUTE_BY_ID[ar.routeId];
+    if (!def) continue;
+    if (nation.embargoedRoutes?.includes(ar.routeId)) continue;
+    const ep1 = state.provinces[def.endpoints[0]];
+    const ep2 = state.provinces[def.endpoints[1]];
+    if (!ep1 || !ep2) continue;
+    const owns1 = ep1.ownerId === nation.id;
+    const owns2 = ep2.ownerId === nation.id;
+    if (!owns1 && !owns2) continue;
+    const mod = LENGTH_MOD[def.length] * routeTradeMod;
+    routeIncome += def.yield.gold * mod;
+    routeInfluence += def.yield.influence;
+    routeFood += def.yield.food ?? 0;
+  }
+
+  const armySize = nation.army.reduce((s, a) => s + a.size, 0);
+  const milCostMult = nation.tier === 'D' ? 0.25 : 0.5;
+  const militaryExpense = armySize * milCostMult;
+
+  // delta 计算（不 mutate）
+  let dGold = netTax + tradeIncome + buildingIncome + routeIncome - militaryExpense;
+  if (nation.civilWar?.active) dGold = Math.round(dGold * 0.7);
+  dGold += nation.resources.gold;  // 加原值后做性格/保底修正，最终 delta = finalGold - origGold
+  // 注意：此处复刻原函数逻辑——原函数是 nation.resources.gold += netTax...; 然后后续修正都基于新 gold 值
+  // 为保持语义一致，dGold 此处临时表示"修正后的最终 gold"，最后 delta = dGold - origGold
+  dInfluence += routeInfluence + (nation.tech.culture * 0.5) * (nation.policyMods?.influenceMod ?? 1);
+  let dFood = routeFood;
+  if (nation.tier === 'D') { dGold += 8; dFood += 8; }
+  if (cm.goldMod) dGold += Math.round(dGold * cm.goldMod / 100);
+  let finalSciPt = dSciPt + nation.resources.sciPt;  // 原函数：sciPt += building; 然后 round(sciPt * sciPtMod)
+  if (cm.sciPtMod && cm.sciPtMod !== 1) finalSciPt = Math.round(finalSciPt * cm.sciPtMod);
+  if (dGold < -50) dGold = -50;
+  const finalAdminPt = 3 + Math.floor(nation.government.efficiency / 25);
+  const totalPop = provs.reduce((s, p) => s + p.population, 0);
+  const foodMilConsume = nation.tier === 'D' ? armySize * 0.1 : (totalPop < 50 ? 0 : armySize * 0.5);
+  const foodConsumed = foodMilConsume + provs.reduce((s, p) => s + p.population, 0) * 0.1;
+  const finalFood = nation.resources.food + dFood + foodProduced - foodConsumed;
+
+  // delta = 最终值 - 原值（processTurn 合并时 nation.resources.X += delta.X）
+  const origGold = nation.resources.gold;
+  const origFood = nation.resources.food;
+  return {
+    taxIncome, tradeIncome, buildingIncome, corruptionLoss, militaryExpense,
+    foodProduced, foodConsumed, woodProduced: wood, ironProduced: iron,
+    delta: {
+      gold: dGold - origGold,
+      wood,
+      iron,
+      influence: dInfluence,
+      adminPt: finalAdminPt - nation.resources.adminPt,  // 覆写转 delta
+      sciPt: finalSciPt - nation.resources.sciPt,        // 倍率覆写转 delta
+      supply: dSupply,
+      food: finalFood - origFood,
+    },
+  };
+}
+
 // ── C3: 建立贸易路线 ──
 // 返回 {ok, reason}。成功则扣金、加 activeTradeRoutes。
 export function establishTradeRoute(nation: Nation, routeId: string, state: GameState): { ok: boolean; reason?: string; routeName?: string } {
