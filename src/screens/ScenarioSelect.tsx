@@ -1,19 +1,30 @@
 // 剧本选择页 — 开场选剧本 + 选国
 import { useState } from 'react';
 import { useGameStore, SCENARIOS, type ScenarioId } from '../store/gameStore';
+import { clearAllSaves, SAVE_VERSION } from '../store/persistence';
 import { Btn, Tag } from '../components/ui';
+
+const BUILD_MARK = '优化版 v4 · hookfix-310';
 
 export default function ScenarioSelect() {
   const { startScenario, startWithNation, load, hasSave, log } = useGameStore();
   const [selected, setSelected] = useState<ScenarioId | null>(null);
   const [pickedNation, setPickedNation] = useState<string | null>(null);
+  const [, forceRefresh] = useState(0);
 
   const scenario = SCENARIOS.find((s) => s.id === selected);
+  const saveExists = hasSave();
+
+  const clearLocal = () => {
+    if (!window.confirm('确认删除本浏览器里的全部 Imperium Aeternum 存档？')) return;
+    clearAllSaves();
+    forceRefresh((x) => x + 1);
+  };
 
   // 选了剧本但需要选国：显示选国界面
   if (scenario && scenario.needsNationPick && !pickedNation) {
     return (
-      <div style={{ maxWidth: 820, margin: '60px auto', padding: '0 20px' }}>
+      <div style={{ maxWidth: 900, margin: '60px auto', padding: '0 20px' }}>
         <div style={{ textAlign: 'center', marginBottom: 'var(--space-6)' }}>
           <h1 className="ia-display" style={{ fontSize: 36, margin: 0, letterSpacing: '0.1em' }}>{scenario.name}</h1>
           <p className="mute" style={{ marginTop: 'var(--space-3)', fontSize: 13 }}>{scenario.description}</p>
@@ -29,15 +40,14 @@ export default function ScenarioSelect() {
               onMouseLeave={(e) => { e.currentTarget.style.borderColor = 'var(--border)'; }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--space-2)' }}>
                 <strong className="ia-display" style={{ fontSize: 16 }}>{n.name}</strong>
-                <Tag text={n.tier} tone={n.tier === 'S' ? 'gold' : 'info'} />
+                <Tag text={n.tier} tone={n.tier === 'S' ? 'gold' : n.tier === 'A' ? 'info' : 'warn'} />
               </div>
               <p className="mute" style={{ fontSize: 12, margin: 0, lineHeight: 1.5 }}>{n.desc}</p>
             </button>
           ))}
         </div>
         <div style={{ textAlign: 'center', marginTop: 'var(--space-5)' }}>
-          <Btn label="← 返回剧本列表" variant="ghost" onClick={() => { setSelected(null); }} />
-          {/* E11: classic 无需选国，点剧本即开；其余剧本在此选国后点「开启纪元」 */}
+          <Btn label="← 返回剧本列表" variant="ghost" onClick={() => { setSelected(null); setPickedNation(null); }} />
         </div>
       </div>
     );
@@ -66,7 +76,7 @@ export default function ScenarioSelect() {
 
   // 默认：剧本列表
   return (
-    <div style={{ maxWidth: 820, margin: '60px auto', padding: '0 20px' }}>
+    <div style={{ maxWidth: 920, margin: '60px auto', padding: '0 20px' }}>
       <div style={{ textAlign: 'center', marginBottom: 'var(--space-6)' }}>
         <h1 className="ia-display" style={{ fontSize: 42, margin: 0, letterSpacing: '0.12em', color: 'var(--gold)' }}>
           Imperium Aeternum
@@ -74,9 +84,14 @@ export default function ScenarioSelect() {
         <p className="ia-display ia-up" style={{ fontSize: 12, color: 'var(--text-mute)', marginTop: 'var(--space-2)', letterSpacing: '0.2em' }}>
           永恒帝国
         </p>
-        <p className="mute" style={{ marginTop: 'var(--space-4)', fontSize: 13, maxWidth: 480, margin: 'var(--space-4) auto 0' }}>
+        <p className="mute" style={{ marginTop: 'var(--space-4)', fontSize: 13, maxWidth: 520, margin: 'var(--space-4) auto 0' }}>
           治理一个国家数百年。扩张越快，崩溃越早。真正的胜利是建立一个能长期运转的国家机器。
         </p>
+        <div style={{ display: 'flex', justifyContent: 'center', gap: 6, marginTop: 12, flexWrap: 'wrap' }}>
+          <Tag text={BUILD_MARK} tone="gold" />
+          <Tag text={`存档 v${SAVE_VERSION}`} tone="info" />
+          <Tag text="旧档自动修复" tone="good" />
+        </div>
       </div>
 
       <div className="ia-display ia-up" style={{ fontSize: 11, color: 'var(--text-dim)', textAlign: 'center', marginBottom: 'var(--space-4)' }}>
@@ -86,7 +101,6 @@ export default function ScenarioSelect() {
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: 'var(--space-4)', marginBottom: 'var(--space-6)' }}>
         {SCENARIOS.map((s) => (
           <button key={s.id} className="ia-card" onClick={() => {
-              // 开启剧本初始化（含 store 中的 pendingScenario/pendingSeed）
               startScenario(s.id);
               if (s.needsNationPick) { setSelected(s.id); setPickedNation(null); }
             }}
@@ -103,23 +117,17 @@ export default function ScenarioSelect() {
         ))}
       </div>
 
-      <div style={{ textAlign: 'center', display: 'flex', gap: 'var(--space-3)', justifyContent: 'center', alignItems: 'center' }}>
-        {hasSave() && <Btn label="读取存档" variant="ghost" onClick={() => { if (load()) { /* scene 切换由 store 处理 */ } }} />}
-        {/* P3: menu 页主题切换（开场前调主题，循环 night→day→bamboo→ink） */}
+      <div style={{ textAlign: 'center', display: 'flex', gap: 'var(--space-3)', justifyContent: 'center', alignItems: 'center', flexWrap: 'wrap' }}>
+        {saveExists && <Btn label="读取自动存档" variant="ghost" onClick={() => load()} />}
+        {saveExists && <Btn label="清空本地存档" warn onClick={clearLocal} />}
         <button onClick={() => {
           const order = ['night', 'day', 'bamboo', 'ink'];
           let cur = 'night';
-          try {
-            if (typeof localStorage !== 'undefined') {
-              cur = localStorage.getItem('ia-theme') || 'night';
-            }
-          } catch { /* ignore */ }
-          const idx = order.indexOf(cur);
-          const next = order[(idx + 1) % order.length];
+          try { cur = localStorage.getItem('ia-theme') || 'night'; } catch { /* ignore */ }
+          const next = order[(order.indexOf(cur) + 1) % order.length];
           document.documentElement.setAttribute('data-theme', next === 'night' ? '' : next);
           try { localStorage.setItem('ia-theme', next); } catch { /* ignore */ }
-          // 强制重渲本组件
-          setSelected((x) => x);
+          forceRefresh((x) => x + 1);
         }} title="切换主题（暗夜/象牙/竹简/水墨）" style={{
           width: 36, height: 36, borderRadius: '50%', cursor: 'pointer',
           background: 'radial-gradient(circle at 35% 35%, #3a3220, #14110d)',
