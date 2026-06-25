@@ -1,0 +1,152 @@
+/* ============================================================
+   Palette refinement — 配色统一层
+   目标：降低“黄白板”刺眼感，形成羊皮纸 + 暗金 + 墨绿 + 赭红的稳定策略界面。
+   放在最后加载，只覆盖视觉变量和少量状态样式。
+   ============================================================ */
+
+:root[data-theme="day"] {
+  --bg-void:    #efe5ce;
+  --bg-deep:    #e4d7bd;
+  --bg-panel:   #f3ead7;
+  --bg-raised:  #f8f1df;
+  --bg-inset:   #e3d4b8;
+
+  --border:        #c8b58d;
+  --border-bright: #a8874d;
+  --border-gold:   #9c7636;
+
+  --text:        #241b12;
+  --text-soft:   #3f3020;
+  --text-mute:   #6f6047;
+  --text-dim:    #a08d6b;
+
+  --gold:    #9c7636;
+  --food:    #56723a;
+  --stable:  #2f6862;
+  --war:     #8a3826;
+  --faith:   #6d5332;
+  --power:   #705033;
+  --warn:    #a76527;
+  --good:    #56723a;
+  --danger:  #8a3826;
+  --accent:  #514875;
+
+  --btn-primary-top: #c9a568;
+  --btn-primary-bot: #a77e3e;
+  --btn-primary-top-h: #d4b577;
+  --btn-primary-bot-h: #b88b49;
+  --btn-primary-fg: #241b12;
+  --btn-warn-top: #b46c4d;
+  --btn-warn-bot: #8f3d2a;
+  --btn-warn-fg: #fff2df;
+  --btn-good-top: #78945a;
+  --btn-good-bot: #56723a;
+  --btn-good-fg: #f5eddc;
+}
+
+:root[data-theme="ink"] {
+  --bg-void:    #e5ded3;
+  --bg-deep:    #d8d0c4;
+  --bg-panel:   #eee8de;
+  --bg-raised:  #f6f1e9;
+  --bg-inset:   #d6cabd;
+  --border:        #b5aa9b;
+  --border-bright: #7e6c5a;
+  --border-gold:   #534333;
+  --gold:          #534333;
+  --accent:        #3f4d5d;
+}
+
+/* 默认暗色也更沉稳一点，减少铜色发脏 */
+:root:not([data-theme]),
+:root[data-theme="night"] {
+  --bg-void:    #14110d;
+  --bg-deep:    #1b1711;
+  --bg-panel:   #242016;
+  --bg-raised:  #2b2519;
+  --bg-inset:   #19150f;
+  --border:        #3f3424;
+  --border-bright: #735f3b;
+  --border-gold:   #b58a42;
+  --gold:          #c29a4b;
+  --food:          #7a9146;
+  --stable:        #48706b;
+  --accent:        #6a6286;
+}
+
+/* 纸面背景不要太亮，避免大面积刺眼 */
+:root[data-theme="day"] body {
+  background-color: var(--bg-void);
+  background-image:
+    linear-gradient(180deg, rgba(255,255,255,0.22), transparent 180px),
+    radial-gradient(ellipse 80% 55% at 50% 0%, rgba(156,118,54,0.045) 0%, transparent 62%),
+    linear-gradient(90deg, rgba(85,60,30,0.035), transparent 18%, transparent 82%, rgba(85,60,30,0.03));
+}
+
+/* 面板统一：薄边、低对比、少阴影 */
+.ia-ruler-card,
+.ia-status-panel,
+.ia-main-nav,
+.ia-content-shell,
+.ia-dash-section,
+.ia-card,
+.ia-scenario-card,
+.ia-choice-card {
+  border-color: color-mix(in srgb, var(--border) 82%, transparent) !important;
+}
+
+.ia-content-shell,
+.ia-ruler-card,
+.ia-status-panel,
+.ia-main-nav {
+  background: color-mix(in srgb, var(--bg-panel) 88%, transparent) !important;
+}
+
+/* 按钮状态统一 */
+.ia-btn,
+.ia-tab-btn,
+.ia-icon-btn,
+.ia-focus-inline button,
+.ia-focus-options button,
+.ia-action-list button {
+  transition: background .16s ease, border-color .16s ease, color .16s ease, opacity .16s ease !important;
+}
+
+.ia-btn:hover:not(:disabled),
+.ia-tab-btn:hover,
+.ia-icon-btn:hover,
+.ia-focus-inline button:hover,
+.ia-focus-options button:hover,
+.ia-action-list button:hover {
+  transform: none !important;
+  box-shadow: none !important;
+}
+
+.ia-tab-btn.is-active,
+.ia-focus-inline button.is-active,
+.ia-focus-options button.is-active {
+  background: color-mix(in srgb, var(--gold) 8%, transparent) !important;
+  border-color: color-mix(in srgb, var(--border-gold) 70%, transparent) !important;
+}
+
+/* 返回按钮：可见但不抢眼 */
+.ia-icon-btn--back {
+  color: var(--text-mute) !important;
+  border-color: color-mix(in srgb, var(--border) 78%, transparent) !important;
+}
+.ia-icon-btn--back:hover {
+  color: var(--warn) !important;
+  border-color: color-mix(in srgb, var(--warn) 70%, var(--border)) !important;
+  background: color-mix(in srgb, var(--warn) 8%, transparent) !important;
+}
+
+/* 风险色不要过饱和 */
+.warn { color: var(--warn) !important; }
+.danger { color: var(--danger) !important; }
+.good { color: var(--good) !important; }
+.gold { color: var(--gold) !important; }
+
+/* 版本标记再淡一点 */
+body > div[style*="position:fixed"][style*="right:8px"] {
+  opacity: .22 !important;
+}
