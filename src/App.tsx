@@ -47,7 +47,7 @@ const TAB_GROUPS: { group: string; tabs: { id: Tab; label: string; key: string; 
   ]},
 ];
 const ALL_TABS = TAB_GROUPS.flatMap((g) => g.tabs);
-const BUILD_MARK = '布局优化 v1';
+const BUILD_MARK = '导航安全 v1';
 
 export default function App() {
   const [tab, setTab] = useState<Tab>('dashboard');
@@ -62,7 +62,7 @@ export default function App() {
     return 'night';
   });
 
-  const { state, nextTurn, scene, justProcessedTurn, clearTurnFlag, pendingTab, consumePendingTab } = useGameStore();
+  const { state, nextTurn, scene, justProcessedTurn, clearTurnFlag, pendingTab, consumePendingTab, backToMenu } = useGameStore();
   const pid = state.playerNationId;
   const player = state.nations[pid];
   const provs = player ? provincesOf(pid, state.provinces) : [];
@@ -137,6 +137,13 @@ export default function App() {
     });
   }, []);
 
+  const safeBackToMenu = useCallback(() => {
+    const ok = window.confirm('返回标题页？当前进度不会自动保存。建议先到“存档”页保存。');
+    if (!ok) return;
+    setTab('dashboard');
+    backToMenu();
+  }, [backToMenu]);
+
   const onKey = useCallback((e: KeyboardEvent) => {
     if (scene !== 'playing') return;
     const t = e.target as HTMLElement;
@@ -146,6 +153,11 @@ export default function App() {
       if (showHelp) {
         e.preventDefault();
         setShowHelp(false);
+        return;
+      }
+      if (tab !== 'dashboard') {
+        e.preventDefault();
+        setTab('dashboard');
       }
       return;
     }
@@ -168,7 +180,7 @@ export default function App() {
       e.preventDefault();
       setTab(hit.id);
     }
-  }, [scene, showHelp, state.pendingEvents, state.victory.type, pid, nextTurn]);
+  }, [scene, showHelp, tab, state.pendingEvents, state.victory.type, pid, nextTurn]);
 
   useEffect(() => {
     window.addEventListener('keydown', onKey);
@@ -200,6 +212,7 @@ export default function App() {
               </button>
               <button className="ia-icon-btn" onClick={() => { setShowHelp(true); setTutorialStep(0); }} title="治国引导" aria-label="治国引导">?</button>
               <button className="ia-icon-btn" onClick={sfxMute.toggle} title={sfxMute.muted ? '音效已关（点击开启）' : '音效已开（点击静音）'} aria-label="音效开关">{sfxMute.muted ? '🔇' : '🔊'}</button>
+              <button className="ia-icon-btn ia-icon-btn--back" onClick={safeBackToMenu} title="返回标题页" aria-label="返回标题页">↩</button>
             </div>
           </div>
 
@@ -239,7 +252,7 @@ export default function App() {
             </div>
           </div>
         ))}
-        <div className="ia-nav-hint">空格下一回合 · T 经济 · {BUILD_MARK}</div>
+        <div className="ia-nav-hint">Esc 回总览 · 空格下一回合 · T 经济 · {BUILD_MARK}</div>
       </nav>
 
       <main className="ia-content-shell ia-fade-in" key={tab}>
