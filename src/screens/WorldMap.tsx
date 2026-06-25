@@ -12,6 +12,21 @@ function nationColor(id: string, isPlayer: boolean): string {
   return `hsl(${hue}, 45%, 45%)`;
 }
 
+// E5: 地形→颜色映射（省份填充用地形色，边界用归属国色）
+const TERRAIN_COLOR: Record<string, string> = {
+  plain: '#7a9a5a',      // 平原绿
+  hill: '#a89060',       // 丘陵棕黄
+  mountain: '#8a6a4a',   // 山地棕
+  coast: '#5a8a9a',      // 沿海蓝
+  desert: '#c0a060',     // 沙漠黄
+  forest: '#4a7a4a',     // 森林深绿
+  river: '#6a8aaa',      // �河流蓝
+  marsh: '#5a7a6a',      // 湿地灰绿
+};
+function terrainColor(terrain: string): string {
+  return TERRAIN_COLOR[terrain] ?? '#8a8a8a';
+}
+
 export default function WorldMap() {
   const { state, setPendingProvince, jumpToTab } = useGameStore();
   const pid = state.playerNationId;
@@ -55,6 +70,15 @@ export default function WorldMap() {
         <svg viewBox={`${bounds.minX} ${bounds.minY} ${W} ${H}`} style={{ width: '100%', height: 480, display: 'block' }}>
           {/* 海洋底 */}
           <rect x={bounds.minX} y={bounds.minY} width={W} height={H} fill="rgba(74,122,122,0.08)" />
+          {/* E5: 相邻省边界线（地形网络，归属同国深线/异国浅线） */}
+          <g opacity={0.35}>
+            {visible.flatMap((p) => p.adjacent.filter((a) => state.provinces[a] && visible.some((v) => v.id === a)).map((a) => {
+              const q = state.provinces[a];
+              const sameOwner = p.ownerId === q.ownerId;
+              return <line key={`${p.id}-${a}`} x1={p.x} y1={p.y} x2={q.x} y2={q.y}
+                stroke={sameOwner ? 'var(--text-dim)' : 'var(--border)'} strokeWidth={sameOwner ? 0.5 : 0.3} />;
+            }))}
+          </g>
           {/* 省份点 */}
           {visible.map((p) => {
             const isPlayer = p.ownerId === pid;
@@ -66,8 +90,8 @@ export default function WorldMap() {
               <g key={p.id}>
                 <circle
                   cx={p.x} cy={p.y} r={r}
-                  fill={nationColor(p.ownerId, isPlayer)}
-                  stroke={isPlayer ? 'var(--border-gold)' : isHover ? 'var(--text)' : 'rgba(0,0,0,0.4)'}
+                  fill={terrainColor(p.terrain)}
+                  stroke={isPlayer ? 'var(--gold)' : isHover ? 'var(--text)' : nationColor(p.ownerId, false)}
                   strokeWidth={isPlayer ? 2 : isHover ? 1.5 : 0.8}
                   style={{ cursor: 'pointer', transition: 'r 0.15s' }}
                   onMouseEnter={() => setHover(p.id)}
@@ -100,6 +124,7 @@ export default function WorldMap() {
               <div style={{ display: 'flex', gap: 4 }}>
                 <Tag text={hoverNation.name} tone={hoverProv.ownerId === pid ? 'gold' : 'info'} />
                 <Tag text={hoverProv.terrain} />
+                <span style={{ display: 'inline-block', width: 10, height: 10, borderRadius: 2, background: terrainColor(hoverProv.terrain), border: '1px solid var(--border)' }} title={`${hoverProv.terrain} 地形`} />
               </div>
             </div>
             <div style={{ display: 'flex', gap: 'var(--space-4)', fontSize: 11.5, color: 'var(--text-mute)' }}>
@@ -111,7 +136,7 @@ export default function WorldMap() {
             </div>
           </div>
         ) : (
-          <p className="dim" style={{ fontSize: 12, margin: 0 }}>悬停省份查看详情 · 金色为吾土 · 大点为首都 · {visible.length} 省显示中</p>
+          <p className="dim" style={{ fontSize: 12, margin: 0 }}>悬停省份查看详情 · 圆点填充=地形色 · 金边=吾土 · 边线=省界（同国深/异国浅） · 大点为首都 · {visible.length} 省显示中</p>
         )}
       </div>
     </Panel>
