@@ -10,11 +10,13 @@ import './dashboard.css';
 import './palette.css';
 import { installLogicGuard } from './gameplay/logicGuard';
 import { installStrategyFocus } from './gameplay/strategyFocus';
+import { installStateHygiene } from './gameplay/stateHygiene';
 
-const BUILD_MARK = '逻辑护栏 v1 · safe-turns';
+const BUILD_MARK = '逻辑优化 v2 · safe-hygiene';
 
 installLogicGuard();
 installStrategyFocus();
+installStateHygiene();
 
 function showFatalError(error: unknown) {
   const root = document.getElementById('root');
