@@ -5,8 +5,12 @@ import { createRoot } from 'react-dom/client';
 import './index.css';
 import './layout.css';
 import './restraint.css';
+import './gameplay/strategyFocus.css';
+import { installStrategyFocus, StrategyFocusDock } from './gameplay/strategyFocus';
 
-const BUILD_MARK = '克制版 v1 · restrained-ui';
+const BUILD_MARK = '玩法扩展 v1 · strategic-focus';
+
+installStrategyFocus();
 
 function showFatalError(error: unknown) {
   const root = document.getElementById('root');
@@ -40,5 +44,9 @@ import('./App')
     const rootEl = document.getElementById('root');
     if (!rootEl) throw new Error('找不到 #root 挂载点');
     createRoot(rootEl).render(<App />);
+    const focusRoot = document.createElement('div');
+    focusRoot.id = 'ia-strategy-focus-root';
+    document.body.appendChild(focusRoot);
+    createRoot(focusRoot).render(<StrategyFocusDock />);
   })
   .catch(showFatalError);
