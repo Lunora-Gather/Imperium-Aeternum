@@ -52,6 +52,15 @@ export default function App() {
   const [tab, setTab] = useState<Tab>('dashboard');
   const [preReportTab, setPreReportTab] = useState<Tab>('dashboard');  // P0: 记住结算前所在页，年报可一键返回
   const [showHelp, setShowHelp] = useState(false);  // P3: 帮助按钮常驻，重显引导卡
+  // E1: 新手教程——首次进入自动弹出 5 步分步教程，可跳过可重看
+  const [tutorialStep, setTutorialStep] = useState(0);  // 0-4 五步，-1 已关闭
+  useEffect(() => {
+    if (typeof localStorage === 'undefined') return;
+    if (!localStorage.getItem('ia-tutorial-done')) {
+      setShowHelp(true);
+      setTutorialStep(0);
+    }
+  }, []);
   const [theme, setTheme] = useState<'night' | 'day' | 'bamboo' | 'ink'>(() => {
     if (typeof localStorage !== 'undefined') {
       const saved = localStorage.getItem('ia-theme');
@@ -198,8 +207,8 @@ export default function App() {
                 }}>
                 <span>{theme === 'night' ? '☾' : theme === 'day' ? '☀' : theme === 'bamboo' ? '筠' : '墨'}</span>
               </button>
-              {/* P3: 帮助按钮常驻——重显治国引导卡 */}
-              <button onClick={() => setShowHelp(true)} title="治国引导"
+              {/* P3: 帮助按钮常驻——重显治国引导卡（E1: 重看教程从头开始） */}
+              <button onClick={() => { setShowHelp(true); setTutorialStep(0); }} title="治国引导"
                 style={{
                   width: 36, height: 36, borderRadius: '50%', cursor: 'pointer',
                   background: 'transparent', border: `1px solid var(--border)`,
@@ -277,9 +286,9 @@ export default function App() {
         Imperium Aeternum · 永恒帝国 · MVP
       </footer>
 
-      {/* P3: 帮助浮层——点「？」重显治国引导 */}
+      {/* P3+E1: 帮助浮层/新手教程——首次自动弹出 5 步分步，点「？」重看 */}
       {showHelp && (
-        <div onClick={() => setShowHelp(false)} style={{
+        <div onClick={() => { setShowHelp(false); setTutorialStep(-1); try { localStorage.setItem('ia-tutorial-done', '1'); } catch { /* ignore */ } }} style={{
           position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 200,
           background: 'rgba(0,0,0,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center',
         }}>
@@ -288,19 +297,41 @@ export default function App() {
             border: '1px solid var(--border-gold)', boxShadow: '0 8px 32px rgba(0,0,0,0.5)',
           }}>
             <div className="ia-display" style={{ fontSize: 16, color: 'var(--gold)', fontWeight: 700, letterSpacing: '0.1em', marginBottom: 12 }}>
-              ✦ 治国之要
+              ✦ 治国之要 · 第 {Math.max(tutorialStep, 0) + 1} / 5 步
             </div>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 10, fontSize: 12, color: 'var(--text-soft)' }}>
-              <div><span style={{ color: 'var(--gold)' }}>①</span> 看<strong>警报</strong>置顶，红危黄警先处理</div>
-              <div><span style={{ color: 'var(--gold)' }}>②</span> 调<strong>税率</strong>（经济页）平衡民心与国库</div>
-              <div><span style={{ color: 'var(--gold)' }}>③</span> 建农田<strong>保粮</strong>、建市场<strong>生金</strong></div>
-              <div><span style={{ color: 'var(--gold)' }}>④</span> 安抚派系、研发科技稳根基</div>
-              <div><span style={{ color: 'var(--gold)' }}>⑤</span> 点<strong>下一回合</strong>或按空格结算</div>
-              <div><span style={{ color: 'var(--gold)' }}>⑥</span> 事件弹窗可按 <strong>1/2/3</strong> 键选择</div>
-              <div><span style={{ color: 'var(--text-dim)' }}>扩张越大治理越难，永恒之道在于稳</span></div>
-            </div>
-            <div style={{ textAlign: 'center', marginTop: 16 }}>
-              <button className="ia-btn ia-btn--primary" onClick={() => setShowHelp(false)}>明白了</button>
+            {(() => {
+              // E1: 5 步分步教程
+              const steps: { title: string; body: string }[] = [
+                { title: '① 总览警报', body: '看总览页<strong>警报</strong>置顶，红危黄警先处理。稳定度<40 或国库<0 是致命的。' },
+                { title: '② 调税率', body: '去经济页调<strong>税率</strong>平衡民心与国库。高税多金但降民心，低税反之。' },
+                { title: '③ 建设省份', body: '省份页建农田<strong>保粮</strong>、建市场<strong>生金</strong>、建兵营<strong>强军</strong>。每省限建上限。' },
+                { title: '④ 派系与科技', body: '政治页安抚派系（贵族/商人/军方/民众/神职），科技页研发科技稳根基。扩张越大治理越难。' },
+                { title: '⑤ 推回合', body: '点<strong>下一回合</strong>或按<strong>空格</strong>结算。事件弹窗可按 <strong>1/2/3</strong> 键选择。永恒之道在于稳。' },
+              ];
+              const cur = steps[Math.max(tutorialStep, 0)] ?? steps[0];
+              return (
+                <>
+                  <div style={{ fontSize: 14, color: 'var(--gold)', fontWeight: 600, marginBottom: 8 }}>{cur.title}</div>
+                  <div style={{ fontSize: 12.5, color: 'var(--text-soft)', lineHeight: 1.7, minHeight: 60 }} dangerouslySetInnerHTML={{ __html: cur.body }} />
+                  {/* 进度点 */}
+                  <div style={{ display: 'flex', gap: 6, justifyContent: 'center', margin: '14px 0 10px' }}>
+                    {steps.map((_, i) => (
+                      <span key={i} style={{ width: 8, height: 8, borderRadius: '50%', background: i === Math.max(tutorialStep, 0) ? 'var(--gold)' : 'var(--border)', transition: 'background 0.2s' }} />
+                    ))}
+                  </div>
+                </>
+              );
+            })()}
+            <div style={{ display: 'flex', gap: 8, justifyContent: 'center', marginTop: 8 }}>
+              <button className="ia-btn ia-btn--ghost" onClick={() => { setShowHelp(false); setTutorialStep(-1); try { localStorage.setItem('ia-tutorial-done', '1'); } catch { /* ignore */ } }}>跳过</button>
+              {tutorialStep > 0 && (
+                <button className="ia-btn" onClick={() => setTutorialStep((s) => Math.max(s - 1, 0))}>上一步</button>
+              )}
+              {tutorialStep < 4 ? (
+                <button className="ia-btn ia-btn--primary" onClick={() => setTutorialStep((s) => Math.min(s + 1, 4))}>下一步</button>
+              ) : (
+                <button className="ia-btn ia-btn--primary" onClick={() => { setShowHelp(false); setTutorialStep(-1); try { localStorage.setItem('ia-tutorial-done', '1'); } catch { /* ignore */ } }}>开始治国</button>
+              )}
             </div>
           </div>
         </div>

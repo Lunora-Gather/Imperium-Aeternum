@@ -3,7 +3,7 @@
 > **唯一指挥棒**。本文档收敛 `06-expansion.md`（10 项 E 系列）+ `08-comprehensive-plan.md`（31 项 P 系列）+ 散落 ADR，统一为一条可追溯的执行线。
 > 任何后续改动必须能映射回本文档的某个工作包（WP），否则不予立项。
 >
-> **基线快照**（2026-06-25 v2.1）：58 源文件 / 11500 行 | typecheck ✅ | **vitest 89/89 ✅**（含 engine-targeted 26 针对性测试，economy/politics/military/diplomacy 各 ≥5）| validate ✅（203 事件 0 重复）| 205 国 577 省 | 150 事件 / **40 建筑** / 32 科技 / 12 政体 / **15 性格** / **20 法律** / 8 商路 / **10 剧本** / **4 主题** / **7 音效** / **统计图表页** | 50 回合 1131ms。
+> **基线快照**（2026-06-25 v2.2）：58 源文件 / 11500 行 | typecheck ✅ | **vitest 89/89 ✅**（含 engine-targeted 26 针对性测试，economy/politics/military/diplomacy 各 ≥5）| validate ✅（203 事件 0 重复）| 205 国 577 省 | 150 事件 / **40 建筑** / 32 科技 / 12 政体 / **15 性格** / **20 法律** / 8 商路 / **10 剧本** / **4 主题** / **7 音效** / **统计图表页** / **5 步新手教程** | 50 回合 1131ms。
 >
 > **穷尽代码核验**（2026-06-25 实读 18 符号：`turn.ts judgeVictory/processTurn/buildReport`、`politics.ts settlePolitics/changeGovernment`、`economy.ts settleEconomy`、`military.ts makePeace/moveArmy`、`ai.ts planAITurn`、`persistence.ts migrate/saveGameToSlot/listAllSlots`、`App.tsx`、`EventModal effectSummary`、`PoliticsScreen civilWar`、`gameStore suppressRebellion/negotiateRebellion/demolishBuilding`、`ErrorBoundary`、`ProvinceScreen`、`DiplomacyScreen`、`MilitaryScreen truce`、`events.ts govTransition`）：
 > - **Phase A 全部 4 WP 已实现**（A1 叛乱临时 Nation+连锁+归顺 / A2 内战镇压谈判 UI+引擎 / A3 孤儿军队撤退 / A4 AI 可见 worldEvents）
@@ -147,7 +147,7 @@
 
 | WP | 标题 | 依赖钩子 | 验收 | 预估 |
 |----|------|---------|------|------|
-| **E1** | 新手交互教程 | `App.tsx` + 新组件 | 首次进入 5 步教程（总览/税率/建设/下一回合/报告）；tooltip+遮罩；可跳过可重看 | M |
+| ~~E1~~ | ~~新手交互教程~~ | ~~`App.tsx` + 新组件~~ | ~~**完成：5 步分步教程（总览/税率/建设/派系科技/推回合），首次自动弹出，可跳过可重看，改造现有引导卡**~~ | M→完成 |
 | ~~E2~~ | ~~统计图表页~~ | ~~新 `StatsScreen.tsx`~~ | ~~**完成：纯 SVG 6 折线（国库/粮/人口/稳定/不满/厌战）+ 派系雷达 + 军力条形 + 科技甘特，'s' 快捷键**~~ | M→完成 |
 | **E3** | 键盘快捷键完善 | `App.tsx` | B 建设农田 / R 征兵 / T 调税 / Esc 关弹窗 / [/] 切省 | **部分完成：Esc 关帮助浮层 + [/] 切省 ✅；B/R/T 留后（需深度改 ProvinceScreen）** | S→部分 |
 | ~~E4~~ | ~~音效系统~~ | ~~新 `utils/audio.ts`~~ | ~~**完成：Web Audio API 合成 7 音效（钟/鼓/竹简/锤/警报/胜利/失败），无音频文件，可静音，App 接入 3 触发点 + 静音按钮**~~ | L→完成 |
@@ -429,3 +429,4 @@ npm run build       # vite build（CI 部署 Pages）
 > - v1.8→v1.9：**本回合完成 E6 一个 Phase E WP**。E6 主题 2→4（+bamboo 竹简青简/ink 水墨丹青），CSS 变量驱动全屏一致，toggleTheme 循环 4 主题，ScenarioSelect 开场页同步。Phase E 仅剩 E1/E2/E4/E5。**教训：CSS 变量架构验证正确——加新主题只需扩 `:root[data-theme]` 块，所有组件零改动自动适配。**
 > - v1.9→v2.0：**本回合完成 E4 一个 Phase E WP**。E4 音效系统 Web Audio API 合成 7 音效（bell 钛/scroll 竹简/drum 战鼓/hammer 锤/alarm 警报/victory 胜利/defeat 失败），无音频文件零依赖，App 接入 3 触发点（回合结算/事件/胜负）+ 静音按钮。Phase E 仅剩 E1/E2/E5。**教训：Web Audio API 合成是零依赖音效最佳方案——oscillator + gain envelope 即可合成钟/鼓/警报，无需音频文件。**
 > - v2.0→v2.1：**本回合完成 E2 一个 Phase E WP**。E2 统计图表页纯 SVG 零依赖——6 折线（国库净收入/粮食/人口/稳定/不满/厌战）+ 派系满意度雷达 + 军力对比条形 + 科技进度甘特，从 history 10 回合取数，'s' 快捷键切入。Phase E 仅剩 E1/E5。**教训：Faction interface 无 name 只有 id，需 `FACTIONS[f.id].name` 转 label——先穷尽读类型再写代码。**
+> - v2.1→v2.2：**本回合完成 E1 一个 Phase E WP**。E1 新手教程 5 步分步（总览警报/调税率/建设省份/派系科技/推回合），首次自动弹出（localStorage 标记），可跳过可重看，改造现有引导卡加 step state。Phase E 仅剩 E5（SVG 地形地图 XL）。**教训：改造现有组件优于新建——showHelp 引导卡已有遮罩+弹窗，只需加 step state 即可变分步教程，零新文件。**
