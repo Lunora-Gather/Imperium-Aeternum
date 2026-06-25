@@ -1,47 +1,51 @@
-// 世界地图 SVG — 省份色块按归属着色 + 玩家金边高亮 + 点击选省
+// 世界地图 SVG — 羊皮战略舆图：底纹、国土光晕、首都、悬停情报
 import { useState, useMemo } from 'react';
 import { useGameStore } from '../store/gameStore';
-import { Panel, Tag, StatusDot } from '../components/ui';
+import { Tag, StatusDot } from '../components/ui';
 
-// 国家颜色：基于 id hash 生成稳定色，玩家用金色
 function nationColor(id: string, isPlayer: boolean): string {
   if (isPlayer) return 'var(--gold)';
   let h = 0;
   for (let i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) | 0;
   const hue = Math.abs(h) % 360;
-  return `hsl(${hue}, 45%, 45%)`;
+  return `hsl(${hue}, 38%, 44%)`;
 }
 
-// E5: 地形→颜色映射（省份填充用地形色，边界用归属国色）
 const TERRAIN_COLOR: Record<string, string> = {
-  plain: '#7a9a5a',      // 平原绿
-  hill: '#a89060',       // 丘陵棕黄
-  mountain: '#8a6a4a',   // 山地棕
-  coast: '#5a8a9a',      // 沿海蓝
-  desert: '#c0a060',     // 沙漠黄
-  forest: '#4a7a4a',     // 森林深绿
-  river: '#6a8aaa',      // �河流蓝
-  marsh: '#5a7a6a',      // 湿地灰绿
+  plain: '#7b8f58',
+  hill: '#a88e5a',
+  mountain: '#80644d',
+  coast: '#5f8793',
+  desert: '#c1a15b',
+  forest: '#557a49',
+  river: '#6d8fac',
+  marsh: '#657b64',
 };
-function terrainColor(terrain: string): string {
-  return TERRAIN_COLOR[terrain] ?? '#8a8a8a';
-}
+const TERRAIN_LABEL: Record<string, string> = {
+  plain: '平原', hill: '丘陵', mountain: '山地', coast: '海岸', desert: '沙漠', forest: '森林', river: '河谷', marsh: '湿地',
+};
+function terrainColor(terrain: string): string { return TERRAIN_COLOR[terrain] ?? '#8a8370'; }
+function terrainLabel(terrain: string): string { return TERRAIN_LABEL[terrain] ?? terrain; }
 
 export default function WorldMap() {
   const { state, setPendingProvince, jumpToTab } = useGameStore();
-  // C2: pid/player 用 selector 精确订阅
   const pid = useGameStore((s) => s.state.playerNationId);
   const player = useGameStore((s) => s.state.nations[pid]);
   const provs = Object.values(state.provinces);
   const [hover, setHover] = useState<string | null>(null);
+  const [selected, setSelected] = useState<string | null>(null);
   const [filter, setFilter] = useState<'all' | 'player' | 'neighbors'>('all');
 
-  // 视口：基于实际坐标范围
   const bounds = useMemo(() => {
-    if (provs.length === 0) return { minX: 0, minY: 0, maxX: 1000, maxY: 600 };
+    if (provs.length === 0) return { minX: 0, minY: 0, maxX: 1000, maxY: 620 };
     let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-    for (const p of provs) { if (p.x < minX) minX = p.x; if (p.y < minY) minY = p.y; if (p.x > maxX) maxX = p.x; if (p.y > maxY) maxY = p.y; }
-    return { minX: minX - 20, minY: minY - 20, maxX: maxX + 20, maxY: maxY + 20 };
+    for (const p of provs) {
+      if (p.x < minX) minX = p.x;
+      if (p.y < minY) minY = p.y;
+      if (p.x > maxX) maxX = p.x;
+      if (p.y > maxY) maxY = p.y;
+    }
+    return { minX: minX - 60, minY: minY - 60, maxX: maxX + 60, maxY: maxY + 60 };
   }, [provs]);
 
   const playerProvs = provs.filter((p) => p.ownerId === pid);
@@ -53,93 +57,163 @@ export default function WorldMap() {
     if (filter === 'neighbors') return p.ownerId === pid || playerNeighborIds.has(p.id);
     return true;
   });
+  const visibleIds = new Set(visible.map((p) => p.id));
 
-  const hoverProv = hover ? state.provinces[hover] : null;
-  const hoverNation = hoverProv ? state.nations[hoverProv.ownerId] : null;
-  const W = bounds.maxX - bounds.minX;
-  const H = bounds.maxY - bounds.minY;
+  const activeId = hover ?? selected;
+  const activeProv = activeId ? state.provinces[activeId] : null;
+  const activeNation = activeProv ? state.nations[activeProv.ownerId] : null;
+  const W = Math.max(320, bounds.maxX - bounds.minX);
+  const H = Math.max(240, bounds.maxY - bounds.minY);
+  const capitalCount = visible.filter((p) => p.isCapital).length;
 
   return (
-    <Panel title="天下舆图" icon="⬡" accent actions={
-      <div style={{ display: 'flex', gap: 6 }}>
-        <button className="ia-btn ia-btn--ghost" onClick={() => setFilter('all')} style={filter === 'all' ? { color: 'var(--gold)', borderColor: 'var(--border-gold)' } : {}}>全图</button>
-        <button className="ia-btn ia-btn--ghost" onClick={() => setFilter('player')} style={filter === 'player' ? { color: 'var(--gold)', borderColor: 'var(--border-gold)' } : {}}>吾土</button>
-        <button className="ia-btn ia-btn--ghost" onClick={() => setFilter('neighbors')} style={filter === 'neighbors' ? { color: 'var(--gold)', borderColor: 'var(--border-gold)' } : {}}>边境</button>
-      </div>
-    }>
-      <div style={{ background: 'var(--bg-inset)', borderRadius: 'var(--radius)', padding: 'var(--space-3)', border: '1px solid var(--border)' }}>
-        <svg viewBox={`${bounds.minX} ${bounds.minY} ${W} ${H}`} style={{ width: '100%', height: 480, display: 'block' }}>
-          {/* 海洋底 */}
-          <rect x={bounds.minX} y={bounds.minY} width={W} height={H} fill="rgba(74,122,122,0.08)" />
-          {/* E5: 相邻省边界线（地形网络，归属同国深线/异国浅线） */}
-          <g opacity={0.35}>
-            {visible.flatMap((p) => p.adjacent.filter((a) => state.provinces[a] && visible.some((v) => v.id === a)).map((a) => {
-              const q = state.provinces[a];
-              const sameOwner = p.ownerId === q.ownerId;
-              return <line key={`${p.id}-${a}`} x1={p.x} y1={p.y} x2={q.x} y2={q.y}
-                stroke={sameOwner ? 'var(--text-dim)' : 'var(--border)'} strokeWidth={sameOwner ? 0.5 : 0.3} />;
-            }))}
-          </g>
-          {/* 省份点 */}
-          {visible.map((p) => {
-            const isPlayer = p.ownerId === pid;
-            const isHover = hover === p.id;
-            const r = p.isCapital ? 7 : (p.population > 500 ? 5 : 3.5);
-            // E22: 玩家军队位置标记（剑形小三角）
-            const playerArmyHere = isPlayer ? player.army.find((a) => a.location === p.id && a.size > 0) : null;
-            return (
-              <g key={p.id}>
-                <circle
-                  cx={p.x} cy={p.y} r={r}
-                  fill={terrainColor(p.terrain)}
-                  stroke={isPlayer ? 'var(--gold)' : isHover ? 'var(--text)' : nationColor(p.ownerId, false)}
-                  strokeWidth={isPlayer ? 2 : isHover ? 1.5 : 0.8}
-                  style={{ cursor: 'pointer', transition: 'r 0.15s' }}
-                  onMouseEnter={() => setHover(p.id)}
-                  onMouseLeave={() => setHover(null)}
-                  onClick={() => { if (isPlayer) { setPendingProvince(p.id); jumpToTab('province'); } }}
-                />
-                {p.isCapital && <circle cx={p.x} cy={p.y} r={r + 3} fill="none" stroke={nationColor(p.ownerId, isPlayer)} strokeWidth={1} opacity={0.4} />}
-                {playerArmyHere && (
-                  <g>
-                    <title>{`${playerArmyHere.size} 兵`}</title>
-                    <polygon
-                      points={`${p.x},${p.y - r - 5} ${p.x - 4},${p.y - r + 1} ${p.x + 4},${p.y - r + 1}`}
-                      fill="var(--war)" stroke="var(--gold)" strokeWidth={0.6}
-                    />
-                    <text x={p.x} y={p.y - r - 7} textAnchor="middle" fontSize={7} fill="var(--war)" style={{ pointerEvents: 'none' }}>{playerArmyHere.size}</text>
-                  </g>
-                )}
-              </g>
-            );
-          })}
-        </svg>
-      </div>
+    <section className="ia-map-page">
+      <header className="ia-map-head">
+        <div>
+          <div className="ia-up ia-map-kicker">Orbis Terrarum</div>
+          <h2 className="ia-display">天下舆图</h2>
+          <p>羊皮战略图 · 点为省份，光晕为国土影响，线为道路/边境联系。</p>
+        </div>
+        <div className="ia-map-controls">
+          <button className={filter === 'all' ? 'is-active' : ''} onClick={() => setFilter('all')}>全图</button>
+          <button className={filter === 'player' ? 'is-active' : ''} onClick={() => setFilter('player')}>吾土</button>
+          <button className={filter === 'neighbors' ? 'is-active' : ''} onClick={() => setFilter('neighbors')}>边境</button>
+        </div>
+      </header>
 
-      {/* 悬停信息 */}
-      <div style={{ marginTop: 'var(--space-3)', minHeight: 56, display: 'flex', gap: 'var(--space-4)', alignItems: 'flex-start' }}>
-        {hoverProv && hoverNation ? (
-          <div className="ia-card--inset" style={{ padding: 'var(--space-3)', flex: 1 }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--space-2)' }}>
-              <strong className="ia-display" style={{ fontSize: 14 }}>{hoverProv.name}{hoverProv.isCapital ? ' ★' : ''}</strong>
-              <div style={{ display: 'flex', gap: 4 }}>
-                <Tag text={hoverNation.name} tone={hoverProv.ownerId === pid ? 'gold' : 'info'} />
-                <Tag text={hoverProv.terrain} />
-                <span style={{ display: 'inline-block', width: 10, height: 10, borderRadius: 2, background: terrainColor(hoverProv.terrain), border: '1px solid var(--border)' }} title={`${hoverProv.terrain} 地形`} />
-              </div>
-            </div>
-            <div style={{ display: 'flex', gap: 'var(--space-4)', fontSize: 11.5, color: 'var(--text-mute)' }}>
-              <span>人口 <strong className="ia-num" style={{ color: 'var(--text)' }}>{hoverProv.population}</strong></span>
-              <span>驻军 <strong className="ia-num" style={{ color: 'var(--text)' }}>{hoverProv.garrison}</strong></span>
-              <span>忠诚 <strong className="ia-num" style={{ color: hoverProv.loyalty < 40 ? 'var(--war)' : 'var(--text)' }}>{Math.round(hoverProv.loyalty)}</strong></span>
-              <span>不满 <strong className="ia-num" style={{ color: hoverProv.unrest > 50 ? 'var(--warn)' : 'var(--text)' }}>{Math.round(hoverProv.unrest)}</strong></span>
-              <span><StatusDot status={hoverProv.rebellionRisk > 70 ? 'danger' : hoverProv.unrest > 50 ? 'warn' : 'good'} />{hoverProv.rebellionRisk > 70 ? '叛乱' : hoverProv.unrest > 50 ? '骚动' : '安定'}</span>
-            </div>
+      <div className="ia-map-layout">
+        <div className="ia-map-atlas">
+          <div className="ia-map-compass">N</div>
+          <svg viewBox={`${bounds.minX} ${bounds.minY} ${W} ${H}`} className="ia-world-svg" preserveAspectRatio="xMidYMid meet">
+            <defs>
+              <radialGradient id="wmParchment" cx="50%" cy="42%" r="78%">
+                <stop offset="0%" stopColor="rgba(255,248,222,0.42)" />
+                <stop offset="62%" stopColor="rgba(201,164,78,0.10)" />
+                <stop offset="100%" stopColor="rgba(80,61,35,0.18)" />
+              </radialGradient>
+              <filter id="wmGlow" x="-40%" y="-40%" width="180%" height="180%">
+                <feGaussianBlur stdDeviation="4" result="blur" />
+                <feMerge><feMergeNode in="blur" /><feMergeNode in="SourceGraphic" /></feMerge>
+              </filter>
+              <pattern id="wmGrid" width="42" height="42" patternUnits="userSpaceOnUse">
+                <path d="M 42 0 L 0 0 0 42" fill="none" stroke="rgba(90,78,54,0.16)" strokeWidth="0.55" />
+              </pattern>
+              <pattern id="wmTinyDots" width="18" height="18" patternUnits="userSpaceOnUse">
+                <circle cx="1" cy="1" r="0.7" fill="rgba(90,78,54,0.18)" />
+              </pattern>
+            </defs>
+
+            <rect x={bounds.minX} y={bounds.minY} width={W} height={H} rx="18" fill="url(#wmParchment)" />
+            <rect x={bounds.minX} y={bounds.minY} width={W} height={H} fill="url(#wmGrid)" opacity="0.42" />
+            <rect x={bounds.minX} y={bounds.minY} width={W} height={H} fill="url(#wmTinyDots)" opacity="0.55" />
+
+            {/* 地缘联系线 */}
+            <g className="wm-links">
+              {visible.flatMap((p) => p.adjacent.filter((a) => state.provinces[a] && visibleIds.has(a) && p.id < a).map((a) => {
+                const q = state.provinces[a];
+                const sameOwner = p.ownerId === q.ownerId;
+                const touchesPlayer = p.ownerId === pid || q.ownerId === pid;
+                return <line key={`${p.id}-${a}`} x1={p.x} y1={p.y} x2={q.x} y2={q.y}
+                  stroke={touchesPlayer ? 'rgba(184,146,74,0.48)' : sameOwner ? 'rgba(80,72,50,0.42)' : 'rgba(130,90,64,0.22)'}
+                  strokeWidth={touchesPlayer ? 1.25 : sameOwner ? 0.75 : 0.45} />;
+              }))}
+            </g>
+
+            {/* 国土/地形光晕，先铺大块，避免只有零散圆点 */}
+            <g className="wm-terrain-halos">
+              {visible.map((p) => {
+                const isPlayer = p.ownerId === pid;
+                const isCapital = p.isCapital;
+                const haloR = isCapital ? 26 : p.population > 900 ? 20 : p.population > 450 ? 16 : 12;
+                return <circle key={`halo-${p.id}`} cx={p.x} cy={p.y} r={haloR}
+                  fill={isPlayer ? 'rgba(201,164,78,0.16)' : terrainColor(p.terrain)}
+                  opacity={isPlayer ? 0.52 : 0.18} filter="url(#wmGlow)" />;
+              })}
+            </g>
+
+            {/* 省份节点 */}
+            <g className="wm-provinces">
+              {visible.map((p) => {
+                const isPlayer = p.ownerId === pid;
+                const isHover = hover === p.id;
+                const isSelected = selected === p.id;
+                const isCapital = p.isCapital;
+                const r = isCapital ? 8 : (p.population > 800 ? 5.6 : p.population > 420 ? 4.5 : 3.5);
+                const playerArmyHere = isPlayer ? player?.army.find((a) => a.location === p.id && a.size > 0) : null;
+                return (
+                  <g key={p.id} className="wm-province" onMouseEnter={() => setHover(p.id)} onMouseLeave={() => setHover(null)} onClick={() => { setSelected(p.id); if (isPlayer) { setPendingProvince(p.id); } }}>
+                    <circle cx={p.x} cy={p.y} r={r + 4} fill="rgba(24,20,16,0.26)" />
+                    {isCapital && <circle cx={p.x} cy={p.y} r={r + 7} fill="none" stroke={nationColor(p.ownerId, isPlayer)} strokeWidth={1.2} opacity="0.58" />}
+                    {(isHover || isSelected) && <circle cx={p.x} cy={p.y} r={r + 9} fill="none" stroke="var(--gold)" strokeWidth={1.5} opacity="0.9" />}
+                    <circle cx={p.x} cy={p.y} r={r}
+                      fill={terrainColor(p.terrain)}
+                      stroke={isPlayer ? 'var(--gold)' : isHover || isSelected ? 'var(--text)' : nationColor(p.ownerId, false)}
+                      strokeWidth={isPlayer ? 2 : isHover || isSelected ? 1.7 : 0.9}
+                      style={{ cursor: 'pointer' }} />
+                    {isCapital && <text x={p.x} y={p.y - r - 10} textAnchor="middle" className="wm-capital-label">{state.nations[p.ownerId]?.name?.slice(0, 4)}</text>}
+                    {playerArmyHere && (
+                      <g>
+                        <title>{`${playerArmyHere.size} 兵`}</title>
+                        <polygon points={`${p.x},${p.y - r - 7} ${p.x - 5},${p.y - r + 1} ${p.x + 5},${p.y - r + 1}`} fill="var(--war)" stroke="var(--gold)" strokeWidth={0.7} />
+                        <text x={p.x} y={p.y - r - 10} textAnchor="middle" fontSize={7} fill="var(--war)" style={{ pointerEvents: 'none' }}>{playerArmyHere.size}</text>
+                      </g>
+                    )}
+                  </g>
+                );
+              })}
+            </g>
+          </svg>
+        </div>
+
+        <aside className="ia-map-info">
+          <div className="ia-map-stat-grid">
+            <div><span>显示省份</span><strong>{visible.length}</strong></div>
+            <div><span>首都</span><strong>{capitalCount}</strong></div>
+            <div><span>吾土</span><strong>{playerProvs.length}</strong></div>
+            <div><span>边境点</span><strong>{playerNeighborIds.size}</strong></div>
           </div>
-        ) : (
-          <p className="dim" style={{ fontSize: 12, margin: 0 }}>悬停省份查看详情 · 圆点填充=地形色 · 金边=吾土 · 边线=省界（同国深/异国浅） · 大点为首都 · {visible.length} 省显示中</p>
-        )}
+
+          {activeProv && activeNation ? (
+            <div className="ia-map-detail">
+              <div className="ia-map-detail-head">
+                <div>
+                  <p className="ia-up">Province Intel</p>
+                  <h3 className="ia-display">{activeProv.name}{activeProv.isCapital ? ' ★' : ''}</h3>
+                </div>
+                <Tag text={activeProv.ownerId === pid ? '吾土' : activeNation.name} tone={activeProv.ownerId === pid ? 'gold' : 'info'} />
+              </div>
+              <div className="ia-map-tags">
+                <span style={{ background: terrainColor(activeProv.terrain) }} />
+                <Tag text={terrainLabel(activeProv.terrain)} />
+                <Tag text={activeProv.isCapital ? '首都' : '省份'} tone={activeProv.isCapital ? 'gold' : 'info'} />
+              </div>
+              <div className="ia-map-detail-list">
+                <div><span>人口</span><strong>{activeProv.population}</strong></div>
+                <div><span>驻军</span><strong>{activeProv.garrison}</strong></div>
+                <div><span>忠诚</span><strong className={activeProv.loyalty < 40 ? 'danger' : ''}>{Math.round(activeProv.loyalty)}</strong></div>
+                <div><span>不满</span><strong className={activeProv.unrest > 50 ? 'warn' : ''}>{Math.round(activeProv.unrest)}</strong></div>
+              </div>
+              <div className="ia-map-state-line">
+                <StatusDot status={activeProv.rebellionRisk > 70 ? 'danger' : activeProv.unrest > 50 ? 'warn' : 'good'} />
+                {activeProv.rebellionRisk > 70 ? '叛乱风险极高' : activeProv.unrest > 50 ? '地方骚动' : '秩序安定'}
+              </div>
+              {activeProv.ownerId === pid && <button className="ia-btn ia-btn--primary" onClick={() => { setPendingProvince(activeProv.id); jumpToTab('province'); }}>治理此省 →</button>}
+            </div>
+          ) : (
+            <div className="ia-map-detail ia-map-detail--empty">
+              <p className="ia-up">Map Guide</p>
+              <h3 className="ia-display">悬停省份查看详情</h3>
+              <p>金色外圈为吾土，大圆为首都。点击吾土省份可进入省份治理。</p>
+            </div>
+          )}
+
+          <div className="ia-map-legend">
+            {Object.entries(TERRAIN_LABEL).slice(0, 8).map(([key, label]) => (
+              <span key={key}><i style={{ background: terrainColor(key) }} />{label}</span>
+            ))}
+          </div>
+        </aside>
       </div>
-    </Panel>
+    </section>
   );
 }
