@@ -8,10 +8,12 @@ import './restraint.css';
 import './quiet.css';
 import './dashboard.css';
 import './palette.css';
+import { installLogicGuard } from './gameplay/logicGuard';
 import { installStrategyFocus } from './gameplay/strategyFocus';
 
-const BUILD_MARK = '配色与回退 v1 · palette-safe-nav';
+const BUILD_MARK = '逻辑护栏 v1 · safe-turns';
 
+installLogicGuard();
 installStrategyFocus();
 
 function showFatalError(error: unknown) {
