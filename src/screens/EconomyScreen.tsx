@@ -30,12 +30,14 @@ export default function EconomyScreen() {
     const onKey = (e: KeyboardEvent) => {
       const t = e.target as HTMLElement;
       if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return;
+      const hasPending = state.pendingEvents.some((p) => p.nationId === player.id);
+      if (hasPending) return;
       if (e.key === 'ArrowLeft') { e.preventDefault(); setTaxRate(Math.max(0, player.taxRate - 0.02)); }
       else if (e.key === 'ArrowRight') { e.preventDefault(); setTaxRate(Math.min(0.5, player.taxRate + 0.02)); }
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [player.taxRate, setTaxRate]);
+  }, [player.taxRate, setTaxRate, state.pendingEvents, player.id]);
 
   // P1-3: 税率调整实时预估——算当前税率 vs +5% 的税收差与民心影响
   const provs = provincesOf(player.id, state.provinces);

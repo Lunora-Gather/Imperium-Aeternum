@@ -136,10 +136,11 @@ export default function App() {
       if (showHelp) { e.preventDefault(); setShowHelp(false); return; }
       return;
     }
-    // P0: 事件未处理时空格不推回合（避免误触），交由 EventModal 的 1/2/3 选
+    // P0: 事件未处理时限制全局快捷键（避免误触），交由 EventModal 的 1/2/3 选
     const hasPending = state.pendingEvents.some((p) => p.nationId === pid);
+    if (hasPending) return;
+
     if (e.code === 'Space') {
-      if (hasPending) return;
       e.preventDefault();
       if (!state.victory.type) nextTurn();
     } else if (e.key === 't' || e.key === 'T') {

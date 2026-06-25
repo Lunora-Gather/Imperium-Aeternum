@@ -59,6 +59,8 @@ export default function ProvinceScreen() {
     const onKey = (e: KeyboardEvent) => {
       const t = e.target as HTMLElement;
       if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return;
+      const hasPending = state.pendingEvents.some((p) => p.nationId === pid);
+      if (hasPending) return;
       if (e.key !== '[' && e.key !== ']') return;
       e.preventDefault();
       const idx = provs.findIndex((p) => p.id === selected);
@@ -68,13 +70,15 @@ export default function ProvinceScreen() {
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [provs, selected]);
+  }, [provs, selected, state.pendingEvents, pid]);
 
   // E3: B 建农田 / R 征兵 50（对当前选中省）
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const t = e.target as HTMLElement;
       if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return;
+      const hasPending = state.pendingEvents.some((p) => p.nationId === pid);
+      if (hasPending) return;
       if (e.key !== 'b' && e.key !== 'B' && e.key !== 'r' && e.key !== 'R') return;
       if (!selected) return;
       e.preventDefault();
@@ -83,7 +87,7 @@ export default function ProvinceScreen() {
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [selected, build, recruit]);
+  }, [selected, build, recruit, state.pendingEvents, pid]);
 
   const prov = state.provinces[selected];
 
