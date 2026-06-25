@@ -9,12 +9,14 @@ import './quiet.css';
 import './dashboard.css';
 import './palette.css';
 import { installLogicGuard } from './gameplay/logicGuard';
+import { installAmbitionSystem } from './gameplay/ambitions';
 import { installStrategyFocus } from './gameplay/strategyFocus';
 import { installStateHygiene } from './gameplay/stateHygiene';
 
-const BUILD_MARK = '逻辑优化 v2 · safe-hygiene';
+const BUILD_MARK = '国运目标 v1 · dynamic-ambitions';
 
 installLogicGuard();
+installAmbitionSystem();
 installStrategyFocus();
 installStateHygiene();
 
