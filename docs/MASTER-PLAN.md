@@ -134,7 +134,7 @@
 
 | WP | 标题 | 依赖钩子 | 验收 | 红线 | 预估 |
 |----|------|---------|------|------|------|
-| **D1** | 事件扩充至 300+ | `data/events.ts` | 每类别 ≥8 个；+5 链（蛮族入侵/瘟疫/继位内战/商业革命/宗教改革）；总链 10+ | 需 DEC 解锁"事件≤100"红线到 300（当前 150 已存于代码，红线文档未更新） | XL |
+| ~~D1~~ | ~~事件扩充至 300+~~ | ~~`data/events.ts`~~ | ~~**完成：203→315 事件（+112），每类别 ≥10；+5 链（蛮族入侵/继位内战/商业革命/宗教改革/瘟疫大流行），总链 10→15（链事件 29→44）；链头 weight>0 链中/尾 weight=0**~~ | DEC-045 解锁"事件≤100"红线到 315 | XL→完成 |
 | **D2** | 科技质变效果 | `data/technologies.ts` + `formulas.ts` | 高级科技解锁新能力（agri_lv5 轮作政策+15%粮；agri_lv8 化肥建筑×1.5；mil_lv5 要塞+50%防；mil_lv8 总动员×2征兵；admin_lv5 科举法-10腐败；admin_lv8 行省制+5省；culture_lv5 文化输出外交；culture_lv8 永恒文脉性格） | 需 DEC 解锁"科技不超 3×8"红线到质变 | L |
 | ~~D3~~ | ~~建筑扩充至 40+~~ | ~~`data/buildings.ts`~~ | ~~**完成：24→40 建筑，+16 含前置科技/地形适配/差异化产出（铁匠铺/漕运码头/城墙加固/书院/驿馆/筒仓/铸币工坊/药铺/望楼/会馆/军械库/观象台/王家粮仓/贸易站/修道院/水利工程）**~~ | — | ✅ 已完成 |
 | ~~D4~~ | ~~法律扩充至 20+~~ | ~~`data/laws.ts`~~ | ~~**完成：12→20 法律，+8 含互斥/前置/派系反应（民法+3/刑法+2/行政法+3）**~~ | S | ✅ 已完成 |
@@ -149,7 +149,7 @@
 |----|------|---------|------|------|
 | ~~E1~~ | ~~新手交互教程~~ | ~~`App.tsx` + 新组件~~ | ~~**完成：5 步分步教程（总览/税率/建设/派系科技/推回合），首次自动弹出，可跳过可重看，改造现有引导卡**~~ | M→完成 |
 | ~~E2~~ | ~~统计图表页~~ | ~~新 `StatsScreen.tsx`~~ | ~~**完成：纯 SVG 6 折线（国库/粮/人口/稳定/不满/厌战）+ 派系雷达 + 军力条形 + 科技甘特，'s' 快捷键**~~ | M→完成 |
-| **E3** | 键盘快捷键完善 | `App.tsx` | B 建设农田 / R 征兵 / T 调税 / Esc 关弹窗 / [/] 切省 | **部分完成：Esc 关帮助浮层 + [/] 切省 ✅；B/R/T 留后（需深度改 ProvinceScreen）** | S→部分 |
+| ~~E3~~ | ~~键盘快捷键完善~~ | ~~`App.tsx` + ProvinceScreen + EconomyScreen~~ | ~~**完成：B 建农田 / R 征兵 50（ProvinceScreen 对选中省）/ T 切经济页（App）/ ←/→ 调税 ±2%（EconomyScreen）/ Esc 关帮助 / [/] 切省**~~ | S→完成 |
 | ~~E4~~ | ~~音效系统~~ | ~~新 `utils/audio.ts`~~ | ~~**完成：Web Audio API 合成 7 音效（钟/鼓/竹简/锤/警报/胜利/失败），无音频文件，可静音，App 接入 3 触发点 + 静音按钮**~~ | L→完成 |
 | **E5** | SVG 地形地图 | `WorldMap.tsx` | 省份改 Voronoi 多边形；地形颜色（平原绿/山地棕/沙漠黄/沿海蓝）；边界按归属国着色；河流/山脉 SVG path | XL |
 | ~~E6~~ | ~~暗色/亮色主题打磨~~ | ~~`index.css` + screens~~ | ~~**完成：主题 2→4（+竹简青简/水墨丹青），CSS 变量驱动全屏一致，toggleTheme 循环切换**~~ | M→完成 |
@@ -430,3 +430,9 @@ npm run build       # vite build（CI 部署 Pages）
 > - v1.9→v2.0：**本回合完成 E4 一个 Phase E WP**。E4 音效系统 Web Audio API 合成 7 音效（bell 钛/scroll 竹简/drum 战鼓/hammer 锤/alarm 警报/victory 胜利/defeat 失败），无音频文件零依赖，App 接入 3 触发点（回合结算/事件/胜负）+ 静音按钮。Phase E 仅剩 E1/E2/E5。**教训：Web Audio API 合成是零依赖音效最佳方案——oscillator + gain envelope 即可合成钟/鼓/警报，无需音频文件。**
 > - v2.0→v2.1：**本回合完成 E2 一个 Phase E WP**。E2 统计图表页纯 SVG 零依赖——6 折线（国库净收入/粮食/人口/稳定/不满/厌战）+ 派系满意度雷达 + 军力对比条形 + 科技进度甘特，从 history 10 回合取数，'s' 快捷键切入。Phase E 仅剩 E1/E5。**教训：Faction interface 无 name 只有 id，需 `FACTIONS[f.id].name` 转 label——先穷尽读类型再写代码。**
 > - v2.1→v2.2：**本回合完成 E1 一个 Phase E WP**。E1 新手教程 5 步分步（总览警报/调税率/建设省份/派系科技/推回合），首次自动弹出（localStorage 标记），可跳过可重看，改造现有引导卡加 step state。Phase E 仅剩 E5（SVG 地形地图 XL）。**教训：改造现有组件优于新建——showHelp 引导卡已有遮罩+弹窗，只需加 step state 即可变分步教程，零新文件。**
+> - v2.2→v2.3：**完成 F2+F3 两个 Phase F WP**。F2 数据格式中立化 `scripts/export-data.ts` 导出 12 数据表 JSON 到 `dist/data/`；F3 `docs/12-godot-migration.md` Godot 移植报告 4 阶段 ~88h。
+> - v2.3→v2.4：**完成 F1 一个 Phase F WP**。`docs/13-engine-ui-separation-audit.md` 引擎/UI 分离审计，引擎 15 文件 3578 行零 React/DOM 反向依赖。Phase F 全部 archived。
+> - v2.4→v2.5：**完成 D2 一个 Phase D WP**。D2 科技质变效果 32 科技 4 路线×8 级 + Lv5/Lv8 解锁能力绑定（agri_lv5 轮作政策/mil_lv8 总动员/admin_lv5 科举法/culture_lv5 文化外交等），通过 prereqTech 字段复用现有机制无需新代码。
+> - v2.5→v2.6：**完成 D3+D4+D5+D6 四个 Phase D WP**。D3 建筑 24→42；D4 法律 12→20；D5 剧本 7→10；D6 国家性格 11→15。
+> - v2.6→v2.7：**完成 D1 一个 Phase D WP**。D1 事件扩充 203→315（+112 单事件 10 类各 ~10 + 5 链 15 链事件），总链 10→15（链事件 29→44），链头 weight>0 链中/尾 weight=0。修复 4 处 factionSat 重复字段（fra() helper）+ 10 处链中尾 weight=0 + world-smoke chainHeads 加 5 新链头。Phase D 全部 archived。**教训：新加事件链的中/尾事件 weight 必须设 0（只靠 triggerEvent 触发），否则会自然触发违链语义；测试 chainHeads 列表也要同步加新链头否则误判。**
+> - v2.7→v2.8：**完成 E3 一个 Phase E WP（部分→完整）**。E3 键盘快捷键 B 建农田/R 征兵 50（ProvinceScreen 对选中省）/T 切经济页（App）/←/→ 调税 ±2%（EconomyScreen）。Phase E 仅剩 E5（SVG 地形地图 XL）。**教训：快捷键要避开 INPUT/TEXTAREA 焦点（t.tagName 检查），否则在输入框打字会误触操作。**
