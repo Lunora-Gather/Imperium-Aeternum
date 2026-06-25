@@ -1,53 +1,64 @@
-// 剧本选择页 — 开场选剧本 + 选国
+// 剧本选择页 — 四列剧本大厅 + 顶部主题控制
 import { useState } from 'react';
 import { useGameStore, SCENARIOS, type ScenarioId } from '../store/gameStore';
 import { clearAllSaves, SAVE_VERSION } from '../store/persistence';
 import { Btn, Tag } from '../components/ui';
 
-const BUILD_MARK = '优化版 v4 · hookfix-310';
+const BUILD_MARK = '布局优化 v2';
+const THEMES = [
+  { id: 'night', label: '暗夜', icon: '☾' },
+  { id: 'day', label: '羊皮', icon: '☀' },
+  { id: 'bamboo', label: '竹简', icon: '筠' },
+  { id: 'ink', label: '水墨', icon: '墨' },
+] as const;
 
 export default function ScenarioSelect() {
   const { startScenario, startWithNation, load, hasSave, log } = useGameStore();
   const [selected, setSelected] = useState<ScenarioId | null>(null);
   const [pickedNation, setPickedNation] = useState<string | null>(null);
-  const [, forceRefresh] = useState(0);
+  const [theme, setTheme] = useState<string>(() => {
+    try { return localStorage.getItem('ia-theme') || 'night'; } catch { return 'night'; }
+  });
 
   const scenario = SCENARIOS.find((s) => s.id === selected);
   const saveExists = hasSave();
 
+  const applyTheme = (next: string) => {
+    setTheme(next);
+    document.documentElement.setAttribute('data-theme', next === 'night' ? '' : next);
+    try { localStorage.setItem('ia-theme', next); } catch { /* ignore */ }
+  };
+
   const clearLocal = () => {
     if (!window.confirm('确认删除本浏览器里的全部 Imperium Aeternum 存档？')) return;
     clearAllSaves();
-    forceRefresh((x) => x + 1);
+    setTheme((x) => `${x}`);
   };
 
   // 选了剧本但需要选国：显示选国界面
   if (scenario && scenario.needsNationPick && !pickedNation) {
     return (
-      <div style={{ maxWidth: 900, margin: '60px auto', padding: '0 20px' }}>
-        <div style={{ textAlign: 'center', marginBottom: 'var(--space-6)' }}>
-          <h1 className="ia-display" style={{ fontSize: 36, margin: 0, letterSpacing: '0.1em' }}>{scenario.name}</h1>
-          <p className="mute" style={{ marginTop: 'var(--space-3)', fontSize: 13 }}>{scenario.description}</p>
+      <div className="ia-menu ia-menu--compact">
+        <div className="ia-menu-toolbar">
+          <button className="ia-btn ia-btn--ghost" onClick={() => { setSelected(null); setPickedNation(null); }}>← 剧本大厅</button>
+          <ThemeSwitch theme={theme} applyTheme={applyTheme} />
         </div>
-        <div className="ia-display ia-up" style={{ fontSize: 11, color: 'var(--text-dim)', textAlign: 'center', marginBottom: 'var(--space-4)' }}>
-          选择你的邦国
-        </div>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))', gap: 'var(--space-3)' }}>
+        <header className="ia-menu-hero">
+          <div className="ia-up ia-menu-kicker">Choose Nation</div>
+          <h1 className="ia-display">{scenario.name}</h1>
+          <p>{scenario.description}</p>
+        </header>
+        <div className="ia-menu-section-title ia-up">选择你的邦国</div>
+        <div className="ia-nation-grid">
           {scenario.playableNations?.map((n) => (
-            <button key={n.id} className="ia-card" onClick={() => setPickedNation(n.id)}
-              style={{ cursor: 'pointer', textAlign: 'left', padding: 'var(--space-4)', transition: 'all 0.2s' }}
-              onMouseEnter={(e) => { e.currentTarget.style.borderColor = 'var(--border-gold)'; }}
-              onMouseLeave={(e) => { e.currentTarget.style.borderColor = 'var(--border)'; }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--space-2)' }}>
-                <strong className="ia-display" style={{ fontSize: 16 }}>{n.name}</strong>
+            <button key={n.id} className="ia-choice-card" onClick={() => setPickedNation(n.id)}>
+              <div className="ia-choice-head">
+                <strong className="ia-display">{n.name}</strong>
                 <Tag text={n.tier} tone={n.tier === 'S' ? 'gold' : n.tier === 'A' ? 'info' : 'warn'} />
               </div>
-              <p className="mute" style={{ fontSize: 12, margin: 0, lineHeight: 1.5 }}>{n.desc}</p>
+              <p>{n.desc}</p>
             </button>
           ))}
-        </div>
-        <div style={{ textAlign: 'center', marginTop: 'var(--space-5)' }}>
-          <Btn label="← 返回剧本列表" variant="ghost" onClick={() => { setSelected(null); setPickedNation(null); }} />
         </div>
       </div>
     );
@@ -57,86 +68,83 @@ export default function ScenarioSelect() {
   if (scenario && pickedNation) {
     const nation = scenario.playableNations?.find((n) => n.id === pickedNation);
     return (
-      <div style={{ maxWidth: 560, margin: '80px auto', textAlign: 'center', padding: '0 20px' }}>
-        <p className="ia-up" style={{ fontSize: 10, color: 'var(--text-dim)' }}>即将开始</p>
-        <h1 className="ia-display" style={{ fontSize: 32, margin: 'var(--space-2) 0' }}>{scenario.name}</h1>
-        <p className="mute" style={{ fontSize: 13, marginBottom: 'var(--space-5)' }}>{scenario.description}</p>
-        <div className="ia-card--raised" style={{ padding: 'var(--space-5)', marginBottom: 'var(--space-5)' }}>
-          <p className="ia-up" style={{ fontSize: 10, color: 'var(--text-dim)' }}>你的邦国</p>
-          <h2 className="ia-display" style={{ fontSize: 24, margin: 'var(--space-2) 0', color: 'var(--gold)' }}>{nation?.name}</h2>
-          <p className="mute" style={{ fontSize: 12 }}>{nation?.desc}</p>
+      <div className="ia-menu ia-menu--confirm">
+        <div className="ia-menu-toolbar">
+          <button className="ia-btn ia-btn--ghost" onClick={() => setPickedNation(null)}>← 重选邦国</button>
+          <ThemeSwitch theme={theme} applyTheme={applyTheme} />
         </div>
-        <div style={{ display: 'flex', gap: 'var(--space-3)', justifyContent: 'center' }}>
-          <Btn label="← 重选" variant="ghost" onClick={() => setPickedNation(null)} />
-          <Btn label="开启纪元 →" variant="primary" onClick={() => startWithNation(pickedNation)} />
+        <div className="ia-confirm-card">
+          <p className="ia-up">即将开始</p>
+          <h1 className="ia-display">{scenario.name}</h1>
+          <p className="mute">{scenario.description}</p>
+          <div className="ia-confirm-nation">
+            <span className="ia-up">你的邦国</span>
+            <h2 className="ia-display">{nation?.name}</h2>
+            <p>{nation?.desc}</p>
+          </div>
+          <div className="ia-confirm-actions">
+            <Btn label="← 返回" variant="ghost" onClick={() => setPickedNation(null)} />
+            <Btn label="开启纪元 →" variant="primary" onClick={() => startWithNation(pickedNation)} />
+          </div>
         </div>
       </div>
     );
   }
 
-  // 默认：剧本列表
+  // 默认：剧本大厅
   return (
-    <div style={{ maxWidth: 920, margin: '60px auto', padding: '0 20px' }}>
-      <div style={{ textAlign: 'center', marginBottom: 'var(--space-6)' }}>
-        <h1 className="ia-display" style={{ fontSize: 42, margin: 0, letterSpacing: '0.12em', color: 'var(--gold)' }}>
-          Imperium Aeternum
-        </h1>
-        <p className="ia-display ia-up" style={{ fontSize: 12, color: 'var(--text-mute)', marginTop: 'var(--space-2)', letterSpacing: '0.2em' }}>
-          永恒帝国
-        </p>
-        <p className="mute" style={{ marginTop: 'var(--space-4)', fontSize: 13, maxWidth: 520, margin: 'var(--space-4) auto 0' }}>
-          治理一个国家数百年。扩张越快，崩溃越早。真正的胜利是建立一个能长期运转的国家机器。
-        </p>
-        <div style={{ display: 'flex', justifyContent: 'center', gap: 6, marginTop: 12, flexWrap: 'wrap' }}>
+    <div className="ia-menu">
+      <div className="ia-menu-toolbar">
+        <div className="ia-menu-version">
           <Tag text={BUILD_MARK} tone="gold" />
           <Tag text={`存档 v${SAVE_VERSION}`} tone="info" />
-          <Tag text="旧档自动修复" tone="good" />
         </div>
+        <ThemeSwitch theme={theme} applyTheme={applyTheme} />
       </div>
 
-      <div className="ia-display ia-up" style={{ fontSize: 11, color: 'var(--text-dim)', textAlign: 'center', marginBottom: 'var(--space-4)' }}>
-        选择剧本
-      </div>
+      <header className="ia-menu-hero">
+        <div className="ia-up ia-menu-kicker">Grand Strategy Chronicle</div>
+        <h1 className="ia-display">Imperium Aeternum</h1>
+        <p className="ia-display ia-up">永恒帝国</p>
+        <div className="ia-menu-subtitle">治理一个国家数百年。扩张越快，崩溃越早。真正的胜利是建立一个能长期运转的国家机器。</div>
+      </header>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: 'var(--space-4)', marginBottom: 'var(--space-6)' }}>
+      <div className="ia-menu-section-title ia-up">选择剧本</div>
+      <div className="ia-scenario-grid">
         {SCENARIOS.map((s) => (
-          <button key={s.id} className="ia-card" onClick={() => {
-              startScenario(s.id);
-              if (s.needsNationPick) { setSelected(s.id); setPickedNation(null); }
-            }}
-            style={{ cursor: 'pointer', textAlign: 'left', padding: 'var(--space-5)', transition: 'all 0.2s' }}
-            onMouseEnter={(e) => { e.currentTarget.style.borderColor = 'var(--border-gold)'; e.currentTarget.style.transform = 'translateY(-2px)'; }}
-            onMouseLeave={(e) => { e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.transform = 'none'; }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 'var(--space-3)' }}>
-              <h3 className="ia-display" style={{ margin: 0, fontSize: 18, color: 'var(--text)' }}>{s.name}</h3>
+          <button key={s.id} className="ia-scenario-card" onClick={() => {
+            startScenario(s.id);
+            if (s.needsNationPick) { setSelected(s.id); setPickedNation(null); }
+          }}>
+            <div className="ia-scenario-card__top">
+              <h3 className="ia-display">{s.name}</h3>
               <Tag text={s.nationCount} tone="gold" />
             </div>
-            <p className="mute" style={{ fontSize: 10, margin: '0 0 var(--space-3) 0', letterSpacing: '0.05em' }}>{s.subtitle}</p>
-            <p className="mute" style={{ fontSize: 12, margin: 0, lineHeight: 1.6 }}>{s.description}</p>
+            <div className="ia-scenario-sub">{s.subtitle}</div>
+            <p>{s.description}</p>
+            <div className="ia-scenario-foot">{s.needsNationPick ? '选择邦国后开始' : '点击立即开始'}</div>
           </button>
         ))}
       </div>
 
-      <div style={{ textAlign: 'center', display: 'flex', gap: 'var(--space-3)', justifyContent: 'center', alignItems: 'center', flexWrap: 'wrap' }}>
+      <div className="ia-menu-actions">
         {saveExists && <Btn label="读取自动存档" variant="ghost" onClick={() => load()} />}
         {saveExists && <Btn label="清空本地存档" warn onClick={clearLocal} />}
-        <button onClick={() => {
-          const order = ['night', 'day', 'bamboo', 'ink'];
-          let cur = 'night';
-          try { cur = localStorage.getItem('ia-theme') || 'night'; } catch { /* ignore */ }
-          const next = order[(order.indexOf(cur) + 1) % order.length];
-          document.documentElement.setAttribute('data-theme', next === 'night' ? '' : next);
-          try { localStorage.setItem('ia-theme', next); } catch { /* ignore */ }
-          forceRefresh((x) => x + 1);
-        }} title="切换主题（暗夜/象牙/竹简/水墨）" style={{
-          width: 36, height: 36, borderRadius: '50%', cursor: 'pointer',
-          background: 'radial-gradient(circle at 35% 35%, #3a3220, #14110d)',
-          border: '1px solid var(--border-gold)', color: 'var(--gold)', fontSize: 16, padding: 0,
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-        }}><span>☾</span></button>
       </div>
 
-      {log.length > 0 && <p className="dim" style={{ textAlign: 'center', marginTop: 'var(--space-4)', fontSize: 11 }}>{log[log.length - 1]}</p>}
+      {log.length > 0 && <p className="dim ia-menu-log">{log[log.length - 1]}</p>}
+    </div>
+  );
+}
+
+function ThemeSwitch({ theme, applyTheme }: { theme: string; applyTheme: (theme: string) => void }) {
+  return (
+    <div className="ia-theme-switch" aria-label="主题模式">
+      {THEMES.map((t) => (
+        <button key={t.id} onClick={() => applyTheme(t.id)} className={theme === t.id || (theme === '' && t.id === 'night') ? 'is-active' : ''} title={`${t.label}主题`}>
+          <span>{t.icon}</span><em>{t.label}</em>
+        </button>
+      ))}
     </div>
   );
 }
