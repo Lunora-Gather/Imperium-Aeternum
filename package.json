@@ -10,7 +10,8 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
-    "validate": "tsx src/data/__validate__.ts"
+    "validate": "tsx src/data/__validate__.ts",
+    "export-data": "tsx scripts/export-data.ts"
   },
   "dependencies": {
     "react": "^18.3.1",

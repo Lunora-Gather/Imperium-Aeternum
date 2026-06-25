@@ -369,3 +369,11 @@
 - **教训**：穷尽实读发现 prereqTech 机制已存在——D2 不是加 unlock 引擎改动，而是加数据利用现有机制，避免过度工程。
 - **替代**：加 unlock 引擎新机制（否决：prereqTech 已存在，过度工程）；加更多质变（否决：6 个已覆盖 4 分支 Lv5/Lv8，足够）。
 
+## DEC-044：F2 数据格式中立化（12 数据表导出 JSON）
+
+- **阶段**：v2 Phase F2（2026-06-25）
+- **背景**：F2 验收要求所有数据表可导出为 JSON，为 Godot/Unity 读 JSON 铺路。引擎深度依赖 data/*.ts 静态 import，真改运行时加载是 XL 改动。
+- **决策**：新建 `scripts/export-data.ts` 导出 12 数据表（nations/provinces/buildings/events/technologies/policies/laws/governments/national-characters/factions/trade-routes/regions）为 JSON 到 `dist/data/`。加 `npm run export-data`。运行验证：12 JSON 生成（events 157KB 最大），可被 Godot/Unity 直接读取。不改引擎 import（移植时再改运行时加载）。
+- **影响**：数据格式中立化 ✅，12 JSON 可被任意语言读取，为移植铺路。typecheck ✅ + 89/89 测试 ✅（纯新增脚本零回归）。
+- **替代**：改引擎运行时 JSON 加载（否决：XL 改动破坏现有测试）；仅导出部分表（否决：F2 验收要所有数据表）。
+
