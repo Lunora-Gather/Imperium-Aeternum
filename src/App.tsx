@@ -1,5 +1,5 @@
 // Imperium Aeternum — App shell
-// 修复 React #310：所有 Hooks 必须在任何条件 return 之前调用。
+// 布局优化：总控台式顶部、分组导航、内容画布。Hooks 保持在条件 return 前，避免 React #310。
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useGameStore } from './store/gameStore';
 import { playSfx, useSfxMute } from './utils/audio';
@@ -29,12 +29,12 @@ const TAB_GROUPS: { group: string; tabs: { id: Tab; label: string; key: string; 
   { group: '治理', tabs: [
     { id: 'dashboard', label: '总览', key: '1', icon: '◈' },
     { id: 'map', label: '舆图', key: 'm', icon: '⬡' },
-    { id: 'province', label: '省份', key: '2', icon: '⬡' },
+    { id: 'province', label: '省份', key: '2', icon: '▣' },
     { id: 'economy', label: '经济', key: '3', icon: '◉' },
     { id: 'population', label: '人口', key: '4', icon: '◯' },
     { id: 'politics', label: '政治', key: '5', icon: '⚖' },
     { id: 'tech', label: '科技', key: '6', icon: '✦' },
-    { id: 'stats', label: '统计', key: 's', icon: '📊' },
+    { id: 'stats', label: '统计', key: 's', icon: '◇' },
   ]},
   { group: '征伐', tabs: [
     { id: 'military', label: '军事', key: '7', icon: '⚔' },
@@ -42,12 +42,12 @@ const TAB_GROUPS: { group: string; tabs: { id: Tab; label: string; key: string; 
   ]},
   { group: '纪事', tabs: [
     { id: 'report', label: '年报', key: '9', icon: '✶' },
-    { id: 'chronicle', label: '史册', key: 'c', icon: '✶' },
+    { id: 'chronicle', label: '史册', key: 'c', icon: '✧' },
     { id: 'save', label: '存档', key: '0', icon: '⌶' },
   ]},
 ];
 const ALL_TABS = TAB_GROUPS.flatMap((g) => g.tabs);
-const BUILD_MARK = 'build hookfix-310';
+const BUILD_MARK = '布局优化 v1';
 
 export default function App() {
   const [tab, setTab] = useState<Tab>('dashboard');
@@ -68,6 +68,10 @@ export default function App() {
   const provs = player ? provincesOf(pid, state.provinces) : [];
   const totalPop = provs.reduce((s, p) => s + p.population, 0);
   const atWar = state.wars.some((w) => w.attackerId === pid || w.defenderId === pid);
+  const pendingCount = state.pendingEvents.filter((p) => p.nationId === pid).length;
+  const netIncome = state.lastReport
+    ? state.lastReport.income.tax + state.lastReport.income.trade + state.lastReport.income.building - state.lastReport.expense.military - state.lastReport.expense.corruption
+    : null;
 
   const sfxMute = useSfxMute();
   const prevPendingCount = useRef(state.pendingEvents.length);
@@ -171,29 +175,36 @@ export default function App() {
     return () => window.removeEventListener('keydown', onKey);
   }, [onKey]);
 
-  // 重点：条件 return 必须放在所有 Hooks 之后，否则从 menu 进入 playing 会触发 React #310。
   if (scene === 'menu') return <ScenarioSelect />;
 
   return (
-    <div style={{ padding: '20px 28px 40px', maxWidth: 1160, margin: '0 auto', minHeight: '100vh' }}>
-      <header style={{ marginBottom: 'var(--space-6)', position: 'relative' }}>
-        <div style={{ position: 'absolute', top: -20, left: 0, right: 0, height: 1, background: 'linear-gradient(90deg, transparent, var(--border-gold) 30%, var(--border-gold) 70%, transparent)', opacity: 0.5 }} />
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', flexWrap: 'wrap', gap: 'var(--space-5)' }}>
-          <div>
-            <h1 className="ia-display" style={{ margin: 0, fontSize: 32, fontWeight: 700, color: 'var(--text)', letterSpacing: '0.08em', lineHeight: 1 }}>
-              {player?.name ?? 'Imperium Aeternum'}
-            </h1>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)', marginTop: 'var(--space-3)' }}>
-              <span className="ia-display ia-up" style={{ fontSize: 11, color: 'var(--gold)', letterSpacing: '0.15em' }}>Anno · {state.turn + 1}</span>
-              <span style={{ color: 'var(--text-dim)' }}>·</span>
-              <span style={{ fontSize: 11, color: 'var(--text-mute)' }}>永恒帝国</span>
-              {atWar && <><span style={{ color: 'var(--text-dim)' }}>·</span><span style={{ fontSize: 11, color: 'var(--war)' }}>⚔ 战时</span></>}
-              {state.victory.type && <span className={state.victory.type.startsWith('win') ? 'good' : 'danger'} style={{ fontSize: 11 }}>{state.victory.type.startsWith('win') ? '🏆 已胜利' : '💀 已陨落'}</span>}
+    <div className="ia-shell">
+      <header className="ia-topbar">
+        <section className="ia-ruler-card">
+          <div className="ia-ruler-kicker ia-up">Imperium Aeternum</div>
+          <div className="ia-ruler-main">
+            <div>
+              <h1 className="ia-ruler-title">{player?.name ?? '未名之国'}</h1>
+              <div className="ia-ruler-subline">
+                <span>Anno · {state.turn + 1}</span>
+                <span>永恒帝国</span>
+                <span>{player?.ruler?.name ? `君主 · ${player.ruler.name}` : '君主 · 无名'}</span>
+                {atWar && <span className="danger">⚔ 战时</span>}
+                {pendingCount > 0 && <span className="warn">✦ 待决事件 {pendingCount}</span>}
+                {state.victory.type && <span className={state.victory.type.startsWith('win') ? 'good' : 'danger'}>{state.victory.type.startsWith('win') ? '🏆 已胜利' : '💀 已陨落'}</span>}
+              </div>
+            </div>
+            <div className="ia-header-actions">
+              <button className="ia-icon-btn ia-icon-btn--gold" onClick={toggleTheme} title={`主题：${theme}`} aria-label="切换主题">
+                {theme === 'night' ? '☾' : theme === 'day' ? '☀' : theme === 'bamboo' ? '筠' : '墨'}
+              </button>
+              <button className="ia-icon-btn" onClick={() => { setShowHelp(true); setTutorialStep(0); }} title="治国引导" aria-label="治国引导">?</button>
+              <button className="ia-icon-btn" onClick={sfxMute.toggle} title={sfxMute.muted ? '音效已关（点击开启）' : '音效已开（点击静音）'} aria-label="音效开关">{sfxMute.muted ? '🔇' : '🔊'}</button>
             </div>
           </div>
 
           {player && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-4)' }}>
+            <div className="ia-resource-dock">
               <ResourceStrip items={[
                 { label: '国库', value: player.resources.gold, warn: player.resources.gold < 0, color: 'var(--gold)', icon: '◉' },
                 { label: '粮储', value: player.resources.food, warn: player.resources.food < 0, color: 'var(--food)', icon: '✦' },
@@ -201,37 +212,37 @@ export default function App() {
                 { label: '安定', value: player.government.stability, warn: player.government.stability < 30, color: 'var(--stable)', icon: '◈' },
                 { label: '疆土', value: provs.length, color: 'var(--accent)', icon: '⬡' },
               ]} />
-              <button onClick={toggleTheme} title={`主题：${theme}`} aria-label="切换主题" style={{ width: 36, height: 36, borderRadius: '50%', cursor: 'pointer', background: 'transparent', border: '1px solid var(--border-gold)', color: 'var(--gold)', fontSize: 16, padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <span>{theme === 'night' ? '☾' : theme === 'day' ? '☀' : theme === 'bamboo' ? '筠' : '墨'}</span>
-              </button>
-              <button onClick={() => { setShowHelp(true); setTutorialStep(0); }} title="治国引导" style={{ width: 36, height: 36, borderRadius: '50%', cursor: 'pointer', background: 'transparent', border: '1px solid var(--border)', color: 'var(--text-mute)', fontSize: 14, padding: 0 }}>?</button>
-              <button onClick={sfxMute.toggle} title={sfxMute.muted ? '音效已关（点击开启）' : '音效已开（点击静音）'} style={{ width: 36, height: 36, borderRadius: '50%', cursor: 'pointer', background: 'transparent', border: '1px solid var(--border)', color: sfxMute.muted ? 'var(--text-dim)' : 'var(--gold)', fontSize: 14, padding: 0 }}>{sfxMute.muted ? '🔇' : '🔊'}</button>
             </div>
           )}
-        </div>
+        </section>
+
+        <aside className="ia-status-panel">
+          <div className="ia-status-row"><span>行政点</span><strong>{Math.round(player?.resources.adminPt ?? 0)}</strong></div>
+          <div className="ia-status-row"><span>科研点</span><strong>{Math.round(player?.resources.sciPt ?? 0)}</strong></div>
+          <div className="ia-status-row"><span>影响力</span><strong>{Math.round(player?.resources.influence ?? 0)}</strong></div>
+          <div className="ia-status-row"><span>净收入</span><strong className={netIncome === null ? '' : netIncome >= 0 ? 'good' : 'danger'}>{netIncome === null ? '—' : `${netIncome >= 0 ? '+' : ''}${Math.round(netIncome)}/年`}</strong></div>
+        </aside>
       </header>
 
-      <nav style={{ display: 'flex', gap: 'var(--space-6)', flexWrap: 'wrap', marginBottom: 'var(--space-6)', alignItems: 'center', paddingBottom: 'var(--space-3)', borderBottom: '1px solid var(--border)' }}>
+      <nav className="ia-main-nav" aria-label="主导航">
         {TAB_GROUPS.map((g) => (
-          <div key={g.group} style={{ display: 'flex', gap: 'var(--space-2)', alignItems: 'center' }}>
-            <span className="ia-up" style={{ fontSize: 9, color: 'var(--text-dim)', marginRight: 2 }}>{g.group}</span>
-            {g.tabs.map((t) => (
-              <button key={t.id} onClick={() => setTab(t.id)} title={`快捷键 ${t.key}`} style={tab === t.id ? {
-                background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--gold)', fontWeight: 600, fontSize: 13, padding: '6px 4px', borderBottom: '2px solid var(--gold)', fontFamily: 'var(--font-body)', display: 'flex', alignItems: 'center', gap: 5,
-              } : {
-                background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-mute)', fontSize: 13, padding: '6px 4px', fontFamily: 'var(--font-body)', display: 'flex', alignItems: 'center', gap: 5,
-              }}>
-                <span style={{ fontSize: 11, opacity: 0.7 }}>{t.icon}</span>{t.label}
-              </button>
-            ))}
+          <div className="ia-nav-group" key={g.group}>
+            <span className="ia-nav-label ia-up">{g.group}</span>
+            <div className="ia-tab-cluster">
+              {g.tabs.map((t) => (
+                <button key={t.id} onClick={() => setTab(t.id)} title={`快捷键 ${t.key}`} className={`ia-tab-btn ${tab === t.id ? 'is-active' : ''}`}>
+                  <span className="ia-tab-icon">{t.icon}</span>
+                  <span>{t.label}</span>
+                  <kbd>{t.key}</kbd>
+                </button>
+              ))}
+            </div>
           </div>
         ))}
-        <div style={{ marginLeft: 'auto', fontSize: 10, color: 'var(--text-dim)', letterSpacing: '0.05em' }}>
-          空格 = 下一回合 · 数字键切换 · {BUILD_MARK}
-        </div>
+        <div className="ia-nav-hint">空格下一回合 · T 经济 · {BUILD_MARK}</div>
       </nav>
 
-      <main className="ia-fade-in" key={tab}>
+      <main className="ia-content-shell ia-fade-in" key={tab}>
         {tab === 'dashboard' && <Dashboard />}
         {tab === 'map' && <WorldMap />}
         {tab === 'province' && <ProvinceScreen />}
@@ -250,14 +261,14 @@ export default function App() {
       {state.pendingEvents.some((p) => p.nationId === pid) && <EventModal />}
       <LogToast />
 
-      <footer style={{ marginTop: 'var(--space-6)', paddingTop: 'var(--space-4)', borderTop: '1px solid var(--border)', color: 'var(--text-dim)', fontSize: 10, textAlign: 'center', letterSpacing: '0.1em' }} className="ia-display ia-up">
-        Imperium Aeternum · 永恒帝国 · MVP · {BUILD_MARK}
+      <footer className="ia-footer ia-display ia-up">
+        Imperium Aeternum · 永恒帝国 · {BUILD_MARK}
       </footer>
 
       {showHelp && scene === 'playing' && (
-        <div onClick={() => { setShowHelp(false); setTutorialStep(-1); try { localStorage.setItem('ia-tutorial-done', '1'); } catch { /* ignore */ } }} style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 200, background: 'rgba(0,0,0,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <div onClick={(e) => e.stopPropagation()} style={{ background: 'var(--bg-panel)', borderRadius: 10, padding: 22, maxWidth: 560, width: '90%', border: '1px solid var(--border-gold)', boxShadow: '0 8px 32px rgba(0,0,0,0.5)' }}>
-            <div className="ia-display" style={{ fontSize: 16, color: 'var(--gold)', fontWeight: 700, letterSpacing: '0.1em', marginBottom: 12 }}>✦ 治国之要 · 第 {Math.max(tutorialStep, 0) + 1} / 5 步</div>
+        <div className="ia-modal-backdrop" onClick={() => { setShowHelp(false); setTutorialStep(-1); try { localStorage.setItem('ia-tutorial-done', '1'); } catch { /* ignore */ } }}>
+          <div className="ia-help-card" onClick={(e) => e.stopPropagation()}>
+            <div className="ia-display ia-help-title">✦ 治国之要 · 第 {Math.max(tutorialStep, 0) + 1} / 5 步</div>
             {(() => {
               const steps = [
                 { title: '① 总览警报', body: '看总览页警报置顶，红危黄警先处理。稳定度<40 或国库<0 是致命的。' },
@@ -267,9 +278,9 @@ export default function App() {
                 { title: '⑤ 推回合', body: '点下一回合或按空格结算。事件弹窗可按 1/2/3 键选择。' },
               ];
               const cur = steps[Math.max(tutorialStep, 0)] ?? steps[0];
-              return <><div style={{ fontSize: 14, color: 'var(--gold)', fontWeight: 600, marginBottom: 8 }}>{cur.title}</div><div style={{ fontSize: 12.5, color: 'var(--text-soft)', lineHeight: 1.7, minHeight: 60 }}>{cur.body}</div></>;
+              return <><div className="ia-help-step-title">{cur.title}</div><div className="ia-help-step-body">{cur.body}</div></>;
             })()}
-            <div style={{ display: 'flex', gap: 8, justifyContent: 'center', marginTop: 8 }}>
+            <div className="ia-help-actions">
               <button className="ia-btn ia-btn--ghost" onClick={() => { setShowHelp(false); setTutorialStep(-1); try { localStorage.setItem('ia-tutorial-done', '1'); } catch { /* ignore */ } }}>跳过</button>
               {tutorialStep > 0 && <button className="ia-btn" onClick={() => setTutorialStep((s) => Math.max(s - 1, 0))}>上一步</button>}
               {tutorialStep < 4 ? <button className="ia-btn ia-btn--primary" onClick={() => setTutorialStep((s) => Math.min(s + 1, 4))}>下一步</button> : <button className="ia-btn ia-btn--primary" onClick={() => { setShowHelp(false); setTutorialStep(-1); try { localStorage.setItem('ia-tutorial-done', '1'); } catch { /* ignore */ } }}>开始治国</button>}
