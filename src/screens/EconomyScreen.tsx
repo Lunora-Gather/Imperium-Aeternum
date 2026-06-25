@@ -9,7 +9,8 @@ import { Panel, Stat, StatRow, Btn, Tag, Divider } from '../components/ui';
 
 export default function EconomyScreen() {
   const { state, setTaxRate, establishTradeRoute, embargoTradeRoute } = useGameStore();
-  const player = state.nations[state.playerNationId];
+  // C2: player 用 selector 精确订阅
+  const player = useGameStore((s) => s.state.nations[s.state.playerNationId]);
   const report = state.lastReport;
   const taxPct = Math.round(player.taxRate * 100);
   const netIncome = report ? (report.income.tax + report.income.trade + report.income.building - report.expense.military - report.expense.corruption) : 0;

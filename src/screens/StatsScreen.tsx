@@ -40,8 +40,9 @@ function LineChart({ data, color, label, unit }: { data: { x: number; y: number 
 
 export default function StatsScreen() {
   const { state } = useGameStore();
-  const pid = state.playerNationId;
-  const player = state.nations[pid];
+  // C2: pid/player 用 selector 精确订阅
+  const pid = useGameStore((s) => s.state.playerNationId);
+  const player = useGameStore((s) => s.state.nations[pid]);
   const history = state.history.filter((r) => r.nationId === pid);
 
   if (history.length === 0) return <Panel title="统计图表"><p className="dim" style={{ padding: 16 }}>尚无回合数据，推进一步后可见趋势。</p></Panel>;

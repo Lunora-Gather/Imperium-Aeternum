@@ -9,8 +9,9 @@ type SlotMeta = NonNullable<ReturnType<typeof getSlotMeta>>;
 
 export default function SaveLoadScreen() {
   const { newGame, saveToSlot, loadFromSlot, deleteSlotSave, state } = useGameStore();
-  const pid = state.playerNationId;
-  const player = state.nations[pid];
+  // C2: pid/player 用 selector 精确订阅
+  const pid = useGameStore((s) => s.state.playerNationId);
+  const player = useGameStore((s) => s.state.nations[pid]);
   const provs = provincesOf(pid, state.provinces);
   // 槽位列表（每次渲染刷新以反映最新存档状态）
   const [slots, setSlots] = useState<ReturnType<typeof listAllSlots>>([]);

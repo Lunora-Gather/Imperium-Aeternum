@@ -15,7 +15,8 @@ const factionLabel = (id: string): string => ({
 
 export default function PoliticsScreen() {
   const { state, enactPolicy, enactLaw, suppressRebellion, negotiateRebellion } = useGameStore();
-  const player = state.nations[state.playerNationId];
+  // C2: player 用 selector 精确订阅
+  const player = useGameStore((s) => s.state.nations[s.state.playerNationId]);
   const govDef = GOVERNMENTS[player.government.type];
   const [tab, setTab] = useState<'policy' | 'law'>('policy');
 

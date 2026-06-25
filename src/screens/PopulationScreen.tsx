@@ -15,8 +15,9 @@ const FACTION_COLOR: Record<string, string> = {
 
 export default function PopulationScreen() {
   const { state, appeaseFaction } = useGameStore();
-  const pid = state.playerNationId;
-  const player = state.nations[pid];
+  // C2: pid/player 用 selector 精确订阅
+  const pid = useGameStore((s) => s.state.playerNationId);
+  const player = useGameStore((s) => s.state.nations[pid]);
   const provs = provincesOf(pid, state.provinces);
   const totalPop = provs.reduce((s, p) => s + p.population, 0);
 

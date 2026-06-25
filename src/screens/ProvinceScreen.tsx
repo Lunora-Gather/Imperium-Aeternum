@@ -38,8 +38,9 @@ function provStatus(p: Province): 'good' | 'warn' | 'danger' | 'neutral' {
 
 export default function ProvinceScreen() {
   const { state, build, recruit, upgradeBuilding, demolishBuilding, developProvince } = useGameStore();
-  const pid = state.playerNationId;
-  const player = state.nations[pid];
+  // C2: pid/player 用 selector 精确订阅
+  const pid = useGameStore((s) => s.state.playerNationId);
+  const player = useGameStore((s) => s.state.nations[pid]);
   const provs = provincesOf(pid, state.provinces);
   // P2: 若有跨页跳转待选省份（地图/骚动徽章点击），优先选中它并清标记
   const pendingId = useGameStore((s) => s.pendingProvinceId);

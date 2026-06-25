@@ -10,7 +10,8 @@ const BRANCH_ICON: Record<string, string> = { agri: '🌾', mil: '⚔', admin: '
 
 export default function TechnologyScreen() {
   const { state, logMsg } = useGameStore();
-  const player = state.nations[state.playerNationId];
+  // C2: player 用 selector 精确订阅
+  const player = useGameStore((s) => s.state.nations[s.state.playerNationId]);
   const researching = player.tech.researchProgress;
   const researchingTech = researching ? TECHNOLOGIES.find((t) => t.id === researching.techId) : null;
   const researchingPct = researching && researchingTech ? Math.min(100, (researching.sciPtInvested / researchingTech.costSci) * 100) : 0;

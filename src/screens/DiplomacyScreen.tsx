@@ -79,8 +79,9 @@ function DiplomacyGraph({ onNodeClick, nodes }: {
 
 export default function DiplomacyScreen() {
   const { state, logMsg, espionage, dynasticMarriage, culturalExport } = useGameStore();
-  const pid = state.playerNationId;
-  const player = state.nations[pid];
+  // C2: pid/player 用 selector 精确订阅
+  const pid = useGameStore((s) => s.state.playerNationId);
+  const player = useGameStore((s) => s.state.nations[pid]);
   const [view, setView] = useState<'list' | 'graph'>('list');
   const [spyTarget, setSpyTarget] = useState<string | null>(null);  // E17: 间谍操作面板选中的目标
   const [focusNation, setFocusNation] = useState<string | null>(null);  // E23: 图谱点击聚焦

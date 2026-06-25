@@ -22,8 +22,9 @@ const KIND_ORDER: ChronicleKind[] = ['founding', 'reign', 'expansion', 'populati
 
 export default function ChronicleScreen() {
   const { state } = useGameStore();
-  const pid = state.playerNationId;
-  const player = state.nations[pid];
+  // C2: pid 用 selector 精确订阅
+  const pid = useGameStore((s) => s.state.playerNationId);
+  const player = useGameStore((s) => s.state.nations[pid]);
   const chronicle = state.chronicle;
 
   // 按类分组

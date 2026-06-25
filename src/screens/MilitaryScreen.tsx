@@ -158,8 +158,9 @@ function BattleReportModal({ war, onClose }: { war: War; onClose: () => void }) 
 
 export default function MilitaryScreen() {
   const { state, recruit, moveArmy: doMoveArmy, makePeace, logMsg } = useGameStore();
-  const pid = state.playerNationId;
-  const player = state.nations[pid];
+  // C2: pid/player 用 selector 精确订阅
+  const pid = useGameStore((s) => s.state.playerNationId);
+  const player = useGameStore((s) => s.state.nations[pid]);
   const provs = provincesOf(pid, state.provinces);
   const myWars = state.wars.filter((w) => w.attackerId === pid || w.defenderId === pid);
   const armyTotal = player.army.reduce((s, a) => s + a.size, 0);

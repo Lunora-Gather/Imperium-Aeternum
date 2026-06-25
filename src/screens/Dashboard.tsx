@@ -100,8 +100,9 @@ function WinProgress({ label, cur, need, extra, ok, color }: { label: string; cu
 
 export default function Dashboard() {
   const { state, nextTurn, save, load, hasSave, newGame, log, setPendingProvince, jumpToTab } = useGameStore();
-  const pid = state.playerNationId;
-  const player = state.nations[pid];
+  // C2: pid/player 用 selector 精确订阅（开场选国后稳定，减少整体订阅重渲染）
+  const pid = useGameStore((s) => s.state.playerNationId);
+  const player = useGameStore((s) => s.state.nations[pid]);
   const provs = provincesOf(pid, state.provinces);
   const totalPop = provs.reduce((s, p) => s + p.population, 0);
   const armySize = player.army.reduce((s, a) => s + a.size, 0);

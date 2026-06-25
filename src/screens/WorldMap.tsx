@@ -29,8 +29,9 @@ function terrainColor(terrain: string): string {
 
 export default function WorldMap() {
   const { state, setPendingProvince, jumpToTab } = useGameStore();
-  const pid = state.playerNationId;
-  const player = state.nations[pid];
+  // C2: pid/player 用 selector 精确订阅
+  const pid = useGameStore((s) => s.state.playerNationId);
+  const player = useGameStore((s) => s.state.nations[pid]);
   const provs = Object.values(state.provinces);
   const [hover, setHover] = useState<string | null>(null);
   const [filter, setFilter] = useState<'all' | 'player' | 'neighbors'>('all');
