@@ -1,8 +1,8 @@
-// EventModal v2 — category 配色 + 选项后果提示 + 键盘快捷键
+// EventModal v3 — hook 顺序安全 + 无效事件自愈 + 快捷键
 import { useEffect } from 'react';
 import { useGameStore } from '../store/gameStore';
 import { EVENT_BY_ID, applyEffect, recordEvent } from '../engine/events';
-import { Btn, Tag } from '../components/ui';
+import { Tag } from '../components/ui';
 import type { EventEffect } from '../data/events';
 
 const CATEGORY_TONE: Record<string, 'danger' | 'warn' | 'info' | 'good'> = {
@@ -15,7 +15,6 @@ const CATEGORY_ICON: Record<string, string> = {
   economy: '💰', diplomacy: '🤝', science: '🔬', opportunity: '✨', culture: '🎭', population: '👥',
 };
 
-// 选项效果摘要
 function effectSummary(eff: EventEffect): { txt: string; tone: 'good' | 'warn' | 'danger' | 'info' }[] {
   const out: { txt: string; tone: 'good' | 'warn' | 'danger' | 'info' }[] = [];
   const push = (v: number, label: string, invert = false) => {
@@ -39,12 +38,17 @@ function effectSummary(eff: EventEffect): { txt: string; tone: 'good' | 'warn' |
 export default function EventModal() {
   const { state, logMsg } = useGameStore();
   const pid = state.playerNationId;
-  const pending = state.pendingEvents.find((p) => p.nationId === pid);
-  if (!pending) return null;
-  const ev = EVENT_BY_ID[pending.eventId];
-  if (!ev) return null;
+  const pending = state.pendingEvents.find((p) => p.nationId === pid) ?? null;
+  const ev = pending ? EVENT_BY_ID[pending.eventId] : null;
+
+  const clearPending = () => {
+    if (!pending) return;
+    state.pendingEvents = state.pendingEvents.filter((p) => p !== pending);
+    useGameStore.setState((s) => ({ state: { ...s.state } }));
+  };
 
   const choose = (idx: number) => {
+    if (!pending || !ev) return;
     const opt = ev.options[idx];
     if (opt) {
       applyEffect(state.nations[pid], opt.effects, state);
@@ -55,9 +59,19 @@ export default function EventModal() {
     useGameStore.setState((s) => ({ state: { ...s.state } }));
   };
 
-  // P0: 键盘快捷键——1/2/3 选对应选项（最多支持 3 选项）
+  // 无效事件自愈：旧档/删改事件导致 EVENT_BY_ID 查不到时，不再隐形卡死。
+  useEffect(() => {
+    if (pending && !ev) {
+      logMsg(`事件已失效：${pending.eventId}，已跳过`);
+      clearPending();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pending?.eventId, !!ev]);
+
+  // 键盘快捷键：1/2/3 选项；Esc 不跳过事件，只避免误关闭造成状态不同步。
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
+      if (!pending || !ev) return;
       if (e.key === '1' && ev.options.length >= 1) { e.preventDefault(); choose(0); }
       else if (e.key === '2' && ev.options.length >= 2) { e.preventDefault(); choose(1); }
       else if (e.key === '3' && ev.options.length >= 3) { e.preventDefault(); choose(2); }
@@ -65,7 +79,9 @@ export default function EventModal() {
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ev.options.length, pending]);
+  }, [pending?.eventId, ev?.options.length]);
+
+  if (!pending || !ev) return null;
 
   const tone = CATEGORY_TONE[ev.category] ?? 'info';
   const icon = CATEGORY_ICON[ev.category] ?? '📢';
@@ -73,17 +89,16 @@ export default function EventModal() {
   return (
     <div style={{
       position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
-      background: 'rgba(0,0,0,0.75)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100,
+      background: 'rgba(0,0,0,0.75)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 200,
       backdropFilter: 'blur(2px)',
     }}>
       <div style={{
         background: 'var(--bg-panel)', borderRadius: 10, padding: 18, maxWidth: 520, width: '90%',
-        border: `2px solid var(--${tone === 'danger' ? 'war' : tone === 'warn' ? 'warn' : tone === 'good' ? 'good' : 'border-hi'})`,
-        boxShadow: `0 8px 32px rgba(0,0,0,0.5), 0 0 24px rgba(52,152,219,0.1)`,
+        border: `1px solid var(--${tone === 'danger' ? 'war' : tone === 'warn' ? 'warn' : tone === 'good' ? 'good' : 'border-gold'})`,
+        boxShadow: `0 8px 28px rgba(0,0,0,0.38)`,
       }}>
-        {/* 标题行 */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
-          <span style={{ fontSize: 28 }}>{icon}</span>
+          <span style={{ fontSize: 26 }}>{icon}</span>
           <div style={{ flex: 1 }}>
             <div style={{ fontSize: 11, color: 'var(--text-dim)', marginBottom: 2 }}>
               <Tag text={ev.category} tone={tone} />
@@ -109,9 +124,7 @@ export default function EventModal() {
                     {sums.map((s, j) => <Tag key={j} text={s.txt} tone={s.tone} />)}
                   </div>
                 )}
-                {hasChain && (
-                  <div style={{ fontSize: 10, color: 'var(--gold)', fontStyle: 'italic', marginTop: 2 }}>✦ 此事后续或有变…</div>
-                )}
+                {hasChain && <div style={{ fontSize: 10, color: 'var(--gold)', fontStyle: 'italic', marginTop: 2 }}>✦ 此事后续或有变…</div>}
               </button>
             );
           })}
