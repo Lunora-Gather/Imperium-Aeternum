@@ -824,3 +824,21 @@ export const useGameStore = create<GameStore>((set, get) => ({
     return true;
   },
 }));
+
+// C2: 精确订阅 selector hooks——screen 按需迁移，减少 set 触发的全订阅重渲染
+// usePlayer 只在玩家国引用变化时重渲染（配合 store 操作深拷贝玩家国后生效）
+export function usePlayer(): Nation {
+  return useGameStore((s) => s.state.nations[s.state.playerNationId]);
+}
+// usePlayerId 只在 playerNationId 变化时重渲染（开场选国后稳定）
+export function usePlayerId(): string {
+  return useGameStore((s) => s.state.playerNationId);
+}
+// usePlayerResources 精确订阅玩家资源（操作后变化最频繁）
+export function usePlayerResources() {
+  return useGameStore((s) => s.state.nations[s.state.playerNationId]?.resources);
+}
+// useTurn 精确订阅回合数
+export function useTurn(): number {
+  return useGameStore((s) => s.state.turn);
+}
