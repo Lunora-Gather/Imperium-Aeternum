@@ -30,7 +30,12 @@ export type PolicyId =
   | 'census'
   | 'diplomatic_corps'
   | 'cultural_patronage'
-  | 'succession_law';
+  | 'succession_law'
+  // ── D2 扩充：4 个质变政策，绑定 Lv5 科技解锁 ──
+  | 'crop_rotation'        // agri_lv5 轮作政策
+  | 'total_mobilization'   // mil_lv5 总动员
+  | 'civil_service_reform' // admin_lv5 科举改革
+  | 'cultural_export';     // culture_lv5 文化输出
 
 export interface PolicyDef {
   id: PolicyId;
@@ -150,6 +155,11 @@ export const POLICIES: PolicyDef[] = [
   { id: 'diplomatic_corps', name: '外交使团', description: '设立专职外交机构，影响力产出升。', costAction: 1, costGold: 130, allowedGovernments: [], effects: { influenceMod: 1.15 }, factionReaction: { nobles: 5, merchants: 5 } },
   { id: 'cultural_patronage', name: '文化赞助', description: '赞助艺术学术，威望与同化升。', costAction: 1, costGold: 110, allowedGovernments: [], effects: { influenceMod: 1.08, assimilationMod: 3 }, factionReaction: { clergy: 5, commoners: 3 } },
   { id: 'succession_law', name: '继承法', description: '确立继承顺序，合法性大升但限制君主。', costAction: 2, costGold: 200, allowedGovernments: ['monarchy', 'empire'], effects: { stabilityMod: 8 }, factionReaction: { nobles: 15, military: -5 } },
+  // ── D2 扩充：4 个质变政策，绑定 Lv5 科技解锁 ──
+  { id: 'crop_rotation', name: '轮作政策', description: '科学轮作养地，粮产 +15%。需农业 Lv5。', costAction: 2, costGold: 280, allowedGovernments: [], effects: { popGrowthMod: 1.15 }, factionReaction: { commoners: 15, nobles: -5 }, prereqTech: 'agri_lv5' },
+  { id: 'total_mobilization', name: '总动员', description: '全国动员，征兵 ×2 但厌战 +15。需军事 Lv5。', costAction: 3, costGold: 350, allowedGovernments: ['empire', 'junta', 'monarchy'], effects: { mobilizationMod: 2.0 }, factionReaction: { military: 25, commoners: -20 }, prereqTech: 'mil_lv5' },
+  { id: 'civil_service_reform', name: '科举改革', description: '深化科举，腐败 -10、行政 +10。需行政 Lv5。', costAction: 3, costGold: 320, allowedGovernments: ['empire', 'monarchy', 'republic'], effects: { corruptionMod: -10, efficiencyMod: 10 }, factionReaction: { nobles: -22, commoners: 12, clergy: 5 }, prereqTech: 'admin_lv5' },
+  { id: 'cultural_export', name: '文化输出', description: '向诸邦输出文化，影响力 +25%、外交 +10。需文化 Lv5。', costAction: 2, costGold: 260, allowedGovernments: [], effects: { influenceMod: 1.25, assimilationMod: 8 }, factionReaction: { clergy: 8, commoners: 5 }, prereqTech: 'culture_lv5' },
 ];
 
 export const POLICY_BY_ID: Record<PolicyId, PolicyDef> = Object.fromEntries(

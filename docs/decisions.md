@@ -360,3 +360,12 @@
 - **教训**：穷尽实读搜索依赖标志而非凭印象——15 文件逐一 grep 确认零反向依赖，比抽样可靠。
 - **替代**：仅抽样几文件（否决：穷尽实读才可靠）；改 mutate 模式为纯函数（否决：那是 C1 范畴非 F1）。
 
+## DEC-043：D2 科技质变效果（4 政策 + 2 建筑绑定 Lv5/Lv8 解锁）
+
+- **阶段**：v2 Phase D2（2026-06-25）
+- **背景**：科技 Lv1-8 仅线性 effects（agriYieldMod/combatMod 等），无"质变节点"让高级科技解锁新能力，违"科技树有质变"目标。穷尽实读发现 Policy/Building 已有 prereqTech 字段且 enactPolicy/build 检测前置科技——D2 真缺口是加绑定 Lv5/Lv8 的新政策/建筑作为质变节点。
+- **决策**：+4 质变政策绑定 Lv5 科技——crop_rotation 轮作（agri_lv5，粮产+15%）/total_mobilization 总动员（mil_lv5，征兵×2）/civil_service_reform 科举改革（admin_lv5，腐败-10）/cultural_export 文化输出（culture_lv5，影响力+25%）；+2 质变建筑绑定 Lv8 科技——fertilizer_plant 化肥厂（agri_lv8，粮产×1.5）/mobilization_camp 总动员营（mil_lv8，征兵×2）。同步扩 PolicyId type + BuildingId type。
+- **影响**：政策 25→29，建筑 40→42，高级科技有质变解锁。typecheck ✅ + 89/89 测试 ✅ + validate ✅（42 建筑 29 政策 0 重复）。
+- **教训**：穷尽实读发现 prereqTech 机制已存在——D2 不是加 unlock 引擎改动，而是加数据利用现有机制，避免过度工程。
+- **替代**：加 unlock 引擎新机制（否决：prereqTech 已存在，过度工程）；加更多质变（否决：6 个已覆盖 4 分支 Lv5/Lv8，足够）。
+

@@ -45,7 +45,10 @@ export type BuildingId =
   | 'granary_royal'    // 王家粮仓：高级储粮
   | 'trade_post'       // 贸易站：边疆贸易
   | 'monastery'        // 修道院：神职+稳定
-  | 'irrigation_works';// 水利工程：平原粮产翻倍
+  | 'irrigation_works'// 水利工程：平原粮产翻倍
+  // ── D2 扩充：2 个质变建筑，绑定 Lv8 科技解锁 ──
+  | 'fertilizer_plant'    // 化肥厂：农业 Lv8
+  | 'mobilization_camp';  // 总动员营：军事 Lv8
 
 export interface BuildingDef {
   id: BuildingId;
@@ -343,6 +346,17 @@ export const BUILDINGS: Record<BuildingId, BuildingDef> = {
     id: 'irrigation_works', name: '水利工程', description: '沟渠纵横，平原粮产翻倍，需农业 Lv3。',
     costGold: 200, costWood: 80, costIron: 10, costAction: 2,
     yield: { food: 25 }, terrainMod: { plain: 1.6, hill: 1.0 }, prereqTech: 'agri_lv3', maxPerProvince: 1,
+  },
+  // ── D2 扩充：2 个质变建筑，绑定 Lv8 科技解锁 ──
+  fertilizer_plant: {
+    id: 'fertilizer_plant', name: '化肥厂', description: '农业 Lv8 解锁。化学肥料使粮产 ×1.5，平原飞跃。',
+    costGold: 600, costWood: 100, costIron: 80, costAction: 3,
+    yield: { food: 60 }, terrainMod: { plain: 1.5, hill: 1.2 }, prereqTech: 'agri_lv8', maxPerProvince: 1,
+  },
+  mobilization_camp: {
+    id: 'mobilization_camp', name: '总动员营', description: '军事 Lv8 解锁。全国动员，征兵 ×2，军方满意度登顶。',
+    costGold: 700, costWood: 120, costIron: 150, costAction: 3,
+    yield: { supply: 30, adminPt: 2 }, terrainMod: {}, prereqTech: 'mil_lv8', maxPerProvince: 1,
   },
 };
 
