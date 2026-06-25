@@ -16,6 +16,7 @@
 | 性能 | world-smoke 50 回合 | ~2s（< 40s 红线）| 2026-06-25 17:22 |
 | NaN 检查 | world-smoke 192 国 600 省 | ✅ 无 NaN/Infinity | 2026-06-25 17:22 |
 | 工作树 | `git status --short` | clean | 2026-06-25 17:37 |
+| **生产构建** | `npx vite build` | ✅ 95 modules transformed，built in 1.11s，dist 产物完整（index.html 0.41kB + CSS 9.66kB + JS 519.35kB gzip 153.66kB）| 2026-06-25 18:33 |
 
 ---
 
