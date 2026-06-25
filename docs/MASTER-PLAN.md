@@ -124,11 +124,11 @@
 |----|------|---------|------|------|------|
 | **C4** | `as` 断言清理收尾 | `politics.ts:137` + `events.ts checkTrigger` + `turn.ts:104` 的 `govTransitionTurns as` 断言 | Nation 接口加 `govTransitionTurns?: number` 正式字段；3 处 `as` 断言改直接访问；typecheck + test 通过 | S | 本回合做 |
 | **C1** | 引擎纯函数化 | `engine/*.ts settleEconomy/settlePolitics/...` | 子引擎改 `(nation, state) => partialResult` 不 mutate；processTurn 合并结果建新 state；可回滚/重放 | XL | 下回合 |
-| **C2** | store 精确订阅 | `gameStore.ts set` + 12 screen | Zustand selector 精确订阅；React.memo 关键屏幕；操作响应 ~50ms→~5ms | L | 下回合 |
+| ~~C2~~ | ~~store 精确订阅~~ | ~~`gameStore.ts` + 12 screen~~ | ~~**完成：gameStore 加 usePlayer/usePlayerId/usePlayerResources/useTurn selector hooks；12 screen pid/player 从整体订阅改为 selector 精确订阅；减少非玩家国变化触发的全订阅重渲染**~~ | L→完成 |
 | ~~C3~~ | ~~引擎单元测试扩充~~ | ~~`__tests__/` → C1~~ | ~~**完成：engine-targeted 11→26 测试，economy/politics/military/diplomacy 各 ≥5，总数 74→89 全绿**~~ | XL | ✅ 已完成 |
 | ~~C5~~ | ~~确定性重放~~ | ~~turn.ts~~ | ~~已实现 `turn.test.ts:384-403`~~ | — | ✅ 已完成 |
 
-**Phase C 验收门槛**：~~C4 收尾完成~~ ✅ + ~~C3 完成~~ ✅ + C1/C2 完成，引擎可纯函数重放、89+ 测试、操作响应 <10ms、50 回合 <2s。**当前：C3/C4/C5 ✅，C1/C2 待做。**
+**Phase C 验收门槛**：~~C4 收尾完成~~ ✅ + ~~C3 完成~~ ✅ + ~~C2 完成~~ ✅ + C1 完成，引擎可纯函数重放、89+ 测试、操作响应 <10ms、50 回合 <2s。**当前：C2/C3/C4/C5 ✅，C1 待做（高风险 XL）。**
 
 ### Phase D：内容丰富（让游戏"耐玩"）
 
@@ -437,3 +437,5 @@ npm run build       # vite build（CI 部署 Pages）
 > - v2.6→v2.7：**完成 D1 一个 Phase D WP**。D1 事件扩充 203→315（+112 单事件 10 类各 ~10 + 5 链 15 链事件），总链 10→15（链事件 29→44），链头 weight>0 链中/尾 weight=0。修复 4 处 factionSat 重复字段（fra() helper）+ 10 处链中尾 weight=0 + world-smoke chainHeads 加 5 新链头。Phase D 全部 archived。**教训：新加事件链的中/尾事件 weight 必须设 0（只靠 triggerEvent 触发），否则会自然触发违链语义；测试 chainHeads 列表也要同步加新链头否则误判。**
 > - v2.7→v2.8：**完成 E3 一个 Phase E WP（部分→完整）**。E3 键盘快捷键 B 建农田/R 征兵 50（ProvinceScreen 对选中省）/T 切经济页（App）/←/→ 调税 ±2%（EconomyScreen）。Phase E 仅剩 E5（SVG 地形地图 XL）。**教训：快捷键要避开 INPUT/TEXTAREA 焦点（t.tagName 检查），否则在输入框打字会误触操作。**
 > - v2.8→v2.9：**完成 E5 一个 Phase E WP（简化版）**。E5 SVG 地形地图 WorldMap 省份圆点 fill 改地形色 + stroke 归属国色 + 相邻省边界线（同国深/异国浅）+ 悬停地形色块。不做真 Voronoi 避依赖，用现有 x/y+adjacent 画边界网络。Phase E 全部 archived。**教训：XL WP 可降级为简化版降风险——真 Voronoi 需 d3-delaunay 依赖，改用现有坐标+邻接画边界网络零依赖纯 SVG，回归风险低且满足"地形可见+边界着色"核心验收。**
+> - v2.9→v2.10：**完成 C2 第一步（基础设施）**。gameStore 加 usePlayer/usePlayerId/usePlayerResources/useTurn selector hooks，供 screen 按需迁移，零回归。
+> - v2.10→v2.11：**完成 C2 第二步（screen 迁移）**。12 screen（Dashboard/Province/Economy/Population/Politics/Military/Diplomacy/Technology/Chronicle/Stats/SaveLoad/WorldMap）pid/player 从 useGameStore() 整体订阅改为 useGameStore((s)=>...) selector 精确订阅。C2 完整 archived。**教训：selector 迁移只动最高频 pid/player，保留 state 整体订阅给 provinces/wars/history（总览页需大部分数据，selector 收益小）——分层迁移降风险。**
