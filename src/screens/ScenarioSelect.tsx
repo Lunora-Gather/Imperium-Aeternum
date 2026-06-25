@@ -86,9 +86,9 @@ export default function ScenarioSelect() {
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: 'var(--space-4)', marginBottom: 'var(--space-6)' }}>
         {SCENARIOS.map((s) => (
           <button key={s.id} className="ia-card" onClick={() => {
-              // 仅 setSelected 进入选国视图（classic 无需选国，直接开）
+              // 开启剧本初始化（含 store 中的 pendingScenario/pendingSeed）
+              startScenario(s.id);
               if (s.needsNationPick) { setSelected(s.id); setPickedNation(null); }
-              else { startScenario(s.id); }
             }}
             style={{ cursor: 'pointer', textAlign: 'left', padding: 'var(--space-5)', transition: 'all 0.2s' }}
             onMouseEnter={(e) => { e.currentTarget.style.borderColor = 'var(--border-gold)'; e.currentTarget.style.transform = 'translateY(-2px)'; }}
