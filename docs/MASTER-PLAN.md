@@ -162,7 +162,7 @@
 |----|------|---------|------|------|
 | **F1** | 引擎/UI 完全分离审计 | `engine/*` + `screens/*` → C1 | 引擎零 React 依赖、零 DOM 依赖；可独立打包为 `imperium-engine` npm 包 | L |
 | **F2** | 数据格式中立化 | `data/*.ts` → JSON | 所有数据表可导出为 JSON；引擎可从 JSON 加载（为 Godot/Unity 读 JSON 铺路） | M |
-| **F3** | Godot 移植可行性报告 | — | 评估引擎→GDScript、数据→JSON、UI→Control 节点的移植路径；输出 `docs/12-godot-migration.md` | S |
+| ~~F3~~ | ~~Godot 移植可行性报告~~ | ~~—~~ | ~~**完成：`docs/12-godot-migration.md` 输出，4 阶段 ~88h 路径，引擎层 58% 友好，硬依赖 F2+C1**~~ | S→完成 |
 
 **Phase F 验收门槛**：引擎可独立打包、数据可导出 JSON、有明确的 Godot 移植路径。
 
