@@ -58,3 +58,43 @@ export function availableTechs(nation: Nation): typeof TECHNOLOGIES {
 
 export { computeSciPt, researchCost };
 export type { TechBranch };
+
+// ── C1: 纯函数版本 settleTechnologyPure ──
+// 不 mutate nation，返回 delta，供 processTurn 合并建新 state
+// 与原 settleTechnology 并存（零回归）
+export interface TechPartial {
+  // resources 增量
+  deltaSciPt: number;
+  deltaGold: number;
+  // researchProgress 最终值（覆写——null 表示完成，否则更新 sciPtInvested）
+  researchProgressFinal: { techId: string; sciPtInvested: number } | null;
+  // 完成时科技等级覆写（null 表示未完成）
+  techLevelUp: { branch: 'agri' | 'mil' | 'admin' | 'culture'; level: number } | null;
+}
+export function settleTechnologyPure(nation: Nation, _state: GameState): TechPartial {
+  if (!nation.tech.researchProgress) {
+    return { deltaSciPt: 0, deltaGold: 0, researchProgressFinal: null, techLevelUp: null };
+  }
+  const tech = TECH_BY_ID[nation.tech.researchProgress.techId];
+  if (!tech) {
+    return { deltaSciPt: 0, deltaGold: 0, researchProgressFinal: null, techLevelUp: null };
+  }
+  const cost = researchCost(tech.level, tech.costSci, tech.costGold);
+  const invest = Math.min(nation.resources.sciPt, cost.sci - nation.tech.researchProgress.sciPtInvested);
+  const newInvested = nation.tech.researchProgress.sciPtInvested + invest;
+  // 完成判定：注意原函数用 nation.resources.gold（未扣 invest 影响 gold）>= cost.gold
+  if (newInvested >= cost.sci && nation.resources.gold >= cost.gold) {
+    return {
+      deltaSciPt: -invest,
+      deltaGold: -cost.gold,
+      researchProgressFinal: null,  // 完成，清空
+      techLevelUp: { branch: tech.branch, level: tech.level },
+    };
+  }
+  return {
+    deltaSciPt: -invest,
+    deltaGold: 0,
+    researchProgressFinal: { techId: nation.tech.researchProgress.techId, sciPtInvested: newInvested },
+    techLevelUp: null,
+  };
+}

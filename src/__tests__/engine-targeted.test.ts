@@ -3,6 +3,7 @@ import { describe, it, expect } from 'vitest';
 import { createInitialState } from '../engine/init';
 import { settleEconomy, establishTradeRoute, settleEconomyPure } from '../engine/economy';
 import { settlePolitics, settlePoliticsPure, changeGovernment, enactPolicy, enactLaw } from '../engine/politics';
+import { settleTechnology, settleTechnologyPure, startResearch } from '../engine/technology';
 import { declareWar, makePeace, recruit, moveArmy } from '../engine/military';
 import { improveRelation, establishTrade, espionage, formAlliance } from '../engine/diplomacy';
 import { draftFromPopulation, settlePopulation, settlePopulationPure } from '../engine/population';
@@ -441,5 +442,37 @@ describe('C1 settlePoliticsPure 纯函数对照', () => {
     const before = JSON.stringify({ gov: p.government, factions: p.factions });
     settlePoliticsPure(p, state);
     expect(JSON.stringify({ gov: p.government, factions: p.factions })).toBe(before);
+  });
+});
+
+// C1: settleTechnologyPure 纯函数对照测试
+describe('C1 settleTechnologyPure 纯函数对照', () => {
+  it('无研发时返回零 delta', () => {
+    const state = createInitialState();
+    const p = state.nations[PLAYER_ID];
+    p.tech.researchProgress = null;
+    const pure = settleTechnologyPure(p, state);
+    expect(pure.deltaSciPt).toBe(0);
+    expect(pure.deltaGold).toBe(0);
+    expect(pure.researchProgressFinal).toBeNull();
+    expect(pure.techLevelUp).toBeNull();
+  });
+
+  it('研发中：deltaSciPt 与 mutate 版扣点一致 + 不 mutate', () => {
+    const state1 = createInitialState();
+    const state2 = createInitialState();
+    const p1 = state1.nations[PLAYER_ID];
+    const p2 = state2.nations[PLAYER_ID];
+    // 启动研发（两份相同 state）
+    startResearch(p1, 'agri_lv2');
+    startResearch(p2, 'agri_lv2');
+    const origSciPt = p1.resources.sciPt;
+    settleTechnology(p1, state1);
+    const pure = settleTechnologyPure(p2, state2);
+    expect(origSciPt - p1.resources.sciPt).toBe(-pure.deltaSciPt);
+    // 不 mutate
+    const before = JSON.stringify({ tech: p2.tech, res: p2.resources });
+    settleTechnologyPure(p2, state2);  // 再调一次仍不 mutate
+    expect(JSON.stringify({ tech: p2.tech, res: p2.resources })).toBe(before);
   });
 });
