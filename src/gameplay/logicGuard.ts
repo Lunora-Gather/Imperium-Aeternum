@@ -2,12 +2,13 @@
 // 目标：
 // 1) 避免旧 processTurn 的浅拷贝把上一回合状态一起改掉；
 // 2) 按真正的 playerNationId 修正报告差值；
-// 3) 保留原有 AI/战争/经济/事件逻辑。
+// 3) 修复战争/停战/行动点几个会破坏可玩性的边界问题。
 
 import { useGameStore } from '../store/gameStore';
 import type { GameState, TurnReport, Province } from '../types/game';
 import { processTurn as unsafeProcessTurn } from '../engine/turn';
 import { normalizeGameState, autoSave } from '../store/persistence';
+import { BUILDINGS } from '../data/buildings';
 
 let installed = false;
 
@@ -147,6 +148,37 @@ function repairReport(prev: GameState, next: GameState, raw: TurnReport): TurnRe
   return repaired;
 }
 
+function applyPostTurnFixes(prev: GameState, next: GameState): void {
+  // 1) 停战后关系不应被夹成 0。刚结束战争的双方至少保持明显敌意。
+  for (const r of next.relations) {
+    const old = prev.relations.find((x) => x.from === r.from && x.to === r.to);
+    if (r.treaty === 'truce' && (old?.treaty === 'war' || (old?.relation ?? 0) < 0)) {
+      r.relation = Math.min(r.relation, -45);
+      r.trust = Math.min(r.trust, 25);
+    }
+  }
+
+  // 2) 行政建筑产出的 adminPt 在旧经济结算里先加后被基础恢复覆盖；这里补回。
+  for (const n of Object.values(next.nations)) {
+    if (n.defeated) continue;
+    let adminBonus = 0;
+    for (const p of provincesOf(next, n.id)) {
+      for (const b of p.buildings) adminBonus += BUILDINGS[b.defId]?.yield.adminPt ?? 0;
+    }
+    if (adminBonus > 0) n.resources.adminPt += adminBonus;
+  }
+
+  // 3) 清理重复反向战争，保留最早的一场，避免双向战争造成进度/和约错乱。
+  const seen = new Set<string>();
+  next.wars = next.wars.filter((w) => {
+    const key = [w.attackerId, w.defenderId].sort().join('|');
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+  next._relMap = undefined;
+}
+
 export function processTurnSafe(state: GameState): { state: GameState; report: TurnReport } {
   const prev = normalizeGameState(cloneState(state));
   const working = normalizeGameState(cloneState(state));
@@ -160,6 +192,7 @@ export function processTurnSafe(state: GameState): { state: GameState; report: T
   const next = normalizeGameState(result.state);
   next.playerNationId = playerId(next);
   for (const n of Object.values(next.nations)) n.isPlayer = n.id === next.playerNationId;
+  applyPostTurnFixes(prev, next);
 
   const report = repairReport(prev, next, result.report);
   next.lastReport = report;
@@ -172,11 +205,26 @@ export function processTurnSafe(state: GameState): { state: GameState; report: T
   return { state: next, report };
 }
 
+function hasActiveWar(state: GameState, a: string, b: string): boolean {
+  return state.wars.some((w) => (w.attackerId === a && w.defenderId === b) || (w.attackerId === b && w.defenderId === a));
+}
+
 export function installLogicGuard(): void {
   if (installed) return;
   installed = true;
 
+  const originalDeclareWar = (useGameStore.getState() as unknown as { declareWar?: (target: string, provinceId: string) => boolean }).declareWar;
+
   useGameStore.setState({
+    declareWar: (target: string, provinceId: string) => {
+      const store = useGameStore.getState() as unknown as { state: GameState; logMsg: (msg: string) => void };
+      const pid = playerId(store.state);
+      if (hasActiveWar(store.state, pid, target)) {
+        store.logMsg('无法宣战：双方已经处于战争中');
+        return false;
+      }
+      return originalDeclareWar?.(target, provinceId) ?? false;
+    },
     nextTurn: () => {
       const store = useGameStore.getState();
       const cur = store.state;
