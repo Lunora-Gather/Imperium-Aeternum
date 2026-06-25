@@ -2,7 +2,7 @@
 // 入口：processTurn(gameState) → 新 GameState + TurnReport
 // 接入 7 系统 engine + AI + 事件
 
-import type { GameState, Nation, TurnReport, Province, NationalTendency } from '../types/game';
+import type { GameState, Nation, TurnReport, Province, NationalTendency, TreatyType } from '../types/game';
 import { clamp, avg } from '../utils/math';
 import { mulberry32, weightedPick } from '../utils/random';
 import { provincesOf } from './init';
@@ -497,9 +497,293 @@ export { processAITurn };
 // 策略：调用 settleEconomyPure/settlePopulationPure/settlePoliticsPure/settleTechnologyPure/settleCultureReligionPure/settleDiplomacyPure 收集 deltas，
 // 合并到 next state；settleWars/processAITurn/ageRulers/applyEffect/recordEvent/lawPerTurnEffects 保留原版本直接 mutate next。
 // 与原 processTurn 语义等价（对照测试验证）。
-// 留下回合实现：Pure 子引擎返回类型字段名已盘点（delta/popDelta/classSatDelta/factionSatFinal/govFinal/deltaSciPt/deltaGold/researchProgressFinal/techLevelUp/provFinal/relationsFinal/nationsGovFinal/newChronicle），需用正确字段名重写合并逻辑。
 
 export function processTurnPure(state: GameState): { state: GameState; report: TurnReport } {
-  // 复用原 processTurn（零回归保险）——留下回合替换为 Pure 子引擎 + 合并逻辑
-  return processTurn(state);
+  const rng = mulberry32(state.seed);
+  const newSeed = Math.floor(rng() * 0xffffffff) >>> 0;
+
+  const next: GameState = {
+    ...state,
+    seed: newSeed,
+    turn: state.turn + 1,
+    nations: { ...state.nations },
+    provinces: { ...state.provinces },
+    relations: [...state.relations],
+    wars: [...state.wars],
+  };
+
+  const playerId = findPlayerId(next);
+  const player = next.nations[playerId];
+  const playerProvs = provincesOf(playerId, next.provinces);
+
+  // ── 玩家回合：6 子引擎 Pure 版本收集 deltas，合并到 next ──
+  const econPure = settleEconomyPure(player, next);
+  // 合并 economy deltas（delta 全部是增量，含 adminPt/sciPt 覆写转 delta）
+  player.resources.gold += econPure.delta.gold;
+  player.resources.food += econPure.delta.food;
+  player.resources.wood += econPure.delta.wood;
+  player.resources.iron += econPure.delta.iron;
+  player.resources.influence += econPure.delta.influence;
+  player.resources.adminPt += econPure.delta.adminPt;
+  player.resources.sciPt += econPure.delta.sciPt;
+  player.resources.supply += econPure.delta.supply;
+  const econ = econPure;  // EconomyPartial extends EconomyResult，可直接传 buildReport
+
+  const foodShortage = player.resources.food < playerProvs.reduce((s, p) => s + p.population, 0) * 0.4;
+  const popPure = settlePopulationPure(player, playerProvs, foodShortage, true, player.atWar, false);
+  // 合并 population deltas：popDelta 每省人口增量 + classSatDelta 每省每阶层 satisfaction 增量
+  for (const [provId, popDelta] of Object.entries(popPure.popDelta)) {
+    const p = next.provinces[provId];
+    if (p) p.population = Math.max(10, p.population + popDelta);
+  }
+  for (const [provId, classDeltas] of Object.entries(popPure.classSatDelta)) {
+    const p = next.provinces[provId];
+    if (!p) continue;
+    for (const [cls, delta] of Object.entries(classDeltas)) {
+      const grp = p.classes.find((c) => c.classId === cls);
+      if (grp) grp.satisfaction = clamp(grp.satisfaction + delta, 0, 100);
+    }
+  }
+  for (const [facId, finalSat] of Object.entries(popPure.factionSatFinal)) {
+    const f = player.factions.find((x) => x.id === facId);
+    if (f) f.satisfaction = finalSat;
+  }
+  const pop = popPure;  // PopPartial extends PopSettleResult
+
+  const polPure = settlePoliticsPure(player, next);
+  // 合并 politics gov finals（覆写值）
+  player.government.stability = polPure.govFinal.stability;
+  player.government.legitimacy = polPure.govFinal.legitimacy;
+  player.government.corruption = polPure.govFinal.corruption;
+  player.government.efficiency = polPure.govFinal.efficiency;
+  for (const [facId, finalSat] of Object.entries(polPure.factionSatFinal)) {
+    const f = player.factions.find((x) => x.id === facId);
+    if (f) f.satisfaction = finalSat;
+  }
+  const pol = polPure;  // PoliticsPartial extends PoliticsResult
+
+  // lawPerTurnEffects：保留原版本 mutate（Pure 版本已建，留下回合替换）
+  lawPerTurnEffects(player, playerProvs);
+
+  const techPure = settleTechnologyPure(player, next);
+  player.resources.sciPt += techPure.deltaSciPt;
+  player.resources.gold += techPure.deltaGold;
+  if (techPure.researchProgressFinal !== null) {
+    player.tech.researchProgress = techPure.researchProgressFinal;
+  } else if (techPure.techLevelUp !== null) {
+    player.tech.researchProgress = null;  // 完成，清空
+    (player.tech as unknown as Record<string, unknown>)[techPure.techLevelUp.branch] = techPure.techLevelUp.level;
+  }
+
+  const crPure = settleCultureReligionPure(player, next);
+  for (const [provId, finals] of Object.entries(crPure.provFinal)) {
+    const p = next.provinces[provId];
+    if (!p) continue;
+    p.assimilation = finals.assimilation;
+    p.loyalty = finals.loyalty;
+    p.rebellionRisk = finals.rebellionRisk;
+  }
+  const cr = crPure;  // CultureReligionPartial extends CultureReligionResult
+
+  // 超管惩罚（与原版一致，直接 mutate）
+  if (playerProvs.length > 0 && player.tier !== 'S') {
+    const pen = overExtensionPenalty(player, playerProvs.length);
+    const stabPen = player.tier === 'A' ? Math.min(pen.stabilityLoss, 2) : Math.min(pen.stabilityLoss, 5);
+    const effPen = player.tier === 'A' ? Math.min(pen.taxEffLoss * 20, 5) : Math.min(pen.taxEffLoss * 20, 10);
+    if (effPen > 0) player.government.efficiency = clamp(player.government.efficiency - effPen, 0, 100);
+    if (stabPen > 0) player.government.stability = clamp(player.government.stability - stabPen, 0, 100);
+  }
+
+  // 外交结算：Pure 版本收集 deltas，合并到 next
+  const dipPure = settleDiplomacyPure(next);
+  for (const r of next.relations) {
+    const key = `${r.from}_${r.to}`;
+    const f = dipPure.relationsFinal[key];
+    if (f) {
+      r.threat = f.threat;
+      r.relation = f.relation;
+      r.truceTurns = f.truceTurns;
+      r.treaty = f.treaty as TreatyType;
+    }
+  }
+  for (const [nid, govF] of Object.entries(dipPure.nationsGovFinal)) {
+    const n = next.nations[nid];
+    if (!n) continue;
+    n.government.stability = govF.stability;
+    n.government.legitimacy = govF.legitimacy;
+  }
+  for (const entry of dipPure.newChronicle) {
+    next.chronicle.push({ ...entry });
+  }
+
+  // 战争结算：保留原版本 mutate（Pure 版本合并复杂，留下回合替换）
+  settleWars(next);
+
+  // 王朝系统：保留原版本 mutate
+  for (const nation of Object.values(next.nations)) {
+    if (nation.defeated) continue;
+    const result = ageRulers(nation, rng);
+    if (result.died && result.eventLog && nation.id === playerId) {
+      pol.stabilityDelta -= 3;
+    }
+    const reignMod = reignLegitimacy(nation);
+    if (reignMod !== 0) {
+      nation.government.legitimacy = clamp(nation.government.legitimacy + reignMod, 0, 100);
+    }
+  }
+
+  // 玩家事件触发：保留原版本 mutate
+  const playerEventIds = rollEvents(player, next, rng, 2);
+  for (const eid of playerEventIds) {
+    const ev = EVENT_BY_ID[eid];
+    if (!ev) continue;
+    const optIdx = aiChooseOption(ev, rng);
+    const opt = ev.options[optIdx];
+    if (opt) applyEffect(player, opt.effects, next);
+    recordEvent(next, playerId, eid, optIdx);
+  }
+  if (player.govTransitionTurns && player.govTransitionTurns > 0) {
+    player.govTransitionTurns -= 1;
+  }
+
+  // AI 国家回合：保留原版本 mutate
+  processAITurn(next);
+
+  // AI 国家结算：保留原版本 mutate（与原版一致）
+  const provsByOwner = new Map<string, Province[]>();
+  for (const p of Object.values(next.provinces)) {
+    const arr = provsByOwner.get(p.ownerId);
+    if (arr) arr.push(p); else provsByOwner.set(p.ownerId, [p]);
+  }
+  const allNations = Object.values(next.nations) as Nation[];
+  for (const n of allNations) {
+    if (n.isPlayer || n.defeated) continue;
+    const nProvs = provsByOwner.get(n.id) ?? [];
+    if (nProvs.length === 0) continue;
+    settleEconomy(n, next);
+    settlePopulation(n, nProvs, n.resources.food < nProvs.reduce((s, p) => s + p.population, 0) * 0.4, true, n.atWar, false);
+    settlePolitics(n, next);
+    lawPerTurnEffects(n, nProvs);
+    settleTechnology(n, next);
+    settleCultureReligion(n, next);
+    n.resources.influence = Math.min(n.resources.influence + 3, 100);
+    const aiEvents = rollEvents(n, next, rng, 1);
+    for (const eid of aiEvents) {
+      const ev = EVENT_BY_ID[eid];
+      if (!ev) continue;
+      const optIdx = aiChooseOption(ev, rng);
+      const opt = ev.options[optIdx];
+      if (opt) applyEffect(n, opt.effects, next);
+      recordEvent(next, n.id, eid, optIdx);
+    }
+    if (next.turn % 10 === 0) {
+      for (const k of Object.keys(n.tendency) as (keyof typeof n.tendency)[]) {
+        n.tendency[k] = clamp(n.tendency[k] - 2, 0, 100);
+      }
+    }
+    const activated = activateTendency(n.tendency) as NationalCharacterId[];
+    n.activeCharacterBonuses = activated.filter((id) => id !== 'balanced' && NATIONAL_CHARACTERS[id]);
+  }
+
+  // 玩家国激活检查
+  const playerNation = next.nations[playerId];
+  if (playerNation) {
+    const pActivated = activateTendency(playerNation.tendency) as NationalCharacterId[];
+    playerNation.activeCharacterBonuses = pActivated.filter((id) => id !== 'balanced' && NATIONAL_CHARACTERS[id]);
+  }
+
+  // triggeredEvents 上限 1000
+  if (next.triggeredEvents.length > 1000) {
+    next.triggeredEvents = next.triggeredEvents.slice(-1000);
+  }
+
+  // 玩家回合报告：worldEvents 计算（与原版一致）
+  const worldEvents: string[] = [];
+  const playerNeighbors = new Set<string>();
+  for (const pp of playerProvs) {
+    for (const adjId of pp.adjacent) {
+      const adj = next.provinces[adjId];
+      if (adj && adj.ownerId !== playerId) playerNeighbors.add(adj.ownerId);
+    }
+  }
+  for (const w of next.wars) {
+    const existed = state.wars.some((pw) => pw.id === w.id);
+    if (!existed) {
+      const attacker = next.nations[w.attackerId];
+      const defender = next.nations[w.defenderId];
+      const target = next.provinces[w.targetProvinceId];
+      if (w.attackerId === playerId || w.defenderId === playerId || playerNeighbors.has(w.attackerId) || playerNeighbors.has(w.defenderId)) {
+        worldEvents.push(`⚔ ${attacker?.name ?? w.attackerId} 向 ${defender?.name ?? w.defenderId} 宣战，攻 ${target?.name ?? w.targetProvinceId}`);
+      }
+    }
+  }
+  for (const [nid, n] of Object.entries(next.nations)) {
+    const prevN = state.nations[nid];
+    if (prevN && !prevN.defeated && n.defeated && nid !== playerId) {
+      if (playerNeighbors.has(nid)) worldEvents.push(`☠ ${n.name} 灭亡`);
+    }
+  }
+  for (const r of next.relations) {
+    if (r.treaty === 'alliance') {
+      const prevR = state.relations.find((pr) => pr.from === r.from && pr.to === r.to);
+      if (!prevR || prevR.treaty !== 'alliance') {
+        if (r.from === playerId || r.to === playerId || playerNeighbors.has(r.from) || playerNeighbors.has(r.to)) {
+          worldEvents.push(`🤝 ${next.nations[r.from]?.name ?? r.from} 与 ${next.nations[r.to]?.name ?? r.to} 结盟`);
+        }
+      }
+    }
+  }
+  for (const r of next.relations) {
+    if (r.treaty !== 'none') continue;
+    const prevR = state.relations.find((pr) => pr.from === r.from && pr.to === r.to);
+    if (prevR?.treaty === 'truce' && prevR.truceTurns > 0) {
+      if (r.from === playerId || r.to === playerId) {
+        const other = r.from === playerId ? r.to : r.from;
+        worldEvents.push(`🕊 与 ${next.nations[other]?.name ?? other} 停战到期，可再宣战`);
+      }
+    }
+  }
+  const provinceChanges: { id: string; name: string; from: string; to: string }[] = [];
+  for (const [pid_, p] of Object.entries(next.provinces)) {
+    const prevP = state.provinces[pid_];
+    if (prevP && prevP.ownerId !== p.ownerId) {
+      if (prevP.ownerId === playerId || p.ownerId === playerId) {
+        provinceChanges.push({ id: pid_, name: p.name, from: prevP.ownerId, to: p.ownerId });
+      }
+    }
+  }
+  const report = buildReport(player, playerProvs, next, state, econ, pol, pop, cr, playerEventIds, worldEvents);
+  report.provinceChanges = provinceChanges;
+  judgeVictory(next, report);
+  // 叛军衰减（与原版一致）
+  const decayedRebels: string[] = [];
+  for (const [nid, n] of Object.entries(next.nations)) {
+    if (n.rebellionDecay === undefined || !n.rebelOf) continue;
+    n.rebellionDecay -= 1;
+    if (n.rebellionDecay <= 0) {
+      for (const p of Object.values(next.provinces)) {
+        if (p.ownerId === nid) {
+          p.ownerId = n.rebelOf;
+          p.loyalty = 40;
+          p.assimilation = 50;
+          p.unrest = 30;
+          p.rebellionRisk = 20;
+        }
+      }
+      addChronicle(next, {
+        id: `rebel_return_${nid}_${next.turn}`,
+        turn: next.turn,
+        kind: 'milestone_rebellion',
+        title: `叛乱平定`,
+        desc: `${n.name.replace('叛军·', '')} 历经 5 年未镇压，自行归顺 ${next.nations[n.rebelOf]?.name ?? '原主'}。`,
+        actorId: n.rebelOf,
+      });
+      decayedRebels.push(nid);
+    }
+  }
+  for (const nid of decayedRebels) delete next.nations[nid];
+  next.lastReport = report;
+  next.history = [...next.history, report].slice(-10);
+  detectMilestones(next, state);
+  return { state: next, report };
 }

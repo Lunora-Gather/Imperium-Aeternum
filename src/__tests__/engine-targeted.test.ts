@@ -11,6 +11,7 @@ import { draftFromPopulation, settlePopulation, settlePopulationPure } from '../
 import { checkTrigger, rollEvents, applyEffect, applyEffectPure, recordEvent, recordEventPure } from '../engine/events';
 import { ageRulers, ageRulersPure } from '../engine/dynasty';
 import { lawPerTurnEffects, lawPerTurnEffectsPure } from '../engine/politics';
+import { processTurn, processTurnPure } from '../engine/turn';
 import { PLAYER_ID } from '../data/nations';
 import type { GameState } from '../types/game';
 import { mulberry32 } from '../utils/random';
@@ -688,5 +689,70 @@ describe('C1 lawPerTurnEffectsPure 纯函数对照', () => {
     const before = JSON.stringify(provs.map((p) => ({ id: p.id, unrest: p.unrest, rebellionRisk: p.rebellionRisk })));
     lawPerTurnEffectsPure(p, provs);
     expect(JSON.stringify(provs.map((p) => ({ id: p.id, unrest: p.unrest, rebellionRisk: p.rebellionRisk })))).toBe(before);
+  });
+});
+
+// C1: processTurnPure 渐进式对照测试（6 子引擎 Pure + 6 子引擎保留原版本）
+describe('C1 processTurnPure 渐进式对照', () => {
+  it('processTurnPure 与 processTurn 产出 player 关键字段一致（同种子）', () => {
+    const state1 = createInitialState();
+    const state2 = createInitialState();
+    // 同种子保证 RNG 一致
+    state2.seed = state1.seed;
+    const r1 = processTurn(state1);
+    const r2 = processTurnPure(state2);
+    const p1 = r1.state.nations[PLAYER_ID];
+    const p2 = r2.state.nations[PLAYER_ID];
+    // 关键字段对照（容许浮点误差）
+    expect(p2.resources.gold).toBeCloseTo(p1.resources.gold, 0);
+    expect(p2.resources.food).toBeCloseTo(p1.resources.food, 0);
+    expect(p2.resources.wood).toBeCloseTo(p1.resources.wood, 0);
+    expect(p2.resources.iron).toBeCloseTo(p1.resources.iron, 0);
+    expect(p2.resources.influence).toBeCloseTo(p1.resources.influence, 0);
+    expect(p2.resources.adminPt).toBeCloseTo(p1.resources.adminPt, 0);
+    expect(p2.resources.sciPt).toBeCloseTo(p1.resources.sciPt, 0);
+    expect(p2.resources.supply).toBeCloseTo(p1.resources.supply, 0);
+    expect(p2.government.stability).toBeCloseTo(p1.government.stability, 0);
+    expect(p2.government.legitimacy).toBeCloseTo(p1.government.legitimacy, 0);
+    expect(p2.government.corruption).toBeCloseTo(p1.government.corruption, 0);
+    expect(p2.government.efficiency).toBeCloseTo(p1.government.efficiency, 0);
+    expect(p2.taxRate).toBeCloseTo(p1.taxRate, 2);
+    expect(p2.warExhaustion).toBeCloseTo(p1.warExhaustion, 0);
+  });
+
+  it('processTurnPure 与 processTurn 产出 player 省份关键字段一致', () => {
+    const state1 = createInitialState();
+    const state2 = createInitialState();
+    state2.seed = state1.seed;
+    const r1 = processTurn(state1);
+    const r2 = processTurnPure(state2);
+    const provs1 = Object.values(r1.state.provinces).filter((p) => p.ownerId === PLAYER_ID);
+    const provs2 = Object.values(r2.state.provinces).filter((p) => p.ownerId === PLAYER_ID);
+    expect(provs2.length).toBe(provs1.length);
+    provs1.forEach((p1, i) => {
+      const p2 = provs2.find((pp) => pp.id === p1.id);
+      if (!p2) return;
+      expect(p2.population).toBe(p1.population);
+      expect(p2.assimilation).toBeCloseTo(p1.assimilation, 0);
+      expect(p2.loyalty).toBeCloseTo(p1.loyalty, 0);
+      expect(p2.rebellionRisk).toBeCloseTo(p1.rebellionRisk, 0);
+      expect(p2.unrest).toBeCloseTo(p1.unrest, 0);
+    });
+  });
+
+  it('processTurnPure 与 processTurn 产出 report 关键字段一致', () => {
+    const state1 = createInitialState();
+    const state2 = createInitialState();
+    state2.seed = state1.seed;
+    const r1 = processTurn(state1);
+    const r2 = processTurnPure(state2);
+    expect(r2.report.turn).toBe(r1.report.turn);
+    expect(r2.report.income.tax).toBe(r1.report.income.tax);
+    expect(r2.report.income.trade).toBe(r1.report.income.trade);
+    expect(r2.report.income.building).toBe(r1.report.income.building);
+    expect(r2.report.foodDelta).toBe(r1.report.foodDelta);
+    expect(r2.report.popDelta).toBe(r1.report.popDelta);
+    expect(r2.report.stabilityDelta).toBe(r1.report.stabilityDelta);
+    expect(r2.report.legitimacyDelta).toBe(r1.report.legitimacyDelta);
   });
 });
