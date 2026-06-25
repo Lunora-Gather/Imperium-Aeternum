@@ -315,3 +315,12 @@
 - **替代**：仅加 1 套（否决：E6 明确要多主题）；加更多主题如青铜/朱砂（否决：4 套已足够覆盖暗/亮/竹/墨四种基调，过多难维护）。
 - **教训**：主题用 CSS 变量驱动是关键——加新主题只需扩 `:root[data-theme]` 块，所有组件零改动自动适配，验证了早期 CSS 变量架构的正确性。
 
+## DEC-038：E4 音效系统（Web Audio API 合成）
+
+- **阶段**：v2 Phase E4（2026-06-25）
+- **背景**：游戏无音效反馈，玩家操作缺感知，违"让游戏舒服"目标。E4 验收要求 Web Audio API 合成（钟声/战鼓/竹简/锤/警报）；无音频文件；可静音。
+- **决策**：新建 `utils/audio.ts`——7 音效 SfxId（bell 钟声/scroll 竹简/drum 战鼓/hammer 锤/alarm 警报/victory 胜利/defeat 失败），用 OscillatorNode + GainNode envelope 合成（tone(freq,start,dur,type,gainPeak) 单音函数，各音效组合多音）。`playSfx(id)` 触发，`setMuted/isMuted` 控制，`useSfxMute()` React hook 给静音按钮。App.tsx 接入 3 useEffect：justProcessedTurn→bell、pendingEvents 新增→scroll、victory 变化→victory/defeat；header 加静音按钮（🔊/🔇）。
+- **影响**：音效 0→7，玩家操作有听觉反馈，可静音。typecheck ✅ + 89/89 测试 ✅。无音频文件，零网络请求，零依赖。
+- **替代**：用音频文件（否决：增包体积 + 网络请求）；接入更多触发点如建设/宣战（否决：需深度改各 Screen，留后）；用第三方音效库（否决：超 MVP 红线零依赖）。
+- **教训**：Web Audio API 合成是零依赖音效的最佳方案——oscillator + gain envelope 即可合成钟/鼓/警报，无需音频文件。AudioContext 需用户交互后 resume（浏览器自动 suspend），getCtx() 处理了 suspended 状态。
+

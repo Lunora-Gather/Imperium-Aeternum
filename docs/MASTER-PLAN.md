@@ -3,7 +3,7 @@
 > **唯一指挥棒**。本文档收敛 `06-expansion.md`（10 项 E 系列）+ `08-comprehensive-plan.md`（31 项 P 系列）+ 散落 ADR，统一为一条可追溯的执行线。
 > 任何后续改动必须能映射回本文档的某个工作包（WP），否则不予立项。
 >
-> **基线快照**（2026-06-25 v1.9）：57 源文件 / 11077 行 | typecheck ✅ | **vitest 89/89 ✅**（含 engine-targeted 26 针对性测试，economy/politics/military/diplomacy 各 ≥5）| validate ✅（203 事件 0 重复）| 205 国 577 省 | 150 事件 / **40 建筑** / 32 科技 / 12 政体 / **15 性格** / **20 法律** / 8 商路 / **10 剧本** / **4 主题** | 50 回合 1131ms。
+> **基线快照**（2026-06-25 v2.0）：58 源文件 / 11340 行 | typecheck ✅ | **vitest 89/89 ✅**（含 engine-targeted 26 针对性测试，economy/politics/military/diplomacy 各 ≥5）| validate ✅（203 事件 0 重复）| 205 国 577 省 | 150 事件 / **40 建筑** / 32 科技 / 12 政体 / **15 性格** / **20 法律** / 8 商路 / **10 剧本** / **4 主题** / **7 音效** | 50 回合 1131ms。
 >
 > **穷尽代码核验**（2026-06-25 实读 18 符号：`turn.ts judgeVictory/processTurn/buildReport`、`politics.ts settlePolitics/changeGovernment`、`economy.ts settleEconomy`、`military.ts makePeace/moveArmy`、`ai.ts planAITurn`、`persistence.ts migrate/saveGameToSlot/listAllSlots`、`App.tsx`、`EventModal effectSummary`、`PoliticsScreen civilWar`、`gameStore suppressRebellion/negotiateRebellion/demolishBuilding`、`ErrorBoundary`、`ProvinceScreen`、`DiplomacyScreen`、`MilitaryScreen truce`、`events.ts govTransition`）：
 > - **Phase A 全部 4 WP 已实现**（A1 叛乱临时 Nation+连锁+归顺 / A2 内战镇压谈判 UI+引擎 / A3 孤儿军队撤退 / A4 AI 可见 worldEvents）
@@ -150,7 +150,7 @@
 | **E1** | 新手交互教程 | `App.tsx` + 新组件 | 首次进入 5 步教程（总览/税率/建设/下一回合/报告）；tooltip+遮罩；可跳过可重看 | M |
 | **E2** | 统计图表页 | 新 `StatsScreen.tsx` | 国库/粮/人口/稳定 50 回合折线；派系满意度雷达；军力对比条形；科技甘特图 | M |
 | **E3** | 键盘快捷键完善 | `App.tsx` | B 建设农田 / R 征兵 / T 调税 / Esc 关弹窗 / [/] 切省 | **部分完成：Esc 关帮助浮层 + [/] 切省 ✅；B/R/T 留后（需深度改 ProvinceScreen）** | S→部分 |
-| **E4** | 音效系统 | 新 `utils/audio.ts` | Web Audio API 合成（钟声/战鼓/竹简/锤/警报）；无音频文件；可静音 | L |
+| ~~E4~~ | ~~音效系统~~ | ~~新 `utils/audio.ts`~~ | ~~**完成：Web Audio API 合成 7 音效（钟/鼓/竹简/锤/警报/胜利/失败），无音频文件，可静音，App 接入 3 触发点 + 静音按钮**~~ | L→完成 |
 | **E5** | SVG 地形地图 | `WorldMap.tsx` | 省份改 Voronoi 多边形；地形颜色（平原绿/山地棕/沙漠黄/沿海蓝）；边界按归属国着色；河流/山脉 SVG path | XL |
 | ~~E6~~ | ~~暗色/亮色主题打磨~~ | ~~`index.css` + screens~~ | ~~**完成：主题 2→4（+竹简青简/水墨丹青），CSS 变量驱动全屏一致，toggleTheme 循环切换**~~ | M→完成 |
 
@@ -427,3 +427,4 @@ npm run build       # vite build（CI 部署 Pages）
 > - v1.6→v1.7：**本回合完成 D3 一个 Phase D WP**。D3 建筑 24→40（+16 含前置科技/地形适配/差异化产出：铁匠铺/漕运码头/城墙加固/书院/驿馆/筒仓/铸币工坊/药铺/望楼/会馆/军械库/观象台/王家粮仓/贸易站/修道院/水利工程）。validate 动态计数 BUILDING_LIST.length 自动适配。Phase D 仅剩 D1/D2/D5。
 > - v1.7→v1.8：**本回合完成 D5 一个 Phase D WP + E3 部分**。D5 剧本 7→10（+w4_europe 欧洲封建 4 洲/w8_indianocean 印度洋贸易 4 洲/challenge_survival 生存挑战硬核模式）；E3 键盘快捷键部分（Esc 关帮助浮层 + [/] 切省，B/R/T 留后）。Phase D 仅剩 D1/D2（XL）。**教训：D5 旧描述指定 w7_fantasy 奇幻需新数据集超 MVP 红线，改做 challenge_survival 硬核模式更契合——再次印证"不照搬旧描述，按红线约束调整"。**
 > - v1.8→v1.9：**本回合完成 E6 一个 Phase E WP**。E6 主题 2→4（+bamboo 竹简青简/ink 水墨丹青），CSS 变量驱动全屏一致，toggleTheme 循环 4 主题，ScenarioSelect 开场页同步。Phase E 仅剩 E1/E2/E4/E5。**教训：CSS 变量架构验证正确——加新主题只需扩 `:root[data-theme]` 块，所有组件零改动自动适配。**
+> - v1.9→v2.0：**本回合完成 E4 一个 Phase E WP**。E4 音效系统 Web Audio API 合成 7 音效（bell 钛/scroll 竹简/drum 战鼓/hammer 锤/alarm 警报/victory 胜利/defeat 失败），无音频文件零依赖，App 接入 3 触发点（回合结算/事件/胜负）+ 静音按钮。Phase E 仅剩 E1/E2/E5。**教训：Web Audio API 合成是零依赖音效最佳方案——oscillator + gain envelope 即可合成钟/鼓/警报，无需音频文件。**

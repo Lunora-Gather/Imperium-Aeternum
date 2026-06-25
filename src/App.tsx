@@ -1,7 +1,8 @@
 // Imperium Aeternum — App v4（青铜铭文设计语言）
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useGameStore } from './store/gameStore';
 import ErrorBoundary from './components/ErrorBoundary';
+import { playSfx, useSfxMute } from './utils/audio';
 
 import { provincesOf } from './engine/init';
 import { ResourceStrip } from './components/ui';
@@ -74,6 +75,25 @@ export default function App() {
       clearTurnFlag();
     }
   }, [justProcessedTurn, clearTurnFlag, state.turn, tab]);
+
+  // E4: 音效——回合结算 bell / 事件 scroll / 胜负 victory·defeat
+  const sfxMute = useSfxMute();
+  const prevPendingCount = useRef(state.pendingEvents.length);
+  const prevVictory = useRef(state.victory.type);
+  useEffect(() => {
+    if (justProcessedTurn) playSfx('bell');
+  }, [justProcessedTurn]);
+  useEffect(() => {
+    const cur = state.pendingEvents.filter((p) => p.nationId === pid).length;
+    if (cur > prevPendingCount.current) playSfx('scroll');
+    prevPendingCount.current = cur;
+  }, [state.pendingEvents, pid]);
+  useEffect(() => {
+    if (state.victory.type && !prevVictory.current) {
+      playSfx(state.victory.type.startsWith('win') ? 'victory' : 'defeat');
+    }
+    prevVictory.current = state.victory.type;
+  }, [state.victory.type]);
 
   // 开场：剧本选择
   if (scene === 'menu') return <ScenarioSelect />;
@@ -184,6 +204,14 @@ export default function App() {
                   color: 'var(--text-mute)', fontSize: 14, padding: 0,
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
                 }}>?</button>
+              {/* E4: 静音按钮 */}
+              <button onClick={sfxMute.toggle} title={sfxMute.muted ? '音效已关（点击开启）' : '音效已开（点击静音）'}
+                style={{
+                  width: 36, height: 36, borderRadius: '50%', cursor: 'pointer',
+                  background: 'transparent', border: `1px solid var(--border)`,
+                  color: sfxMute.muted ? 'var(--text-dim)' : 'var(--gold)', fontSize: 14, padding: 0,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                }}>{sfxMute.muted ? '🔇' : '🔊'}</button>
             </div>
           )}
         </div>
