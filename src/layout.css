@@ -1,0 +1,470 @@
+/* ============================================================
+   Imperium Aeternum — 布局精修层
+   只负责结构、间距、响应式与精致感；颜色沿用 index.css 主题变量。
+   ============================================================ */
+
+:root {
+  --shell-max: 1280px;
+  --shell-pad-x: clamp(16px, 3vw, 34px);
+  --shell-pad-y: clamp(14px, 2.2vw, 28px);
+  --panel-blur: blur(14px);
+}
+
+.ia-shell {
+  width: min(var(--shell-max), calc(100vw - 18px));
+  min-height: 100vh;
+  margin: 0 auto;
+  padding: var(--shell-pad-y) var(--shell-pad-x) 36px;
+  position: relative;
+}
+
+.ia-shell::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  background:
+    linear-gradient(90deg, rgba(201,164,78,0.055), transparent 18%, transparent 82%, rgba(201,164,78,0.04)),
+    radial-gradient(circle at 50% -10%, rgba(201,164,78,0.08), transparent 42%);
+  opacity: 0.9;
+}
+
+.ia-topbar {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 240px;
+  gap: 14px;
+  align-items: stretch;
+  margin-bottom: 14px;
+  position: sticky;
+  top: 0;
+  z-index: 60;
+  padding-top: 4px;
+  backdrop-filter: var(--panel-blur);
+}
+
+.ia-ruler-card,
+.ia-status-panel,
+.ia-main-nav,
+.ia-content-shell {
+  position: relative;
+  border: 1px solid var(--border);
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--bg-raised) 82%, transparent), color-mix(in srgb, var(--bg-panel) 96%, transparent));
+  box-shadow: var(--shadow-card), inset 0 1px 0 rgba(201,164,78,0.08);
+}
+
+.ia-ruler-card {
+  border-radius: 16px;
+  padding: 18px 18px 14px;
+  overflow: hidden;
+}
+
+.ia-ruler-card::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  background:
+    linear-gradient(90deg, rgba(201,164,78,0.12), transparent 18%, transparent 82%, rgba(201,164,78,0.08)),
+    radial-gradient(circle at 6% 0%, rgba(201,164,78,0.12), transparent 28%);
+  opacity: 0.7;
+}
+
+.ia-ruler-kicker {
+  position: relative;
+  font-size: 10px;
+  color: var(--gold);
+  margin-bottom: 8px;
+}
+
+.ia-ruler-main {
+  position: relative;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.ia-ruler-title {
+  margin: 0;
+  color: var(--text);
+  font-size: clamp(27px, 3vw, 42px);
+  line-height: 1;
+  letter-spacing: 0.08em;
+  text-shadow: 0 0 22px rgba(201,164,78,0.12);
+}
+
+.ia-ruler-subline {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  margin-top: 10px;
+  color: var(--text-mute);
+  font-size: 11.5px;
+}
+
+.ia-ruler-subline > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.ia-ruler-subline > span:not(:last-child)::after {
+  content: '·';
+  color: var(--text-dim);
+  margin-left: 5px;
+}
+
+.ia-header-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.ia-icon-btn {
+  width: 38px;
+  height: 38px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  border: 1px solid var(--border);
+  background: color-mix(in srgb, var(--bg-inset) 82%, transparent);
+  color: var(--text-mute);
+  cursor: pointer;
+  font-family: var(--font-body);
+  transition: transform 0.18s ease, border-color 0.18s ease, color 0.18s ease, background 0.18s ease;
+}
+
+.ia-icon-btn:hover {
+  transform: translateY(-1px);
+  border-color: var(--border-gold);
+  color: var(--text);
+  background: color-mix(in srgb, var(--bg-raised) 90%, transparent);
+}
+
+.ia-icon-btn--gold {
+  border-color: var(--border-gold);
+  color: var(--gold);
+}
+
+.ia-resource-dock {
+  position: relative;
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid color-mix(in srgb, var(--border) 65%, transparent);
+  overflow-x: auto;
+}
+
+.ia-status-panel {
+  border-radius: 16px;
+  padding: 14px;
+  display: grid;
+  align-content: stretch;
+  gap: 8px;
+}
+
+.ia-status-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding: 9px 10px;
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--bg-inset) 72%, transparent);
+  border: 1px solid color-mix(in srgb, var(--border) 72%, transparent);
+  min-height: 36px;
+}
+
+.ia-status-row span {
+  color: var(--text-dim);
+  font-size: 10.5px;
+  letter-spacing: 0.08em;
+}
+
+.ia-status-row strong {
+  color: var(--text-soft);
+  font-family: var(--font-mono);
+  font-size: 13px;
+}
+
+.ia-main-nav {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px 14px;
+  border-radius: 16px;
+  padding: 10px 12px;
+  margin-bottom: 14px;
+  backdrop-filter: var(--panel-blur);
+  position: sticky;
+  top: 124px;
+  z-index: 55;
+}
+
+.ia-nav-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.ia-nav-label {
+  color: var(--text-dim);
+  font-size: 9px;
+  padding: 0 2px;
+  white-space: nowrap;
+}
+
+.ia-tab-cluster {
+  display: flex;
+  gap: 5px;
+  flex-wrap: wrap;
+}
+
+.ia-tab-btn {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 34px;
+  padding: 6px 9px;
+  border-radius: 10px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--text-mute);
+  font-family: var(--font-body);
+  font-size: 12.5px;
+  cursor: pointer;
+  transition: all 0.16s ease;
+}
+
+.ia-tab-btn:hover {
+  color: var(--text);
+  background: color-mix(in srgb, var(--bg-inset) 72%, transparent);
+  border-color: var(--border);
+}
+
+.ia-tab-btn.is-active {
+  color: var(--gold);
+  background:
+    linear-gradient(180deg, rgba(201,164,78,0.11), rgba(201,164,78,0.035)),
+    color-mix(in srgb, var(--bg-inset) 72%, transparent);
+  border-color: var(--border-gold);
+  box-shadow: inset 0 1px 0 rgba(201,164,78,0.16), 0 0 0 1px rgba(201,164,78,0.035);
+}
+
+.ia-tab-icon {
+  opacity: 0.82;
+  font-size: 12px;
+}
+
+.ia-tab-btn kbd {
+  margin-left: 2px;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 5px;
+  border: 1px solid color-mix(in srgb, var(--border) 76%, transparent);
+  background: color-mix(in srgb, var(--bg-inset) 70%, transparent);
+  color: var(--text-dim);
+  font-family: var(--font-mono);
+  font-size: 9px;
+}
+
+.ia-tab-btn.is-active kbd {
+  color: var(--gold);
+  border-color: color-mix(in srgb, var(--border-gold) 65%, transparent);
+}
+
+.ia-nav-hint {
+  margin-left: auto;
+  color: var(--text-dim);
+  font-size: 10px;
+  letter-spacing: 0.05em;
+  white-space: nowrap;
+}
+
+.ia-content-shell {
+  border-radius: 18px;
+  padding: clamp(14px, 2.2vw, 22px);
+  min-height: 56vh;
+  overflow: hidden;
+}
+
+.ia-content-shell::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  border-radius: inherit;
+  background:
+    linear-gradient(180deg, rgba(201,164,78,0.045), transparent 76%),
+    radial-gradient(circle at 100% 0%, rgba(201,164,78,0.05), transparent 24%);
+}
+
+.ia-content-shell > * {
+  position: relative;
+}
+
+.ia-content-shell .ia-card,
+.ia-content-shell .ia-card--raised,
+.ia-content-shell [class*='Panel'] {
+  backdrop-filter: blur(8px);
+}
+
+.ia-footer {
+  margin: 18px 0 0;
+  padding: 12px 0 2px;
+  color: var(--text-dim);
+  font-size: 10px;
+  text-align: center;
+  letter-spacing: 0.12em;
+}
+
+.ia-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  background: rgba(0,0,0,0.72);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  backdrop-filter: blur(5px);
+}
+
+.ia-help-card {
+  width: min(560px, 92vw);
+  background: linear-gradient(180deg, var(--bg-raised), var(--bg-panel));
+  border-radius: 16px;
+  padding: 24px;
+  border: 1px solid var(--border-gold);
+  box-shadow: 0 18px 60px rgba(0,0,0,0.52), inset 0 1px 0 rgba(201,164,78,0.1);
+}
+
+.ia-help-title {
+  font-size: 16px;
+  color: var(--gold);
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  margin-bottom: 14px;
+}
+
+.ia-help-step-title {
+  font-size: 14px;
+  color: var(--gold);
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+
+.ia-help-step-body {
+  font-size: 13px;
+  color: var(--text-soft);
+  line-height: 1.75;
+  min-height: 64px;
+}
+
+.ia-help-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+  margin-top: 12px;
+  flex-wrap: wrap;
+}
+
+/* 通用细节增强：卡片更像游戏面板 */
+.ia-card {
+  box-shadow: inset 0 1px 0 rgba(201,164,78,0.045);
+}
+
+.ia-card:hover {
+  border-color: color-mix(in srgb, var(--border-bright) 72%, var(--border));
+}
+
+button:focus-visible,
+.ia-btn:focus-visible,
+.ia-tab-btn:focus-visible,
+.ia-icon-btn:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--border-gold) 85%, transparent);
+  outline-offset: 2px;
+}
+
+@media (max-width: 1040px) {
+  .ia-topbar {
+    grid-template-columns: 1fr;
+    position: relative;
+  }
+  .ia-status-panel {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+  .ia-main-nav {
+    top: 0;
+  }
+}
+
+@media (max-width: 760px) {
+  .ia-shell {
+    width: 100%;
+    padding: 10px 10px 28px;
+  }
+  .ia-ruler-card,
+  .ia-status-panel,
+  .ia-main-nav,
+  .ia-content-shell {
+    border-radius: 13px;
+  }
+  .ia-ruler-main {
+    flex-direction: column;
+  }
+  .ia-ruler-title {
+    font-size: 28px;
+  }
+  .ia-header-actions {
+    align-self: stretch;
+  }
+  .ia-icon-btn {
+    width: 36px;
+    height: 36px;
+  }
+  .ia-status-panel {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .ia-main-nav {
+    align-items: flex-start;
+    overflow-x: auto;
+    flex-wrap: nowrap;
+    padding-bottom: 12px;
+  }
+  .ia-nav-group {
+    align-items: flex-start;
+    flex-direction: column;
+    min-width: max-content;
+  }
+  .ia-tab-cluster {
+    flex-wrap: nowrap;
+  }
+  .ia-nav-hint {
+    display: none;
+  }
+  .ia-content-shell {
+    padding: 12px;
+  }
+}
+
+@media (max-width: 520px) {
+  .ia-status-panel {
+    grid-template-columns: 1fr;
+  }
+  .ia-ruler-subline > span:not(:last-child)::after {
+    display: none;
+  }
+  .ia-tab-btn kbd {
+    display: none;
+  }
+}
