@@ -1,4 +1,5 @@
 // Economy v2 — 税率滑块 + 收支对比 + 警告 + C3 贸易路线
+import { useEffect } from 'react';
 import { useGameStore } from '../store/gameStore';
 import { availableTradeRoutes, routeYieldEstimate } from '../engine/economy';
 import { computeTax } from '../engine/formulas';
@@ -22,6 +23,18 @@ export default function EconomyScreen() {
     : taxPct <= 20 ? { txt: '均衡·推荐', tone: 'info' as const }
     : taxPct <= 30 ? { txt: '高税·民心略降', tone: 'warn' as const }
     : { txt: '苛税·民心大降', tone: 'danger' as const };
+
+  // E3: ←/→ 调税 ±2%（切到此页后键盘微调）
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const t = e.target as HTMLElement;
+      if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return;
+      if (e.key === 'ArrowLeft') { e.preventDefault(); setTaxRate(Math.max(0, player.taxRate - 0.02)); }
+      else if (e.key === 'ArrowRight') { e.preventDefault(); setTaxRate(Math.min(0.5, player.taxRate + 0.02)); }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [player.taxRate, setTaxRate]);
 
   // P1-3: 税率调整实时预估——算当前税率 vs +5% 的税收差与民心影响
   const provs = provincesOf(player.id, state.provinces);
@@ -73,7 +86,7 @@ export default function EconomyScreen() {
         <Btn label="+2%" variant="ghost" onClick={() => setTaxRate(Math.min(0.5, player.taxRate + 0.02))} />
         <Btn label="+5%" variant="ghost" onClick={() => setTaxRate(Math.min(0.5, player.taxRate + 0.05))} />
       </div>
-      <p className="dim" style={{ fontSize: 11 }}>⚠ 高税增收但降民心；建议 10%-25%。</p>
+      <p className="dim" style={{ fontSize: 11 }}>⚠ 高税增收但降民心；建议 10%-25%。键盘 ←/→ 微调 ±2%</p>
 
       {/* P1-3: 税率调整实时预估——消除盲调 */}
       <div className="ia-card" style={{ marginTop: 8, padding: 10, background: 'var(--bg-inset)', fontSize: 11 }}>

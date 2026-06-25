@@ -142,6 +142,10 @@ export default function App() {
       if (hasPending) return;
       e.preventDefault();
       if (!state.victory.type) nextTurn();
+    } else if (e.key === 't' || e.key === 'T') {
+      // E3: T 切经济页（调税率）
+      e.preventDefault();
+      setTab('economy');
     } else {
       const hit = ALL_TABS.find((x) => x.key === e.key);
       if (hit) { e.preventDefault(); setTab(hit.id); }

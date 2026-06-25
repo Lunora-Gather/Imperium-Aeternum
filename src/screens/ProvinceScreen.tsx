@@ -69,6 +69,21 @@ export default function ProvinceScreen() {
     return () => window.removeEventListener('keydown', onKey);
   }, [provs, selected]);
 
+  // E3: B 建农田 / R 征兵 50（对当前选中省）
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const t = e.target as HTMLElement;
+      if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return;
+      if (e.key !== 'b' && e.key !== 'B' && e.key !== 'r' && e.key !== 'R') return;
+      if (!selected) return;
+      e.preventDefault();
+      if (e.key === 'b' || e.key === 'B') build(selected, 'farm');
+      else recruit(selected, 50);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [selected, build, recruit]);
+
   const prov = state.provinces[selected];
 
   if (!prov) return <Panel title="省份管理"><p className="dim">无省份</p></Panel>;
