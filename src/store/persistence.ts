@@ -96,9 +96,10 @@ export function saveGameToSlot(state: GameState, slot: number): { ok: boolean; s
 
 // B3: 槽位读档
 export function loadGameFromSlot(slot: number): GameState | null {
-  const raw = localStorage.getItem(SLOT_KEY(slot));
-  if (!raw) return null;
   try {
+    if (typeof localStorage === 'undefined') return null;
+    const raw = localStorage.getItem(SLOT_KEY(slot));
+    if (!raw) return null;
     const parsed = JSON.parse(raw) as SaveGame;
     const migrated = migrate(parsed);
     return migrated.gameState;
@@ -110,9 +111,10 @@ export function loadGameFromSlot(slot: number): GameState | null {
 
 // B3: 槽位元信息
 export function getSlotMeta(slot: number): { createdAt: string; turn: number; version: number; nationName?: string } | null {
-  const raw = localStorage.getItem(SLOT_KEY(slot));
-  if (!raw) return null;
   try {
+    if (typeof localStorage === 'undefined') return null;
+    const raw = localStorage.getItem(SLOT_KEY(slot));
+    if (!raw) return null;
     const parsed = JSON.parse(raw) as SaveGame;
     const pid = parsed.gameState?.playerNationId;
     const nationName = pid ? parsed.gameState?.nations?.[pid]?.name : undefined;
@@ -134,7 +136,13 @@ export function listAllSlots(): ({ slot: number; meta: NonNullable<ReturnType<ty
 
 // B3: 删除槽位
 export function deleteSlot(slot: number): void {
-  localStorage.removeItem(SLOT_KEY(slot));
+  try {
+    if (typeof localStorage !== 'undefined') {
+      localStorage.removeItem(SLOT_KEY(slot));
+    }
+  } catch {
+    // ignore
+  }
 }
 
 // B3: 自动存档（每 10 回合到槽位 0）
@@ -150,7 +158,11 @@ export function loadGame(): GameState | null {
   return loadGameFromSlot(AUTO_SLOT);
 }
 export function hasSave(): boolean {
-  return !!localStorage.getItem(SLOT_KEY(AUTO_SLOT));
+  try {
+    return typeof localStorage !== 'undefined' && !!localStorage.getItem(SLOT_KEY(AUTO_SLOT));
+  } catch {
+    return false;
+  }
 }
 export function getSaveMeta(): { createdAt: string; turn: number; version: number } | null {
   return getSlotMeta(AUTO_SLOT);

@@ -108,7 +108,12 @@ export default function ScenarioSelect() {
         {/* P3: menu 页主题切换（开场前调主题，循环 night→day→bamboo→ink） */}
         <button onClick={() => {
           const order = ['night', 'day', 'bamboo', 'ink'];
-          const cur = (typeof localStorage !== 'undefined' && localStorage.getItem('ia-theme')) || 'night';
+          let cur = 'night';
+          try {
+            if (typeof localStorage !== 'undefined') {
+              cur = localStorage.getItem('ia-theme') || 'night';
+            }
+          } catch { /* ignore */ }
           const idx = order.indexOf(cur);
           const next = order[(idx + 1) % order.length];
           document.documentElement.setAttribute('data-theme', next === 'night' ? '' : next);

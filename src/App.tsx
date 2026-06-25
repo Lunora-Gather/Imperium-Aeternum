@@ -55,17 +55,25 @@ export default function App() {
   // E1: 新手教程——首次进入自动弹出 5 步分步教程，可跳过可重看
   const [tutorialStep, setTutorialStep] = useState(0);  // 0-4 五步，-1 已关闭
   useEffect(() => {
-    if (typeof localStorage === 'undefined') return;
-    if (!localStorage.getItem('ia-tutorial-done')) {
+    try {
+      if (typeof localStorage === 'undefined') return;
+      if (!localStorage.getItem('ia-tutorial-done')) {
+        setShowHelp(true);
+        setTutorialStep(0);
+      }
+    } catch {
+      // If localStorage is locked, fall back to showing help
       setShowHelp(true);
       setTutorialStep(0);
     }
   }, []);
   const [theme, setTheme] = useState<'night' | 'day' | 'bamboo' | 'ink'>(() => {
-    if (typeof localStorage !== 'undefined') {
-      const saved = localStorage.getItem('ia-theme');
-      if (saved === 'day' || saved === 'night' || saved === 'bamboo' || saved === 'ink') return saved as 'night' | 'day' | 'bamboo' | 'ink';
-    }
+    try {
+      if (typeof localStorage !== 'undefined') {
+        const saved = localStorage.getItem('ia-theme');
+        if (saved === 'day' || saved === 'night' || saved === 'bamboo' || saved === 'ink') return saved as 'night' | 'day' | 'bamboo' | 'ink';
+      }
+    } catch { /* ignore */ }
     return 'night';
   });
   const { state, nextTurn, scene, justProcessedTurn, clearTurnFlag, pendingTab, consumePendingTab } = useGameStore();
