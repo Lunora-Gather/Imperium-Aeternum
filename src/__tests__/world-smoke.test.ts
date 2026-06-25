@@ -209,6 +209,9 @@ describe('W4 世界级烟雾测试（192 国 / 600 省）', () => {
       'evt_chain_plague_1', 'evt_chain_heir_1', 'evt_chain_border_1',
       'evt_chain_drought_1', 'evt_chain_decline_1', 'evt_chain_tech_1',
       'evt_chain_culture_1', 'evt_chain_alliance_1', 'evt_chain_migrate_1',
+      // D1 新增 5 链头
+      'evt_chain_barbarian_1', 'evt_chain_succession_1', 'evt_chain_commerce_1',
+      'evt_chain_reform_1', 'evt_chain_pandemic_1',
     ];
     for (const id of chainHeads) {
       expect(EVENT_BY_ID[id].weight).toBeGreaterThan(0);

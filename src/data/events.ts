@@ -759,11 +759,11 @@ export const EVENTS: EventDef[] = [
     { text: '增兵戒备', effects: { gold: -80, factionSat: fr('military', 5), triggerEvent: 'evt_chain_barbarian_2' }, aiWeight: 3 },
     { text: '遣使探虚实', effects: { gold: -30, influence: -3, triggerEvent: 'evt_chain_barbarian_2' }, aiWeight: 2 },
   ] },
-  { id: 'evt_chain_barbarian_2', title: '蛮族南下', description: '蛮族铁骑南下，连陷数镇！', category: 'military', trigger: { minTurn: 13 }, weight: 8, cooldown: 60, unique: false, options: [
+  { id: 'evt_chain_barbarian_2', title: '蛮族南下', description: '蛮族铁骑南下，连陷数镇！', category: 'military', trigger: { minTurn: 13 }, weight: 0, cooldown: 0, unique: false, options: [
     { text: '主力决战', effects: { gold: -150, factionSat: fr('military', 10), stability: -5, triggerEvent: 'evt_chain_barbarian_3' }, aiWeight: 2 },
     { text: '坚壁清野', effects: { food: -100, gold: -60, stability: -8, triggerEvent: 'evt_chain_barbarian_3' }, aiWeight: 3 },
   ] },
-  { id: 'evt_chain_barbarian_3', title: '蛮族余波', description: '蛮族退去，边境残破。', category: 'military', trigger: { minTurn: 14 }, weight: 5, cooldown: 50, unique: false, options: [
+  { id: 'evt_chain_barbarian_3', title: '蛮族余波', description: '蛮族退去，边境残破。', category: 'military', trigger: { minTurn: 14 }, weight: 0, cooldown: 0, unique: false, options: [
     { text: '重建边境', effects: { gold: -120, stability: 5, factionSat: fr('commoners', 8) }, aiWeight: 3 },
     { text: '暂置', effects: { stability: -3, influence: -5 }, aiWeight: 2 },
   ] },
@@ -772,11 +772,11 @@ export const EVENTS: EventDef[] = [
     { text: '立长子', effects: { legitimacy: 5, stability: -5, triggerEvent: 'evt_chain_succession_2' }, aiWeight: 3 },
     { text: '择贤立', effects: { legitimacy: -5, stability: -8, factionSat: fr('nobles', -10), triggerEvent: 'evt_chain_succession_2' }, aiWeight: 2 },
   ] },
-  { id: 'evt_chain_succession_2', title: '诸王争位', description: '诸王子各立党羽，朝野分裂！', category: 'politics', trigger: { minTurn: 26 }, weight: 8, cooldown: 80, unique: false, options: [
+  { id: 'evt_chain_succession_2', title: '诸王争位', description: '诸王子各立党羽，朝野分裂！', category: 'politics', trigger: { minTurn: 26 }, weight: 0, cooldown: 0, unique: false, options: [
     { text: '强力镇压', effects: { gold: -100, stability: -10, factionSat: fr('military', 8), triggerEvent: 'evt_chain_succession_3' }, aiWeight: 2 },
     { text: '谈判和解', effects: { gold: -150, legitimacy: -8, stability: 3, triggerEvent: 'evt_chain_succession_3' }, aiWeight: 3 },
   ] },
-  { id: 'evt_chain_succession_3', title: '内战结束', description: '争位之争终见分晓。', category: 'politics', trigger: { minTurn: 27 }, weight: 5, cooldown: 60, unique: false, options: [
+  { id: 'evt_chain_succession_3', title: '内战结束', description: '争位之争终见分晓。', category: 'politics', trigger: { minTurn: 27 }, weight: 0, cooldown: 0, unique: false, options: [
     { text: '大赦天下', effects: { gold: -80, legitimacy: 10, stability: 8 }, aiWeight: 3 },
     { text: '清算旧账', effects: { gold: -40, legitimacy: 5, factionSat: fr('nobles', -15) }, aiWeight: 2 },
   ] },
@@ -785,11 +785,11 @@ export const EVENTS: EventDef[] = [
     { text: '授予特权', effects: { gold: 100, factionSat: fra({ faction: 'merchants', delta: 12 }, { faction: 'nobles', delta: -8 }), triggerEvent: 'evt_chain_commerce_2' }, aiWeight: 3 },
     { text: '限制', effects: { gold: -20, factionSat: fr('merchants', -10), triggerEvent: 'evt_chain_commerce_2' }, aiWeight: 2 },
   ] },
-  { id: 'evt_chain_commerce_2', title: '商业繁荣', description: '商业空前繁荣，金币如雨！', category: 'economy', trigger: { minTurn: 16 }, weight: 5, cooldown: 60, unique: false, options: [
+  { id: 'evt_chain_commerce_2', title: '商业繁荣', description: '商业空前繁荣，金币如雨！', category: 'economy', trigger: { minTurn: 16 }, weight: 0, cooldown: 0, unique: false, options: [
     { text: '大举征税', effects: { gold: 200, factionSat: fr('merchants', -12), triggerEvent: 'evt_chain_commerce_3' }, aiWeight: 2 },
     { text: '轻税促商', effects: { gold: 80, factionSat: fr('merchants', 10), stability: 3, triggerEvent: 'evt_chain_commerce_3' }, aiWeight: 3 },
   ] },
-  { id: 'evt_chain_commerce_3', title: '商潮余波', description: '商业浪潮后，经济格局已变。', category: 'economy', trigger: { minTurn: 17 }, weight: 4, cooldown: 50, unique: false, options: [
+  { id: 'evt_chain_commerce_3', title: '商潮余波', description: '商业浪潮后，经济格局已变。', category: 'economy', trigger: { minTurn: 17 }, weight: 0, cooldown: 0, unique: false, options: [
     { text: '规范市场', effects: { gold: -60, corruption: -5, factionSat: fr('merchants', 5) }, aiWeight: 3 },
     { text: '放任', effects: { corruption: 8, gold: 50 }, aiWeight: 2 },
   ] },
@@ -798,11 +798,11 @@ export const EVENTS: EventDef[] = [
     { text: '镇压', effects: { gold: -80, factionSat: fr('clergy', 12), stability: -5, triggerEvent: 'evt_chain_reform_2' }, aiWeight: 2 },
     { text: '容忍', effects: { factionSat: fr('clergy', -15), stability: 3, triggerEvent: 'evt_chain_reform_2' }, aiWeight: 3 },
   ] },
-  { id: 'evt_chain_reform_2', title: '宗教分裂', description: '教派对立全国动荡！', category: 'religion', trigger: { minTurn: 19 }, weight: 6, cooldown: 80, unique: false, options: [
+  { id: 'evt_chain_reform_2', title: '宗教分裂', description: '教派对立全国动荡！', category: 'religion', trigger: { minTurn: 19 }, weight: 0, cooldown: 0, unique: false, options: [
     { text: '定一尊', effects: { gold: -150, legitimacy: 8, stability: -10, factionSat: fr('clergy', 15), triggerEvent: 'evt_chain_reform_3' }, aiWeight: 2 },
     { text: '宽容并立', effects: { gold: -50, stability: 5, legitimacy: -5, factionSat: fr('clergy', -10), triggerEvent: 'evt_chain_reform_3' }, aiWeight: 3 },
   ] },
-  { id: 'evt_chain_reform_3', title: '教争终局', description: '宗教之争暂告段落。', category: 'religion', trigger: { minTurn: 20 }, weight: 4, cooldown: 60, unique: false, options: [
+  { id: 'evt_chain_reform_3', title: '教争终局', description: '宗教之争暂告段落。', category: 'religion', trigger: { minTurn: 20 }, weight: 0, cooldown: 0, unique: false, options: [
     { text: '重建教权', effects: { gold: -100, legitimacy: 5, factionSat: fr('clergy', 10) }, aiWeight: 3 },
     { text: '政教分离', effects: { gold: -50, stability: 5, factionSat: fr('clergy', -8) }, aiWeight: 2 },
   ] },
@@ -811,11 +811,11 @@ export const EVENTS: EventDef[] = [
     { text: '严防输入', effects: { gold: -100, stability: 3, triggerEvent: 'evt_chain_pandemic_2' }, aiWeight: 3 },
     { text: '观望', effects: { triggerEvent: 'evt_chain_pandemic_2' }, aiWeight: 2 },
   ] },
-  { id: 'evt_chain_pandemic_2', title: '大疫爆发', description: '疫病全国蔓延，死者甚众！', category: 'crisis', trigger: { minTurn: 23 }, weight: 9, cooldown: 80, unique: false, options: [
+  { id: 'evt_chain_pandemic_2', title: '大疫爆发', description: '疫病全国蔓延，死者甚众！', category: 'crisis', trigger: { minTurn: 23 }, weight: 0, cooldown: 0, unique: false, options: [
     { text: '封城救治', effects: { gold: -200, population: -300, stability: -8, factionSat: fr('clergy', 8), triggerEvent: 'evt_chain_pandemic_3' }, aiWeight: 3 },
     { text: '祈祷', effects: { population: -500, stability: -15, legitimacy: -8, triggerEvent: 'evt_chain_pandemic_3' }, aiWeight: 1 },
   ] },
-  { id: 'evt_chain_pandemic_3', title: '疫后重建', description: '大疫终于退去，百废待兴。', category: 'crisis', trigger: { minTurn: 24 }, weight: 5, cooldown: 60, unique: false, options: [
+  { id: 'evt_chain_pandemic_3', title: '疫后重建', description: '大疫终于退去，百废待兴。', category: 'crisis', trigger: { minTurn: 24 }, weight: 0, cooldown: 0, unique: false, options: [
     { text: '休养生息', effects: { gold: -150, population: 200, stability: 8, legitimacy: 5 }, aiWeight: 3 },
     { text: '加税重建', effects: { gold: 100, factionSat: fr('commoners', -15), stability: -5 }, aiWeight: 2 },
   ] },
