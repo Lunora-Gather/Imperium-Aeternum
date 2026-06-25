@@ -6,9 +6,10 @@ import './index.css';
 import './layout.css';
 import './restraint.css';
 import './gameplay/strategyFocus.css';
+import './quiet.css';
 import { installStrategyFocus, StrategyFocusDock } from './gameplay/strategyFocus';
 
-const BUILD_MARK = '精修 v2 · quiet-ui';
+const BUILD_MARK = '精修 v3 · quiet-ui';
 
 installStrategyFocus();
 
