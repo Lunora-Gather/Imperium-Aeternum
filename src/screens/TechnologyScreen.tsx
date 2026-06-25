@@ -1,7 +1,6 @@
 // Technology v2 — 三路科技树可视化 + 研发状态色 + 科研点置顶
 import { useGameStore } from '../store/gameStore';
 import { TECHNOLOGIES } from '../data/technologies';
-import { startResearch } from '../engine/technology';
 import { Panel, Stat, Btn, Tag, Bar, Divider } from '../components/ui';
 
 const BRANCH_LABEL: Record<string, string> = { agri: '农业', mil: '军事', admin: '行政', culture: '文化' };
@@ -9,7 +8,7 @@ const BRANCH_COLOR: Record<string, string> = { agri: 'var(--food)', mil: 'var(--
 const BRANCH_ICON: Record<string, string> = { agri: '🌾', mil: '⚔', admin: '⚖', culture: '✦' };
 
 export default function TechnologyScreen() {
-  const { state, logMsg } = useGameStore();
+  const { research } = useGameStore();
   // C2: player 用 selector 精确订阅
   const player = useGameStore((s) => s.state.nations[s.state.playerNationId]);
   const researching = player.tech.researchProgress;
@@ -17,9 +16,7 @@ export default function TechnologyScreen() {
   const researchingPct = researching && researchingTech ? Math.min(100, (researching.sciPtInvested / researchingTech.costSci) * 100) : 0;
 
   const doResearch = (techId: string) => {
-    const r = startResearch(player, techId);
-    logMsg(r.ok ? `开始研发 ${techId}` : `研发失败：${r.reason}`);
-    useGameStore.setState((s) => ({ state: { ...s.state } }));
+    research(techId);
   };
 
   return (

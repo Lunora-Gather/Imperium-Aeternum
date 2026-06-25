@@ -1,7 +1,6 @@
-// Diplomacy v3 — 国家关系卡片 + 条约状态色 + 行动按钮分级 + E14 关系图谱
 import { useState, useEffect } from 'react';
 import { useGameStore } from '../store/gameStore';
-import { improveRelation, establishTrade, formAlliance, findRelationExplicit } from '../engine/diplomacy';
+import { findRelationExplicit } from '../engine/diplomacy';
 import { Panel, Stat, Btn, Tag, Bar } from '../components/ui';
 import type { Nation, DiplomaticRelation } from '../types/game';
 
@@ -78,7 +77,7 @@ function DiplomacyGraph({ onNodeClick, nodes }: {
 }
 
 export default function DiplomacyScreen() {
-  const { state, logMsg, espionage, dynasticMarriage, culturalExport } = useGameStore();
+  const { state, logMsg, espionage, dynasticMarriage, culturalExport, improveRelation, formTrade, formAlliance } = useGameStore();
   // C2: pid/player 用 selector 精确订阅
   const pid = useGameStore((s) => s.state.playerNationId);
   const player = useGameStore((s) => s.state.nations[pid]);
@@ -118,12 +117,9 @@ export default function DiplomacyScreen() {
   }
 
   const doAct = (target: string, kind: 'improve' | 'trade' | 'alliance') => {
-    let r: { ok: boolean; reason?: string };
-    if (kind === 'improve') r = improveRelation(player, target, state);
-    else if (kind === 'trade') r = establishTrade(player, target, state);
-    else r = formAlliance(player, target, state);
-    logMsg(r.ok ? `${kind} ${target} 成功` : `${kind} ${target} 失败：${r.reason}`);
-    useGameStore.setState((s) => ({ state: { ...s.state } }));
+    if (kind === 'improve') improveRelation(target);
+    else if (kind === 'trade') formTrade(target);
+    else formAlliance(target);
   };
 
   return (

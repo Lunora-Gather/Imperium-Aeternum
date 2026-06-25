@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import { useGameStore } from '../store/gameStore';
 import { provincesOf } from '../engine/init';
-import { declareWar } from '../engine/military';
 import { findRelationExplicit } from '../engine/diplomacy';
 import { Panel, Stat, Btn, Tag, Bar, Divider } from '../components/ui';
 import type { War, Army, GameState } from '../types/game';
@@ -157,7 +156,7 @@ function BattleReportModal({ war, onClose }: { war: War; onClose: () => void }) 
 }
 
 export default function MilitaryScreen() {
-  const { state, recruit, moveArmy: doMoveArmy, makePeace, logMsg } = useGameStore();
+  const { state, recruit, moveArmy: doMoveArmy, makePeace, declareWar: storeDeclareWar, logMsg } = useGameStore();
   // C2: pid/player 用 selector 精确订阅
   const pid = useGameStore((s) => s.state.playerNationId);
   const player = useGameStore((s) => s.state.nations[pid]);
@@ -168,9 +167,7 @@ export default function MilitaryScreen() {
   const [moveTarget, setMoveTarget] = useState<Army | null>(null);
 
   const doDeclare = (target: string, provId: string) => {
-    const w = declareWar(state, pid, target, provId);
-    logMsg(w ? `向 ${target} 宣战` : '无法宣战');
-    useGameStore.setState((s) => ({ state: { ...s.state } }));
+    storeDeclareWar(target, provId);
   };
 
   return (

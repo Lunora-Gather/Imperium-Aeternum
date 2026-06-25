@@ -4,8 +4,8 @@
 import { create } from 'zustand';
 import type { GameState, TurnReport, Nation } from '../types/game';
 import { createInitialState, createWorldState, getRelationObj } from '../engine/init';
-import { espionage as engineEspionage, dynasticMarriage as engineMarriage, culturalExport as engineCulturalExport } from '../engine/diplomacy';
-import { moveArmy as engineMoveArmy, makePeace as engineMakePeace } from '../engine/military';
+import { espionage as engineEspionage, dynasticMarriage as engineMarriage, culturalExport as engineCulturalExport, improveRelation as engineImproveRelation, establishTrade as engineEstablishTrade, formAlliance as engineFormAlliance } from '../engine/diplomacy';
+import { moveArmy as engineMoveArmy, makePeace as engineMakePeace, declareWar as engineDeclareWar } from '../engine/military';
 import { processTurn, recordPlayerAction } from '../engine/turn';
 import { addChronicle } from '../engine/chronicle';
 import { saveGame, loadGame, hasSave, deleteSave, saveGameToSlot, loadGameFromSlot, deleteSlot, autoSave } from './persistence';
@@ -219,6 +219,9 @@ interface GameStore {
   recruit: (provinceId: string, count: number) => boolean;
   research: (techId: string) => boolean;
   improveRelation: (target: string) => boolean;
+  formTrade: (target: string) => boolean;
+  formAlliance: (target: string) => boolean;
+  declareWar: (target: string, provinceId: string) => boolean;
   espionage: (target: string, kind: 'steal_tech' | 'foment_rebellion' | 'spy_military') => boolean;  // E17: 间谍
   dynasticMarriage: (target: string) => boolean;   // E17: 联姻
   culturalExport: (target: string) => boolean;     // E17: 文化输出
@@ -478,15 +481,47 @@ export const useGameStore = create<GameStore>((set, get) => ({
     const player = s.nations[pid(s)];
     const commit = spendAP(player, 'improveRelation');
     if (!commit) { get().logMsg('行动点不足'); return false; }
-    if (player.resources.influence < 20) { get().logMsg('外交影响力不足'); return false; }
-    player.resources.influence -= 20;
+    const r = engineImproveRelation(player, target, s);
+    if (!r.ok) { get().logMsg(`改善失败：${r.reason}`); return false; }
     commit();
-    // E9: 用关系索引替代 .find
-    const rel = getRelationObj(pid(s), target, s);
-    if (rel) rel.relation = Math.min(100, rel.relation + 5);
     recordPlayerAction(s, 'appease_populace');
     set((st) => ({ state: { ...st.state } }));
-    get().logMsg(`改善了与 ${target} 的关系（耗 1 行动点）`);
+    get().logMsg(`改善了与 ${s.nations[target]?.name ?? target} 的关系（耗 1 行动点）`);
+    return true;
+  },
+
+  formTrade: (target) => {
+    const s = get().state;
+    const player = s.nations[pid(s)];
+    const commit = spendAP(player, 'improveRelation');
+    if (!commit) { get().logMsg('行动点不足'); return false; }
+    const r = engineEstablishTrade(player, target, s);
+    if (!r.ok) { get().logMsg(`建立贸易协定失败：${r.reason}`); return false; }
+    commit();
+    set((st) => ({ state: { ...st.state } }));
+    get().logMsg(`与 ${s.nations[target]?.name ?? target} 建立贸易协定（耗 1 行动点）`);
+    return true;
+  },
+
+  formAlliance: (target) => {
+    const s = get().state;
+    const player = s.nations[pid(s)];
+    const commit = spendAP(player, 'improveRelation');
+    if (!commit) { get().logMsg('行动点不足'); return false; }
+    const r = engineFormAlliance(player, target, s);
+    if (!r.ok) { get().logMsg(`结盟失败：${r.reason}`); return false; }
+    commit();
+    set((st) => ({ state: { ...st.state } }));
+    get().logMsg(`与 ${s.nations[target]?.name ?? target} 结盟（耗 1 行动点）`);
+    return true;
+  },
+
+  declareWar: (target, provinceId) => {
+    const s = get().state;
+    const w = engineDeclareWar(s, pid(s), target, provinceId);
+    if (!w) { get().logMsg('无法宣战（条约/停战/已在战争）'); return false; }
+    set((st) => ({ state: { ...st.state } }));
+    get().logMsg(`向 ${s.nations[target]?.name ?? target} 宣战！`);
     return true;
   },
 
