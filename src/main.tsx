@@ -13,7 +13,7 @@ import { installAmbitionSystem } from './gameplay/ambitions';
 import { installStrategyFocus } from './gameplay/strategyFocus';
 import { installStateHygiene } from './gameplay/stateHygiene';
 
-const BUILD_MARK = '国运目标 v1 · dynamic-ambitions';
+const BUILD_MARK = '全面审查 v1 · safe-store-audit';
 
 installLogicGuard();
 installAmbitionSystem();
