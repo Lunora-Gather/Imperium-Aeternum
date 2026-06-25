@@ -649,7 +649,7 @@ export function processTurnPure(state: GameState): { state: GameState; report: T
   // AI 国家回合：保留原版本 mutate
   processAITurn(next);
 
-  // AI 国家结算：保留原版本 mutate（与原版一致）
+  // AI 国家结算：保留原版本 mutate（与原版一致——AI 回合 Pure 迁移引入累积差异，回退保零回归）
   const provsByOwner = new Map<string, Province[]>();
   for (const p of Object.values(next.provinces)) {
     const arr = provsByOwner.get(p.ownerId);
