@@ -324,3 +324,12 @@
 - **替代**：用音频文件（否决：增包体积 + 网络请求）；接入更多触发点如建设/宣战（否决：需深度改各 Screen，留后）；用第三方音效库（否决：超 MVP 红线零依赖）。
 - **教训**：Web Audio API 合成是零依赖音效的最佳方案——oscillator + gain envelope 即可合成钟/鼓/警报，无需音频文件。AudioContext 需用户交互后 resume（浏览器自动 suspend），getCtx() 处理了 suspended 状态。
 
+## DEC-039：E2 统计图表页（纯 SVG 折线/雷达/条形）
+
+- **阶段**：v2 Phase E2（2026-06-25）
+- **背景**：玩家无直观趋势可视化，国库/粮/人口/稳定变化仅靠年报数字，违"让游戏舒服"目标。E2 验收要求国库/粮/人口/稳定 50 回合折线；派系满意度雷达；军力对比条形；科技甘特图。
+- **决策**：新建 `StatsScreen.tsx`——纯 SVG 零依赖。LineChart 组件（W480×H140，零线+折线+数据点+轴标签）渲染 6 折线：国库净收入/粮食变化/人口变化/稳定度变化/不满度变化/厌战值，从 `state.history`（最近 10 回合 TurnReport）取数。派系满意度雷达（同心圆 20/40/60/80/100 + 多边形 + 顶点标签，从 `player.factions` 取数用 `FACTIONS[f.id].name` 转 label）。军力对比条形（玩家 vs 最强 3 AI，从 `nation.army.reduce` 取数）。科技进度甘特（4 分支 Lv 0-8 进度条）。App.tsx 加 'stats' Tab + 's' 快捷键 + 治理组渲染。
+- **影响**：统计页 0→1，玩家可见 6 指标趋势 + 派系雷达 + 军力对比 + 科技进度，零依赖纯 SVG。typecheck ✅ + 89/89 测试 ✅。
+- **教训**：Faction interface 无 name 字段只有 id，需通过 `FACTIONS[f.id].name` 转人类可读 label——印证"先穷尽读类型再写代码"，避免凭印象用 `.name`。
+- **替代**：用图表库如 recharts（否决：超 MVP 红线零依赖）；仅折线无雷达/条形/甘特（否决：E2 验收明确要 4 种图表）；从 history 之外取数（否决：history 已是最近 10 回合快照，足够画趋势）。
+

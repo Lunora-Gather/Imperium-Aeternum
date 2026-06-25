@@ -16,13 +16,14 @@ import PoliticsScreen from './screens/PoliticsScreen';
 import MilitaryScreen from './screens/MilitaryScreen';
 import DiplomacyScreen from './screens/DiplomacyScreen';
 import TechnologyScreen from './screens/TechnologyScreen';
+import StatsScreen from './screens/StatsScreen';
 import TurnReportScreen from './screens/TurnReportScreen';
 import ChronicleScreen from './screens/ChronicleScreen';
 import SaveLoadScreen from './screens/SaveLoadScreen';
 import EventModal from './screens/EventModal';
 import LogToast from './components/LogToast';
 
-type Tab = 'dashboard' | 'map' | 'province' | 'economy' | 'population' | 'politics' | 'military' | 'diplomacy' | 'tech' | 'report' | 'chronicle' | 'save';
+type Tab = 'dashboard' | 'map' | 'province' | 'economy' | 'population' | 'politics' | 'military' | 'diplomacy' | 'tech' | 'stats' | 'report' | 'chronicle' | 'save';
 
 const TAB_GROUPS: { group: string; tabs: { id: Tab; label: string; key: string; icon: string }[] }[] = [
   { group: '治理', tabs: [
@@ -33,6 +34,7 @@ const TAB_GROUPS: { group: string; tabs: { id: Tab; label: string; key: string; 
     { id: 'population', label: '人口', key: '4', icon: '◯' },
     { id: 'politics', label: '政治', key: '5', icon: '⚖' },
     { id: 'tech', label: '科技', key: '6', icon: '✦' },
+    { id: 'stats', label: '统计', key: 's', icon: '📊' },
   ]},
   { group: '征伐', tabs: [
     { id: 'military', label: '军事', key: '7', icon: '⚔' },
@@ -259,6 +261,7 @@ export default function App() {
         {tab === 'military' && <MilitaryScreen />}
         {tab === 'diplomacy' && <DiplomacyScreen />}
         {tab === 'tech' && <TechnologyScreen />}
+        {tab === 'stats' && <StatsScreen />}
         {tab === 'report' && <TurnReportScreen onContinue={() => setTab(preReportTab)} />}
         {tab === 'chronicle' && <ChronicleScreen />}
         {tab === 'save' && <SaveLoadScreen />}
