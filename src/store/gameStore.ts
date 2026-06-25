@@ -1,5 +1,5 @@
 // Imperium Aeternum — 安全主状态层
-// 目标：保留所有页面动作接口，降低大文件维护风险，避免选国/回退/行动点状态卡死。
+// 目标：保留页面接口，降低大文件维护风险，避免选国/回退/行动点状态卡死。
 
 import { create } from 'zustand';
 import type { GameState, Nation } from '../types/game';
@@ -19,16 +19,7 @@ import { LAWS } from '../data/laws';
 import { addChronicle } from '../engine/chronicle';
 
 export type ScenarioId = 'classic' | 'world' | 'eastasia' | 'w3_eastasia' | 'w5_mediterranean' | 'w6_americas' | 'w7_random' | 'w4_europe' | 'w8_indianocean' | 'challenge_survival';
-export interface ScenarioDef {
-  id: ScenarioId;
-  name: string;
-  subtitle: string;
-  description: string;
-  nationCount: string;
-  needsNationPick: boolean;
-  playableNations?: { id: string; name: string; tier: string; desc: string }[];
-  regionFilter?: string[];
-}
+export interface ScenarioDef { id: ScenarioId; name: string; subtitle: string; description: string; nationCount: string; needsNationPick: boolean; playableNations?: { id: string; name: string; tier: string; desc: string }[]; regionFilter?: string[]; }
 
 const WORLD_PLAYABLE = [
   { id: 'n_me_persia', name: '波斯帝国', tier: 'S', desc: '东方霸主，高压帝国，军力最强' },
@@ -55,154 +46,46 @@ export const SCENARIOS: ScenarioDef[] = [
 ];
 
 type SpyKind = 'steal_tech' | 'foment_rebellion' | 'spy_military';
-
 interface GameStore {
-  state: GameState;
-  log: string[];
-  justProcessedTurn: boolean;
-  scene: 'menu' | 'playing';
-  returnTab: string | null;
-  setReturnTab: (t: string | null) => void;
-  pendingProvinceId: string | null;
-  setPendingProvince: (id: string | null) => void;
-  pendingTab: string | null;
-  jumpToTab: (tab: string) => void;
-  consumePendingTab: () => void;
-  startScenario: (id: ScenarioId) => void;
-  startWithNation: (nationId: string) => void;
-  backToMenu: () => void;
-  newGame: () => void;
-  load: () => boolean;
-  save: () => void;
-  clearSave: () => void;
-  hasSave: () => boolean;
-  saveToSlot: (slot: number) => void;
-  loadFromSlot: (slot: number) => boolean;
-  deleteSlotSave: (slot: number) => void;
-  nextTurn: () => unknown;
-  clearTurnFlag: () => void;
-  setTaxRate: (rate: number) => void;
-  appeaseFaction: (factionId: string) => boolean;
-  build: (provinceId: string, buildingDefId: string) => boolean;
-  recruit: (provinceId: string, count: number) => boolean;
-  research: (techId: string) => boolean;
-  improveRelation: (target: string) => boolean;
-  formTrade: (target: string) => boolean;
-  formAlliance: (target: string) => boolean;
-  espionage: (target: string, kind: SpyKind) => boolean;
-  dynasticMarriage: (target: string) => boolean;
-  culturalExport: (target: string) => boolean;
-  declareWar: (target: string, provinceId: string) => boolean;
-  makePeace: (warId: string) => boolean;
-  moveArmy: (armyId: string, toProvinceId: string) => boolean;
-  enactPolicy: (policyId: PolicyId) => boolean;
-  enactLaw: (lawId: string) => boolean;
-  establishTradeRoute: (routeId: string) => boolean;
-  embargoTradeRoute: (routeId: string) => boolean;
-  developProvince: (provinceId: string, kind: 'reclaim' | 'garrison_deploy' | 'garrison_recall') => boolean;
-  upgradeBuilding: (provinceId: string, buildingInstanceId: string) => boolean;
-  demolishBuilding: (provinceId: string, buildingInstanceId: string) => boolean;
-  suppressRebellion: () => boolean;
-  negotiateRebellion: () => boolean;
-  logMsg: (msg: string) => void;
+  state: GameState; log: string[]; justProcessedTurn: boolean; scene: 'menu' | 'playing'; returnTab: string | null; setReturnTab: (t: string | null) => void; pendingProvinceId: string | null; setPendingProvince: (id: string | null) => void; pendingTab: string | null; jumpToTab: (tab: string) => void; consumePendingTab: () => void;
+  startScenario: (id: ScenarioId) => void; startWithNation: (nationId: string) => void; backToMenu: () => void; newGame: () => void; load: () => boolean; save: () => void; clearSave: () => void; hasSave: () => boolean; saveToSlot: (slot: number) => void; loadFromSlot: (slot: number) => boolean; deleteSlotSave: (slot: number) => void; nextTurn: () => unknown; clearTurnFlag: () => void; setTaxRate: (rate: number) => void;
+  appeaseFaction: (factionId: string) => boolean; build: (provinceId: string, buildingDefId: string) => boolean; recruit: (provinceId: string, count: number) => boolean; research: (techId: string) => boolean; improveRelation: (target: string) => boolean; formTrade: (target: string) => boolean; formAlliance: (target: string) => boolean; espionage: (target: string, kind: SpyKind) => boolean; dynasticMarriage: (target: string) => boolean; culturalExport: (target: string) => boolean; declareWar: (target: string, provinceId: string) => boolean; makePeace: (warId: string) => boolean; moveArmy: (armyId: string, toProvinceId: string) => boolean; enactPolicy: (policyId: PolicyId) => boolean; enactLaw: (lawId: string) => boolean; establishTradeRoute: (routeId: string) => boolean; embargoTradeRoute: (routeId: string) => boolean; developProvince: (provinceId: string, kind: 'reclaim' | 'garrison_deploy' | 'garrison_recall') => boolean; upgradeBuilding: (provinceId: string, buildingInstanceId: string) => boolean; demolishBuilding: (provinceId: string, buildingInstanceId: string) => boolean; suppressRebellion: () => boolean; negotiateRebellion: () => boolean; logMsg: (msg: string) => void;
 }
 
 let pendingScenario: ScenarioId | null = null;
 let pendingSeed = 0;
-
 function pid(s: GameState): string { return s.playerNationId || PLAYER_ID; }
 function playerOf(s: GameState): Nation { return s.nations[pid(s)]; }
-function touch(set: (fn: (s: GameStore) => Partial<GameStore>) => void) { set((st) => ({ state: { ...st.state } })); }
+function touch(set: unknown) { (set as (fn: (s: GameStore) => Partial<GameStore>) => void)((st) => ({ state: { ...st.state } })); }
 function log(get: () => GameStore, msg: string) { get().logMsg(msg); }
 function markPlayer(state: GameState, id: string) { state.playerNationId = id; Object.values(state.nations).forEach((n) => { n.isPlayer = n.id === id; }); }
 function cost(player: Nation, n: number, get: () => GameStore): boolean { if (player.resources.adminPt < n) { log(get, `行动点不足（需 ${n}）`); return false; } player.resources.adminPt -= n; return true; }
 function relBoth(s: GameState, a: string, b: string, fn: (r: ReturnType<typeof getRelationObj>) => void) { const r1 = getRelationObj(a, b, s); const r2 = getRelationObj(b, a, s); if (r1) fn(r1); if (r2) fn(r2); }
-
-function applyChallenge(state: GameState) {
-  const p = playerOf(state);
-  p.resources.gold = Math.min(p.resources.gold, 120);
-  p.resources.food = Math.min(p.resources.food, 180);
-  p.government.stability = Math.min(p.government.stability, 35);
-  p.government.legitimacy = Math.min(p.government.legitimacy, 45);
-  p.government.corruption = Math.max(p.government.corruption, 45);
-  Object.values(state.provinces).filter((x) => x.ownerId === p.id).forEach((prov) => { prov.unrest = Math.max(prov.unrest, 35); prov.rebellionRisk = Math.max(prov.rebellionRisk, 25); });
-}
+function applyChallenge(state: GameState) { const p = playerOf(state); p.resources.gold = Math.min(p.resources.gold, 120); p.resources.food = Math.min(p.resources.food, 180); p.government.stability = Math.min(p.government.stability, 35); p.government.legitimacy = Math.min(p.government.legitimacy, 45); p.government.corruption = Math.max(p.government.corruption, 45); Object.values(state.provinces).filter((x) => x.ownerId === p.id).forEach((prov) => { prov.unrest = Math.max(prov.unrest, 35); prov.rebellionRisk = Math.max(prov.rebellionRisk, 25); }); }
 
 export const useGameStore = create<GameStore>((set, get) => ({
-  state: createInitialState(),
-  log: [],
-  justProcessedTurn: false,
-  scene: 'menu',
-  returnTab: null,
-  setReturnTab: (t) => set({ returnTab: t }),
-  pendingProvinceId: null,
-  setPendingProvince: (id) => set({ pendingProvinceId: id }),
-  pendingTab: null,
-  jumpToTab: (tab) => set({ pendingTab: tab }),
-  consumePendingTab: () => set({ pendingTab: null }),
-
-  startScenario: (id) => {
-    pendingScenario = id;
-    pendingSeed = Math.floor(Math.random() * 1e9);
-    const scenario = SCENARIOS.find((s) => s.id === id);
-    if (!scenario?.needsNationPick) {
-      const regions = id === 'w7_random' ? [['asia_east'], ['mediterranean'], ['americas'], ['europe_w'], ['middle_east']][pendingSeed % 5] : undefined;
-      const state = id === 'classic' || id === 'challenge_survival' ? createInitialState() : createWorldState(pendingSeed, undefined, regions);
-      const chosen = Object.values(state.nations).find((n) => n.isPlayer) ?? Object.values(state.nations)[0];
-      if (chosen) markPlayer(state, chosen.id);
-      if (id === 'challenge_survival') applyChallenge(state);
-      set({ state, scene: 'playing', log: [`新游戏开始：${scenario?.name ?? id} · 第 1 年`], justProcessedTurn: false });
-      pendingScenario = null;
-    } else {
-      set({ log: [`已选剧本：${scenario.name}，请选择你的邦国`] });
-    }
-  },
-
-  startWithNation: (nationId) => {
-    if (!pendingScenario) return;
-    const scenario = SCENARIOS.find((s) => s.id === pendingScenario);
-    const state = createWorldState(pendingSeed, nationId, scenario?.regionFilter);
-    const player = state.nations[nationId] ?? Object.values(state.nations)[0];
-    if (player) markPlayer(state, player.id);
-    set({ state, scene: 'playing', log: [`新游戏开始：${scenario?.name ?? pendingScenario} · 你执掌 ${player?.name ?? '未知'} · 第 1 年`], justProcessedTurn: false });
-    pendingScenario = null;
-  },
-
-  backToMenu: () => { pendingScenario = null; set({ scene: 'menu', log: [], pendingTab: null, pendingProvinceId: null }); },
-  newGame: () => get().startScenario('classic'),
-  load: () => { const s = loadGame(); if (!s) return false; s._relMap = undefined; set({ state: s, scene: 'playing', log: ['读档成功'], justProcessedTurn: false }); return true; },
-  save: () => { const r = saveGame(get().state); log(get, r.ok ? `已存档${r.sizeKB ? `（${r.sizeKB}KB）` : ''}` : (r.error ?? '存档失败')); },
-  clearSave: () => { deleteSave(); log(get, '已删档'); },
-  hasSave: () => hasSave(),
-  saveToSlot: (slot) => { const r = saveGameToSlot(get().state, slot); log(get, r.ok ? `${slot === 0 ? '自动存档' : `已存档到槽位 ${slot}`}${r.sizeKB ? `（${r.sizeKB}KB）` : ''}` : (r.error ?? '存档失败')); },
-  loadFromSlot: (slot) => { const s = loadGameFromSlot(slot); if (!s) { log(get, '读档失败：存档不存在或损坏'); return false; } s._relMap = undefined; set({ state: s, scene: 'playing', log: [`已读取槽位 ${slot} 存档`] }); return true; },
-  deleteSlotSave: (slot) => { deleteSlot(slot); log(get, `已删除槽位 ${slot} 存档`); },
-
-  nextTurn: () => { const cur = get().state; if (cur.victory.type) return null; const { state, report } = processTurn(cur); set({ state, justProcessedTurn: true }); if (report.warnings.length) log(get, report.warnings.join('; ')); log(get, `进入第 ${state.turn + 1} 年`); if (state.turn > 0 && state.turn % 10 === 0) autoSave(state); return report; },
-  clearTurnFlag: () => set({ justProcessedTurn: false }),
-  setTaxRate: (rate) => { const s = get().state; playerOf(s).taxRate = Math.max(0, Math.min(0.5, rate)); touch(set); log(get, `税率调整为 ${Math.round(playerOf(s).taxRate * 100)}%`); },
-
+  state: createInitialState(), log: [], justProcessedTurn: false, scene: 'menu', returnTab: null, setReturnTab: (t) => set({ returnTab: t }), pendingProvinceId: null, setPendingProvince: (id) => set({ pendingProvinceId: id }), pendingTab: null, jumpToTab: (tab) => set({ pendingTab: tab }), consumePendingTab: () => set({ pendingTab: null }),
+  startScenario: (id) => { pendingScenario = id; pendingSeed = Math.floor(Math.random() * 1e9); const scenario = SCENARIOS.find((s) => s.id === id); if (!scenario?.needsNationPick) { const regions = id === 'w7_random' ? [['asia_east'], ['mediterranean'], ['americas'], ['europe_w'], ['middle_east']][pendingSeed % 5] : undefined; const state = id === 'classic' || id === 'challenge_survival' ? createInitialState() : createWorldState(pendingSeed, undefined, regions); const chosen = Object.values(state.nations).find((n) => n.isPlayer) ?? Object.values(state.nations)[0]; if (chosen) markPlayer(state, chosen.id); if (id === 'challenge_survival') applyChallenge(state); set({ state, scene: 'playing', log: [`新游戏开始：${scenario?.name ?? id} · 第 1 年`], justProcessedTurn: false }); pendingScenario = null; } else set({ log: [`已选剧本：${scenario.name}，请选择你的邦国`] }); },
+  startWithNation: (nationId) => { if (!pendingScenario) return; const scenario = SCENARIOS.find((s) => s.id === pendingScenario); const state = createWorldState(pendingSeed, nationId, scenario?.regionFilter); const player = state.nations[nationId] ?? Object.values(state.nations)[0]; if (player) markPlayer(state, player.id); set({ state, scene: 'playing', log: [`新游戏开始：${scenario?.name ?? pendingScenario} · 你执掌 ${player?.name ?? '未知'} · 第 1 年`], justProcessedTurn: false }); pendingScenario = null; },
+  backToMenu: () => { pendingScenario = null; set({ scene: 'menu', log: [], pendingTab: null, pendingProvinceId: null }); }, newGame: () => get().startScenario('classic'), load: () => { const s = loadGame(); if (!s) return false; s._relMap = undefined; set({ state: s, scene: 'playing', log: ['读档成功'], justProcessedTurn: false }); return true; }, save: () => { const r = saveGame(get().state); log(get, r.ok ? `已存档${r.sizeKB ? `（${r.sizeKB}KB）` : ''}` : (r.error ?? '存档失败')); }, clearSave: () => { deleteSave(); log(get, '已删档'); }, hasSave: () => hasSave(), saveToSlot: (slot) => { const r = saveGameToSlot(get().state, slot); log(get, r.ok ? `${slot === 0 ? '自动存档' : `已存档到槽位 ${slot}`}${r.sizeKB ? `（${r.sizeKB}KB）` : ''}` : (r.error ?? '存档失败')); }, loadFromSlot: (slot) => { const s = loadGameFromSlot(slot); if (!s) { log(get, '读档失败：存档不存在或损坏'); return false; } s._relMap = undefined; set({ state: s, scene: 'playing', log: [`已读取槽位 ${slot} 存档`] }); return true; }, deleteSlotSave: (slot) => { deleteSlot(slot); log(get, `已删除槽位 ${slot} 存档`); },
+  nextTurn: () => { const cur = get().state; if (cur.victory.type) return null; const { state, report } = processTurn(cur); set({ state, justProcessedTurn: true }); if (report.warnings.length) log(get, report.warnings.join('; ')); log(get, `进入第 ${state.turn + 1} 年`); if (state.turn > 0 && state.turn % 10 === 0) autoSave(state); return report; }, clearTurnFlag: () => set({ justProcessedTurn: false }), setTaxRate: (rate) => { const s = get().state; playerOf(s).taxRate = Math.max(0, Math.min(0.5, rate)); touch(set); log(get, `税率调整为 ${Math.round(playerOf(s).taxRate * 100)}%`); },
   appeaseFaction: (factionId) => { const s = get().state; const p = playerOf(s); if (!cost(p, 1, get)) return false; if (p.resources.gold < 30) { p.resources.adminPt += 1; log(get, '金不足，无法安抚'); return false; } const f = p.factions.find((x) => x.id === factionId); if (!f) return false; p.resources.gold -= 30; f.satisfaction = Math.min(100, f.satisfaction + 8); touch(set); log(get, `安抚了 ${factionId}`); return true; },
   build: (provinceId, buildingDefId) => { const s = get().state; const p = playerOf(s); const prov = s.provinces[provinceId]; const def = BUILDINGS[buildingDefId as BuildingId]; if (!prov || prov.ownerId !== p.id || !def) { log(get, '无法建造'); return false; } if (!cost(p, 1, get)) return false; if (p.resources.gold < def.costGold || p.resources.wood < def.costWood || p.resources.iron < def.costIron) { p.resources.adminPt += 1; log(get, '资源不足'); return false; } if (def.maxPerProvince > 0 && prov.buildings.filter((b) => b.defId === buildingDefId).length >= def.maxPerProvince) { p.resources.adminPt += 1; log(get, '已达建造上限'); return false; } p.resources.gold -= def.costGold; p.resources.wood -= def.costWood; p.resources.iron -= def.costIron; prov.buildings.push({ id: `b_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`, defId: buildingDefId as never, provinceId, level: 1 }); recordPlayerAction(s, 'build_farm'); touch(set); log(get, `在 ${prov.name} 建造了 ${def.name}`); return true; },
   recruit: (provinceId, count) => { const s = get().state; const p = playerOf(s); const prov = s.provinces[provinceId]; if (!prov || prov.ownerId !== p.id) return false; if (!cost(p, 1, get)) return false; const gold = count * 1.5, supply = count * 0.2; if (p.resources.gold < gold || p.resources.supply < supply || prov.population < count) { p.resources.adminPt += 1; log(get, '资源或人口不足'); return false; } p.resources.gold -= gold; p.resources.supply -= supply; prov.population -= count; let army = p.army.find((a) => a.location === p.capital); if (!army) { army = { id: `army_${Date.now()}`, ownerId: p.id, location: p.capital, size: 0, morale: 60, training: 50, equipment: 50, supply: 80 }; p.army.push(army); } army.size += count; recordPlayerAction(s, 'conscription'); touch(set); log(get, `征兵 ${count} 人`); return true; },
   research: (techId) => { const s = get().state; const p = playerOf(s); const def = TECHNOLOGIES.find((t) => t.id === techId); if (!def) return false; if (!cost(p, 1, get)) return false; if (p.resources.sciPt < def.costSci || p.resources.gold < def.costGold) { p.resources.adminPt += 1; log(get, '科研点或金不足'); return false; } p.resources.sciPt -= def.costSci; p.resources.gold -= def.costGold; p.tech[def.branch] = Math.max(p.tech[def.branch], def.level); recordPlayerAction(s, 'research_tech'); touch(set); log(get, `研发完成：${def.name}`); return true; },
-
   improveRelation: (target) => { const s = get().state; const p = playerOf(s); if (!cost(p, 1, get)) return false; if (p.resources.influence < 20) { p.resources.adminPt += 1; log(get, '影响力不足'); return false; } p.resources.influence -= 20; relBoth(s, p.id, target, (r) => { if (r) { r.relation = Math.min(100, r.relation + 10); r.trust = Math.min(100, r.trust + 4); } }); touch(set); log(get, `改善了与 ${s.nations[target]?.name ?? target} 的关系`); return true; },
   formTrade: (target) => { const s = get().state; const p = playerOf(s); const r = getRelationObj(p.id, target, s); if (!r || r.relation < 0 || p.resources.influence < 30) { log(get, '无法建立贸易'); return false; } if (!cost(p, 1, get)) return false; p.resources.influence -= 30; relBoth(s, p.id, target, (x) => { if (x) { x.treaty = 'trade'; x.tradeDep = Math.max(x.tradeDep, 20); } }); touch(set); log(get, `与 ${s.nations[target]?.name ?? target} 建立贸易`); return true; },
   formAlliance: (target) => { const s = get().state; const p = playerOf(s); const r = getRelationObj(p.id, target, s); if (!r || r.relation < 50 || p.resources.influence < 50) { log(get, '无法结盟'); return false; } if (!cost(p, 1, get)) return false; p.resources.influence -= 50; relBoth(s, p.id, target, (x) => { if (x) x.treaty = 'alliance'; }); touch(set); log(get, `与 ${s.nations[target]?.name ?? target} 结盟`); return true; },
   espionage: (target, kind) => { const s = get().state; const p = playerOf(s); const t = s.nations[target]; if (!t || p.resources.influence < 40) { log(get, '间谍行动条件不足'); return false; } if (!cost(p, 2, get)) return false; p.resources.influence -= 40; if (kind === 'steal_tech') p.resources.sciPt += 30; else if (kind === 'foment_rebellion') Object.values(s.provinces).filter((x) => x.ownerId === target).slice(0, 2).forEach((x) => { x.unrest += 8; x.rebellionRisk += 6; }); else log(get, `${t.name} 军力约 ${t.army.reduce((a, b) => a + b.size, 0)}`); relBoth(s, p.id, target, (r) => { if (r) r.trust = Math.max(0, r.trust - 5); }); touch(set); log(get, '间谍行动完成'); return true; },
   dynasticMarriage: (target) => { const s = get().state; const p = playerOf(s); if (p.resources.influence < 30 || p.resources.gold < 80) { log(get, '联姻资源不足'); return false; } if (!cost(p, 2, get)) return false; p.resources.influence -= 30; p.resources.gold -= 80; relBoth(s, p.id, target, (r) => { if (r) { r.relation += 15; r.trust += 10; } }); touch(set); log(get, '联姻成功'); return true; },
   culturalExport: (target) => { const s = get().state; const p = playerOf(s); if (p.resources.sciPt < 30) { log(get, '科研点不足'); return false; } if (!cost(p, 1, get)) return false; p.resources.sciPt -= 30; p.resources.influence += 5; relBoth(s, p.id, target, (r) => { if (r) r.relation += 8; }); touch(set); log(get, '文化输出完成'); return true; },
-
-  declareWar: (target, provinceId) => { const s = get().state; const p = playerOf(s); if (s.wars.some((w) => [w.attackerId, w.defenderId].includes(p.id) && [w.attackerId, w.defenderId].includes(target))) { log(get, '双方已经处于战争中'); return false; } const r = engineDeclareWar(p, target, provinceId, s) as unknown as { ok: boolean; reason?: string }; if (!r.ok) { log(get, `宣战失败：${r.reason ?? '条件不足'}`); return false; } relBoth(s, p.id, target, (x) => { if (x) { x.treaty = 'war'; x.relation = -100; } }); touch(set); log(get, `向 ${s.nations[target]?.name ?? target} 宣战`); return true; },
+  declareWar: (target, provinceId) => { const s = get().state; const p = playerOf(s); if (s.wars.some((w) => [w.attackerId, w.defenderId].includes(p.id) && [w.attackerId, w.defenderId].includes(target))) { log(get, '双方已经处于战争中'); return false; } const war = engineDeclareWar(s, p.id, target, provinceId); if (!war) { log(get, '宣战失败：停战期、已有战争或目标无效'); return false; } touch(set); log(get, `向 ${s.nations[target]?.name ?? target} 宣战`); return true; },
   makePeace: (warId) => { const s = get().state; const p = playerOf(s); const w = s.wars.find((x) => x.id === warId); if (!w) return false; if (!cost(p, 1, get)) return false; engineMakePeace(s, w); const other = w.attackerId === p.id ? w.defenderId : w.attackerId; relBoth(s, p.id, other, (r) => { if (r) { r.treaty = 'truce'; r.truceTurns = Math.max(r.truceTurns, 10); r.relation = Math.min(r.relation, -35); } }); touch(set); log(get, '议和完成'); return true; },
-  moveArmy: (armyId, toProvinceId) => { const s = get().state; const p = playerOf(s); const army = p.army.find((a) => a.id === armyId); const from = army ? s.provinces[army.location] : undefined; const to = s.provinces[toProvinceId]; if (!army || !from || !to) return false; if (!cost(p, 1, get)) return false; const r = engineMoveArmy(p, armyId, toProvinceId, from, to) as unknown as { ok: boolean; reason?: string }; if (!r.ok) { p.resources.adminPt += 1; log(get, `调动失败：${r.reason ?? '不可达'}`); return false; } touch(set); log(get, `军队调至 ${to.name}`); return true; },
-
+  moveArmy: (armyId, toProvinceId) => { const s = get().state; const p = playerOf(s); const army = p.army.find((a) => a.id === armyId); const from = army ? s.provinces[army.location] : undefined; const to = s.provinces[toProvinceId]; if (!army || !from || !to) return false; if (!cost(p, 1, get)) return false; const r = engineMoveArmy(p, armyId, toProvinceId, from, to); if (!r.ok) { p.resources.adminPt += 1; log(get, `调动失败：${r.reason ?? '不可达'}`); return false; } touch(set); log(get, `军队调至 ${to.name}`); return true; },
   enactPolicy: (policyId) => { const s = get().state; const p = playerOf(s); const def = POLICY_BY_ID[policyId]; if (!def || p.activePolicies.some((x) => x.policyId === policyId)) return false; if (!cost(p, 2, get)) return false; if (p.resources.gold < def.costGold) { p.resources.adminPt += 2; log(get, '金不足'); return false; } p.resources.gold -= def.costGold; p.activePolicies.push({ policyId, enactedTurn: s.turn }); const e = def.effects; if (e.stabilityMod) p.government.stability += e.stabilityMod; if (e.efficiencyMod) p.government.efficiency += e.efficiencyMod; if (e.corruptionMod) p.government.corruption += e.corruptionMod; for (const [fid, d] of Object.entries(def.factionReaction)) { const f = p.factions.find((x) => x.id === fid); if (f && d) f.satisfaction = Math.max(0, Math.min(100, f.satisfaction + d)); } touch(set); log(get, `推行政策：${def.name}`); return true; },
-  enactLaw: (lawId) => { const s = get().state; const p = playerOf(s); const def = LAWS.find((x) => x.id === lawId); if (!def) return false; if (!cost(p, 2, get)) return false; const r = engineEnactLaw(p, lawId, s) as unknown as { ok: boolean; reason?: string }; if (!r.ok) { p.resources.adminPt += 2; log(get, `推行失败：${r.reason ?? '条件不足'}`); return false; } touch(set); log(get, `推行法律：${def.name}`); return true; },
-  establishTradeRoute: (routeId) => { const s = get().state; const p = playerOf(s); if (!cost(p, 1, get)) return false; const r = engineEstablishRoute(p, routeId, s) as unknown as { ok: boolean; reason?: string; routeName?: string }; if (!r.ok) { p.resources.adminPt += 1; log(get, `建立失败：${r.reason ?? '条件不足'}`); return false; } touch(set); log(get, `建立贸易路线：${r.routeName ?? routeId}`); return true; },
+  enactLaw: (lawId) => { const s = get().state; const p = playerOf(s); const def = LAWS.find((x) => x.id === lawId); if (!def) return false; if (!cost(p, 2, get)) return false; const r = engineEnactLaw(p, lawId, s); if (!r.ok) { p.resources.adminPt += 2; log(get, `推行失败：${r.reason ?? '条件不足'}`); return false; } touch(set); log(get, `推行法律：${def.name}`); return true; },
+  establishTradeRoute: (routeId) => { const s = get().state; const p = playerOf(s); if (!cost(p, 1, get)) return false; const r = engineEstablishRoute(p, routeId, s); if (!r.ok) { p.resources.adminPt += 1; log(get, `建立失败：${r.reason ?? '条件不足'}`); return false; } touch(set); log(get, `建立贸易路线：${r.routeName ?? routeId}`); return true; },
   embargoTradeRoute: (routeId) => { const s = get().state; const p = playerOf(s); if (!p.activeTradeRoutes.some((r) => r.routeId === routeId)) { log(get, '未建立该路线'); return false; } if (!cost(p, 1, get)) return false; p.embargoedRoutes = p.embargoedRoutes ?? []; p.embargoedRoutes = p.embargoedRoutes.includes(routeId) ? p.embargoedRoutes.filter((r) => r !== routeId) : [...p.embargoedRoutes, routeId]; touch(set); log(get, p.embargoedRoutes.includes(routeId) ? '已禁运' : '已解除禁运'); return true; },
-
   developProvince: (provinceId, kind) => { const s = get().state; const p = playerOf(s); const prov = s.provinces[provinceId]; if (!prov || prov.ownerId !== p.id) return false; if (!cost(p, 1, get)) return false; if (kind === 'reclaim') { if (p.resources.gold < 60) { p.resources.adminPt += 1; log(get, '金不足'); return false; } p.resources.gold -= 60; prov.agriBase = Math.min(12, prov.agriBase + 2); } else if (kind === 'garrison_deploy') { const army = p.army.find((a) => a.location === p.capital && a.size >= 50); if (!army) { p.resources.adminPt += 1; log(get, '首都军队不足'); return false; } army.size -= 50; prov.garrison += 50; } else { if (prov.garrison < 50) { p.resources.adminPt += 1; log(get, '驻军不足'); return false; } prov.garrison -= 50; let army = p.army.find((a) => a.location === p.capital); if (!army) { army = { id: `army_${Date.now()}`, ownerId: p.id, location: p.capital, size: 0, morale: 60, training: 50, equipment: 50, supply: 80 }; p.army.push(army); } army.size += 50; } touch(set); log(get, '省份开发完成'); return true; },
   upgradeBuilding: (provinceId, buildingInstanceId) => { const s = get().state; const p = playerOf(s); const prov = s.provinces[provinceId]; const inst = prov?.buildings.find((b) => b.id === buildingInstanceId); if (!prov || !inst) return false; const def = BUILDINGS[inst.defId as BuildingId]; if (!def || inst.level >= 3) return false; if (!cost(p, 1, get)) return false; const gold = Math.round(def.costGold * 0.6 * inst.level); if (p.resources.gold < gold) { p.resources.adminPt += 1; log(get, '金不足'); return false; } p.resources.gold -= gold; inst.level += 1; touch(set); log(get, `${def.name} 升级完成`); return true; },
   demolishBuilding: (provinceId, buildingInstanceId) => { const s = get().state; const p = playerOf(s); const prov = s.provinces[provinceId]; const inst = prov?.buildings.find((b) => b.id === buildingInstanceId); if (!prov || !inst) return false; const def = BUILDINGS[inst.defId as BuildingId]; prov.buildings = prov.buildings.filter((b) => b.id !== buildingInstanceId); p.resources.gold += Math.round((def?.costGold ?? 50) * 0.3 * inst.level); touch(set); log(get, '建筑已拆除'); return true; },
