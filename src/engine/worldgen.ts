@@ -28,8 +28,8 @@ const NATION_TEMPLATES: Record<NationTier, NationTemplate> = {
   D: { tier: 'D', provinceCountRange: [1, 2], initGoldRange: [100, 150], initArmyRange: [80, 120], initTech: { agri: 1, mil: 1, admin: 1 }, governmentPool: ['tribe', 'junta', 'theocracy'], characterPool: ['militarism', 'feudal', 'balanced'] },
 };
 
-// ── 手写 S/A 级关键国（16 国）──
-// 这些国家有独特名字/性格/资源，生成器跳过
+// ── 手写 S/A/B 级关键国 ──
+// 这些国家有独特名字/性格/资源，生成器会按所属区域精确放置。
 const KEY_NATIONS: Partial<NationDef>[] = [
   // 地中海
   { id: 'n_med_rome', name: '罗马', tier: 'A', government: 'monarchy', character: 'balanced', initGold: 300, initFood: 400, initArmy: { size: 200, morale: 60, training: 50, equipment: 40 } },
@@ -45,6 +45,7 @@ const KEY_NATIONS: Partial<NationDef>[] = [
   { id: 'n_sa_maurya', name: '孔雀帝国', tier: 'A', government: 'empire', character: 'welfare', initGold: 900, initFood: 450, initArmy: { size: 650, morale: 50, training: 50, equipment: 45 } },
   // 北非
   { id: 'n_na_egypt', name: '埃及', tier: 'B', government: 'theocracy', character: 'religiosity', initGold: 400, initFood: 350, initArmy: { size: 300, morale: 50, training: 45, equipment: 40 } },
+  { id: 'n_na_carthage', name: '努米底亚', tier: 'B', government: 'monarchy', character: 'militarism', initGold: 380, initFood: 300, initArmy: { size: 320, morale: 55, training: 45, equipment: 40 } },
   // 美洲
   { id: 'n_am_inca', name: '印加帝国', tier: 'A', government: 'empire', character: 'authoritarian', initGold: 700, initFood: 400, initArmy: { size: 600, morale: 55, training: 40, equipment: 35 } },
   { id: 'n_am_aztec', name: '阿兹特克', tier: 'B', government: 'junta', character: 'militarism', initGold: 400, initFood: 300, initArmy: { size: 400, morale: 60, training: 45, equipment: 30 } },
@@ -58,6 +59,28 @@ const KEY_NATIONS: Partial<NationDef>[] = [
   // 大洋洲
   { id: 'n_oc_srivijaya', name: '室利佛逝', tier: 'B', government: 'merchant_republic', character: 'commerce', initGold: 450, initFood: 300, initArmy: { size: 250, morale: 45, training: 40, equipment: 35 } },
 ];
+
+// 关键国必须按明确区域放置，不能只靠 id 前缀。
+// 例如 n_sa_ 同时可能表示 South Asia，也可能被误认为 Southern Africa。
+const KEY_NATION_REGION: Record<string, RegionTemplate['continent']> = {
+  n_med_rome: 'mediterranean',
+  n_med_carthage: 'mediterranean',
+  n_med_syracuse: 'mediterranean',
+  n_me_persia: 'middle_east',
+  n_me_parthia: 'middle_east',
+  n_ea_qin: 'asia_east',
+  n_ea_han: 'asia_east',
+  n_sa_maurya: 'asia_south',
+  n_na_egypt: 'africa_n',
+  n_na_carthage: 'africa_n',
+  n_am_inca: 'americas',
+  n_am_aztec: 'americas',
+  n_am_maya: 'americas',
+  n_ee_kievan: 'europe_e',
+  n_ca_xiongnu: 'asia_central',
+  n_we_frank: 'europe_w',
+  n_oc_srivijaya: 'oceania',
+};
 
 // ── 世界生成主函数 ──
 export interface WorldGenResult {
@@ -95,6 +118,8 @@ export function generateWorld(seed: number, playerNationId?: string, regionFilte
         // 只为邻国生成关系（简化：同区域都算邻国）
         const baseRel = rng() > 0.5 ? 10 : -5;
         relations.push({ from: regionNations[i].id, to: regionNations[j].id, relation: baseRel, trust: 50 });
+        // UI 和外交行动大量按 from=玩家、to=目标读取，因此必须同时生成反向关系。
+        relations.push({ from: regionNations[j].id, to: regionNations[i].id, relation: baseRel, trust: 50 });
       }
     }
 
@@ -118,16 +143,13 @@ function generateRegionNations(region: RegionTemplate, rng: () => number, idOffs
       const nationId = `n_${idOffset + localId + 1}`;
       localId++;
 
-      // 检查是否是手写关键国（修：continent 前缀与 key id 前缀不一致，改用映射表）
-      const CONTINENT_KEY_PREFIX: Record<string, string> = {
-        mediterranean: 'n_med_', europe_w: 'n_we_', europe_e: 'n_ee_', europe_n: 'n_en_',
-        middle_east: 'n_me_', africa_n: 'n_na_', africa_s: 'n_sa_',
-        asia_central: 'n_ca_', asia_east: 'n_ea_', asia_south: 'n_sa_',
-        americas: 'n_am_', oceania: 'n_oc_',
-      };
-      const prefix = CONTINENT_KEY_PREFIX[region.continent] ?? '';
-      // 修：按 tier 匹配 keyNation，且只匹配一次（usedKeyNation 跟踪）
-      const keyNation = prefix ? KEY_NATIONS.find((k) => k.id?.startsWith(prefix) && k.tier === tier && !usedKeyNation.has(k.id)) : undefined;
+      // 手写关键国按明确区域 + tier 匹配，避免前缀误判和跨区域重复。
+      const keyNation = KEY_NATIONS.find((k) => (
+        !!k.id
+        && KEY_NATION_REGION[k.id] === region.continent
+        && k.tier === tier
+        && !usedKeyNation.has(k.id)
+      ));
       if (keyNation && (tier === 'S' || tier === 'A' || tier === 'B')) {
         usedKeyNation.add(keyNation.id!);
         // 用手写覆盖——保留 key.id，玩家匹配检查 key.id
