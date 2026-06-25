@@ -4,6 +4,7 @@ import { createInitialState } from '../engine/init';
 import { settleEconomy, establishTradeRoute, settleEconomyPure } from '../engine/economy';
 import { settlePolitics, settlePoliticsPure, changeGovernment, enactPolicy, enactLaw } from '../engine/politics';
 import { settleTechnology, settleTechnologyPure, startResearch } from '../engine/technology';
+import { settleCultureReligion, settleCultureReligionPure } from '../engine/culture';
 import { declareWar, makePeace, recruit, moveArmy } from '../engine/military';
 import { improveRelation, establishTrade, espionage, formAlliance } from '../engine/diplomacy';
 import { draftFromPopulation, settlePopulation, settlePopulationPure } from '../engine/population';
@@ -474,5 +475,35 @@ describe('C1 settleTechnologyPure 纯函数对照', () => {
     const before = JSON.stringify({ tech: p2.tech, res: p2.resources });
     settleTechnologyPure(p2, state2);  // 再调一次仍不 mutate
     expect(JSON.stringify({ tech: p2.tech, res: p2.resources })).toBe(before);
+  });
+});
+
+// C1: settleCultureReligionPure 纯函数对照测试
+describe('C1 settleCultureReligionPure 纯函数对照', () => {
+  it('provFinal 与 settleCultureReligion mutate 后的省值一致', () => {
+    const state1 = createInitialState();
+    const state2 = createInitialState();
+    const p1 = state1.nations[PLAYER_ID];
+    const p2 = state2.nations[PLAYER_ID];
+    const provs1 = provincesOf(PLAYER_ID, state1.provinces);
+    settleCultureReligion(p1, state1);
+    const pure = settleCultureReligionPure(p2, state2);
+    provs1.forEach((p) => {
+      const f = pure.provFinal[p.id];
+      expect(f).toBeDefined();
+      expect(p.assimilation).toBeCloseTo(f.assimilation, 0);
+      expect(p.loyalty).toBeCloseTo(f.loyalty, 0);
+      expect(p.rebellionRisk).toBeCloseTo(f.rebellionRisk, 0);
+    });
+    expect(pure.rebellionTriggered).toEqual(p1 ? [] : []);  // 初始态通常无叛乱
+  });
+
+  it('settleCultureReligionPure 不 mutate nation/provinces', () => {
+    const state = createInitialState();
+    const p = state.nations[PLAYER_ID];
+    const provs = provincesOf(PLAYER_ID, state.provinces);
+    const before = JSON.stringify({ nation: p, provs });
+    settleCultureReligionPure(p, state);
+    expect(JSON.stringify({ nation: p, provs })).toBe(before);
   });
 });

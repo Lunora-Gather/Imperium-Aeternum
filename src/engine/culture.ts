@@ -56,3 +56,46 @@ export function settleCultureReligion(nation: Nation, state: GameState): Culture
 }
 
 export { assimilationDelta, loyaltyDelta };
+
+// ── C1: 纯函数版本 settleCultureReligionPure ──
+// 不 mutate nation/provinces，返回每省 delta + rebellionTriggered，供 processTurn 合并建新 state
+// 与原 settleCultureReligion 并存（零回归）
+export interface CultureReligionPartial extends CultureReligionResult {
+  // 每省覆写值（assimilation/loyalty/rebellionRisk 都是 clamp 后最终值）
+  provFinal: Record<string, { assimilation: number; loyalty: number; rebellionRisk: number }>;
+}
+export function settleCultureReligionPure(nation: Nation, state: GameState): CultureReligionPartial {
+  const provs = provincesOf(nation.id, state.provinces);
+  const triggered: string[] = [];
+  const culturePolicy: 'assimilate' | 'respect' = 'assimilate';
+  const religionPolicy: 'tolerant' | 'state' | 'persecute' = 'tolerant';
+  const capital = state.provinces[nation.capital];
+  const stateCulture: CultureId | null = capital?.culture ?? null;
+  const stateReligion: ReligionId | null = capital?.religion ?? null;
+  const provFinal: Record<string, { assimilation: number; loyalty: number; rebellionRisk: number }> = {};
+
+  for (const p of provs) {
+    const cultureDiff = stateCulture !== null && p.culture !== stateCulture;
+    const religionDiff = stateReligion !== null && p.religion !== stateReligion;
+    const farFromCapital = p.distToPlayerCapital > 2;
+    const cultureTechBonus = nation.tech.culture * 0.5 + (nation.policyMods?.assimilationMod ?? 0);
+    const dAssim = assimilationDelta(
+      p.buildings.filter((b) => b.defId === 'road').length,
+      culturePolicy, nation.government.efficiency, cultureDiff, farFromCapital,
+    ) + cultureTechBonus;
+    const finalAssim = clamp(p.assimilation + dAssim, 0, 100);
+    // loyalty 用 finalAssim（等价原函数 mutate 后值）
+    const dLoy = loyaltyDelta(
+      nation.government.stability, finalAssim, p.garrison > 0, p.unrest,
+      nation.activeCharacterBonuses.includes('welfare'),
+    );
+    const finalLoy = clamp(p.loyalty + dLoy, 0, 100);
+    const finalReb = clamp(computeRebellion({
+      unrest: p.unrest, cultureDiff, religionDiff, religionPolicy,
+      garrison: p.garrison, stability: nation.government.stability,
+    }), 0, 100);
+    provFinal[p.id] = { assimilation: finalAssim, loyalty: finalLoy, rebellionRisk: finalReb };
+    if (finalReb >= 100 && p.garrison === 0) triggered.push(p.id);
+  }
+  return { rebellionTriggered: triggered, provFinal };
+}
