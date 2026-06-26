@@ -83,6 +83,7 @@ export function inspectSaveSlot(slot: number): SaveRecoveryPreview {
 
   try {
     const originalVersion = read.save.version ?? 0;
+    const hadTransientRelMap = !!read.save.gameState?._relMap;
     const migrated = safeMigrate(read.save);
     const migratedState = migrated.gameState;
     const repairedState = sanitizeState(migratedState);
@@ -91,6 +92,7 @@ export function inspectSaveSlot(slot: number): SaveRecoveryPreview {
     const afterReport = safeReadiness(repairedState);
 
     const repairs = structuralRepairs(migratedState, repairedState);
+    if (hadTransientRelMap) repairs.unshift('清理临时外交缓存');
     if (originalVersion < SAVE_VERSION) repairs.unshift(`升级存档架构 v${originalVersion || '?'} → v${SAVE_VERSION}`);
     const compactedKB = sizeKB(compacted);
     if (read.sizeKB - compactedKB >= 64) repairs.push(`瘦身约 ${read.sizeKB - compactedKB}KB`);
