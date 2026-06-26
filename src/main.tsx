@@ -13,7 +13,7 @@ import { installAmbitionSystem } from './gameplay/ambitions';
 import { installStrategyFocus } from './gameplay/strategyFocus';
 import { installStateHygiene } from './gameplay/stateHygiene';
 
-const BUILD_MARK = '第十一轮优化 v11 · combat-stability-guard';
+const BUILD_MARK = '第十一轮综合加固 v11 · quality-ai-save-guard';
 
 installLogicGuard();
 installAmbitionSystem();
