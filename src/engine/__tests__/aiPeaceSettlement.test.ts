@@ -7,7 +7,7 @@ describe('AI peace settlement', () => {
     const state = createInitialState();
     const attacker = state.nations.n01;
     const defender = state.nations.n02;
-    const target = state.provinces.p05;
+    const target = state.provinces.p08;
 
     expect(attacker).toBeTruthy();
     expect(defender).toBeTruthy();
