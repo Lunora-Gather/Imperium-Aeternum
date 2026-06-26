@@ -11,10 +11,9 @@ type JumpToTab = (tab: string) => void;
 
 export default function DashboardStrategicHq({ state, commandActions, jumpToTab }: { state: GameState; commandActions: CommandCenterAction[]; jumpToTab: JumpToTab }) {
   const plan = useMemo(() => buildStrategicHqPlan(state, commandActions), [state, commandActions]);
-  const primaryTab = plan.summaryView.lines[0]?.actionLabel && plan.nextAction?.tab;
 
   return <StrategicHqPanel
     plan={plan}
-    jumpToPrimary={primaryTab ? () => jumpToTab(primaryTab) : undefined}
+    jumpToPrimary={plan.primaryTab ? () => jumpToTab(plan.primaryTab!) : undefined}
   />;
 }
