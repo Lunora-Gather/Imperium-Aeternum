@@ -1,0 +1,77 @@
+name: Deploy Imperium Aeternum Preview
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build optimization branch
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout optimized branch
+        uses: actions/checkout@v4
+        with:
+          ref: optimize/v39-action-plan
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Targeted tests for dashboard and war systems
+        run: |
+          npx vitest run src/gameplay/__tests__/commandExecutionPlan.test.ts
+          npx vitest run src/gameplay/__tests__/actionPlanSummary.test.ts
+          npx vitest run src/gameplay/__tests__/strategicHq.test.ts
+          npx vitest run src/gameplay/__tests__/warAssessment.test.ts
+          npx vitest run src/gameplay/__tests__/warPreview.test.ts
+          npx vitest run src/gameplay/__tests__/warOpportunityAdvisor.test.ts
+          npx vitest run src/gameplay/__tests__/aiWarDecision.test.ts
+          npx vitest run src/gameplay/__tests__/aiWarActionAdapter.test.ts
+          npx vitest run src/engine/__tests__/aiWarPlannerIntegration.test.ts
+
+      - name: Build Pages artifact
+        env:
+          VITE_BASE: /Imperium-Aeternum/
+        run: |
+          npm run pages:build
+          cp dist/index.html dist/404.html
+
+      - name: Configure Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+
+  deploy:
+    name: Deploy to GitHub Pages
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy
+        id: deployment
+        uses: actions/deploy-pages@v4
