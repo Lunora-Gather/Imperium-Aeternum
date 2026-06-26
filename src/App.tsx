@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useGameStore } from './store/gameStore';
 import { playSfx, useSfxMute } from './utils/audio';
+import { BUILD_MARK } from './buildInfo';
 
 import { provincesOf } from './engine/init';
 import { ResourceStrip } from './components/ui';
@@ -47,7 +48,6 @@ const TAB_GROUPS: { group: string; tabs: { id: Tab; label: string; key: string; 
   ]},
 ];
 const ALL_TABS = TAB_GROUPS.flatMap((g) => g.tabs);
-const BUILD_MARK = '导航安全 v1';
 
 export default function App() {
   const [tab, setTab] = useState<Tab>('dashboard');
@@ -255,7 +255,7 @@ export default function App() {
         <div className="ia-nav-hint">Esc 回总览 · 空格下一回合 · T 经济 · {BUILD_MARK}</div>
       </nav>
 
-      <main className="ia-content-shell ia-fade-in" key={tab}>
+      <main className="ia-content-shell ia-fade-in">
         {tab === 'dashboard' && <Dashboard />}
         {tab === 'map' && <WorldMap />}
         {tab === 'province' && <ProvinceScreen />}
