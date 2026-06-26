@@ -1,1 +1,1 @@
-export const BUILD_MARK = 'V38 command-explainability';
+export const BUILD_MARK = 'V39 action-plan';
