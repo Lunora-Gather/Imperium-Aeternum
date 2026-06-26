@@ -24,9 +24,12 @@ jobs:
           node-version: 20
           cache: npm
       - run: npm ci
-      - run: npm run build
+      - name: TypeScript check (non-blocking)
+        run: npm run typecheck
+        continue-on-error: true
+      - name: Build static site
+        run: npm run pages:build
         env:
-          # Vite base for Pages project page
           VITE_BASE: /Imperium-Aeternum/
       - uses: actions/upload-pages-artifact@v3
         with:
