@@ -1,1 +1,1 @@
-export const BUILD_MARK = 'V41 war-opportunity-advisor';
+export const BUILD_MARK = 'V41 war-opportunity-bridge';
