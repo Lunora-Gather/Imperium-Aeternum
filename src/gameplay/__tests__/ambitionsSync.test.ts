@@ -43,7 +43,7 @@ describe('ambition progress synchronization', () => {
     base.ambitionMeta.peaceTurns = 4;
     player(base).government.stability = 70;
     player(base).government.legitimacy = 70;
-    base.wars = [{ id: 'w_test', attackerId: base.playerNationId, defenderId: 'n02', targetProvinceId: 'p02', progress: 10, startTurn: base.turn, battleReports: [] }];
+    base.wars = [{ id: 'w_test', attackerId: base.playerNationId, defenderId: 'n02', targetProvinceId: 'p02', progress: 10, turns: 0, battleReports: [] }];
 
     const applied = applyAmbitionsAfterTurn({ ...base, turn: base.turn + 1 }).state as GameState & { ambitionMeta: { startProvinces: number; peaceTurns: number } };
 
