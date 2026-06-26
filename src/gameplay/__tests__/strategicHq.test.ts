@@ -53,6 +53,7 @@ describe('strategic HQ planner', () => {
     expect(hq.objective).toBe('处理待决事件');
     expect(hq.risk).toBe('danger');
     expect(hq.riskLabel).toBe('高风险');
+    expect(hq.primaryTab).toBe('dashboard');
     expect(hq.confidence).toBeLessThan(70);
     expect(hq.why.join(' ')).toContain('待决事件');
     expect(hq.impacts).toEqual(expect.arrayContaining([expect.objectContaining({ id: 'blockers', value: '1 项', tone: 'danger' })]));
@@ -68,6 +69,7 @@ describe('strategic HQ planner', () => {
 
     expect(hq.risk).toBe('warn');
     expect(hq.riskLabel).toBe('中风险');
+    expect(hq.primaryTab).toBe('economy');
     expect(hq.horizon).toContain('2～3');
     expect(hq.why.join(' ')).toContain('年度净收入');
     expect(hq.impacts).toEqual(expect.arrayContaining([expect.objectContaining({ id: 'net', value: '-50/年', tone: 'warn' })]));
@@ -82,6 +84,7 @@ describe('strategic HQ planner', () => {
     expect(hq.title).toContain('主动扩张');
     expect(hq.risk).toBe('normal');
     expect(hq.riskLabel).toBe('低风险');
+    expect(hq.primaryTab).toBe('province');
     expect(hq.confidence).toBeGreaterThanOrEqual(80);
     expect(hq.primaryCta).toBe('先做：发展核心省份');
     expect(hq.summaryView.advanceLabel).toBe('可进入下一年');
@@ -92,6 +95,7 @@ describe('strategic HQ planner', () => {
 
     expect(hq.objective).toBe('存档后推进下一年');
     expect(hq.primaryCta).toBe('存档后推进');
+    expect(hq.primaryTab).toBeUndefined();
     expect(hq.why[0]).toContain('没有明显硬伤');
   });
 });
