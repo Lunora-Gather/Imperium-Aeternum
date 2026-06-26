@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { useGameStore } from './store/gameStore';
 import { playSfx, useSfxMute } from './utils/audio';
 import { BUILD_MARK } from './buildInfo';
+import { getOnboardingStep, nextOnboardingIndex, onboardingProgress, prevOnboardingIndex } from './gameplay/onboarding';
 
 import { provincesOf } from './engine/init';
 import { ResourceStrip } from './components/ui';
@@ -76,6 +77,12 @@ export default function App() {
   const sfxMute = useSfxMute();
   const prevPendingCount = useRef(state.pendingEvents.length);
   const prevVictory = useRef(state.victory.type);
+
+  const finishHelp = useCallback(() => {
+    setShowHelp(false);
+    setTutorialStep(0);
+    try { localStorage.setItem('ia-tutorial-done', '1'); } catch { /* ignore */ }
+  }, []);
 
   useEffect(() => {
     try {
@@ -189,6 +196,13 @@ export default function App() {
 
   if (scene === 'menu') return <ScenarioSelect />;
 
+  const helpProgress = onboardingProgress(tutorialStep);
+  const helpStep = getOnboardingStep(tutorialStep);
+  const goHelpTab = () => {
+    setTab(helpStep.tab as Tab);
+    setShowHelp(false);
+  };
+
   return (
     <div className="ia-shell">
       <header className="ia-topbar">
@@ -255,7 +269,7 @@ export default function App() {
         <div className="ia-nav-hint">Esc 回总览 · 空格下一回合 · T 经济 · {BUILD_MARK}</div>
       </nav>
 
-      <main className="ia-content-shell ia-fade-in">
+      <main className="ia-content-shell ia-fade">
         {tab === 'dashboard' && <Dashboard />}
         {tab === 'map' && <WorldMap />}
         {tab === 'province' && <ProvinceScreen />}
@@ -279,24 +293,19 @@ export default function App() {
       </footer>
 
       {showHelp && scene === 'playing' && (
-        <div className="ia-modal-backdrop" onClick={() => { setShowHelp(false); setTutorialStep(-1); try { localStorage.setItem('ia-tutorial-done', '1'); } catch { /* ignore */ } }}>
+        <div className="ia-modal-backdrop" onClick={finishHelp}>
           <div className="ia-help-card" onClick={(e) => e.stopPropagation()}>
-            <div className="ia-display ia-help-title">✦ 治国之要 · 第 {Math.max(tutorialStep, 0) + 1} / 5 步</div>
-            {(() => {
-              const steps = [
-                { title: '① 总览警报', body: '看总览页警报置顶，红危黄警先处理。稳定度<40 或国库<0 是致命的。' },
-                { title: '② 调税率', body: '去经济页调税率平衡民心与国库。高税多金但降民心，低税反之。' },
-                { title: '③ 建设省份', body: '省份页建农田保粮、建市场生金、建兵营强军。' },
-                { title: '④ 派系与科技', body: '政治页安抚派系，科技页研发科技稳根基。扩张越大治理越难。' },
-                { title: '⑤ 推回合', body: '点下一回合或按空格结算。事件弹窗可按 1/2/3 键选择。' },
-              ];
-              const cur = steps[Math.max(tutorialStep, 0)] ?? steps[0];
-              return <><div className="ia-help-step-title">{cur.title}</div><div className="ia-help-step-body">{cur.body}</div></>;
-            })()}
+            <div className="ia-display ia-help-title">✦ 治国路线 · 第 {helpProgress.current} / {helpProgress.total} 步</div>
+            <div className="ia-help-step-title">{helpStep.title}</div>
+            <div className="ia-help-step-body">{helpStep.body}</div>
+            <div className="ia-dash-note" style={{ marginTop: 10 }}>
+              推荐页面：{ALL_TABS.find((x) => x.id === helpStep.tab)?.label ?? helpStep.tab}{helpStep.shortcut ? ` · 快捷键 ${helpStep.shortcut}` : ''}
+            </div>
             <div className="ia-help-actions">
-              <button className="ia-btn ia-btn--ghost" onClick={() => { setShowHelp(false); setTutorialStep(-1); try { localStorage.setItem('ia-tutorial-done', '1'); } catch { /* ignore */ } }}>跳过</button>
-              {tutorialStep > 0 && <button className="ia-btn" onClick={() => setTutorialStep((s) => Math.max(s - 1, 0))}>上一步</button>}
-              {tutorialStep < 4 ? <button className="ia-btn ia-btn--primary" onClick={() => setTutorialStep((s) => Math.min(s + 1, 4))}>下一步</button> : <button className="ia-btn ia-btn--primary" onClick={() => { setShowHelp(false); setTutorialStep(-1); try { localStorage.setItem('ia-tutorial-done', '1'); } catch { /* ignore */ } }}>开始治国</button>}
+              <button className="ia-btn ia-btn--ghost" onClick={finishHelp}>不再提示</button>
+              {tutorialStep > 0 && <button className="ia-btn" onClick={() => setTutorialStep((s) => prevOnboardingIndex(s))}>上一步</button>}
+              <button className="ia-btn" onClick={goHelpTab}>{helpStep.cta}</button>
+              {!helpProgress.done ? <button className="ia-btn ia-btn--primary" onClick={() => setTutorialStep((s) => nextOnboardingIndex(s))}>下一步</button> : <button className="ia-btn ia-btn--primary" onClick={finishHelp}>开始治国</button>}
             </div>
           </div>
         </div>
