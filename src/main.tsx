@@ -13,7 +13,7 @@ import { installAmbitionSystem } from './gameplay/ambitions';
 import { installStrategyFocus } from './gameplay/strategyFocus';
 import { installStateHygiene } from './gameplay/stateHygiene';
 
-const BUILD_MARK = '大优化 v8 · territorial-chronicle-save';
+const BUILD_MARK = '部署修复 v9 · pages-build-safe';
 
 installLogicGuard();
 installAmbitionSystem();
