@@ -1,1 +1,1 @@
-export const BUILD_MARK = 'V41 military-war-preview';
+export const BUILD_MARK = 'V41 ai-war-decision';
