@@ -1,10 +1,10 @@
-// V20 行动中心：把回合前体检、年报行动、战略简报合成一条“现在最该做什么”。
+// V21 行动中心：支持复用总览页已算好的体检、年报行动和战略简报。
 // 纯函数，不改 GameState；总览 UI、未来快捷栏和测试可复用。
 
 import type { GameState } from '../types/game';
-import { buildReadinessReport } from './readiness';
-import { buildStrategicBrief } from './strategicAdvisor';
-import { buildTurnReportActions } from './turnReportActions';
+import { buildReadinessReport, type ReadinessReport } from './readiness';
+import { buildStrategicBrief, type StrategicBrief } from './strategicAdvisor';
+import { buildTurnReportActions, type TurnReportAction } from './turnReportActions';
 
 export type CommandActionTone = 'normal' | 'warn' | 'danger';
 
@@ -16,6 +16,12 @@ export interface CommandCenterAction {
   level: number;
   tone: CommandActionTone;
   source: 'readiness' | 'report' | 'strategy' | 'fallback';
+}
+
+export interface CommandCenterContext {
+  readiness?: ReadinessReport;
+  brief?: StrategicBrief;
+  reportActions?: TurnReportAction[];
 }
 
 function tone(level: number, danger = false): CommandActionTone {
@@ -30,11 +36,11 @@ function pushUnique(out: CommandCenterAction[], item: CommandCenterAction): void
   out.push(item);
 }
 
-export function buildCommandCenterActions(state: GameState, limit = 5): CommandCenterAction[] {
+export function buildCommandCenterActions(state: GameState, limit = 5, context: CommandCenterContext = {}): CommandCenterAction[] {
   const out: CommandCenterAction[] = [];
-  const readiness = buildReadinessReport(state);
-  const reportActions = buildTurnReportActions(state);
-  const brief = buildStrategicBrief(state);
+  const brief = context.brief ?? buildStrategicBrief(state);
+  const readiness = context.readiness ?? buildReadinessReport(state);
+  const reportActions = context.reportActions ?? buildTurnReportActions(state, { brief });
 
   for (const item of [...readiness.blockers, ...readiness.warnings, ...readiness.advice].slice(0, 8)) {
     if (!item.tab) continue;

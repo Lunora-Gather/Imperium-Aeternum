@@ -1,8 +1,8 @@
-// V19 年报行动路由：把“今年发生了什么”转成“下一步该去哪儿”。
-// 纯函数，供年报页、未来快捷行动栏和测试复用。
+// V21 年报行动路由：支持复用外部预计算战略简报，避免总览/年报重复诊断。
+// 纯函数，供年报页、行动中心、未来快捷行动栏和测试复用。
 
 import type { GameState } from '../types/game';
-import { buildStrategicBrief } from './strategicAdvisor';
+import { buildStrategicBrief, type StrategicBrief } from './strategicAdvisor';
 
 export type TurnReportActionTone = 'good' | 'warn' | 'danger' | 'info';
 export type TurnReportActionTab = 'dashboard' | 'province' | 'economy' | 'population' | 'politics' | 'military' | 'diplomacy' | 'tech' | 'save';
@@ -15,6 +15,10 @@ export interface TurnReportAction {
   level: number;
   tone: TurnReportActionTone;
   tag: string;
+}
+
+export interface TurnReportActionContext {
+  brief?: StrategicBrief;
 }
 
 function toneFromLevel(level: number): TurnReportActionTone {
@@ -45,7 +49,7 @@ function dedupe(actions: TurnReportAction[]): TurnReportAction[] {
   return out;
 }
 
-export function buildTurnReportActions(state: GameState): TurnReportAction[] {
+export function buildTurnReportActions(state: GameState, context: TurnReportActionContext = {}): TurnReportAction[] {
   const r = state.lastReport;
   const pid = state.playerNationId;
   const player = state.nations[pid];
@@ -82,7 +86,7 @@ export function buildTurnReportActions(state: GameState): TurnReportAction[] {
   }
   if (player.resources.sciPt > 250) actions.push(action('science-ready', '可推进科技', '科研点已有积累，下一步可以解锁建筑、政策或治理效率。', 'tech', 44));
 
-  const brief = buildStrategicBrief(state);
+  const brief = context.brief ?? buildStrategicBrief(state);
   for (const x of brief.urgent.slice(0, 4)) {
     actions.push(action(`brief-${x.title}`, x.title, x.body, x.tab as TurnReportActionTab, x.level));
   }
