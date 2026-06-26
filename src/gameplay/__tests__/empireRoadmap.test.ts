@@ -14,8 +14,8 @@ const ambition: AmbitionSnapshot = {
   worldScale: 'local',
 };
 
-function action(id: string, tab: CommandCenterAction['tab'], level: number): CommandCenterAction {
-  return { id, label: `行动${id}`, desc: `处理${id}`, tab, level, tone: level > 88 ? 'danger' : level > 55 ? 'warn' : 'normal', source: 'fallback' };
+function action(id: string, tab: CommandCenterAction['tab'], level: number, source: CommandCenterAction['source'] = 'fallback'): CommandCenterAction {
+  return { id, label: `行动${id}`, desc: `处理${id}`, tab, level, tone: level > 88 ? 'danger' : level > 55 ? 'warn' : 'normal', source };
 }
 
 describe('empire roadmap', () => {
@@ -43,12 +43,12 @@ describe('empire roadmap', () => {
     const state = createInitialState();
     const brief = buildStrategicBrief(state);
     const readiness = buildReadinessReport(state);
-    const commandActions = [action('a', 'economy', 80), action('b', 'province', 70)];
+    const commandActions = [action('a', 'economy', 80, 'readiness'), action('b', 'province', 70, 'strategy')];
 
     const roadmap = buildEmpireRoadmap(state, { brief, readiness, commandActions, ambition });
 
-    expect(roadmap.steps[0]).toMatchObject({ id: 'action-a', tab: 'economy', horizon: '现在' });
-    expect(roadmap.steps[1]).toMatchObject({ id: 'action-b', tab: 'province', horizon: '本年' });
+    expect(roadmap.steps[0]).toMatchObject({ id: 'action-a', tab: 'economy', horizon: '现在', reason: '回合前体检 · 优先级 80' });
+    expect(roadmap.steps[1]).toMatchObject({ id: 'action-b', tab: 'province', horizon: '本年', reason: '战略参谋 · 优先级 70' });
   });
 
   it('keeps route progress clamped to 100 percent', () => {
@@ -64,5 +64,20 @@ describe('empire roadmap', () => {
     const roadmap = buildEmpireRoadmap(state, { ambition: maxed });
 
     expect(roadmap.route.progress).toBe(100);
+  });
+
+  it('adds evidence and impact text to make the roadmap explainable', () => {
+    const state = createInitialState();
+    const brief = buildStrategicBrief(state);
+    const readiness = buildReadinessReport(state);
+    const commandActions = [action('finance', 'economy', 80, 'readiness')];
+
+    const roadmap = buildEmpireRoadmap(state, { brief, readiness, commandActions, ambition });
+
+    expect(roadmap.evidence.length).toBeGreaterThanOrEqual(4);
+    expect(roadmap.evidenceLine).toContain('体检');
+    expect(roadmap.evidenceLine).toContain('主线');
+    expect(roadmap.steps[0].body).toContain('依据：回合前体检 · 优先级 80');
+    expect(roadmap.steps[0].body).toContain('影响：优先保护财政与粮食循环');
   });
 });
