@@ -3,6 +3,7 @@
 
 import type { GameState } from '../types/game';
 import type { CommandCenterAction } from './commandCenterActions';
+import type { NavigationTab } from './navigationTabs';
 import { buildCommandExecutionPlan } from './commandExecutionPlan';
 import { buildActionPlanSummary, type ActionPlanSummary } from './actionPlanSummary';
 
@@ -24,6 +25,7 @@ export interface StrategicHqPlan {
   riskLabel: string;
   horizon: string;
   primaryCta: string;
+  primaryTab?: NavigationTab;
   why: string[];
   impacts: StrategicHqImpact[];
   summaryView: ActionPlanSummary;
@@ -111,6 +113,7 @@ export function buildStrategicHqPlan(state: GameState, actions: CommandCenterAct
     riskLabel: riskLabel(risk),
     horizon: horizonFor(risk),
     primaryCta: summaryView.primaryCta,
+    primaryTab: first?.tab,
     why: why.length > 0 ? why : ['当前没有明显硬伤，可以把主动权用于建设、外交或科技。'],
     impacts: buildImpacts(state, actions),
     summaryView,
