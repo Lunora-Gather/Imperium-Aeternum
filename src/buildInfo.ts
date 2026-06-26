@@ -1,1 +1,1 @@
-export const BUILD_MARK = 'V27 next-turn preview';
+export const BUILD_MARK = 'V28 pre-turn council';
