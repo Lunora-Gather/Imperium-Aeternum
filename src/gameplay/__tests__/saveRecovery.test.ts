@@ -46,7 +46,7 @@ describe('save recovery previews', () => {
   it('previews migration and repair without mutating localStorage', () => {
     const save = healthySave(3);
     save.gameState.wars.push({ id: 'bad-war', attackerId: save.gameState.playerNationId, defenderId: 'missing', targetProvinceId: 'missing-province', progress: 200, turns: -3, battleReports: [] });
-    (save.gameState as typeof save.gameState & { _relMap?: Record<string, unknown> })._relMap = {};
+    save.gameState._relMap = new Map();
     const rawBefore = JSON.stringify(save);
     localStorage.setItem(key(1), rawBefore);
 
