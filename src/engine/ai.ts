@@ -11,8 +11,8 @@ import { clamp } from '../utils/math';
 import { mulberry32 } from '../utils/random';
 import { genId } from '../utils/id';
 import type { PolicyId } from '../data/policies';
+import { mergeAiWarActionPlan } from '../gameplay/aiWarActionAdapter';
 
-// W-fix: 世界生成国家的默认 AI 权重（按 tier）——导出供世界生成复用
 export function defaultAIWeights(tier: NationTier): NationDef['aiWeights'] {
   const base = { taxUp: 1.0, buildFarm: 1.0, suppress: 0.8, expandArmy: 0.8, alliance: 1.0, declareWar: 0.6, research: 1.0 };
   if (tier === 'S' || tier === 'A') return { ...base, expandArmy: 1.2, declareWar: 0.9, research: 1.2 };
@@ -20,30 +20,22 @@ export function defaultAIWeights(tier: NationTier): NationDef['aiWeights'] {
   return base;
 }
 
-// AI 决策行动 id
 export type AIActionId =
   | 'tax_up' | 'tax_down' | 'build_farm' | 'build_market' | 'build_barracks'
   | 'recruit' | 'research' | 'appease' | 'suppress' | 'improve_relation'
   | 'declare_war' | 'make_peace' | 'establish_trade' | 'move_army'
-  | 'enact_policy';  // P-fix: AI 推行政策（原完全缺失）
+  | 'enact_policy';
 
 export interface AIAction {
   actionId: AIActionId;
   weight: number;
-  target?: string;  // 省份/国家/科技/派系 id；宣战时为 defender nation id
-  targetProvinceId?: string; // O12: 宣战闭环，绑定 AI 觊觎/复仇的真实战争目标省
+  target?: string;
+  targetProvinceId?: string;
   reason?: 'desired' | 'revenge' | 'weak_neighbor' | 'frontier';
 }
 
-interface TerritoryMemoryLike {
-  desiredProvinceId?: string;
-  revengeProvinceId?: string;
-  pressure?: number;
-}
-interface AIMemoryLike {
-  rivalId?: string;
-  territory?: TerritoryMemoryLike;
-}
+interface TerritoryMemoryLike { desiredProvinceId?: string; revengeProvinceId?: string; pressure?: number; }
+interface AIMemoryLike { rivalId?: string; territory?: TerritoryMemoryLike; }
 type StateWithAIMemory = GameState & { aiMemory?: Record<string, AIMemoryLike> };
 
 function armySize(nation: Nation | undefined): number {
@@ -91,13 +83,7 @@ function chooseExpansionOpportunity(nation: Nation, state: GameState, w: NationD
     if (!target) continue;
     if (!hasMilitaryEdge(nation, state.nations[target.ownerId], item.reason === 'revenge' ? 1.2 : 1.35)) continue;
     const pressure = memory?.territory?.pressure ?? 0;
-    return {
-      actionId: 'declare_war',
-      weight: (item.baseWeight + pressure / 18) * w.declareWar,
-      target: target.ownerId,
-      targetProvinceId: target.id,
-      reason: item.reason,
-    };
+    return { actionId: 'declare_war', weight: (item.baseWeight + pressure / 18) * w.declareWar, target: target.ownerId, targetProvinceId: target.id, reason: item.reason };
   }
 
   let best: { province: Province; score: number } | null = null;
@@ -113,16 +99,9 @@ function chooseExpansionOpportunity(nation: Nation, state: GameState, w: NationD
     }
   }
   if (!best) return null;
-  return {
-    actionId: 'declare_war',
-    weight: (6 + Math.min(8, best.score / 18)) * w.declareWar,
-    target: best.province.ownerId,
-    targetProvinceId: best.province.id,
-    reason: 'weak_neighbor',
-  };
+  return { actionId: 'declare_war', weight: (6 + Math.min(8, best.score / 18)) * w.declareWar, target: best.province.ownerId, targetProvinceId: best.province.id, reason: 'weak_neighbor' };
 }
 
-// AI 评估本回合应采取的行动
 export function planAITurn(nation: Nation, state: GameState, rng: () => number): AIAction[] {
   void rng;
   const actions: AIAction[] = [];
@@ -130,35 +109,31 @@ export function planAITurn(nation: Nation, state: GameState, rng: () => number):
   if (provs.length === 0) return [];
 
   const def = NATIONS.find((n) => n.id === nation.id);
-  // W-fix: 世界生成国家不在 NATIONS 数组中，用 tier 默认权重
   const w = def ? def.aiWeights : defaultAIWeights(nation.tier);
-
-  // 维度评估
   const lowGold = nation.resources.gold < 100;
-  const lowFood = nation.resources.food < provs.reduce((s, p) => s + p.population, 0) * 0.3;  // W-fix: 阈值从 0.5 降到 0.3
-  const lowStab = nation.government.stability < 40;  // W-fix: 从 30 提到 40，AI 更早安抚
+  const lowFood = nation.resources.food < provs.reduce((s, p) => s + p.population, 0) * 0.3;
+  const lowStab = nation.government.stability < 40;
   const hasRebellionRisk = provs.some((p) => p.rebellionRisk > 50);
   const atWar = nation.atWar;
   const lowTech = nation.tech.agri < 3 || nation.tech.mil < 3 || nation.tech.admin < 3 || nation.tech.culture < 3;
 
-  // 候选行动 + 性格权重
   if (lowGold) actions.push({ actionId: 'tax_up', weight: 10 * w.taxUp });
   if (lowFood) actions.push({ actionId: 'build_farm', weight: 12 * w.buildFarm, target: leastFarmProvince(provs) });
   if (hasRebellionRisk) actions.push({ actionId: 'suppress', weight: 8 * w.suppress, target: provs.find((p) => p.rebellionRisk > 50)?.id });
   if (lowStab) actions.push({ actionId: 'appease', weight: 6 });
   if (lowTech) actions.push({ actionId: 'research', weight: 8 * w.research });
+
   if (!atWar) {
     const expansion = chooseExpansionOpportunity(nation, state, w);
     if (expansion) actions.push(expansion);
 
-    // 改善关系
     for (const r of state.relations) {
       if (r.from === nation.id && r.relation < 30 && r.treaty === 'none') {
         actions.push({ actionId: 'improve_relation', weight: 4 * w.alliance, target: r.to });
         break;
       }
     }
-    // 贸易（W-fix v2: 同时查显式和隐式关系，找贸易伙伴；门槛放宽到 relation>-10，容忍轻度敌对商贸）
+
     let tradeTarget: string | undefined;
     for (const r of state.relations) {
       if (r.from === nation.id && r.relation > -10 && r.treaty === 'none') { tradeTarget = r.to; break; }
@@ -174,9 +149,7 @@ export function planAITurn(nation: Nation, state: GameState, rng: () => number):
     }
     if (tradeTarget) actions.push({ actionId: 'establish_trade', weight: 15 * w.alliance, target: tradeTarget });
   } else {
-    // 战争中：考虑停战
     if (nation.warExhaustion > 50) actions.push({ actionId: 'make_peace', weight: 8 });
-    // E22: AI 战争中重新调动军队——若某战争无军队在前线，触发 move_army
     for (const w of state.wars) {
       if (w.attackerId !== nation.id) continue;
       const targetProv = state.provinces[w.targetProvinceId];
@@ -187,24 +160,21 @@ export function planAITurn(nation: Nation, state: GameState, rng: () => number):
       );
       if (!hasFrontArmy) { actions.push({ actionId: 'move_army', weight: 10, target: w.id }); break; }
     }
-    // 补兵
     actions.push({ actionId: 'recruit', weight: 8 * w.expandArmy, target: nation.capital });
   }
 
-  // P-fix: AI 政策推行——稳定度高且金充足时考虑改革（原完全缺失）
   if (nation.government.stability > 50 && nation.resources.gold > 200 && nation.activePolicies.length < 2) actions.push({ actionId: 'enact_policy', weight: 5 * (w.research ?? 1) });
 
-  // 按权重排序，取前 3（行动点上限）
-  actions.sort((a, b) => b.weight - a.weight);
-  // W-fix: 负粮或粮储低于年消耗时强制建农场（A4：提前触发，不止 food<0）
+  const planned = !atWar ? mergeAiWarActionPlan(state, nation.id, actions) as AIAction[] : actions;
+  planned.sort((a, b) => b.weight - a.weight);
   const provsAll = provincesOf(nation.id, state.provinces);
-  const foodConsume = provsAll.reduce((s, p) => s + p.population, 0) * 0.1;  // 与 economy.ts 消耗率一致
+  const foodConsume = provsAll.reduce((s, p) => s + p.population, 0) * 0.1;
   if (nation.resources.food < foodConsume * 2) {
     const target = leastFarmProvince(provsAll);
-    if (target) actions.unshift({ actionId: 'build_farm', weight: 99, target });
-    if (nation.taxRate > 0.10) actions.push({ actionId: 'tax_down', weight: 50 });
+    if (target) planned.unshift({ actionId: 'build_farm', weight: 99, target });
+    if (nation.taxRate > 0.10) planned.push({ actionId: 'tax_down', weight: 50 });
   }
-  return actions.slice(0, 3);
+  return planned.slice(0, 3);
 }
 
 function leastFarmProvince(provs: ReturnType<typeof provincesOf>): string | undefined {
@@ -234,45 +204,29 @@ function moveCapitalArmyToFront(nation: Nation, state: GameState, targetProvince
   nation.army = nation.army.filter((a) => a.id !== capitalArmy.id);
 }
 
-// 执行 AI 行动（简化版，直接修改 state）
 export function executeAIAction(nation: Nation, action: AIAction, state: GameState): void {
   switch (action.actionId) {
-    case 'tax_up':
-      nation.taxRate = clamp(nation.taxRate + 0.02, 0, 0.5);
-      break;
-    case 'tax_down':
-      nation.taxRate = clamp(nation.taxRate - 0.02, 0, 0.5);
-      break;
+    case 'tax_up': nation.taxRate = clamp(nation.taxRate + 0.02, 0, 0.5); break;
+    case 'tax_down': nation.taxRate = clamp(nation.taxRate - 0.02, 0, 0.5); break;
     case 'build_farm': {
       if (!action.target) break;
       const p = state.provinces[action.target];
-      if (p && nation.resources.gold >= 50) {
-        nation.resources.gold -= 50;
-        p.buildings.push({ id: genId('b'), defId: 'farm', provinceId: p.id, level: 1 });
-      }
+      if (p && nation.resources.gold >= 50) { nation.resources.gold -= 50; p.buildings.push({ id: genId('b'), defId: 'farm', provinceId: p.id, level: 1 }); }
       break;
     }
     case 'build_market': {
       if (!action.target) break;
       const p = state.provinces[action.target];
-      if (p && nation.resources.gold >= 80) {
-        nation.resources.gold -= 80;
-        p.buildings.push({ id: genId('b'), defId: 'market', provinceId: p.id, level: 1 });
-      }
+      if (p && nation.resources.gold >= 80) { nation.resources.gold -= 80; p.buildings.push({ id: genId('b'), defId: 'market', provinceId: p.id, level: 1 }); }
       break;
     }
     case 'recruit': {
       if (!action.target) break;
       const p = state.provinces[action.target];
       if (p && nation.resources.gold >= 75 && nation.resources.supply >= 10 && p.population > 50) {
-        nation.resources.gold -= 75;
-        nation.resources.supply -= 10;
-        p.population -= 50;
+        nation.resources.gold -= 75; nation.resources.supply -= 10; p.population -= 50;
         let army = nation.army.find((a) => a.location === action.target);
-        if (!army) {
-          army = { id: genId('army'), ownerId: nation.id, location: action.target, size: 0, morale: 60, training: 50, equipment: 50, supply: 80 };
-          nation.army.push(army);
-        }
+        if (!army) { army = { id: genId('army'), ownerId: nation.id, location: action.target, size: 0, morale: 60, training: 50, equipment: 50, supply: 80 }; nation.army.push(army); }
         army.size += 50;
       }
       break;
@@ -286,35 +240,23 @@ export function executeAIAction(nation: Nation, action: AIAction, state: GameSta
     }
     case 'appease': {
       const low = [...nation.factions].sort((a, b) => a.satisfaction - b.satisfaction)[0];
-      if (low && nation.resources.gold >= 30) {
-        nation.resources.gold -= 30;
-        low.satisfaction = clamp(low.satisfaction + 8, 0, 100);
-      }
+      if (low && nation.resources.gold >= 30) { nation.resources.gold -= 30; low.satisfaction = clamp(low.satisfaction + 8, 0, 100); }
       break;
     }
     case 'suppress': {
       if (!action.target) break;
       const p = state.provinces[action.target];
-      if (p && nation.resources.gold >= 50) {
-        nation.resources.gold -= 50;
-        p.unrest = clamp(p.unrest - 15, 0, 100);
-      }
+      if (p && nation.resources.gold >= 50) { nation.resources.gold -= 50; p.unrest = clamp(p.unrest - 15, 0, 100); }
       break;
     }
     case 'improve_relation': {
       if (!action.target) break;
-      if (nation.resources.influence >= 20) {
-        nation.resources.influence -= 20;
-        const r = getRelationObj(nation.id, action.target, state);
-        if (r) r.relation = clamp(r.relation + 5, -100, 100);
-      }
+      if (nation.resources.influence >= 20) { nation.resources.influence -= 20; const r = getRelationObj(nation.id, action.target, state); if (r) r.relation = clamp(r.relation + 5, -100, 100); }
       break;
     }
     case 'declare_war': {
       const targetProvince = action.targetProvinceId ? isAttackableProvince(nation, state, action.targetProvinceId) : null;
-      const fallbackTarget = !targetProvince && action.target
-        ? provincesOf(nation.id, state.provinces).flatMap((p) => p.adjacent.map((adj) => state.provinces[adj])).find((p) => p && p.ownerId === action.target)
-        : null;
+      const fallbackTarget = !targetProvince && action.target ? provincesOf(nation.id, state.provinces).flatMap((p) => p.adjacent.map((adj) => state.provinces[adj])).find((p) => p && p.ownerId === action.target) : null;
       const target = targetProvince ?? fallbackTarget ?? null;
       if (!target) break;
       const defenderId = target.ownerId;
@@ -362,11 +304,7 @@ export function executeAIAction(nation: Nation, action: AIAction, state: GameSta
         { id: 'education_reform', costGold: 200, allowedGovernments: [], effects: {} },
         { id: 'welfare', costGold: 150, allowedGovernments: [], effects: {} },
       ];
-      const avail = POLICIES_AI.filter((p) =>
-        nation.resources.gold >= p.costGold &&
-        !nation.activePolicies.some((ap) => ap.policyId === p.id) &&
-        (p.allowedGovernments.length === 0 || p.allowedGovernments.includes(nation.government.type))
-      );
+      const avail = POLICIES_AI.filter((p) => nation.resources.gold >= p.costGold && !nation.activePolicies.some((ap) => ap.policyId === p.id) && (p.allowedGovernments.length === 0 || p.allowedGovernments.includes(nation.government.type)));
       if (avail.length > 0) {
         const prng = mulberry32((state.seed ^ 0x5DEECE) ^ (state.turn * 31) ^ (nation.id.length * 7));
         const pick = avail[Math.floor(prng() * avail.length)];
@@ -377,8 +315,6 @@ export function executeAIAction(nation: Nation, action: AIAction, state: GameSta
     }
   }
 }
-
-// ── W1.4: AI 三档结算（DEC-014） ──
 
 export function processAITurnFull(nation: Nation, state: GameState, rng: () => number): void {
   const actions = planAITurn(nation, state, rng);
@@ -446,7 +382,6 @@ export function processAITurn(state: GameState): GameState {
   for (const nation of Object.values(state.nations) as Nation[]) {
     if (nation.isPlayer) continue;
     if (nation.defeated) continue;
-
     const tier = nation.tier;
     if (tier === 'S' || tier === 'A' || isPlayerNeighbor(nation.id, state, playerNeighbors)) processAITurnFull(nation, state, rng);
     else if (tier === 'B' || tier === 'C') processAITurnLite(nation, state, rng);
