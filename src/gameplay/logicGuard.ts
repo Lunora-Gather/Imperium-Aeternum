@@ -6,16 +6,11 @@
 
 import { useGameStore } from '../store/gameStore';
 import type { GameState, TurnReport, Province } from '../types/game';
-import { processTurn as unsafeProcessTurn } from '../engine/turn';
+import { cloneGameStateForTurn, processTurnIsolated } from '../engine/turnIsolation';
 import { normalizeGameState, autoSave } from '../store/persistence';
 import { BUILDINGS } from '../data/buildings';
 
 let installed = false;
-
-function cloneState(state: GameState): GameState {
-  // GameState 是纯数据；_relMap 是 transient Map，不能序列化，故显式丢弃。
-  return JSON.parse(JSON.stringify({ ...state, _relMap: undefined })) as GameState;
-}
 
 function playerId(state: GameState): string {
   if (state.playerNationId && state.nations[state.playerNationId]) return state.playerNationId;
@@ -180,15 +175,15 @@ function applyPostTurnFixes(prev: GameState, next: GameState): void {
 }
 
 export function processTurnSafe(state: GameState): { state: GameState; report: TurnReport } {
-  const prev = normalizeGameState(cloneState(state));
-  const working = normalizeGameState(cloneState(state));
+  const prev = normalizeGameState(cloneGameStateForTurn(state));
+  const working = normalizeGameState(cloneGameStateForTurn(state));
 
   // 规范 isPlayer，避免旧档多个国家带 isPlayer 导致 UI/AI 误判。
   const pid = playerId(working);
   working.playerNationId = pid;
   for (const n of Object.values(working.nations)) n.isPlayer = n.id === pid;
 
-  const result = unsafeProcessTurn(working);
+  const result = processTurnIsolated(working);
   const next = normalizeGameState(result.state);
   next.playerNationId = playerId(next);
   for (const n of Object.values(next.nations)) n.isPlayer = n.id === next.playerNationId;
