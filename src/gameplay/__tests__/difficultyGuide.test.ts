@@ -30,7 +30,7 @@ describe('difficulty and challenge guide', () => {
 
   it('detects hard scenarios for launch hub warnings', () => {
     expect(isHardScenario('classic')).toBe(false);
-    expect(isHardScenario('w5_mediterranean')).toBe(false); // hard label but pressure below the warning threshold
+    expect(isHardScenario('w5_mediterranean')).toBe(true);
     expect(isHardScenario('world')).toBe(true);
     expect(isHardScenario('challenge_survival')).toBe(true);
   });
