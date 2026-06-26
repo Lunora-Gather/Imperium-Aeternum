@@ -28,14 +28,14 @@ function report(state: GameState, patch: Partial<TurnReport> = {}): TurnReport {
   };
 }
 
-function brief(): StrategicBrief {
+function brief(urgent: StrategicBrief['urgent'] = [{ title: '预计算战略', body: '来自 brief 上下文', tab: 'tech', level: 77, tone: 'warn', reason: 'test' }]): StrategicBrief {
   return {
     phase: '测试期',
     doctrine: '测试 doctrine',
     doctrineBody: '测试 body',
     score: 70,
     scoreLabel: '稳健',
-    urgent: [{ title: '预计算战略', body: '来自 brief 上下文', tab: 'tech', level: 77, tone: 'warn', reason: 'test' }],
+    urgent,
     opportunities: [],
     horizon: [],
     risks: [],
@@ -96,5 +96,28 @@ describe('command center actions', () => {
       expect.objectContaining({ id: 'report-precomputed-report', source: 'report', tab: 'economy' }),
       expect.objectContaining({ id: 'strategy-预计算战略', source: 'strategy', tab: 'tech' }),
     ]));
+  });
+
+  it('filters useless no-report actions on the dashboard command center', () => {
+    const state = createInitialState();
+    const readiness = { ...buildReadinessReport(state), blockers: [], warnings: [], advice: [] };
+    const reportActions: TurnReportAction[] = [{ id: 'no-report', title: '先回总览', body: '尚无年度报告。', tab: 'dashboard', level: 20, tone: 'info', tag: '规划' }];
+
+    const actions = buildCommandCenterActions(state, 5, { readiness, brief: brief([]), reportActions });
+
+    expect(actions.some((a) => a.id === 'report-no-report')).toBe(false);
+    expect(actions.some((a) => a.label === '先回总览')).toBe(false);
+    expect(actions.some((a) => a.source === 'fallback')).toBe(true);
+  });
+
+  it('uses situation-aware fallback actions when there is a war', () => {
+    const state = createInitialState();
+    const target = Object.values(state.provinces).find((p) => p.ownerId !== state.playerNationId)!;
+    state.wars.push({ id: 'war-fallback', attackerId: state.playerNationId, defenderId: target.ownerId, targetProvinceId: target.id, progress: 0, turns: 0, battleReports: [] });
+    const readiness = { ...buildReadinessReport(state), blockers: [], warnings: [], advice: [] };
+
+    const actions = buildCommandCenterActions(state, 5, { readiness, brief: brief([]), reportActions: [] });
+
+    expect(actions[0]).toMatchObject({ id: 'fallback-military', tab: 'military', source: 'fallback' });
   });
 });
