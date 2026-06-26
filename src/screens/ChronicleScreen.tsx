@@ -26,7 +26,15 @@ export default function ChronicleScreen() {
   const chronicle = [...state.chronicle].sort((a, b) => a.turn - b.turn);
   const grouped: Record<string, ChronicleEntry[]> = {};
   for (const c of chronicle) (grouped[c.kind] ??= []).push(c);
-  const stats = { total: chronicle.length, reign: chronicle.filter((c) => c.kind === 'reign').length, expansion: chronicle.filter((c) => c.kind === 'expansion').length, victory: chronicle.filter((c) => c.kind === 'victory').length, crisis: chronicle.filter((c) => c.kind === 'crisis').length, reform: chronicle.filter((c) => c.kind === 'reform').length };
+  const stats = {
+    total: chronicle.length,
+    reign: chronicle.filter((c) => c.kind === 'reign').length,
+    expansion: chronicle.filter((c) => c.kind === 'expansion').length,
+    victory: chronicle.filter((c) => c.kind === 'victory').length,
+    crisis: chronicle.filter((c) => c.kind === 'crisis').length,
+    reform: chronicle.filter((c) => c.kind === 'reform').length,
+    trade: chronicle.filter((c) => c.kind === 'trade').length,
+  };
   const recent = chronicle.slice(-5).reverse();
   const crisisRatio = stats.total ? stats.crisis / stats.total : 0;
   const warRatio = stats.total ? stats.victory / stats.total : 0;
