@@ -57,6 +57,8 @@ jobs:
         run: npx vitest run src/gameplay/__tests__/nationIntel.test.ts
       - name: Chronicle digest tests
         run: npx vitest run src/gameplay/__tests__/chronicleDigest.test.ts
+      - name: Contextual guidance tests
+        run: npx vitest run src/gameplay/__tests__/contextualGuidance.test.ts
       - name: Readiness diagnostics tests
         run: npx vitest run src/gameplay/__tests__/readiness.test.ts
       - name: State hygiene repair tests
