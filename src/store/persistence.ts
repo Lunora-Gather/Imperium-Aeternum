@@ -223,13 +223,26 @@ export function saveGameToSlot(state: GameState, slot: number): { ok: boolean; s
   }
 }
 
+export type SlotReadResult =
+  | { ok: true; save: SaveGame; raw: string; sizeKB: number }
+  | { ok: false; empty?: boolean; error: string };
+
+export function readSaveGameFromSlot(slot: number): SlotReadResult {
+  try {
+    if (typeof localStorage === 'undefined') return { ok: false, empty: true, error: 'localStorage 不可用' };
+    const raw = localStorage.getItem(SLOT_KEY(slot));
+    if (!raw) return { ok: false, empty: true, error: '空槽位' };
+    return { ok: true, raw, save: JSON.parse(raw) as SaveGame, sizeKB: Math.round(raw.length / 1024) };
+  } catch (e) {
+    return { ok: false, error: `存档解析失败：${(e as Error).message}` };
+  }
+}
+
 export function loadGameFromSlot(slot: number): GameState | null {
   try {
-    if (typeof localStorage === 'undefined') return null;
-    const raw = localStorage.getItem(SLOT_KEY(slot));
-    if (!raw) return null;
-    const parsed = JSON.parse(raw) as SaveGame;
-    const migrated = migrate(parsed);
+    const read = readSaveGameFromSlot(slot);
+    if (!read.ok) return null;
+    const migrated = migrate(read.save);
     localStorage.setItem(SLOT_KEY(slot), JSON.stringify({ ...migrated, gameState: compactGameStateForSave(migrated.gameState), createdAt: migrated.createdAt ?? new Date().toISOString() }));
     return migrated.gameState;
   } catch (e) {
@@ -240,10 +253,9 @@ export function loadGameFromSlot(slot: number): GameState | null {
 
 export function getSlotMeta(slot: number): { createdAt: string; turn: number; version: number; nationName?: string } | null {
   try {
-    if (typeof localStorage === 'undefined') return null;
-    const raw = localStorage.getItem(SLOT_KEY(slot));
-    if (!raw) return null;
-    const parsed = JSON.parse(raw) as SaveGame;
+    const read = readSaveGameFromSlot(slot);
+    if (!read.ok) return null;
+    const parsed = read.save;
     const pid = parsed.gameState?.playerNationId;
     const nationName = pid ? parsed.gameState?.nations?.[pid]?.name : undefined;
     return { createdAt: parsed.createdAt, turn: parsed.gameState?.turn ?? 0, version: parsed.version, nationName };
