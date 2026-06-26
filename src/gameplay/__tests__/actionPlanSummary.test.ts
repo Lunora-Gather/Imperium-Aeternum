@@ -43,7 +43,7 @@ describe('action plan summary', () => {
     expect(summary.lines.some((line) => line.body.includes('可以存档'))).toBe(true);
   });
 
-  it('uses careful wording for warning-only plans', () => {
+  it('uses careful wording and localized route labels for warning-only plans', () => {
     const summary = buildActionPlanSummary(buildCommandExecutionPlan([
       action({ id: 'eco', label: '修复财政', tone: 'warn', level: 70, tab: 'economy', source: 'strategy', reason: '财政压力会拖慢胜利路线。' }),
     ]));
@@ -51,6 +51,6 @@ describe('action plan summary', () => {
     expect(summary.kicker).toBe('Careful Plan');
     expect(summary.tone).toBe('warn');
     expect(summary.advanceLabel).toBe('可进入下一年');
-    expect(summary.lines[1].actionLabel).toBe('前往economy');
+    expect(summary.lines[1].actionLabel).toBe('前往经济');
   });
 });
