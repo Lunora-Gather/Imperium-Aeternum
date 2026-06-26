@@ -3,8 +3,14 @@ import { createInitialState, createWorldState } from '../init';
 import { processTurnSafe } from '../../gameplay/logicGuard';
 import type { GameState } from '../../types/game';
 
+const NEUTRAL_OWNER = 'barbarian';
+
 function assertFiniteNumber(label: string, value: number) {
   expect(Number.isFinite(value), label).toBe(true);
+}
+
+function hasValidOwner(state: GameState, ownerId: string): boolean {
+  return ownerId === NEUTRAL_OWNER || !!state.nations[ownerId];
 }
 
 function assertHealthyState(state: GameState) {
@@ -29,7 +35,7 @@ function assertHealthyState(state: GameState) {
   }
 
   for (const [id, province] of Object.entries(state.provinces)) {
-    expect(province.ownerId === 'barbarian' || !!state.nations[province.ownerId], `${id}.owner`).toBe(true);
+    expect(hasValidOwner(state, String(province.ownerId)), `${id}.owner`).toBe(true);
     assertFiniteNumber(`${id}.population`, province.population);
     assertFiniteNumber(`${id}.unrest`, province.unrest);
     assertFiniteNumber(`${id}.rebellionRisk`, province.rebellionRisk);
