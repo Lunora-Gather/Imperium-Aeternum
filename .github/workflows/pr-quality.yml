@@ -51,6 +51,8 @@ jobs:
         run: npx vitest run src/gameplay/__tests__/ambitionsSync.test.ts
       - name: Readiness diagnostics tests
         run: npx vitest run src/gameplay/__tests__/readiness.test.ts
+      - name: State hygiene repair tests
+        run: npx vitest run src/gameplay/__tests__/stateHygiene.test.ts
       - name: Save compaction tests
         run: npx vitest run src/store/__tests__/persistenceCompact.test.ts
       - name: Turn purity tests
