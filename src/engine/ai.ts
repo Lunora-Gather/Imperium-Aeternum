@@ -6,6 +6,7 @@ import type { GameState, Nation, Province } from '../types/game';
 import type { NationTier, NationDef } from '../data/nations';
 import { NATIONS, AI_NATIONS, PLAYER_ID } from '../data/nations';
 import { provincesOf, getRelationObj } from './init';
+import { makePeace } from './military';
 import { clamp } from '../utils/math';
 import { mulberry32 } from '../utils/random';
 import { genId } from '../utils/id';
@@ -330,16 +331,8 @@ export function executeAIAction(nation: Nation, action: AIAction, state: GameSta
       break;
     }
     case 'make_peace': {
-      const endedWars = state.wars.filter((w) => w.attackerId === nation.id || w.defenderId === nation.id);
-      state.wars = state.wars.filter((w) => w.attackerId !== nation.id && w.defenderId !== nation.id);
-      for (const w of endedWars) {
-        for (const r of state.relations) {
-          if ((r.from === w.attackerId && r.to === w.defenderId) || (r.from === w.defenderId && r.to === w.attackerId)) {
-            r.treaty = 'truce'; r.truceTurns = 10;
-          }
-        }
-      }
-      nation.atWar = false;
+      const warsToEnd = state.wars.filter((w) => w.attackerId === nation.id || w.defenderId === nation.id);
+      for (const w of warsToEnd) makePeace(state, w);
       break;
     }
     case 'move_army': {
