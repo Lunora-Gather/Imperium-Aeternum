@@ -1,4 +1,4 @@
-// Dashboard v28 — 回合前作战会议：在路线图和预演之上给出最终推进决策
+// Dashboard v32 — 帝国路线图 + 作战会议 + 史册摘要
 import { useMemo } from 'react';
 import { useGameStore } from '../store/gameStore';
 import { provincesOf } from '../engine/init';
@@ -13,6 +13,7 @@ import { buildCommandCenterActions, type CommandCenterAction } from '../gameplay
 import { buildEmpireRoadmap, type EmpireRoadmap } from '../gameplay/empireRoadmap';
 import { buildTurnPreview, type TurnPreview } from '../gameplay/turnPreview';
 import { buildPreTurnCouncil, type PreTurnCouncil } from '../gameplay/preTurnCouncil';
+import { buildChronicleDigest, type ChronicleDigest, type ChronicleHighlight } from '../gameplay/chronicleDigest';
 
 const FOCUSES: { id: StrategyFocusId; label: string; short: string; desc: string; effect: string }[] = [
   { id: 'balance', label: '均衡', short: '守中', desc: '保留行政弹性，应对不确定局势。', effect: '行政点 +1' },
@@ -132,8 +133,16 @@ function AdvisorList({ title, items, empty, jumpToTab }: { title: string; items:
   return <section className="ia-dash-section"><header><div><small>Advisor</small><h3>{title}</h3></div></header><div className="ia-action-list">{items.length === 0 ? <div className="ia-risk-empty">{empty}</div> : items.slice(0, 4).map((x, i) => <button key={`${x.title}-${i}`} className={`tone-${x.tone === 'danger' ? 'danger' : x.tone === 'warn' ? 'warn' : 'normal'}`} onClick={() => jumpToTab(x.tab)}><b>{x.title}</b><span>{x.body}</span></button>)}</div></section>;
 }
 
+function ChronicleLine({ item }: { item: ChronicleHighlight }) {
+  return <div className="ia-card" style={{ padding: 8, borderLeft: `3px solid ${toneBorder(item.tone)}` }}><div style={{ display: 'flex', justifyContent: 'space-between', gap: 6, marginBottom: 4 }}><strong style={{ fontSize: 12 }}>{item.icon} {item.title}</strong><Tag text={`第${item.turn}年`} tone={tagTone(item.tone)} /></div><div style={{ fontSize: 11, color: 'var(--text-dim)', lineHeight: 1.45 }}>{item.body}</div></div>;
+}
+
+function ChronicleDigestPanel({ digest }: { digest: ChronicleDigest }) {
+  return <section className="ia-dash-section" style={{ borderColor: toneBorder(digest.tone) }}><header><div><small>Chronicle</small><h3>帝国史册</h3></div><div style={{ display: 'flex', gap: 5, flexWrap: 'wrap', justifyContent: 'flex-end' }}><Tag text={digest.era} tone="gold" /><Tag text={`${digest.total} 条`} tone={tagTone(digest.tone)} /></div></header><div className="ia-card" style={{ padding: 10, marginBottom: 8, borderLeft: `3px solid ${toneBorder(digest.tone)}` }}><strong style={{ fontSize: 13 }}>{digest.chapterTitle}</strong><div style={{ fontSize: 11, color: 'var(--text-dim)', lineHeight: 1.55, marginTop: 5 }}>{digest.summary}</div></div><div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 6, marginBottom: 8 }}><Metric label="荣光" value={digest.glory} tone="gold" /><Metric label="危机" value={digest.crisis} tone={digest.crisis > 0 ? 'warn' : 'normal'} /><Metric label="统绪" value={digest.reform} /><Metric label="外交" value={digest.diplomacy} tone="good" /></div><div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>{digest.empty ? <div className="ia-risk-empty">尚无入史事件。推进回合后，开国、扩张、危机、继位和胜利会被写入史册。</div> : digest.recent.slice(0, 3).map((item) => <ChronicleLine key={item.id} item={item} />)}</div>{digest.highlights.length > 0 && <div className="ia-dash-note" style={{ marginTop: 8 }}>史册主轴：{digest.highlights.slice(0, 2).map((x) => x.title).join(' / ')}</div>}</section>;
+}
+
 export default function Dashboard() {
-  const { state, nextTurn, save, load, hasSave, newGame, log, jumpToTab } = useGameStore();
+  const { state, nextTurn, save, load, hasSave, newGame, jumpToTab } = useGameStore();
   const pid = useGameStore((s) => s.state.playerNationId);
   const player = useGameStore((s) => s.state.nations[pid]);
   if (!player) return <Panel title="国政总览"><p className="dim">玩家国家缺失，请读档或开始新局。</p></Panel>;
@@ -152,6 +161,7 @@ export default function Dashboard() {
   const roadmap = useMemo(() => buildEmpireRoadmap(state, { brief, readiness, reportActions, commandActions }), [state, brief, readiness, reportActions, commandActions]);
   const turnPreview = useMemo(() => buildTurnPreview(state, { readiness, roadmap, commandActions }), [state, readiness, roadmap, commandActions]);
   const council = useMemo(() => buildPreTurnCouncil(state, { readiness, roadmap, preview: turnPreview, commandActions }), [state, readiness, roadmap, turnPreview, commandActions]);
+  const chronicle = useMemo(() => buildChronicleDigest(state), [state]);
 
   const lastNet = state.lastReport ? state.lastReport.income.tax + state.lastReport.income.trade + state.lastReport.income.building - state.lastReport.expense.military - state.lastReport.expense.corruption : 0;
   const unrest = provs.filter((p) => p.rebellionRisk > 70 || p.unrest > 50);
@@ -187,7 +197,7 @@ export default function Dashboard() {
     <div className="ia-dash-grid">
       <aside className="ia-dash-col"><Panel title="国家摘要" icon="◈"><div className="ia-dash-metrics"><Metric label="国库" value={n(player.resources.gold)} tone={player.resources.gold < 0 ? 'danger' : 'gold'} hint={lastNet ? `${lastNet >= 0 ? '+' : ''}${n(lastNet)}/年` : '—'} /><Metric label="粮储" value={n(player.resources.food)} tone={player.resources.food < 0 ? 'danger' : 'good'} /><Metric label="人口" value={n(totalPop)} /><Metric label="疆土" value={`${provs.length} 省`} /><Metric label="军力" value={`${n(armySize)} 卒`} tone={wars.length > 0 ? 'warn' : 'normal'} /><Metric label="战事" value={`${wars.length} 起`} tone={wars.length > 0 ? 'danger' : 'normal'} /></div><div className="ia-dash-sep" /><div className="ia-dash-kv"><span>政体</span><strong>{player.government.type}</strong></div><div className="ia-dash-kv"><span>国性</span><strong>{player.character}</strong></div><div className="ia-dash-kv"><span>统治者</span><strong>{player.ruler.name} · {player.ruler.age}岁</strong></div><div className="ia-dash-kv"><span>盟友倾向</span><strong>{allies} 个高关系对象</strong></div></Panel></aside>
       <main className="ia-dash-main"><RoadmapPanel roadmap={roadmap} jumpToTab={jumpToTab} /><CouncilPanel council={council} jumpToTab={jumpToTab} /><TurnPreviewPanel preview={turnPreview} jumpToTab={jumpToTab} /><CommandCenterPanel items={commandActions} jumpToTab={jumpToTab} /><StrategicDirectorPanel brief={brief} jumpToTab={jumpToTab} /><ReadinessPanel report={readiness} jumpToTab={jumpToTab} /><section className="ia-dash-section"><header><div><small>State</small><h3>治理指标</h3></div></header><div className="ia-dash-meter-grid"><Meter label="安定" value={g.stability} lowBad /><Meter label="法统" value={g.legitimacy} lowBad /><Meter label="治能" value={g.efficiency} lowBad /><Meter label="腐败" value={g.corruption} /><Meter label="厌战" value={player.warExhaustion} /><Meter label="补给" value={player.resources.supply} lowBad /></div></section><section className="ia-dash-section"><header><div><small>Trend</small><h3>近年趋势</h3></div></header><div className="ia-dash-trends"><Sparkline data={goldTrend} label="财政" /><Sparkline data={foodTrend} label="粮食" /><Sparkline data={stabilityTrend} label="安定" /></div></section>{state.victory.type && <section className="ia-dash-section ia-dash-victory"><h3>{state.victory.type.startsWith('win') ? '万世之业已成' : '社稷倾覆'}</h3><p>第 {state.turn} 年 · {player.name}</p></section>}</main>
-      <aside className="ia-dash-col"><AmbitionPanel state={state} /><FocusPanel focus={focus} onChange={setFocus} /><RiskPanel risks={risks} /><AdvisorList title="战略机会" items={brief.opportunities} empty="暂无明确机会" jumpToTab={jumpToTab} /><section className="ia-dash-section"><header><div><small>Chronicle</small><h3>近事</h3></div></header><div className="ia-dash-log">{log.length === 0 ? <p>尚无纪事</p> : log.slice(-6).reverse().map((l, i) => <p key={`${l}-${i}`}>{l}</p>)}</div></section></aside>
+      <aside className="ia-dash-col"><AmbitionPanel state={state} /><FocusPanel focus={focus} onChange={setFocus} /><RiskPanel risks={risks} /><AdvisorList title="战略机会" items={brief.opportunities} empty="暂无明确机会" jumpToTab={jumpToTab} /><ChronicleDigestPanel digest={chronicle} /></aside>
     </div>
   </div>;
 }
