@@ -1,1 +1,1 @@
-export const BUILD_MARK = 'V28 pre-turn council';
+export const BUILD_MARK = 'V29 strategy closure pack';
