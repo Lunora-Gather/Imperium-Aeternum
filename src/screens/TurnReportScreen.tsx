@@ -1,12 +1,13 @@
-// TurnReport v10 — 年报接入帝国总参谋部：年度总结 + 下一阶段路线
+// TurnReport v19 — 年报行动路由：结算后直接告诉玩家下一步去哪儿
 import { useGameStore } from '../store/gameStore';
 import { Panel, Tag, Btn, Divider } from '../components/ui';
 import { buildStrategicBrief, type StrategicItem } from '../gameplay/strategicAdvisor';
+import { buildTurnReportActions, type TurnReportAction } from '../gameplay/turnReportActions';
 
 const FACTION_LABEL: Record<string, string> = { nobles: '贵族', merchants: '商人', military: '军方', commoners: '民众', clergy: '神职' };
 
-function adviceTone(level: number): 'good' | 'warn' | 'danger' | 'info' { if (level >= 90) return 'danger'; if (level >= 60) return 'warn'; return 'info'; }
 function itemTone(t: string): 'good' | 'warn' | 'danger' | 'info' | 'gold' { return t === 'danger' ? 'danger' : t === 'warn' ? 'warn' : t === 'good' ? 'good' : t === 'gold' ? 'gold' : 'info'; }
+function borderForAction(a: TurnReportAction): string { return a.tone === 'danger' ? 'var(--war)' : a.tone === 'warn' ? 'var(--warn)' : 'var(--border)'; }
 
 export default function TurnReportScreen({ onContinue }: { onContinue?: () => void }) {
   const { state, jumpToTab } = useGameStore();
@@ -14,22 +15,12 @@ export default function TurnReportScreen({ onContinue }: { onContinue?: () => vo
   if (!r) return <Panel title="回合报告"><p className="dim">尚无报告。点击「下一回合」开始。</p></Panel>;
 
   const pid = state.playerNationId;
-  const player = state.nations[pid];
   const income = r.income.tax + r.income.trade + r.income.building;
   const expense = r.expense.military + r.expense.corruption;
   const net = income - expense;
-  const atWar = state.wars.some((w) => w.attackerId === pid || w.defenderId === pid);
   const brief = buildStrategicBrief(state);
-
-  const advice: { title: string; body: string; tab: string; level: number }[] = [];
-  if (player) {
-    for (const x of brief.urgent.slice(0, 4)) advice.push({ title: x.title, body: x.body, tab: x.tab, level: x.level });
-    if (r.worldEvents.some((e) => e.includes('扩张战略') || e.includes('宣战') || e.includes('觊觎'))) advice.push({ title: '关注邻国动向', body: '周边战略或领土野心正在变化，建议查看外交与军事页。', tab: 'diplomacy', level: 72 });
-    if (player.resources.sciPt > 250) advice.push({ title: '可推进科技', body: '科研点已有积累，下一步可以解锁建筑、政策或治理效率。', tab: 'tech', level: 42 });
-    if (atWar && r.warProgress.length === 0) advice.push({ title: '检查前线', body: '战争中但本年没有明显战果，可能缺前线军队或补给不足。', tab: 'military', level: 70 });
-  }
-  if (advice.length === 0) advice.push({ title: '局势尚稳', body: '可以按长期目标推进：发展经济、研发科技、扩展外交或准备下一场战争。', tab: 'dashboard', level: 20 });
-  advice.sort((a, b) => b.level - a.level);
+  const actions = buildTurnReportActions(state);
+  const primary = actions[0];
 
   const stories: { txt: string; tone: 'good' | 'warn' | 'danger' | 'info' }[] = [];
   if (net > 0) stories.push({ txt: `国库净增 ${Math.round(net)} 金`, tone: 'good' }); else if (net < 0) stories.push({ txt: `国库净减 ${Math.round(-net)} 金`, tone: 'danger' });
@@ -40,10 +31,10 @@ export default function TurnReportScreen({ onContinue }: { onContinue?: () => vo
   if (r.events.length > 0) stories.push({ txt: `发生 ${r.events.length} 起事件`, tone: 'info' });
 
   return <div>
-    <Panel title={`第 ${r.turn} 年 · 年度报告`} accent actions={onContinue ? <Btn label="← 继续治理" variant="primary" onClick={onContinue} /> : undefined}>
+    <Panel title={`第 ${r.turn} 年 · 年度报告`} accent actions={<div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>{primary && <Btn label={`处理：${primary.title}`} variant={primary.tone === 'danger' ? 'warn' : 'primary'} onClick={() => jumpToTab(primary.tab)} />}{onContinue && <Btn label="← 继续治理" variant="ghost" onClick={onContinue} />}</div>}>
       <div style={{ marginBottom: 12 }}>
         <strong style={{ fontSize: 13, color: 'var(--text-mute)' }}>下一年优先级</strong>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))', gap: 8, marginTop: 8 }}>{advice.slice(0, 3).map((a, i) => <button key={i} className="ia-card" onClick={() => jumpToTab(a.tab)} style={{ textAlign: 'left', padding: 10, cursor: 'pointer', border: `1px solid var(--${adviceTone(a.level) === 'danger' ? 'war' : adviceTone(a.level) === 'warn' ? 'warn' : 'border'})` }}><div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, marginBottom: 4 }}><strong style={{ fontSize: 13 }}>{a.title}</strong><Tag text={a.level >= 80 ? '紧急' : a.level >= 55 ? '建议' : '规划'} tone={adviceTone(a.level)} /></div><div style={{ fontSize: 11, color: 'var(--text-dim)', lineHeight: 1.5 }}>{a.body}</div></button>)}</div>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))', gap: 8, marginTop: 8 }}>{actions.slice(0, 4).map((a) => <button key={a.id} className="ia-card" onClick={() => jumpToTab(a.tab)} style={{ textAlign: 'left', padding: 10, cursor: 'pointer', border: `1px solid ${borderForAction(a)}` }}><div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, marginBottom: 4 }}><strong style={{ fontSize: 13 }}>{a.title}</strong><Tag text={a.tag} tone={a.tone} /></div><div style={{ fontSize: 11, color: 'var(--text-dim)', lineHeight: 1.5 }}>{a.body}</div></button>)}</div>
       </div>
 
       <Divider label="下一阶段路线" />
