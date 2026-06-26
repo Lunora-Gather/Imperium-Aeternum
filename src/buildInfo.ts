@@ -1,1 +1,1 @@
-export const BUILD_MARK = 'V29 strategy closure pack';
+export const BUILD_MARK = 'V31 style-ai-intel';
