@@ -1,11 +1,12 @@
 // Imperium Aeternum — App shell
-// V18：顶部 ↩ 改为真正返回上一页；标题页返回拆成独立按钮，避免误触丢失上下文。
+// V23：主导航使用统一 NavigationTab 合约，避免各模块手写 tab 字符串漂移。
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useGameStore } from './store/gameStore';
 import { playSfx, useSfxMute } from './utils/audio';
 import { BUILD_MARK } from './buildInfo';
 import { getOnboardingStep, nextOnboardingIndex, onboardingProgress, prevOnboardingIndex } from './gameplay/onboarding';
 import { pushPageHistory, resetPageHistory, resolveBackTarget } from './gameplay/pageHistory';
+import { isNavigationTab, type NavigationTab } from './gameplay/navigationTabs';
 
 import { provincesOf } from './engine/init';
 import { ResourceStrip } from './components/ui';
@@ -26,7 +27,7 @@ import SaveLoadScreen from './screens/SaveLoadScreen';
 import EventModal from './screens/EventModal';
 import LogToast from './components/LogToast';
 
-type Tab = 'dashboard' | 'map' | 'province' | 'economy' | 'population' | 'politics' | 'military' | 'diplomacy' | 'tech' | 'stats' | 'report' | 'chronicle' | 'save';
+type Tab = NavigationTab;
 
 const TAB_GROUPS: { group: string; tabs: { id: Tab; label: string; key: string; icon: string }[] }[] = [
   { group: '治理', tabs: [
@@ -112,7 +113,7 @@ export default function App() {
 
   useEffect(() => {
     if (pendingTab) {
-      goToTab(pendingTab as Tab);
+      if (isNavigationTab(pendingTab)) goToTab(pendingTab);
       consumePendingTab();
     }
   }, [pendingTab, consumePendingTab, goToTab]);
@@ -212,7 +213,7 @@ export default function App() {
   const helpProgress = onboardingProgress(tutorialStep);
   const helpStep = getOnboardingStep(tutorialStep);
   const goHelpTab = () => {
-    goToTab(helpStep.tab as Tab);
+    if (isNavigationTab(helpStep.tab)) goToTab(helpStep.tab);
     setShowHelp(false);
   };
 
