@@ -43,6 +43,8 @@ jobs:
         run: npx vitest run src/engine/__tests__/battleResolution.test.ts
       - name: AI peace settlement tests
         run: npx vitest run src/engine/__tests__/aiPeaceSettlement.test.ts
+      - name: Turn isolation tests
+        run: npx vitest run src/engine/__tests__/turnIsolation.test.ts
       - name: Save compaction tests
         run: npx vitest run src/store/__tests__/persistenceCompact.test.ts
       - name: Turn purity tests
