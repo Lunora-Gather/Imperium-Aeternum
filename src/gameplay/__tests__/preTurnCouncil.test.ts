@@ -53,7 +53,12 @@ describe('pre-turn council', () => {
     const council = buildPreTurnCouncil(state, {
       readiness: readiness({ canAdvance: false, tone: 'danger', score: 40 }),
       roadmap: roadmap(),
-      preview: preview({ status: 'blocked', tone: 'danger', canAdvance: false }),
+      preview: preview({
+        status: 'blocked',
+        tone: 'danger',
+        canAdvance: false,
+        beforePress: [{ id: 'blocker', title: '处理待决事件', body: '先处理事件再推进。', tone: 'danger', tab: 'dashboard' }],
+      }),
       commandActions: [action('block', 'danger')],
     });
 
