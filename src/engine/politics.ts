@@ -220,24 +220,26 @@ export function enactLaw(nation: Nation, lawId: string, state: GameState): { ok:
   return { ok: true };
 }
 
-// 每回合法律效果：unrestReduction / rebellionReduction 在 turn.ts 调用
+export type LawPerTurnEffectFinals = Record<string, { unrest?: number; rebellionRisk?: number }>;
+
+// 每回合法律效果：保留原公开 API，但内部只合并 pure 版本产物。
 export function lawPerTurnEffects(nation: Nation, provs: Province[]): void {
-  for (const al of nation.activeLaws) {
-    const def = LAWS.find((l) => l.id === al.lawId);
-    if (!def) continue;
-    const e = def.effects;
-    if (e.unrestReduction) {
-      for (const p of provs) p.unrest = clamp(p.unrest - e.unrestReduction, 0, 100);
-    }
-    if (e.rebellionReduction) {
-      for (const p of provs) p.rebellionRisk = clamp(p.rebellionRisk - e.rebellionReduction, 0, 100);
-    }
+  applyLawPerTurnEffectFinals(provs, lawPerTurnEffectsPure(nation, provs));
+}
+
+export function applyLawPerTurnEffectFinals(provs: Province[], finals: LawPerTurnEffectFinals): void {
+  const byId = new Map(provs.map((p) => [p.id, p]));
+  for (const [provId, final] of Object.entries(finals)) {
+    const p = byId.get(provId);
+    if (!p) continue;
+    if (final.unrest !== undefined) p.unrest = final.unrest;
+    if (final.rebellionRisk !== undefined) p.rebellionRisk = final.rebellionRisk;
   }
 }
 
 // ── C1 纯函数版本（不 mutate，返回每省 unrest/rebellionRisk final 供 processTurn 合并） ──
-export function lawPerTurnEffectsPure(nation: Nation, provs: Province[]): Record<string, { unrest?: number; rebellionRisk?: number }> {
-  const finals: Record<string, { unrest?: number; rebellionRisk?: number }> = {};
+export function lawPerTurnEffectsPure(nation: Nation, provs: Province[]): LawPerTurnEffectFinals {
+  const finals: LawPerTurnEffectFinals = {};
   for (const al of nation.activeLaws) {
     const def = LAWS.find((l) => l.id === al.lawId);
     if (!def) continue;
