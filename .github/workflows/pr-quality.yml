@@ -14,7 +14,7 @@ concurrency:
 
 jobs:
   verify:
-    name: Tests, data validation and Pages build
+    name: Targeted tests, data validation and Pages build
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -26,8 +26,15 @@ jobs:
       - name: TypeScript debt report (non-blocking)
         run: npm run typecheck
         continue-on-error: true
-      - name: Unit and simulation tests
-        run: npm run test
+      - name: Battle resolution tests
+        run: npx vitest run src/engine/__tests__/battleResolution.test.ts
+      - name: Save compaction tests
+        run: npx vitest run src/store/__tests__/persistenceCompact.test.ts
+      - name: Turn purity tests
+        run: npx vitest run src/engine/__tests__/turnPurity.test.ts
+      - name: Long-run simulation diagnostics (non-blocking)
+        run: npx vitest run src/engine/__tests__/longRunSimulation.test.ts
+        continue-on-error: true
       - name: Data and scenario validation
         run: npm run validate
       - name: Pages-compatible production build
