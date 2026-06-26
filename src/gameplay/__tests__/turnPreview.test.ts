@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { createInitialState } from '../../engine/init';
 import { buildTurnPreview } from '../turnPreview';
-import { buildReadinessReport } from '../readiness';
-import { buildCommandCenterActions } from '../commandCenterActions';
+import { buildReadinessReport, type ReadinessReport } from '../readiness';
 import type { EmpireRoadmap } from '../empireRoadmap';
+import type { CommandCenterAction } from '../commandCenterActions';
 
 function roadmap(progress = 20): EmpireRoadmap {
   return {
@@ -21,6 +21,14 @@ function roadmap(progress = 20): EmpireRoadmap {
   };
 }
 
+function goodReadiness(): ReadinessReport {
+  return { score: 90, label: '稳健', tone: 'good', canAdvance: true, blockers: [], warnings: [], advice: [], devChecks: [] };
+}
+
+function action(id: string, tab: CommandCenterAction['tab'], level = 40): CommandCenterAction {
+  return { id, label: `行动${id}`, desc: `处理${id}`, tab, level, tone: level > 88 ? 'danger' : level > 55 ? 'warn' : 'normal', source: 'fallback' };
+}
+
 describe('turn preview', () => {
   it('blocks advancing when there are pending events', () => {
     const state = createInitialState();
@@ -33,7 +41,7 @@ describe('turn preview', () => {
     expect(preview.signals.find((s) => s.id === 'events')).toMatchObject({ value: '1', tone: 'danger' });
   });
 
-  it('warns about high-risk resource and stability states', () => {
+  it('flags dangerous resource and stability signals', () => {
     const state = createInitialState();
     const player = state.nations[state.playerNationId];
     player.resources.gold = -20;
@@ -42,8 +50,9 @@ describe('turn preview', () => {
 
     const preview = buildTurnPreview(state);
 
-    expect(['danger', 'blocked']).toContain(preview.status);
-    expect(preview.likelyChanges.some((x) => x.id === 'stability-risk')).toBe(true);
+    expect(preview.signals.find((s) => s.id === 'gold')).toMatchObject({ tone: 'danger' });
+    expect(preview.signals.find((s) => s.id === 'food')).toMatchObject({ tone: 'danger' });
+    expect(preview.signals.find((s) => s.id === 'stability')).toMatchObject({ tone: 'danger' });
     expect(preview.saveAdvice.tab).toBe('save');
   });
 
@@ -76,17 +85,17 @@ describe('turn preview', () => {
   it('reuses supplied diagnostics and command actions for before-press guidance', () => {
     const state = createInitialState();
     const readiness = buildReadinessReport(state);
-    const commandActions = buildCommandCenterActions(state, 5, { readiness }).slice(0, 2);
+    const commandActions = [action('economy', 'economy', 80), action('province', 'province', 70)];
 
     const preview = buildTurnPreview(state, { readiness, commandActions, roadmap: roadmap() });
 
-    expect(preview.beforePress.length).toBeGreaterThan(0);
-    expect(preview.beforePress[0].title).toContain('先处理');
+    expect(preview.beforePress).toHaveLength(2);
+    expect(preview.beforePress[0]).toMatchObject({ title: '先处理：行动economy', tab: 'economy' });
   });
 
   it('recommends saving near a victory window', () => {
     const state = createInitialState();
-    const preview = buildTurnPreview(state, { roadmap: roadmap(82) });
+    const preview = buildTurnPreview(state, { readiness: goodReadiness(), roadmap: roadmap(82), commandActions: [action('stable', 'dashboard')] });
 
     expect(preview.saveAdvice.id).toBe('save-route');
     expect(preview.saveAdvice.tone).toBe('gold');
