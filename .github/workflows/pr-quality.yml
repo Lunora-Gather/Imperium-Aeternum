@@ -59,6 +59,8 @@ jobs:
         run: npx vitest run src/gameplay/__tests__/onboarding.test.ts
       - name: Page history navigation tests
         run: npx vitest run src/gameplay/__tests__/pageHistory.test.ts
+      - name: Turn report action routing tests
+        run: npx vitest run src/gameplay/__tests__/turnReportActions.test.ts
       - name: Save compaction tests
         run: npx vitest run src/store/__tests__/persistenceCompact.test.ts
       - name: Turn purity tests
