@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { createInitialState } from '../../engine/init';
-import { arrangeCommandCenterActions, buildCommandCenterActions, type CommandCenterAction } from '../commandCenterActions';
+import { arrangeCommandCenterActions, buildCommandCenterActions, explainCommandAction, type CommandCenterAction } from '../commandCenterActions';
 import { buildReadinessReport } from '../readiness';
 import type { GameState, TurnReport } from '../../types/game';
 import type { StrategicBrief } from '../strategicAdvisor';
@@ -165,5 +165,21 @@ describe('command center actions', () => {
     expect(tabs.has('economy')).toBe(true);
     expect(tabs.has('province')).toBe(true);
     expect(tabs.has('diplomacy')).toBe(true);
+  });
+
+  it('annotates built actions with readable priority reasons', () => {
+    const state = createInitialState();
+    state.pendingEvents.push({ nationId: state.playerNationId, eventId: 'test_event' });
+
+    const actions = buildCommandCenterActions(state, 4);
+
+    expect(actions.every((a) => a.reason && a.desc.includes('依据：'))).toBe(true);
+    expect(explainCommandAction(actions[0])).toContain('体检');
+  });
+
+  it('can explain unannotated actions from source and priority', () => {
+    const explanation = explainCommandAction(action('raw-strategy', 'tech', 80, 'warn'));
+
+    expect(explanation).toContain('总参谋部');
   });
 });
