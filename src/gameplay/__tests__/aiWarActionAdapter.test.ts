@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { createInitialState } from '../../engine/init';
-import { buildAiWarActionPlan } from '../aiWarActionAdapter';
+import { buildAiWarActionPlan, mergeAiWarActionPlan } from '../aiWarActionAdapter';
 
 function aggressiveSetup() {
   const state = createInitialState();
@@ -47,5 +47,34 @@ describe('AI war action adapter', () => {
     expect(plan.action).toBeNull();
     expect(plan.confidence).toBeGreaterThanOrEqual(0);
     expect(plan.reasons.length).toBeGreaterThan(0);
+  });
+
+  it('merges a new assessed war action into existing AI actions', () => {
+    const { state, ai } = aggressiveSetup();
+    const merged = mergeAiWarActionPlan(state, ai.id, [
+      { actionId: 'research', weight: 8 },
+      { actionId: 'declare_war', weight: 4, target: 'old', targetProvinceId: 'old_p', reason: 'frontier' },
+    ]);
+
+    expect(merged.some((a) => a.actionId === 'research')).toBe(true);
+    const war = merged.find((a) => a.actionId === 'declare_war');
+    expect(war?.target).not.toBe('old');
+    expect(war?.weight).toBeGreaterThan(4);
+  });
+
+  it('removes old war actions when the new assessment avoids war', () => {
+    const state = createInitialState();
+    const ai = Object.values(state.nations).find((n) => !n.isPlayer)!;
+    ai.resources.gold = -1000;
+    ai.resources.supply = 0;
+    ai.government.stability = 10;
+    ai.warExhaustion = 90;
+
+    const merged = mergeAiWarActionPlan(state, ai.id, [
+      { actionId: 'research', weight: 8 },
+      { actionId: 'declare_war', weight: 12, target: 'bad', targetProvinceId: 'bad_p', reason: 'frontier' },
+    ]);
+
+    expect(merged.map((a) => a.actionId)).toEqual(['research']);
   });
 });
