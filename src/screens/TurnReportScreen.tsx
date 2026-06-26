@@ -1,25 +1,28 @@
-// TurnReport v19 — 年报行动路由：结算后直接告诉玩家下一步去哪儿
+// TurnReport v29 — 回合后复盘 + 胜利路线仪表盘：计划 → 推进 → 复盘 → 修正计划
 import { useGameStore } from '../store/gameStore';
 import { Panel, Tag, Btn, Divider } from '../components/ui';
 import { buildStrategicBrief, type StrategicItem } from '../gameplay/strategicAdvisor';
 import { buildTurnReportActions, type TurnReportAction } from '../gameplay/turnReportActions';
+import { buildTurnDebrief, type DebriefPoint } from '../gameplay/turnDebrief';
+import type { VictoryRouteCard } from '../gameplay/victoryRoutes';
 
 const FACTION_LABEL: Record<string, string> = { nobles: '贵族', merchants: '商人', military: '军方', commoners: '民众', clergy: '神职' };
 
 function itemTone(t: string): 'good' | 'warn' | 'danger' | 'info' | 'gold' { return t === 'danger' ? 'danger' : t === 'warn' ? 'warn' : t === 'good' ? 'good' : t === 'gold' ? 'gold' : 'info'; }
 function borderForAction(a: TurnReportAction): string { return a.tone === 'danger' ? 'var(--war)' : a.tone === 'warn' ? 'var(--warn)' : 'var(--border)'; }
+function toneBorder(t: string): string { return t === 'danger' ? 'var(--war)' : t === 'warn' ? 'var(--warn)' : t === 'gold' ? 'var(--gold)' : t === 'good' ? 'var(--good)' : 'var(--border)'; }
 
 export default function TurnReportScreen({ onContinue }: { onContinue?: () => void }) {
   const { state, jumpToTab } = useGameStore();
   const r = state.lastReport;
   if (!r) return <Panel title="回合报告"><p className="dim">尚无报告。点击「下一回合」开始。</p></Panel>;
 
-  const pid = state.playerNationId;
   const income = r.income.tax + r.income.trade + r.income.building;
   const expense = r.expense.military + r.expense.corruption;
   const net = income - expense;
   const brief = buildStrategicBrief(state);
   const actions = buildTurnReportActions(state);
+  const debrief = buildTurnDebrief(state);
   const primary = actions[0];
 
   const stories: { txt: string; tone: 'good' | 'warn' | 'danger' | 'info' }[] = [];
@@ -31,11 +34,15 @@ export default function TurnReportScreen({ onContinue }: { onContinue?: () => vo
   if (r.events.length > 0) stories.push({ txt: `发生 ${r.events.length} 起事件`, tone: 'info' });
 
   return <div>
-    <Panel title={`第 ${r.turn} 年 · 年度报告`} accent actions={<div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>{primary && <Btn label={`处理：${primary.title}`} variant={primary.tone === 'danger' ? 'warn' : 'primary'} onClick={() => jumpToTab(primary.tab)} />}{onContinue && <Btn label="← 继续治理" variant="ghost" onClick={onContinue} />}</div>}>
+    <Panel title={`第 ${r.turn} 年 · 年度报告`} accent actions={<div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>{debrief && <Btn label={`复盘：${debrief.nextFocus.title}`} variant={debrief.nextFocus.tone === 'danger' ? 'warn' : 'primary'} onClick={() => jumpToTab(debrief.nextFocus.tab)} />}{primary && <Btn label={`处理：${primary.title}`} variant={primary.tone === 'danger' ? 'warn' : 'primary'} onClick={() => jumpToTab(primary.tab)} />}{onContinue && <Btn label="← 继续治理" variant="ghost" onClick={onContinue} />}</div>}>
+      {debrief && <DebriefPanel debrief={debrief} jumpToTab={jumpToTab} />}
+
       <div style={{ marginBottom: 12 }}>
         <strong style={{ fontSize: 13, color: 'var(--text-mute)' }}>下一年优先级</strong>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))', gap: 8, marginTop: 8 }}>{actions.slice(0, 4).map((a) => <button key={a.id} className="ia-card" onClick={() => jumpToTab(a.tab)} style={{ textAlign: 'left', padding: 10, cursor: 'pointer', border: `1px solid ${borderForAction(a)}` }}><div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, marginBottom: 4 }}><strong style={{ fontSize: 13 }}>{a.title}</strong><Tag text={a.tag} tone={a.tone} /></div><div style={{ fontSize: 11, color: 'var(--text-dim)', lineHeight: 1.5 }}>{a.body}</div></button>)}</div>
       </div>
+
+      {debrief && <VictoryRoutesPanel routes={debrief.routes} jumpToTab={jumpToTab} />}
 
       <Divider label="下一阶段路线" />
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 8, marginBottom: 12 }}>
@@ -58,6 +65,19 @@ export default function TurnReportScreen({ onContinue }: { onContinue?: () => vo
       {r.warnings.length > 0 && <><Divider label="警告" /><div className="ia-pulse" style={{ background: 'rgba(245,166,35,0.08)', border: '1px solid var(--warn)', borderRadius: 6, padding: 10 }}>{r.warnings.map((w, i) => <div key={i} className="warn" style={{ fontSize: 13, padding: '2px 0' }}>⚠ {w}</div>)}</div></>}
     </Panel>
   </div>;
+}
+
+function DebriefPanel({ debrief, jumpToTab }: { debrief: NonNullable<ReturnType<typeof buildTurnDebrief>>; jumpToTab: (tab: string) => void }) {
+  const points = [...debrief.worsened, ...debrief.improved].slice(0, 4);
+  return <div style={{ marginBottom: 12 }}><Divider label="年度复盘" /><div className="ia-card" style={{ padding: 10, borderLeft: `3px solid ${toneBorder(debrief.tone)}`, marginBottom: 8 }}><div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap' }}><div><strong style={{ fontSize: 14 }}>{debrief.title}</strong><div style={{ fontSize: 11, color: 'var(--text-dim)', marginTop: 4, lineHeight: 1.5 }}>{debrief.verdict}</div></div><Tag text={`${debrief.score}/100`} tone={itemTone(debrief.tone)} /></div></div><div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 8 }}>{points.length === 0 ? <div className="ia-card" style={{ padding: 10, color: 'var(--text-mute)', fontSize: 12 }}>没有明显波动，下一年按路线图稳步推进。</div> : points.map((p) => <DebriefPointCard key={p.id} point={p} jumpToTab={jumpToTab} />)}</div></div>;
+}
+
+function DebriefPointCard({ point, jumpToTab }: { point: DebriefPoint; jumpToTab: (tab: string) => void }) {
+  return <button className="ia-card" onClick={() => jumpToTab(point.tab)} style={{ padding: 10, textAlign: 'left', cursor: 'pointer', border: `1px solid ${toneBorder(point.tone)}` }}><div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, marginBottom: 4 }}><strong style={{ fontSize: 13 }}>{point.title}</strong><Tag text={point.tone === 'danger' ? '恶化' : point.tone === 'warn' ? '关注' : '改善'} tone={itemTone(point.tone)} /></div><div style={{ fontSize: 11, color: 'var(--text-dim)', lineHeight: 1.5 }}>{point.body}</div></button>;
+}
+
+function VictoryRoutesPanel({ routes, jumpToTab }: { routes: VictoryRouteCard[]; jumpToTab: (tab: string) => void }) {
+  return <div style={{ marginBottom: 12 }}><Divider label="胜利路线仪表盘" /><div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 8 }}>{routes.map((route) => <button key={route.id} className="ia-card" onClick={() => jumpToTab(route.tab)} style={{ padding: 10, textAlign: 'left', cursor: 'pointer', border: `1px solid ${toneBorder(route.tone)}` }}><div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, marginBottom: 6 }}><strong style={{ fontSize: 13 }}>{route.label}</strong><Tag text={`${route.progress}%`} tone={itemTone(route.tone)} /></div><Bar value={route.progress} max={100} positive={route.tone !== 'danger'} /><div style={{ fontSize: 11, color: 'var(--text-dim)', lineHeight: 1.45, marginTop: 6 }}>{route.current} / {route.target}</div><div style={{ fontSize: 11, color: 'var(--text-mute)', lineHeight: 1.45, marginTop: 4 }}>{route.warning ?? route.next}</div></button>)}</div></div>;
 }
 
 function Row({ k, v, neg }: { k: string; v: number; neg?: boolean }) { return <div style={{ display: 'flex', justifyContent: 'space-between', padding: '3px 0', borderBottom: '1px solid rgba(42,58,90,0.3)' }}><span style={{ color: 'var(--text-mute)' }}>{k}</span><span style={{ fontVariantNumeric: 'tabular-nums', color: neg ? 'var(--war)' : 'var(--good)', fontWeight: 600 }}>{v >= 0 ? '+' : ''}{Math.round(v)}</span></div>; }

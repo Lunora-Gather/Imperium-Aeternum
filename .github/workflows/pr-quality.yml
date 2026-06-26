@@ -49,6 +49,10 @@ jobs:
         run: npx vitest run src/engine/__tests__/lawEffectsPure.test.ts
       - name: Ambition sync tests
         run: npx vitest run src/gameplay/__tests__/ambitionsSync.test.ts
+      - name: Victory route dashboard tests
+        run: npx vitest run src/gameplay/__tests__/victoryRoutes.test.ts
+      - name: Turn debrief tests
+        run: npx vitest run src/gameplay/__tests__/turnDebrief.test.ts
       - name: Readiness diagnostics tests
         run: npx vitest run src/gameplay/__tests__/readiness.test.ts
       - name: State hygiene repair tests
