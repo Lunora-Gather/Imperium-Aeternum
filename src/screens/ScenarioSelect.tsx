@@ -1,10 +1,11 @@
-// 剧本选择页 v34 — 开局大厅：难度挑战阶梯 + 存档健康继续 + 剧本推荐画像
+// 剧本选择页 v35 — 开局大厅：玩法速查手册 + 难度挑战阶梯 + 存档健康继续
 import { useMemo, useState } from 'react';
 import { useGameStore, SCENARIOS, type ScenarioId } from '../store/gameStore';
 import { clearAllSaves, SAVE_VERSION } from '../store/persistence';
 import { inspectAllSaveSlots, type SaveRecoveryPreview } from '../gameplay/saveRecovery';
 import { getScenarioProfile, nationStyleTags, recommendedScenarioIds, summarizeSavePreviews, type LaunchTone } from '../gameplay/launchHub';
 import { buildScenarioChallengeGuide, recommendedChallengePath, summarizeChallengePath, type ScenarioChallengeGuide } from '../gameplay/difficultyGuide';
+import { buildLaunchHandbook, type LaunchHandbook } from '../gameplay/launchHandbook';
 import { BUILD_MARK } from '../buildInfo';
 import { Btn, Tag } from '../components/ui';
 
@@ -28,6 +29,7 @@ export default function ScenarioSelect() {
   const saveSummary = useMemo(() => summarizeSavePreviews(previews), [previews]);
   const recommended = useMemo(() => new Set(recommendedScenarioIds()), []);
   const challengePath = useMemo(() => summarizeChallengePath(), []);
+  const handbook = useMemo(() => buildLaunchHandbook(), []);
 
   const applyTheme = (next: string) => { setTheme(next); document.documentElement.setAttribute('data-theme', next === 'night' ? '' : next); try { localStorage.setItem('ia-theme', next); } catch { /* ignore */ } };
   const refreshSaves = () => setPreviews(inspectAllSaveSlots());
@@ -61,6 +63,7 @@ export default function ScenarioSelect() {
     <div className="ia-menu-toolbar"><div className="ia-menu-version"><Tag text={BUILD_MARK} tone="gold" /><Tag text={`存档 v${SAVE_VERSION}`} tone="info" /><Tag text={saveSummary.headline} tone={saveSummary.tone} /></div><ThemeSwitch theme={theme} applyTheme={applyTheme} /></div>
     <header className="ia-menu-hero"><div className="ia-up ia-menu-kicker">Grand Strategy Chronicle</div><h1 className="ia-display">Imperium Aeternum</h1><p className="ia-display ia-up">永恒帝国</p><div className="ia-menu-subtitle">治理一个国家数百年。扩张越快，崩溃越早。真正的胜利是建立一个能长期运转的国家机器。</div></header>
     <ContinuePanel summary={saveSummary} onContinue={continueBest} onRefresh={refreshSaves} />
+    <HandbookPanel handbook={handbook} />
     <DifficultyTrack path={challengePath.ids} headline={challengePath.headline} advice={challengePath.advice} onPick={(id) => { const s = SCENARIOS.find((x) => x.id === id); if (!s) return; if (s.needsNationPick) { setSelected(id); setPickedNation(null); } else startScenario(id); }} />
     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 8, margin: '0 auto 18px', maxWidth: 980 }}><Guide title="第一次玩" body="选地中海黎明，最快理解财政、省份、战争和事件。" tone="good" /><Guide title="喜欢经营" body="选印度洋贸易，经济和海贸路线更清晰。" tone="info" /><Guide title="喜欢冲突" body="选地中海争霸，战争、贸易和外交都很密集。" tone="warn" /><Guide title="追求旗舰长局" body="选万邦纪元，但建议熟悉系统后再玩。" tone="danger" /></div>
     <div className="ia-menu-section-title ia-up">选择剧本</div>
@@ -68,6 +71,10 @@ export default function ScenarioSelect() {
     <div className="ia-menu-actions">{saveExists && <Btn label="读取自动存档" variant="ghost" onClick={() => loadFromSlot(0)} />}{saveSummary.best && <Btn label={`继续槽位 ${saveSummary.best.slot}`} variant="primary" onClick={continueBest} />}{previews.some((p) => p.status !== 'empty') && <Btn label="刷新存档体检" variant="ghost" onClick={refreshSaves} />}{previews.some((p) => p.status !== 'empty') && <Btn label="清理本地存档" warn onClick={clearLocal} />}</div>
     {log.length > 0 && <p className="dim ia-menu-log">{log[log.length - 1]}</p>}
   </div>;
+}
+
+function HandbookPanel({ handbook }: { handbook: LaunchHandbook }) {
+  return <div className="ia-card" style={{ maxWidth: 980, margin: '0 auto 18px', padding: 12, borderLeft: '4px solid var(--gold)' }}><div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap', marginBottom: 10 }}><div><Tag text="玩法速查" tone="gold" /><strong style={{ display: 'block', marginTop: 6, fontSize: 14 }}>{handbook.headline}</strong><div style={{ color: 'var(--text-mute)', fontSize: 12, lineHeight: 1.55, marginTop: 4 }}>{handbook.subtitle}</div></div><Tag text={handbook.primaryAdvice} tone="good" /></div><div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 8 }}>{handbook.sections.map((section) => <div key={section.id} className="ia-card" style={{ padding: 10, borderLeft: `3px solid var(--${toneVar(section.tone)})` }}><Tag text={section.kicker} tone={section.tone} /><strong style={{ display: 'block', marginTop: 6, fontSize: 13 }}>{section.title}</strong><div style={{ color: 'var(--text-mute)', fontSize: 11, lineHeight: 1.45, marginTop: 4 }}>{section.summary}</div><div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginTop: 8 }}>{section.steps.slice(0, 3).map((x) => <Tag key={x.id} text={x.label} tone={x.tone} />)}</div></div>)}</div></div>;
 }
 
 function ChallengePanel({ guide, compact = false }: { guide: ScenarioChallengeGuide; compact?: boolean }) {
