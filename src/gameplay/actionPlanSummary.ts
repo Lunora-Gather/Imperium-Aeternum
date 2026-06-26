@@ -2,6 +2,7 @@
 // 纯函数，不改 GameState；下一步可以直接接入总览页卡片。
 
 import type { CommandExecutionPlan, CommandExecutionStep, ExecutionPlanTone } from './commandExecutionPlan';
+import type { NavigationTab } from './navigationTabs';
 
 export interface ActionPlanSummaryLine {
   id: string;
@@ -21,11 +22,31 @@ export interface ActionPlanSummary {
   lines: ActionPlanSummaryLine[];
 }
 
+const TAB_LABELS: Record<NavigationTab, string> = {
+  dashboard: '总览',
+  map: '舆图',
+  province: '省份',
+  economy: '经济',
+  population: '人口',
+  politics: '政治',
+  military: '军事',
+  diplomacy: '外交',
+  tech: '科技',
+  stats: '统计',
+  report: '年报',
+  chronicle: '史册',
+  save: '存档',
+};
+
 function sourceLabel(source: CommandExecutionStep['source']): string {
   if (source === 'readiness') return '体检';
   if (source === 'report') return '年报';
   if (source === 'strategy') return '参谋';
   return '规划';
+}
+
+function tabLabel(tab: NavigationTab): string {
+  return TAB_LABELS[tab] ?? tab;
 }
 
 function phaseFallback(id: string): string {
@@ -40,7 +61,7 @@ function summarizeStep(step: CommandExecutionStep): ActionPlanSummaryLine {
     title: step.label,
     body: `${sourceLabel(step.source)}：${step.reason}`,
     tone: step.tone,
-    actionLabel: `前往${step.tab}`,
+    actionLabel: `前往${tabLabel(step.tab)}`,
   };
 }
 
