@@ -1,10 +1,11 @@
 // Imperium Aeternum — App shell
-// 布局优化：总控台式顶部、分组导航、内容画布。Hooks 保持在条件 return 前，避免 React #310。
+// V18：顶部 ↩ 改为真正返回上一页；标题页返回拆成独立按钮，避免误触丢失上下文。
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useGameStore } from './store/gameStore';
 import { playSfx, useSfxMute } from './utils/audio';
 import { BUILD_MARK } from './buildInfo';
 import { getOnboardingStep, nextOnboardingIndex, onboardingProgress, prevOnboardingIndex } from './gameplay/onboarding';
+import { pushPageHistory, resetPageHistory, resolveBackTarget } from './gameplay/pageHistory';
 
 import { provincesOf } from './engine/init';
 import { ResourceStrip } from './components/ui';
@@ -52,6 +53,7 @@ const ALL_TABS = TAB_GROUPS.flatMap((g) => g.tabs);
 
 export default function App() {
   const [tab, setTab] = useState<Tab>('dashboard');
+  const [tabHistory, setTabHistory] = useState<Tab[]>([]);
   const [preReportTab, setPreReportTab] = useState<Tab>('dashboard');
   const [showHelp, setShowHelp] = useState(false);
   const [tutorialStep, setTutorialStep] = useState(0);
@@ -78,6 +80,18 @@ export default function App() {
   const prevPendingCount = useRef(state.pendingEvents.length);
   const prevVictory = useRef(state.victory.type);
 
+  const goToTab = useCallback((next: Tab, remember = true) => {
+    if (next === tab) return;
+    if (remember) setTabHistory((history) => pushPageHistory(history, tab, next));
+    setTab(next);
+  }, [tab]);
+
+  const goBackPage = useCallback(() => {
+    const resolved = resolveBackTarget(tabHistory, tab, 'dashboard');
+    setTabHistory(resolved.history);
+    setTab(resolved.target);
+  }, [tab, tabHistory]);
+
   const finishHelp = useCallback(() => {
     setShowHelp(false);
     setTutorialStep(0);
@@ -98,20 +112,20 @@ export default function App() {
 
   useEffect(() => {
     if (pendingTab) {
-      setTab(pendingTab as Tab);
+      goToTab(pendingTab as Tab);
       consumePendingTab();
     }
-  }, [pendingTab, consumePendingTab]);
+  }, [pendingTab, consumePendingTab, goToTab]);
 
   useEffect(() => {
     if (!justProcessedTurn) return;
-    if (state.turn <= 1) setTab('report');
+    if (state.turn <= 1) goToTab('report', false);
     else {
       setPreReportTab(tab);
-      setTab('report');
+      goToTab('report', false);
     }
     clearTurnFlag();
-  }, [justProcessedTurn, clearTurnFlag, state.turn, tab]);
+  }, [justProcessedTurn, clearTurnFlag, state.turn, tab, goToTab]);
 
   useEffect(() => {
     if (justProcessedTurn) playSfx('bell');
@@ -147,6 +161,7 @@ export default function App() {
   const safeBackToMenu = useCallback(() => {
     const ok = window.confirm('返回标题页？当前进度不会自动保存。建议先到“存档”页保存。');
     if (!ok) return;
+    setTabHistory(resetPageHistory<Tab>());
     setTab('dashboard');
     backToMenu();
   }, [backToMenu]);
@@ -162,10 +177,8 @@ export default function App() {
         setShowHelp(false);
         return;
       }
-      if (tab !== 'dashboard') {
-        e.preventDefault();
-        setTab('dashboard');
-      }
+      e.preventDefault();
+      goBackPage();
       return;
     }
 
@@ -179,15 +192,15 @@ export default function App() {
     }
     if (e.key === 't' || e.key === 'T') {
       e.preventDefault();
-      setTab('economy');
+      goToTab('economy');
       return;
     }
     const hit = ALL_TABS.find((x) => x.key === e.key);
     if (hit) {
       e.preventDefault();
-      setTab(hit.id);
+      goToTab(hit.id);
     }
-  }, [scene, showHelp, tab, state.pendingEvents, state.victory.type, pid, nextTurn]);
+  }, [scene, showHelp, state.pendingEvents, state.victory.type, pid, nextTurn, goToTab, goBackPage]);
 
   useEffect(() => {
     window.addEventListener('keydown', onKey);
@@ -199,7 +212,7 @@ export default function App() {
   const helpProgress = onboardingProgress(tutorialStep);
   const helpStep = getOnboardingStep(tutorialStep);
   const goHelpTab = () => {
-    setTab(helpStep.tab as Tab);
+    goToTab(helpStep.tab as Tab);
     setShowHelp(false);
   };
 
@@ -226,7 +239,8 @@ export default function App() {
               </button>
               <button className="ia-icon-btn" onClick={() => { setShowHelp(true); setTutorialStep(0); }} title="治国引导" aria-label="治国引导">?</button>
               <button className="ia-icon-btn" onClick={sfxMute.toggle} title={sfxMute.muted ? '音效已关（点击开启）' : '音效已开（点击静音）'} aria-label="音效开关">{sfxMute.muted ? '🔇' : '🔊'}</button>
-              <button className="ia-icon-btn ia-icon-btn--back" onClick={safeBackToMenu} title="返回标题页" aria-label="返回标题页">↩</button>
+              <button className="ia-icon-btn ia-icon-btn--back" onClick={goBackPage} title="返回上一页；没有上一页则回总览" aria-label="返回上一页">↩</button>
+              <button className="ia-icon-btn ia-icon-btn--back" onClick={safeBackToMenu} title="返回标题页" aria-label="返回标题页">⌂</button>
             </div>
           </div>
 
@@ -257,7 +271,7 @@ export default function App() {
             <span className="ia-nav-label ia-up">{g.group}</span>
             <div className="ia-tab-cluster">
               {g.tabs.map((t) => (
-                <button key={t.id} onClick={() => setTab(t.id)} title={`快捷键 ${t.key}`} className={`ia-tab-btn ${tab === t.id ? 'is-active' : ''}`}>
+                <button key={t.id} onClick={() => goToTab(t.id)} title={`快捷键 ${t.key}`} className={`ia-tab-btn ${tab === t.id ? 'is-active' : ''}`}>
                   <span className="ia-tab-icon">{t.icon}</span>
                   <span>{t.label}</span>
                   <kbd>{t.key}</kbd>
@@ -266,7 +280,7 @@ export default function App() {
             </div>
           </div>
         ))}
-        <div className="ia-nav-hint">Esc 回总览 · 空格下一回合 · T 经济 · {BUILD_MARK}</div>
+        <div className="ia-nav-hint">Esc / ↩ 返回上一页 · 空格下一回合 · T 经济 · {BUILD_MARK}</div>
       </nav>
 
       <main className="ia-content-shell ia-fade">
@@ -280,7 +294,7 @@ export default function App() {
         {tab === 'diplomacy' && <DiplomacyScreen />}
         {tab === 'tech' && <TechnologyScreen />}
         {tab === 'stats' && <StatsScreen />}
-        {tab === 'report' && <TurnReportScreen onContinue={() => setTab(preReportTab)} />}
+        {tab === 'report' && <TurnReportScreen onContinue={() => goToTab(preReportTab, false)} />}
         {tab === 'chronicle' && <ChronicleScreen />}
         {tab === 'save' && <SaveLoadScreen />}
       </main>
