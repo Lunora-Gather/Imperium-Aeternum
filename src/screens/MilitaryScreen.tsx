@@ -1,8 +1,11 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useGameStore } from '../store/gameStore';
 import { provincesOf } from '../engine/init';
 import { findRelationExplicit } from '../engine/diplomacy';
-import { Panel, Stat, Btn, Tag, Bar, Divider } from '../components/ui';
+import { Panel, Stat, Btn, Tag, Bar } from '../components/ui';
+import WarPreviewPanel from '../components/WarPreviewPanel';
+import { assessWar } from '../gameplay/warAssessment';
+import { buildWarPreview } from '../gameplay/warPreview';
 import type { War, Army, GameState } from '../types/game';
 
 function peaceTermsText(war: War, state: GameState, pid: string): { txt: string; tone: 'good' | 'warn' | 'danger' | 'info' }[] {
@@ -150,6 +153,7 @@ export default function MilitaryScreen() {
   const armyTotal = player.army.reduce((s, a) => s + a.size, 0);
   const [reportWar, setReportWar] = useState<War | null>(null);
   const [moveTarget, setMoveTarget] = useState<Army | null>(null);
+  const [previewTarget, setPreviewTarget] = useState<{ defenderId: string; provinceId: string } | null>(null);
 
   const frontierProvinceIds = new Set<string>();
   for (const p of provs) {
@@ -165,6 +169,12 @@ export default function MilitaryScreen() {
     return { p, adj, rel };
   })).filter((x): x is NonNullable<typeof x> => !!x);
 
+  const selectedWarPreview = useMemo(() => {
+    if (!previewTarget) return null;
+    if (!state.nations[previewTarget.defenderId] || !state.provinces[previewTarget.provinceId]) return null;
+    return buildWarPreview(assessWar(state, pid, previewTarget.defenderId, previewTarget.provinceId));
+  }, [previewTarget, state, pid]);
+
   const guidance: { title: string; body: string; tone: 'good' | 'warn' | 'danger' | 'info' }[] = [];
   if (myWars.length > 0 && frontierArmies.length === 0) guidance.push({ title: '先调兵到前线', body: '你在战争中，但军队没有部署在边境省。先点“调动”，把军队移到敌省相邻的己省。', tone: 'danger' });
   if (player.warExhaustion > 60) guidance.push({ title: '考虑议和', body: '厌战过高会拖垮稳定和财政。若战线没有优势，优先求和止损。', tone: 'warn' });
@@ -173,7 +183,7 @@ export default function MilitaryScreen() {
   if (myWars.length === 0 && possibleWarRows.length > 0 && armyTotal >= Math.max(200, provs.length * 45)) guidance.push({ title: '可选择扩张', body: '当前无战争且兵力尚可，可在宣战区选择低关系邻国。', tone: 'good' });
   if (guidance.length === 0) guidance.push({ title: '军情平稳', body: '保持边境驻军，避免多线作战，等待更好的扩张机会。', tone: 'info' });
 
-  const doDeclare = (target: string, provId: string) => { storeDeclareWar(target, provId); };
+  const doDeclare = (target: string, provId: string) => { storeDeclareWar(target, provId); setPreviewTarget(null); };
 
   return (
     <div>
@@ -255,10 +265,11 @@ export default function MilitaryScreen() {
       {moveTarget && <MoveArmyModal army={moveTarget} onClose={() => setMoveTarget(null)} />}
 
       <Panel title="宣战">
-        <p className="dim" style={{ fontSize: 11, marginBottom: 8 }}>向相邻非同盟国家宣战。战力对比助你预判胜算——<span style={{ color: 'var(--good)' }}>绿</span>占优、<span style={{ color: 'var(--warn)' }}>黄</span>均势、<span style={{ color: 'var(--war)' }}>红</span>劣势。</p>
+        <p className="dim" style={{ fontSize: 11, marginBottom: 8 }}>向相邻非同盟国家宣战。先点“预演”查看胜率、后勤、财政、厌战与外交风险，再决定是否发动战争。</p>
         <div className="ia-card" style={{ marginBottom: 8, padding: 8, background: 'rgba(201,120,40,0.08)', border: '1px solid var(--warn)' }}>
           <span style={{ fontSize: 11, color: 'var(--warn)' }}>⚠ 战略要点：宣战后须在“军队部署”区把军队调动到与敌省相邻的己省（前线），否则无军队在前线将自动议和。</span>
         </div>
+        {selectedWarPreview && previewTarget && <div style={{ marginBottom: 10 }}><WarPreviewPanel preview={selectedWarPreview} onPrimary={() => doDeclare(previewTarget.defenderId, previewTarget.provinceId)} /></div>}
         <div>
           {possibleWarRows.map(({ p, adj, rel }) => {
             if (rel?.treaty === 'truce' && rel.truceTurns > 0) {
@@ -277,12 +288,14 @@ export default function MilitaryScreen() {
             const enemyArmy = enemy?.army.reduce((s, a) => s + a.size, 0) ?? 0;
             const ratio = armyTotal > 0 ? armyTotal / Math.max(1, enemyArmy) : 0;
             const advantage = ratio >= 1.5 ? { txt: '占优', tone: 'good' as const } : ratio >= 0.8 ? { txt: '均势', tone: 'warn' as const } : { txt: '劣势', tone: 'danger' as const };
+            const selected = previewTarget?.defenderId === adj.ownerId && previewTarget?.provinceId === adj.id;
             return (
-              <div key={`${p.id}-${adj.id}`} style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr 60px 70px', gap: 8, padding: '8px 0', borderBottom: '1px solid var(--border)', alignItems: 'center' }}>
+              <div key={`${p.id}-${adj.id}`} style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr 60px 70px 70px', gap: 8, padding: '8px 0', borderBottom: '1px solid var(--border)', alignItems: 'center' }}>
                 <span style={{ fontSize: 12 }}>邻省 <strong>{adj.name}</strong> <span className="dim">属 {enemy?.name ?? adj.ownerId}</span></span>
                 <span style={{ fontSize: 12, color: `var(--${tone === 'danger' ? 'war' : tone === 'warn' ? 'warn' : 'good'})` }}>关系 {Math.round(relation)}</span>
                 <span style={{ fontSize: 12 }}><span style={{ color: 'var(--good)' }}>{armyTotal}</span><span className="dim" style={{ margin: '0 4px' }}>vs</span><span style={{ color: 'var(--war)' }}>{enemyArmy}</span></span>
                 <Tag text={advantage.txt} tone={advantage.tone} />
+                <Btn label={selected ? '已预演' : '预演'} variant="ghost" onClick={() => setPreviewTarget({ defenderId: adj.ownerId, provinceId: adj.id })} />
                 <Btn label="宣战" warn onClick={() => doDeclare(adj.ownerId, adj.id)} />
               </div>
             );
