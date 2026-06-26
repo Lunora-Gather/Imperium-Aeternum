@@ -57,6 +57,8 @@ jobs:
         run: npx vitest run src/gameplay/__tests__/saveRecovery.test.ts
       - name: Guided onboarding tests
         run: npx vitest run src/gameplay/__tests__/onboarding.test.ts
+      - name: Navigation tab contract tests
+        run: npx vitest run src/gameplay/__tests__/navigationTabs.test.ts
       - name: Page history navigation tests
         run: npx vitest run src/gameplay/__tests__/pageHistory.test.ts
       - name: Turn report action routing tests

@@ -1,11 +1,12 @@
-// V21 年报行动路由：支持复用外部预计算战略简报，避免总览/年报重复诊断。
+// V23 年报行动路由：复用统一 NavigationTab 合约，避免跳转目标字符串漂移。
 // 纯函数，供年报页、行动中心、未来快捷行动栏和测试复用。
 
 import type { GameState } from '../types/game';
+import type { NavigationTab } from './navigationTabs';
 import { buildStrategicBrief, type StrategicBrief } from './strategicAdvisor';
 
 export type TurnReportActionTone = 'good' | 'warn' | 'danger' | 'info';
-export type TurnReportActionTab = 'dashboard' | 'province' | 'economy' | 'population' | 'politics' | 'military' | 'diplomacy' | 'tech' | 'save';
+export type TurnReportActionTab = NavigationTab;
 
 export interface TurnReportAction {
   id: string;
@@ -88,7 +89,7 @@ export function buildTurnReportActions(state: GameState, context: TurnReportActi
 
   const brief = context.brief ?? buildStrategicBrief(state);
   for (const x of brief.urgent.slice(0, 4)) {
-    actions.push(action(`brief-${x.title}`, x.title, x.body, x.tab as TurnReportActionTab, x.level));
+    actions.push(action(`brief-${x.title}`, x.title, x.body, x.tab, x.level));
   }
 
   if (actions.length === 0) {

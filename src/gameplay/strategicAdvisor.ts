@@ -2,9 +2,10 @@
 // 统一分析财政、粮食、战争、地方、外交、科技、派系和国运阶段。
 
 import type { GameState, Nation, Province, TurnReport } from '../types/game';
+import type { NavigationTab } from './navigationTabs';
 import { getAIStrategyInfo } from './strategyFocus';
 
-type AdvisorTab = 'dashboard' | 'province' | 'economy' | 'population' | 'politics' | 'military' | 'diplomacy' | 'tech' | 'stats' | 'chronicle' | 'save';
+type AdvisorTab = NavigationTab;
 export type AdvisorTone = 'danger' | 'warn' | 'good' | 'info' | 'gold';
 
 export interface StrategicItem {

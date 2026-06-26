@@ -1,5 +1,7 @@
-// V17 新手/回归玩家引导：把总览、国运目标、回合前检查、存档恢复串成一条可执行路线。
+// V23 新手/回归玩家引导：复用统一 NavigationTab 合约，避免引导跳转目标漂移。
 // 纯数据 + 纯函数，供 App 引导弹窗、测试和未来任务系统复用。
+
+import type { NavigationTab } from './navigationTabs';
 
 export type OnboardingStepId = 'dashboard' | 'ambition' | 'readiness' | 'action' | 'turn' | 'save';
 
@@ -7,7 +9,7 @@ export interface OnboardingStep {
   id: OnboardingStepId;
   title: string;
   body: string;
-  tab: 'dashboard' | 'province' | 'economy' | 'politics' | 'military' | 'diplomacy' | 'tech' | 'report' | 'save';
+  tab: NavigationTab;
   cta: string;
   shortcut?: string;
 }

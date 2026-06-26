@@ -1,10 +1,11 @@
-// V22 行动中心：过滤无意义年报兜底，并按当前局势生成更贴近玩家的规划行动。
+// V23 行动中心：复用统一 NavigationTab 合约，并过滤旧自由字符串 tab。
 // 纯函数，不改 GameState；总览 UI、未来快捷栏和测试可复用。
 
 import type { GameState, Nation } from '../types/game';
 import { buildReadinessReport, type ReadinessReport } from './readiness';
 import { buildStrategicBrief, type StrategicBrief } from './strategicAdvisor';
 import { buildTurnReportActions, type TurnReportAction } from './turnReportActions';
+import { isNavigationTab, type NavigationTab } from './navigationTabs';
 
 export type CommandActionTone = 'normal' | 'warn' | 'danger';
 
@@ -12,7 +13,7 @@ export interface CommandCenterAction {
   id: string;
   label: string;
   desc: string;
-  tab: string;
+  tab: NavigationTab;
   level: number;
   tone: CommandActionTone;
   source: 'readiness' | 'report' | 'strategy' | 'fallback';
@@ -64,7 +65,7 @@ export function buildCommandCenterActions(state: GameState, limit = 5, context: 
   const reportActions = context.reportActions ?? buildTurnReportActions(state, { brief });
 
   for (const item of [...readiness.blockers, ...readiness.warnings, ...readiness.advice].slice(0, 8)) {
-    if (!item.tab) continue;
+    if (!isNavigationTab(item.tab)) continue;
     const level = item.tone === 'danger' ? 100 : item.tone === 'warn' ? 78 : 45;
     pushUnique(out, {
       id: `ready-${item.id}`,
