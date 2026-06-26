@@ -37,7 +37,7 @@ jobs:
         run: npm run typecheck
 
       - name: Test
-        run: npm test -- --runInBand=false
+        run: npm test
 
       - name: Build Pages artifact
         env:
