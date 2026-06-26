@@ -1,5 +1,6 @@
 // 动态国运目标：按剧本体量缩放胜利条件。
 // 解决：世界剧本/大国开局时，旧的“7省征服胜利、2000金经济胜利”过于固定。
+// V13：把进度同步从 UI wrapper 里抽成可复用函数，避免新局、读档、回合链顺序导致右侧目标条滞后。
 
 import { useGameStore } from '../store/gameStore';
 import type { GameState } from '../types/game';
@@ -12,6 +13,7 @@ export interface AmbitionMeta {
   worldProvinces: number;
   economyTurns: number;
   peaceTurns: number;
+  lastProgressTurn?: number;
   warnedPremature?: boolean;
 }
 
@@ -57,6 +59,16 @@ function makeMeta(state: GameState): AmbitionMeta {
     worldProvinces: Object.keys(state.provinces).length,
     economyTurns: 0,
     peaceTurns: 0,
+    lastProgressTurn: state.turn,
+  };
+}
+
+function normalizeMetaForState(state: GameState, meta: AmbitionMeta): AmbitionMeta {
+  return {
+    ...meta,
+    lastProgressTurn: meta.lastProgressTurn ?? state.turn,
+    economyTurns: Math.max(0, Math.round(meta.economyTurns ?? 0)),
+    peaceTurns: Math.max(0, Math.round(meta.peaceTurns ?? 0)),
   };
 }
 
@@ -65,7 +77,7 @@ function getMetaForRead(state: StateWithAmbition): AmbitionMeta {
   const worldProvinces = Object.keys(state.provinces).length;
   const meta = state.ambitionMeta;
   if (!meta || meta.playerNationId !== pid || meta.worldProvinces !== worldProvinces) return makeMeta(state);
-  return meta;
+  return normalizeMetaForState(state, meta);
 }
 
 function ensureMetaForWrite(state: StateWithAmbition): AmbitionMeta {
@@ -73,6 +85,8 @@ function ensureMetaForWrite(state: StateWithAmbition): AmbitionMeta {
   const worldProvinces = Object.keys(state.provinces).length;
   if (!state.ambitionMeta || state.ambitionMeta.playerNationId !== pid || state.ambitionMeta.worldProvinces !== worldProvinces) {
     state.ambitionMeta = makeMeta(state);
+  } else {
+    state.ambitionMeta = normalizeMetaForState(state, state.ambitionMeta);
   }
   return state.ambitionMeta;
 }
@@ -115,12 +129,18 @@ export function getAmbitionSnapshot(state: GameState): AmbitionSnapshot {
   };
 }
 
-function applyAmbitions(state: GameState): { state: GameState; note?: string } {
-  const next = state as StateWithAmbition;
+export function syncAmbitionMeta(state: GameState): GameState {
+  const next = { ...state } as StateWithAmbition;
+  next.ambitionMeta = ensureMetaForWrite(next);
+  return next;
+}
+
+export function applyAmbitionsAfterTurn(state: GameState): { state: GameState; note?: string } {
+  const next = syncAmbitionMeta(state) as StateWithAmbition;
   const meta = ensureMetaForWrite(next);
   const pid = playerId(next);
   const player = next.nations[pid];
-  if (!player) return { state };
+  if (!player) return { state: next };
 
   const t = targets(meta);
   const provs = provinceCount(next, pid);
@@ -128,11 +148,16 @@ function applyAmbitions(state: GameState): { state: GameState; note?: string } {
   const stable = player.government.stability >= 40;
   const good = goodRelationCount(next, pid);
 
-  if (player.resources.gold >= t.economyTarget && stable) meta.economyTurns += 1;
-  else meta.economyTurns = 0;
+  // 进度计数只允许每个 state.turn 推进一次，避免 wrapper 重装、读档恢复或重复 setState 造成右侧目标条跳动。
+  if (meta.lastProgressTurn !== next.turn) {
+    if (player.resources.gold >= t.economyTarget && stable) meta.economyTurns += 1;
+    else meta.economyTurns = 0;
 
-  if (!atWar && player.government.stability >= 45 && player.government.legitimacy >= 35) meta.peaceTurns += 1;
-  else meta.peaceTurns = 0;
+    if (!atWar && player.government.stability >= 45 && player.government.legitimacy >= 35) meta.peaceTurns += 1;
+    else meta.peaceTurns = 0;
+
+    meta.lastProgressTurn = next.turn;
+  }
 
   let note: string | undefined;
 
@@ -161,17 +186,52 @@ function applyAmbitions(state: GameState): { state: GameState; note?: string } {
   return { state: next, note };
 }
 
+function syncStoreAmbitions(advanceTurn: boolean): void {
+  const cur = useGameStore.getState() as unknown as { state: GameState; scene?: string; logMsg?: (msg: string) => void };
+  if (cur.scene && cur.scene !== 'playing') return;
+  const applied = advanceTurn ? applyAmbitionsAfterTurn(cur.state) : { state: syncAmbitionMeta(cur.state) };
+  useGameStore.setState({ state: applied.state } as never);
+  if ('note' in applied && applied.note) cur.logMsg?.(applied.note);
+}
+
 export function installAmbitionSystem(): void {
   if (installed) return;
   installed = true;
-  const originalNextTurn = (useGameStore.getState() as unknown as { nextTurn?: () => unknown }).nextTurn;
+  const store = useGameStore.getState() as unknown as {
+    startScenario?: (id: string) => void;
+    startWithNation?: (nationId: string) => void;
+    load?: () => boolean;
+    loadFromSlot?: (slot: number) => boolean;
+    nextTurn?: () => unknown;
+  };
+  const originalStartScenario = store.startScenario;
+  const originalStartWithNation = store.startWithNation;
+  const originalLoad = store.load;
+  const originalLoadFromSlot = store.loadFromSlot;
+  const originalNextTurn = store.nextTurn;
+
   useGameStore.setState({
+    startScenario: (id: string) => {
+      originalStartScenario?.(id);
+      syncStoreAmbitions(false);
+    },
+    startWithNation: (nationId: string) => {
+      originalStartWithNation?.(nationId);
+      syncStoreAmbitions(false);
+    },
+    load: () => {
+      const ok = originalLoad?.() ?? false;
+      if (ok) syncStoreAmbitions(false);
+      return ok;
+    },
+    loadFromSlot: (slot: number) => {
+      const ok = originalLoadFromSlot?.(slot) ?? false;
+      if (ok) syncStoreAmbitions(false);
+      return ok;
+    },
     nextTurn: () => {
       const result = originalNextTurn?.();
-      const cur = useGameStore.getState() as unknown as { state: GameState; logMsg?: (msg: string) => void };
-      const applied = applyAmbitions(cur.state);
-      useGameStore.setState({ state: applied.state } as never);
-      if (applied.note) cur.logMsg?.(applied.note);
+      if (result !== null) syncStoreAmbitions(true);
       return result;
     },
   } as never);

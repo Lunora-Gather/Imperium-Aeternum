@@ -47,6 +47,8 @@ jobs:
         run: npx vitest run src/engine/__tests__/turnIsolation.test.ts
       - name: Law per-turn pure tests
         run: npx vitest run src/engine/__tests__/lawEffectsPure.test.ts
+      - name: Ambition sync tests
+        run: npx vitest run src/gameplay/__tests__/ambitionsSync.test.ts
       - name: Save compaction tests
         run: npx vitest run src/store/__tests__/persistenceCompact.test.ts
       - name: Turn purity tests
