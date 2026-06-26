@@ -1,1 +1,1 @@
-export const BUILD_MARK = 'V40 dashboard-hq-live';
+export const BUILD_MARK = 'V41 war-assessment';
