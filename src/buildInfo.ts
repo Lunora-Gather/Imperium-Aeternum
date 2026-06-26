@@ -1,1 +1,1 @@
-export const BUILD_MARK = 'V31 style-ai-intel';
+export const BUILD_MARK = 'V32 chronicle-polish';
