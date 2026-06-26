@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { createInitialState } from '../../engine/init';
 import { buildReadinessReport } from '../readiness';
 import { sanitizeState } from '../stateHygiene';
-import type { GameState } from '../../types/game';
+import type { GameState, TurnReport } from '../../types/game';
 
 function clone<T>(value: T): T {
   return JSON.parse(JSON.stringify(value)) as T;
@@ -10,6 +10,27 @@ function clone<T>(value: T): T {
 
 function firstForeignNationId(state: GameState): string {
   return Object.keys(state.nations).find((id) => id !== state.playerNationId) ?? state.playerNationId;
+}
+
+function report(turn: number, nationId: string): TurnReport {
+  return {
+    turn,
+    nationId,
+    income: { tax: 0, trade: 0, building: 0 },
+    expense: { military: 0, corruption: 0 },
+    foodDelta: 0,
+    popDelta: 0,
+    stabilityDelta: 0,
+    legitimacyDelta: 0,
+    unrestDelta: 0,
+    events: [],
+    warnings: [],
+    warProgress: [],
+    factionDelta: [],
+    exhaustSnapshot: 0,
+    worldEvents: [],
+    provinceChanges: [],
+  };
 }
 
 describe('state hygiene repair chain', () => {
@@ -54,19 +75,19 @@ describe('state hygiene repair chain', () => {
     expect(buildReadinessReport(state).devChecks.map((item) => item.id)).toEqual(expect.arrayContaining(['invalid-war-refs', 'transient-relmap-present']));
 
     const repaired = sanitizeState(state);
-    const report = buildReadinessReport(repaired);
+    const readiness = buildReadinessReport(repaired);
 
     expect(repaired._relMap).toBeUndefined();
     expect(repaired.wars.some((w) => w.id === 'bad-war')).toBe(false);
-    expect(report.devChecks.map((item) => item.id)).not.toContain('invalid-war-refs');
-    expect(report.devChecks.map((item) => item.id)).not.toContain('transient-relmap-present');
+    expect(readiness.devChecks.map((item) => item.id)).not.toContain('invalid-war-refs');
+    expect(readiness.devChecks.map((item) => item.id)).not.toContain('transient-relmap-present');
   });
 
   it('moves orphan armies back to an owned province and trims noisy history', () => {
     const state = createInitialState();
     const player = state.nations[state.playerNationId];
     player.army.push({ id: 'orphan', ownerId: player.id, location: 'missing-province', size: 50, morale: 120, training: -10, equipment: 40, supply: 35 });
-    state.history = Array.from({ length: 20 }, (_, i) => ({ ...state.lastReport!, turn: i }));
+    state.history = Array.from({ length: 20 }, (_, i) => report(i, state.playerNationId));
 
     const repaired = sanitizeState(state);
     const army = repaired.nations[state.playerNationId].army.find((a) => a.id === 'orphan');
