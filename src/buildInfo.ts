@@ -1,1 +1,1 @@
-export const BUILD_MARK = '第二十一轮 v21 · diagnostic-reuse';
+export const BUILD_MARK = '第二十二轮 v22 · action-quality';
