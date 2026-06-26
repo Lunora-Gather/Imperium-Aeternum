@@ -1,1 +1,1 @@
-export const BUILD_MARK = 'V39 action-plan-summary';
+export const BUILD_MARK = 'V40 strategic-hq';
