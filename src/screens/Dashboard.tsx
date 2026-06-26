@@ -1,4 +1,4 @@
-// Dashboard v20 — 帝国总参谋部：行动中心 / 全局诊断 / 近期路线 / 国运目标 / 回合前体检
+// Dashboard v21 — 帝国总参谋部：复用诊断结果，避免总览行动中心重复计算
 import { useMemo } from 'react';
 import { useGameStore } from '../store/gameStore';
 import { provincesOf } from '../engine/init';
@@ -8,6 +8,7 @@ import type { StrategyFocusId } from '../gameplay/strategyFocus';
 import { getAmbitionSnapshot } from '../gameplay/ambitions';
 import { buildReadinessReport, type ReadinessReport, type ReadinessItem } from '../gameplay/readiness';
 import { buildStrategicBrief, type StrategicBrief, type StrategicItem } from '../gameplay/strategicAdvisor';
+import { buildTurnReportActions } from '../gameplay/turnReportActions';
 import { buildCommandCenterActions, type CommandCenterAction } from '../gameplay/commandCenterActions';
 
 const FOCUSES: { id: StrategyFocusId; label: string; short: string; desc: string; effect: string }[] = [
@@ -114,7 +115,8 @@ export default function Dashboard() {
   const focus = (((state as unknown as { strategyFocus?: StrategyFocusId }).strategyFocus) ?? 'balance') as StrategyFocusId;
   const brief = useMemo(() => buildStrategicBrief(state), [state]);
   const readiness = useMemo(() => buildReadinessReport(state), [state]);
-  const commandActions = useMemo(() => buildCommandCenterActions(state), [state]);
+  const reportActions = useMemo(() => buildTurnReportActions(state, { brief }), [state, brief]);
+  const commandActions = useMemo(() => buildCommandCenterActions(state, 5, { brief, readiness, reportActions }), [state, brief, readiness, reportActions]);
 
   const lastNet = state.lastReport ? state.lastReport.income.tax + state.lastReport.income.trade + state.lastReport.income.building - state.lastReport.expense.military - state.lastReport.expense.corruption : 0;
   const unrest = provs.filter((p) => p.rebellionRisk > 70 || p.unrest > 50);
