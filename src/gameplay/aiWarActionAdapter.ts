@@ -19,6 +19,8 @@ export interface AiWarActionPlan {
   reasons: string[];
 }
 
+export type AiActionLike = AiDeclareWarActionLike | { actionId: string; weight: number; target?: string; targetProvinceId?: string; reason?: string };
+
 function weightFromConfidence(confidence: number): number {
   if (confidence >= 85) return 18;
   if (confidence >= 75) return 14;
@@ -49,4 +51,22 @@ export function buildAiWarActionPlan(state: GameState, attackerId: string): AiWa
     confidence: decision.confidence,
     reasons: decision.reasons,
   };
+}
+
+export function mergeAiWarActionPlan<T extends AiActionLike>(state: GameState, attackerId: string, actions: T[]): T[] {
+  const plan = buildAiWarActionPlan(state, attackerId);
+  const nonWar = actions.filter((a) => a.actionId !== 'declare_war');
+  const oldWar = actions.filter((a) => a.actionId === 'declare_war');
+
+  if (!plan.action) {
+    // 新评估认为不该宣战时，保留非战争行动，压制旧的“只看军力比例”的宣战候选。
+    return nonWar;
+  }
+
+  const bestOld = oldWar.slice().sort((a, b) => b.weight - a.weight)[0];
+  const merged = plan.action as unknown as T;
+  if (bestOld && bestOld.target === merged.target && bestOld.targetProvinceId === merged.targetProvinceId) {
+    return [...nonWar, { ...bestOld, weight: Math.max(bestOld.weight, merged.weight), reason: bestOld.reason ?? merged.reason } as T];
+  }
+  return [...nonWar, merged];
 }
