@@ -1,1 +1,1 @@
-export const BUILD_MARK = '第二十三轮 v23 · navigation-tab-contract';
+export const BUILD_MARK = '第二十四轮 v24 · launch-hub-polish';
