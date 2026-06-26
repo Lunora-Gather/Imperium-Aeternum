@@ -24,8 +24,21 @@ jobs:
           cache: npm
       - run: npm ci
       - name: TypeScript debt report (non-blocking)
-        run: npm run typecheck
-        continue-on-error: true
+        run: |
+          set +e
+          npm run typecheck -- --pretty false > typecheck-report.txt 2>&1
+          status=$?
+          echo "TypeScript debt report exit code: ${status}"
+          echo "First 80 report lines:"
+          sed -n '1,80p' typecheck-report.txt
+          exit 0
+      - name: Upload TypeScript debt report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: typecheck-report
+          path: typecheck-report.txt
+          retention-days: 14
       - name: Battle resolution tests
         run: npx vitest run src/engine/__tests__/battleResolution.test.ts
       - name: Save compaction tests
