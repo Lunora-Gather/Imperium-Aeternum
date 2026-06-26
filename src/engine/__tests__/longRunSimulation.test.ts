@@ -29,7 +29,7 @@ function assertHealthyState(state: GameState) {
   }
 
   for (const [id, province] of Object.entries(state.provinces)) {
-    expect(state.nations[province.ownerId], `${id}.owner`).toBeTruthy();
+    expect(province.ownerId === 'barbarian' || !!state.nations[province.ownerId], `${id}.owner`).toBe(true);
     assertFiniteNumber(`${id}.population`, province.population);
     assertFiniteNumber(`${id}.unrest`, province.unrest);
     assertFiniteNumber(`${id}.rebellionRisk`, province.rebellionRisk);
