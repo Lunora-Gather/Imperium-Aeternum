@@ -1,1 +1,1 @@
-export const BUILD_MARK = '第二十轮 v20 · command-center-actions';
+export const BUILD_MARK = '第二十一轮 v21 · diagnostic-reuse';
