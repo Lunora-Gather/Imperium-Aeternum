@@ -1,0 +1,93 @@
+import { describe, expect, it } from 'vitest';
+import { createInitialState, createWorldState } from '../init';
+import { processTurnSafe } from '../../gameplay/logicGuard';
+import type { GameState } from '../../types/game';
+
+const NEUTRAL_OWNER = 'barbarian';
+const LONG_RUN_TIMEOUT_MS = 60_000;
+const DEEP_SIM = process.env.IA_DEEP_SIM === '1';
+const CLASSIC_YEARS = DEEP_SIM ? 200 : 30;
+const REGIONAL_YEARS = DEEP_SIM ? 80 : 10;
+
+function assertFiniteNumber(label: string, value: number) {
+  expect(Number.isFinite(value), label).toBe(true);
+}
+
+function hasValidOwner(state: GameState, ownerId: string): boolean {
+  return ownerId === NEUTRAL_OWNER || !!state.nations[ownerId];
+}
+
+function assertHealthyState(state: GameState) {
+  expect(state.playerNationId).toBeTruthy();
+  expect(state.nations[state.playerNationId], 'player nation exists').toBeTruthy();
+
+  for (const [id, nation] of Object.entries(state.nations)) {
+    assertFiniteNumber(`${id}.gold`, nation.resources.gold);
+    assertFiniteNumber(`${id}.food`, nation.resources.food);
+    assertFiniteNumber(`${id}.stability`, nation.government.stability);
+    assertFiniteNumber(`${id}.legitimacy`, nation.government.legitimacy);
+    assertFiniteNumber(`${id}.warExhaustion`, nation.warExhaustion);
+    expect(nation.government.stability).toBeGreaterThanOrEqual(0);
+    expect(nation.government.stability).toBeLessThanOrEqual(100);
+    expect(nation.warExhaustion).toBeGreaterThanOrEqual(0);
+    expect(nation.warExhaustion).toBeLessThanOrEqual(100);
+    for (const army of nation.army) {
+      expect(state.provinces[army.location], `${id}.army.${army.id}.location`).toBeTruthy();
+      assertFiniteNumber(`${id}.army.${army.id}.size`, army.size);
+      expect(army.size).toBeGreaterThanOrEqual(0);
+    }
+  }
+
+  for (const [id, province] of Object.entries(state.provinces)) {
+    expect(hasValidOwner(state, String(province.ownerId)), `${id}.owner`).toBe(true);
+    assertFiniteNumber(`${id}.population`, province.population);
+    assertFiniteNumber(`${id}.unrest`, province.unrest);
+    assertFiniteNumber(`${id}.rebellionRisk`, province.rebellionRisk);
+    expect(province.population).toBeGreaterThanOrEqual(0);
+    expect(province.unrest).toBeGreaterThanOrEqual(0);
+    expect(province.unrest).toBeLessThanOrEqual(100);
+    for (const adj of province.adjacent) expect(state.provinces[adj], `${id}.adjacent.${adj}`).toBeTruthy();
+  }
+
+  const activeWarPairs = new Set<string>();
+  for (const war of state.wars) {
+    expect(state.nations[war.attackerId], `${war.id}.attacker`).toBeTruthy();
+    expect(state.nations[war.defenderId], `${war.id}.defender`).toBeTruthy();
+    expect(state.provinces[war.targetProvinceId], `${war.id}.target`).toBeTruthy();
+    assertFiniteNumber(`${war.id}.progress`, war.progress);
+    expect(war.progress).toBeGreaterThanOrEqual(0);
+    expect(war.progress).toBeLessThanOrEqual(100);
+    const pair = [war.attackerId, war.defenderId].sort().join('|');
+    expect(activeWarPairs.has(pair), `${war.id}.duplicate-war-pair`).toBe(false);
+    activeWarPairs.add(pair);
+    for (const report of war.battleReports ?? []) {
+      assertFiniteNumber(`${war.id}.report.progressDelta`, report.progressDelta);
+      assertFiniteNumber(`${war.id}.report.attLoss`, report.attLoss);
+      assertFiniteNumber(`${war.id}.report.defLoss`, report.defLoss);
+    }
+  }
+}
+
+function simulate(state: GameState, years: number): GameState {
+  let current = state;
+  for (let i = 0; i < years; i += 1) {
+    if (current.victory.type) current = { ...current, victory: { type: null } };
+    const result = processTurnSafe(current);
+    current = result.state;
+    assertHealthyState(current);
+  }
+  return current;
+}
+
+describe('long-run simulation guard', () => {
+  it(`keeps the classic scenario internally valid for ${CLASSIC_YEARS} turns`, () => {
+    const finalState = simulate(createInitialState(), CLASSIC_YEARS);
+    expect(finalState.turn).toBe(CLASSIC_YEARS);
+  }, LONG_RUN_TIMEOUT_MS);
+
+  it(`keeps a regional world scenario valid for ${REGIONAL_YEARS} turns`, () => {
+    const finalState = simulate(createWorldState(20260626, 'n_med_rome', ['mediterranean', 'europe_w', 'middle_east', 'africa_n']), REGIONAL_YEARS);
+    expect(finalState.turn).toBe(REGIONAL_YEARS);
+    expect(Object.keys(finalState.nations).length).toBeGreaterThan(10);
+  }, LONG_RUN_TIMEOUT_MS);
+});

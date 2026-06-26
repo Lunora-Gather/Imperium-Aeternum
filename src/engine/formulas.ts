@@ -262,14 +262,29 @@ export interface BattleResult {
   defenderMoraleDelta: number;
 }
 
+function safeNonNegative(value: number): number {
+  return Number.isFinite(value) ? Math.max(0, value) : 0;
+}
+
 export function resolveBattle(attackerPower: number, defenderPower: number, attackerSize: number, defenderSize: number): BattleResult {
-  const ratio = attackerPower / (attackerPower + defenderPower);
-  // W-fix: 进度加速 + 最小推进，让战争能实际产生领土转移（旧值势均力敌时≈0，战争永远不灭国）
+  const attPower = safeNonNegative(attackerPower);
+  const defPower = safeNonNegative(defenderPower);
+  const attSize = safeNonNegative(attackerSize);
+  const defSize = safeNonNegative(defenderSize);
+  const totalPower = attPower + defPower;
+
+  // O11: 零战力前线不应产生 NaN 战报/进度；交给战争代价与后续状态巡检处理。
+  if (totalPower <= 0) {
+    return { progressDelta: 0, attackerLoss: 0, defenderLoss: 0, attackerMoraleDelta: 0, defenderMoraleDelta: 0 };
+  }
+
+  const ratio = attPower / totalPower;
+  // W-fix: 进度加速 + 最小推进，让战争能实际产生领土转移；势均力敌时保持胶着。
   const rawDelta = (ratio - 0.5) * 60;  // 40→60，差距更敏感
-  const progressDelta = ratio > 0.5 ? Math.max(rawDelta, 3) : Math.min(rawDelta, -3);  // 胜方至少+3/败方至少-3
+  const progressDelta = ratio === 0.5 ? 0 : ratio > 0.5 ? Math.max(rawDelta, 3) : Math.min(rawDelta, -3);  // 胜方至少推进/击退 3
   const baseLoss = 0.05;
-  const attackerLoss = defenderPower / Math.max(attackerPower, 1) * baseLoss * attackerSize;
-  const defenderLoss = attackerPower / Math.max(defenderPower, 1) * baseLoss * defenderSize;
+  const attackerLoss = clamp(defPower / Math.max(attPower, 1) * baseLoss * attSize, 0, attSize);
+  const defenderLoss = clamp(attPower / Math.max(defPower, 1) * baseLoss * defSize, 0, defSize);
   return {
     progressDelta,
     attackerLoss,

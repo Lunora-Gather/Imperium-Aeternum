@@ -35,16 +35,7 @@ function normalizeRelation(r: Partial<DiplomaticRelation>): DiplomaticRelation |
 }
 
 function reverseRelation(r: DiplomaticRelation): DiplomaticRelation {
-  return {
-    from: r.to,
-    to: r.from,
-    relation: r.relation,
-    trust: r.trust,
-    threat: r.threat,
-    tradeDep: r.tradeDep,
-    treaty: r.treaty,
-    truceTurns: r.truceTurns,
-  };
+  return { from: r.to, to: r.from, relation: r.relation, trust: r.trust, threat: r.threat, tradeDep: r.tradeDep, treaty: r.treaty, truceTurns: r.truceTurns };
 }
 
 // v4：集中修复旧存档/旧世界生成留下的结构问题。
@@ -68,7 +59,6 @@ export function normalizeGameState(gs: GameState): GameState {
   state.highEconomyStableTurns = num(state.highEconomyStableTurns);
   state.chronicle = Array.isArray(state.chronicle) ? state.chronicle : [];
 
-  // 玩家国不存在时兜底到第一个未亡国家，避免读旧档直接白屏。
   if (!gs.playerNationId || !gs.nations[gs.playerNationId]) {
     const fallback = Object.values(gs.nations).find((n) => !n.defeated) ?? Object.values(gs.nations)[0];
     if (fallback) gs.playerNationId = fallback.id;
@@ -127,7 +117,6 @@ export function normalizeGameState(gs: GameState): GameState {
     p.rebellionRisk = clamp(num(p.rebellionRisk), 0, 100);
   }
 
-  // 外交关系双向补全。旧世界只存 A→B 时，玩家选到 B 会找不到 B→A。
   const byKey = new Map<string, DiplomaticRelation>();
   for (const raw of gs.relations ?? []) {
     const r = normalizeRelation(raw);
@@ -144,7 +133,29 @@ export function normalizeGameState(gs: GameState): GameState {
   return gs;
 }
 
-// B7: 迁移函数——v1→v2→v3→v4 补字段
+function pruneRecordByLastUpdated(value: unknown, keep: number): unknown {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return value;
+  const entries = Object.entries(value as Record<string, { lastUpdated?: number }>);
+  if (entries.length <= keep) return value;
+  return Object.fromEntries(entries.sort((a, b) => num(b[1]?.lastUpdated) - num(a[1]?.lastUpdated)).slice(0, keep));
+}
+
+// O13: 保存前瘦身。只删除可再生/陈旧/已限长数据，不改变玩家正在看的核心局势。
+export function compactGameStateForSave(gs: GameState): GameState {
+  const compact = normalizeGameState({ ...gs, _relMap: undefined });
+  compact.history = (compact.history ?? []).slice(-10);
+  compact.triggeredEvents = (compact.triggeredEvents ?? []).slice(-1000);
+  compact.eventCooldowns = (compact.eventCooldowns ?? []).slice(-500);
+  compact.chronicle = (compact.chronicle ?? []).slice(-80);
+  compact.wars = (compact.wars ?? []).map((w) => ({ ...w, battleReports: (w.battleReports ?? []).slice(-20) }));
+
+  const dyn = compact as MutableGameState;
+  dyn.aiMemory = pruneRecordByLastUpdated(dyn.aiMemory, 180);
+  dyn.aiStrategyMeta = pruneRecordByLastUpdated(dyn.aiStrategyMeta, 180);
+  dyn._relMap = undefined;
+  return compact;
+}
+
 const migrations: { from: number; to: number; apply: (s: SaveGame) => SaveGame }[] = [
   {
     from: 1, to: 2,
@@ -183,10 +194,7 @@ const migrations: { from: number; to: number; apply: (s: SaveGame) => SaveGame }
       return { ...s, version: 3 };
     },
   },
-  {
-    from: 3, to: 4,
-    apply: (s) => ({ ...s, version: 4, gameState: normalizeGameState(s.gameState) }),
-  },
+  { from: 3, to: 4, apply: (s) => ({ ...s, version: 4, gameState: normalizeGameState(s.gameState) }) },
 ];
 
 export function migrate(save: SaveGame): SaveGame {
@@ -200,13 +208,8 @@ export function migrate(save: SaveGame): SaveGame {
   return { ...cur, gameState: normalizeGameState(cur.gameState), version: SAVE_VERSION };
 }
 
-// B3: 槽位存档
 export function saveGameToSlot(state: GameState, slot: number): { ok: boolean; sizeKB?: number; error?: string } {
-  const data: SaveGame = {
-    version: SAVE_VERSION,
-    createdAt: new Date().toISOString(),
-    gameState: normalizeGameState({ ...state, _relMap: undefined }),
-  };
+  const data: SaveGame = { version: SAVE_VERSION, createdAt: new Date().toISOString(), gameState: compactGameStateForSave(state) };
   try {
     const raw = JSON.stringify(data);
     const sizeKB = Math.round(raw.length / 1024);
@@ -214,15 +217,12 @@ export function saveGameToSlot(state: GameState, slot: number): { ok: boolean; s
     localStorage.setItem(SLOT_KEY(slot), raw);
     return { ok: true, sizeKB };
   } catch (e) {
-    const msg = (e instanceof DOMException && e.name === 'QuotaExceededError')
-      ? '存档超出浏览器容量上限（约5MB），无法存档'
-      : `存档失败：${(e as Error).message}`;
+    const msg = (e instanceof DOMException && e.name === 'QuotaExceededError') ? '存档超出浏览器容量上限（约5MB），无法存档' : `存档失败：${(e as Error).message}`;
     console.error(msg, e);
     return { ok: false, error: msg };
   }
 }
 
-// B3: 槽位读档
 export function loadGameFromSlot(slot: number): GameState | null {
   try {
     if (typeof localStorage === 'undefined') return null;
@@ -230,8 +230,7 @@ export function loadGameFromSlot(slot: number): GameState | null {
     if (!raw) return null;
     const parsed = JSON.parse(raw) as SaveGame;
     const migrated = migrate(parsed);
-    // 成功迁移后回写，让下次读取更快，也让槽位显示最新版本。
-    localStorage.setItem(SLOT_KEY(slot), JSON.stringify({ ...migrated, createdAt: migrated.createdAt ?? new Date().toISOString() }));
+    localStorage.setItem(SLOT_KEY(slot), JSON.stringify({ ...migrated, gameState: compactGameStateForSave(migrated.gameState), createdAt: migrated.createdAt ?? new Date().toISOString() }));
     return migrated.gameState;
   } catch (e) {
     console.error('存档读取失败', e);
@@ -239,7 +238,6 @@ export function loadGameFromSlot(slot: number): GameState | null {
   }
 }
 
-// B3: 槽位元信息
 export function getSlotMeta(slot: number): { createdAt: string; turn: number; version: number; nationName?: string } | null {
   try {
     if (typeof localStorage === 'undefined') return null;
@@ -254,14 +252,12 @@ export function getSlotMeta(slot: number): { createdAt: string; turn: number; ve
   }
 }
 
-// B3: 列出所有槽位元信息（含空槽位）
 export function listAllSlots(): ({ slot: number; meta: NonNullable<ReturnType<typeof getSlotMeta>> } | { slot: number; meta: null })[] {
   const out: ({ slot: number; meta: NonNullable<ReturnType<typeof getSlotMeta>> } | { slot: number; meta: null })[] = [];
   for (let i = 0; i < SLOT_COUNT; i++) out.push({ slot: i, meta: getSlotMeta(i) });
   return out;
 }
 
-// B3: 删除槽位
 export function deleteSlot(slot: number): void {
   try {
     if (typeof localStorage !== 'undefined') localStorage.removeItem(SLOT_KEY(slot));
@@ -270,36 +266,16 @@ export function deleteSlot(slot: number): void {
 
 export function clearAllSaves(): void {
   for (let i = 0; i < SLOT_COUNT; i++) deleteSlot(i);
-  // 兼容历史遗留默认键。
-  try {
-    if (typeof localStorage !== 'undefined') localStorage.removeItem(STORAGE_KEY_BASE);
-  } catch { /* ignore */ }
+  try { if (typeof localStorage !== 'undefined') localStorage.removeItem(STORAGE_KEY_BASE); } catch { /* ignore */ }
 }
 
-// B3: 自动存档（每 10 回合到槽位 0）
-export function autoSave(state: GameState): void {
-  saveGameToSlot(state, AUTO_SLOT);
-}
-
-// ── 旧 API 兼容（默认槽位 0）──
-export function saveGame(state: GameState): { ok: boolean; sizeKB?: number; error?: string } {
-  return saveGameToSlot(state, AUTO_SLOT);
-}
-export function loadGame(): GameState | null {
-  return loadGameFromSlot(AUTO_SLOT);
-}
+export function autoSave(state: GameState): void { saveGameToSlot(state, AUTO_SLOT); }
+export function saveGame(state: GameState): { ok: boolean; sizeKB?: number; error?: string } { return saveGameToSlot(state, AUTO_SLOT); }
+export function loadGame(): GameState | null { return loadGameFromSlot(AUTO_SLOT); }
 export function hasSave(): boolean {
-  try {
-    return typeof localStorage !== 'undefined' && !!localStorage.getItem(SLOT_KEY(AUTO_SLOT));
-  } catch {
-    return false;
-  }
+  try { return typeof localStorage !== 'undefined' && !!localStorage.getItem(SLOT_KEY(AUTO_SLOT)); } catch { return false; }
 }
-export function getSaveMeta(): { createdAt: string; turn: number; version: number } | null {
-  return getSlotMeta(AUTO_SLOT);
-}
-export function deleteSave(): void {
-  deleteSlot(AUTO_SLOT);
-}
+export function getSaveMeta(): { createdAt: string; turn: number; version: number } | null { return getSlotMeta(AUTO_SLOT); }
+export function deleteSave(): void { deleteSlot(AUTO_SLOT); }
 
 export { SAVE_VERSION };
