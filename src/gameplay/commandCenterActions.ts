@@ -1,4 +1,4 @@
-// V23 行动中心：复用统一 NavigationTab 合约，并过滤旧自由字符串 tab。
+// V37 行动中心：复用统一 NavigationTab 合约，并增强建议多样化，避免同一页面建议挤占全部席位。
 // 纯函数，不改 GameState；总览 UI、未来快捷栏和测试可复用。
 
 import type { GameState, Nation } from '../types/game';
@@ -57,6 +57,29 @@ function fallbackActions(state: GameState, player?: Nation): CommandCenterAction
   return actions;
 }
 
+function distinctTabs(actions: CommandCenterAction[]): number {
+  return new Set(actions.map((a) => a.tab)).size;
+}
+
+export function arrangeCommandCenterActions(actions: CommandCenterAction[], limit: number): CommandCenterAction[] {
+  const sorted = [...actions].sort((a, b) => b.level - a.level);
+  const selected: CommandCenterAction[] = [];
+  const selectedKeys = new Set<string>();
+  const selectedTabs = new Set<NavigationTab>();
+  const add = (item: CommandCenterAction) => {
+    const key = `${item.id}|${item.tab}`;
+    if (selected.length >= limit || selectedKeys.has(key)) return;
+    selected.push(item);
+    selectedKeys.add(key);
+    selectedTabs.add(item.tab);
+  };
+
+  for (const item of sorted) if (item.tone === 'danger' || item.level >= 88) add(item);
+  for (const item of sorted) if (!selectedTabs.has(item.tab)) add(item);
+  for (const item of sorted) add(item);
+  return selected.slice(0, limit);
+}
+
 export function buildCommandCenterActions(state: GameState, limit = 5, context: CommandCenterContext = {}): CommandCenterAction[] {
   const out: CommandCenterAction[] = [];
   const player = state.nations[state.playerNationId] ?? Object.values(state.nations).find((n) => n.isPlayer && !n.defeated);
@@ -102,9 +125,10 @@ export function buildCommandCenterActions(state: GameState, limit = 5, context: 
     });
   }
 
-  if (out.length < 3) {
+  const desiredDiversity = Math.min(3, limit);
+  if (out.length < 3 || distinctTabs(out) < desiredDiversity) {
     for (const item of fallbackActions(state, player)) pushUnique(out, item);
   }
 
-  return out.sort((a, b) => b.level - a.level).slice(0, limit);
+  return arrangeCommandCenterActions(out, limit);
 }

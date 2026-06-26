@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { createInitialState } from '../../engine/init';
-import { buildCommandCenterActions } from '../commandCenterActions';
+import { arrangeCommandCenterActions, buildCommandCenterActions, type CommandCenterAction } from '../commandCenterActions';
 import { buildReadinessReport } from '../readiness';
 import type { GameState, TurnReport } from '../../types/game';
 import type { StrategicBrief } from '../strategicAdvisor';
@@ -40,6 +40,10 @@ function brief(urgent: StrategicBrief['urgent'] = [{ title: '预计算战略', b
     horizon: [],
     risks: [],
   };
+}
+
+function action(id: string, tab: CommandCenterAction['tab'], level: number, tone: CommandCenterAction['tone'] = 'normal'): CommandCenterAction {
+  return { id, label: id, desc: id, tab, level, tone, source: 'strategy' };
 }
 
 describe('command center actions', () => {
@@ -119,5 +123,47 @@ describe('command center actions', () => {
     const actions = buildCommandCenterActions(state, 5, { readiness, brief: brief([]), reportActions: [] });
 
     expect(actions[0]).toMatchObject({ id: 'fallback-military', tab: 'military', source: 'fallback' });
+  });
+
+  it('diversifies non-urgent actions across different tabs before filling duplicates', () => {
+    const arranged = arrangeCommandCenterActions([
+      action('eco-1', 'economy', 70, 'warn'),
+      action('eco-2', 'economy', 68, 'warn'),
+      action('province-1', 'province', 40),
+      action('save-1', 'save', 20),
+      action('diplomacy-1', 'diplomacy', 25),
+    ], 4);
+
+    expect(arranged.map((x) => x.tab).slice(0, 3)).toEqual(['economy', 'province', 'diplomacy']);
+    expect(new Set(arranged.slice(0, 3).map((x) => x.tab)).size).toBe(3);
+  });
+
+  it('keeps urgent blockers ahead even when they share the same tab', () => {
+    const arranged = arrangeCommandCenterActions([
+      action('eco-danger-1', 'economy', 100, 'danger'),
+      action('eco-danger-2', 'economy', 95, 'danger'),
+      action('province-1', 'province', 80, 'warn'),
+    ], 3);
+
+    expect(arranged[0].id).toBe('eco-danger-1');
+    expect(arranged[1].id).toBe('eco-danger-2');
+    expect(arranged[2].tab).toBe('province');
+  });
+
+  it('adds fallback actions when high-scoring candidates are too narrow', () => {
+    const state = createInitialState();
+    const readiness = { ...buildReadinessReport(state), blockers: [], warnings: [], advice: [] };
+    const reportActions: TurnReportAction[] = [
+      { id: 'eco-a', title: '经济 A', body: '经济', tab: 'economy', level: 70, tone: 'warn', tag: '建议' },
+      { id: 'eco-b', title: '经济 B', body: '经济', tab: 'economy', level: 68, tone: 'warn', tag: '建议' },
+      { id: 'eco-c', title: '经济 C', body: '经济', tab: 'economy', level: 66, tone: 'warn', tag: '建议' },
+    ];
+
+    const actions = buildCommandCenterActions(state, 5, { readiness, brief: brief([]), reportActions });
+    const tabs = new Set(actions.map((x) => x.tab));
+
+    expect(tabs.has('economy')).toBe(true);
+    expect(tabs.has('province')).toBe(true);
+    expect(tabs.has('diplomacy')).toBe(true);
   });
 });
