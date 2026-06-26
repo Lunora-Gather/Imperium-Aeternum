@@ -25,7 +25,7 @@ describe('difficulty and challenge guide', () => {
     const sorted = [...ids].sort(compareScenarioDifficulty);
 
     expect(sorted[0]).toBe('classic');
-    expect(sorted.at(-1)).toBe('challenge_survival');
+    expect(sorted[sorted.length - 1]).toBe('challenge_survival');
   });
 
   it('detects hard scenarios for launch hub warnings', () => {
@@ -40,7 +40,7 @@ describe('difficulty and challenge guide', () => {
     const summary = summarizeChallengePath(path);
 
     expect(path[0]).toBe('classic');
-    expect(path.at(-1)).toBe('challenge_survival');
+    expect(path[path.length - 1]).toBe('challenge_survival');
     expect(summary.ids[0]).toBe('classic');
     expect(summary.headline).toContain('休闲入门');
     expect(summary.advice).toContain('挑战阶梯');
