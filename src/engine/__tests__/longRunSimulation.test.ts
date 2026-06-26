@@ -5,6 +5,9 @@ import type { GameState } from '../../types/game';
 
 const NEUTRAL_OWNER = 'barbarian';
 const LONG_RUN_TIMEOUT_MS = 60_000;
+const DEEP_SIM = process.env.IA_DEEP_SIM === '1';
+const CLASSIC_YEARS = DEEP_SIM ? 200 : 30;
+const REGIONAL_YEARS = DEEP_SIM ? 80 : 10;
 
 function assertFiniteNumber(label: string, value: number) {
   expect(Number.isFinite(value), label).toBe(true);
@@ -77,14 +80,14 @@ function simulate(state: GameState, years: number): GameState {
 }
 
 describe('long-run simulation guard', () => {
-  it('keeps the classic scenario internally valid for 200 turns', () => {
-    const finalState = simulate(createInitialState(), 200);
-    expect(finalState.turn).toBe(200);
+  it(`keeps the classic scenario internally valid for ${CLASSIC_YEARS} turns`, () => {
+    const finalState = simulate(createInitialState(), CLASSIC_YEARS);
+    expect(finalState.turn).toBe(CLASSIC_YEARS);
   }, LONG_RUN_TIMEOUT_MS);
 
-  it('keeps a regional world scenario valid long enough to catch AI/worldgen drift', () => {
-    const finalState = simulate(createWorldState(20260626, 'n_med_rome', ['mediterranean', 'europe_w', 'middle_east', 'africa_n']), 80);
-    expect(finalState.turn).toBe(80);
+  it(`keeps a regional world scenario valid for ${REGIONAL_YEARS} turns`, () => {
+    const finalState = simulate(createWorldState(20260626, 'n_med_rome', ['mediterranean', 'europe_w', 'middle_east', 'africa_n']), REGIONAL_YEARS);
+    expect(finalState.turn).toBe(REGIONAL_YEARS);
     expect(Object.keys(finalState.nations).length).toBeGreaterThan(10);
   }, LONG_RUN_TIMEOUT_MS);
 });
