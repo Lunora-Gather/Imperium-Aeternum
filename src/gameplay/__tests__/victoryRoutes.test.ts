@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { createInitialState } from '../../engine/init';
-import { buildVictoryRoutes, bestVictoryRoute } from '../victoryRoutes';
+import { buildVictoryRoutes, bestVictoryRoute, buildVictoryRouteFocus } from '../victoryRoutes';
 import type { AmbitionSnapshot } from '../ambitions';
 
 const snapshot: AmbitionSnapshot = {
@@ -46,5 +46,28 @@ describe('victory route dashboard', () => {
     const state = createInitialState();
 
     expect(bestVictoryRoute(state, snapshot).id).toBe('diplomacy');
+  });
+
+  it('builds a readable route focus with runner-up comparison', () => {
+    const state = createInitialState();
+    const focus = buildVictoryRouteFocus(state, snapshot);
+
+    expect(focus.primary.id).toBe('diplomacy');
+    expect(focus.runnerUp?.id).toBe('economy');
+    expect(focus.headline).toContain('合纵路线');
+    expect(focus.routeLine).toContain('合纵 90%');
+    expect(focus.actionLabel).toBe('冲刺主线');
+  });
+
+  it('surfaces route restrictions in the focus summary', () => {
+    const state = createInitialState();
+    const target = Object.values(state.provinces).find((p) => p.ownerId !== state.playerNationId)!;
+    state.wars.push({ id: 'route-war', attackerId: state.playerNationId, defenderId: target.ownerId, targetProvinceId: target.id, progress: 0, turns: 0, battleReports: [] });
+
+    const focus = buildVictoryRouteFocus(state, snapshot);
+
+    expect(focus.tone).toBe('warn');
+    expect(focus.summary).toContain('限制');
+    expect(focus.actionLabel).toBe('先处理限制');
   });
 });
