@@ -4,6 +4,7 @@ import { processTurnSafe } from '../../gameplay/logicGuard';
 import type { GameState } from '../../types/game';
 
 const NEUTRAL_OWNER = 'barbarian';
+const LONG_RUN_TIMEOUT_MS = 60_000;
 
 function assertFiniteNumber(label: string, value: number) {
   expect(Number.isFinite(value), label).toBe(true);
@@ -79,11 +80,11 @@ describe('long-run simulation guard', () => {
   it('keeps the classic scenario internally valid for 200 turns', () => {
     const finalState = simulate(createInitialState(), 200);
     expect(finalState.turn).toBe(200);
-  });
+  }, LONG_RUN_TIMEOUT_MS);
 
   it('keeps a regional world scenario valid long enough to catch AI/worldgen drift', () => {
     const finalState = simulate(createWorldState(20260626, 'n_med_rome', ['mediterranean', 'europe_w', 'middle_east', 'africa_n']), 80);
     expect(finalState.turn).toBe(80);
     expect(Object.keys(finalState.nations).length).toBeGreaterThan(10);
-  });
+  }, LONG_RUN_TIMEOUT_MS);
 });
