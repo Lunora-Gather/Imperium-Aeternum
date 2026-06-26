@@ -63,7 +63,7 @@ describe('chronicle digest', () => {
       entry(1, 'founding', '开国'),
       entry(10, 'victory', '首战告捷'),
       entry(20, 'crisis', '财政危机'),
-      entry(65, 'diplomacy', '远交近攻'),
+      entry(65, 'milestone_diplomacy', '远交近攻'),
       entry(66, 'tech', '学术兴盛'),
     ];
 
