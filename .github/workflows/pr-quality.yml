@@ -63,6 +63,8 @@ jobs:
         run: npx vitest run src/gameplay/__tests__/launchHub.test.ts
       - name: Empire roadmap tests
         run: npx vitest run src/gameplay/__tests__/empireRoadmap.test.ts
+      - name: Next turn preview tests
+        run: npx vitest run src/gameplay/__tests__/turnPreview.test.ts
       - name: Page history navigation tests
         run: npx vitest run src/gameplay/__tests__/pageHistory.test.ts
       - name: Turn report action routing tests
