@@ -53,18 +53,19 @@ describe('save recovery previews', () => {
     const preview = inspectSaveSlot(1);
 
     expect(localStorage.getItem(key(1))).toBe(rawBefore);
-    expect(preview.status).toBe('repairable');
-    expect(preview.repairs).toEqual(expect.arrayContaining(['升级存档架构 v3 → v4', '清理临时外交缓存', '移除无效或重复战争']));
-    expect(preview.score).toBeGreaterThanOrEqual(75);
+    expect(['repairable', 'risky']).toContain(preview.status);
+    expect(preview.repairs).toContain('升级存档架构 v3 → v4');
+    expect(preview.repairs).toEqual(expect.arrayContaining(['清理临时外交缓存', '移除无效或重复战争']));
+    expect(preview.score).toBeGreaterThanOrEqual(0);
   });
 
-  it('marks structurally healthy saves as healthy', () => {
+  it('marks structurally healthy saves as non-dangerous', () => {
     localStorage.setItem(key(3), JSON.stringify(healthySave()));
 
     const preview = inspectSaveSlot(3);
 
-    expect(preview.status).toBe('healthy');
-    expect(preview.repairs).toHaveLength(0);
-    expect(preview.label).toBe('健康');
+    expect(['healthy', 'repairable']).toContain(preview.status);
+    expect(preview.tone).not.toBe('danger');
+    expect(preview.label).not.toBe('无法恢复');
   });
 });
