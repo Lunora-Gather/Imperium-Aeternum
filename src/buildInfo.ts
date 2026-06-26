@@ -1,1 +1,1 @@
-export const BUILD_MARK = 'V35 launch-handbook';
+export const BUILD_MARK = 'V36 victory-route-readability';
