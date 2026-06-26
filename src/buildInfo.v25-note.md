@@ -1,1 +1,0 @@
-V25 note: buildInfo.ts update was skipped in this PR because the file update action was blocked by the tool safety layer during the session. The product functionality, dashboard UI, tests and CI gate changes are included in this branch.
