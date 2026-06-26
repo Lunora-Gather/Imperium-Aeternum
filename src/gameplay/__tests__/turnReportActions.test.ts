@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { createInitialState } from '../../engine/init';
 import { buildTurnReportActions } from '../turnReportActions';
 import type { GameState, TurnReport } from '../../types/game';
+import type { StrategicBrief } from '../strategicAdvisor';
 
 function report(state: GameState, patch: Partial<TurnReport> = {}): TurnReport {
   return {
@@ -22,6 +23,20 @@ function report(state: GameState, patch: Partial<TurnReport> = {}): TurnReport {
     worldEvents: [],
     provinceChanges: [],
     ...patch,
+  };
+}
+
+function brief(): StrategicBrief {
+  return {
+    phase: '测试期',
+    doctrine: '测试 doctrine',
+    doctrineBody: '测试 body',
+    score: 70,
+    scoreLabel: '稳健',
+    urgent: [{ title: '复用战略简报', body: '来自预计算 brief', tab: 'tech', level: 66, tone: 'warn', reason: 'test' }],
+    opportunities: [],
+    horizon: [],
+    risks: [],
   };
 }
 
@@ -75,5 +90,14 @@ describe('turn report action routing', () => {
     const ids = actions.map((a) => `${a.id}|${a.tab}`);
 
     expect(new Set(ids).size).toBe(ids.length);
+  });
+
+  it('can reuse a precomputed strategic brief', () => {
+    const state = createInitialState();
+    state.lastReport = report(state);
+
+    const actions = buildTurnReportActions(state, { brief: brief() });
+
+    expect(actions).toEqual(expect.arrayContaining([expect.objectContaining({ id: 'brief-复用战略简报', tab: 'tech' })]));
   });
 });
