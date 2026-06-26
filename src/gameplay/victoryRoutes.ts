@@ -1,4 +1,4 @@
-// V29 胜利路线仪表盘：把四条国运目标转成可展示、可测试、可跳转的路线卡。
+// V36 胜利路线仪表盘：把四条国运目标转成可展示、可测试、可跳转的路线卡与路线焦点。
 // 纯函数，不改 GameState；年报页、总览页和未来任务系统可复用。
 
 import type { GameState } from '../types/game';
@@ -21,6 +21,17 @@ export interface VictoryRouteCard {
   warning?: string;
 }
 
+export interface VictoryRouteFocus {
+  headline: string;
+  summary: string;
+  tone: VictoryRouteTone;
+  primary: VictoryRouteCard;
+  runnerUp?: VictoryRouteCard;
+  routeLine: string;
+  actionLabel: string;
+  routes: VictoryRouteCard[];
+}
+
 function pct(current: number, target: number): number {
   if (!Number.isFinite(current) || !Number.isFinite(target) || target <= 0) return 0;
   return Math.max(0, Math.min(100, Math.round((current / target) * 100)));
@@ -37,6 +48,14 @@ function tone(progress: number, done: boolean, warning?: string): VictoryRouteTo
 function stableEnough(state: GameState): boolean {
   const player = state.nations[state.playerNationId];
   return (player?.government.stability ?? 0) >= 40;
+}
+
+function routeActionLabel(route: VictoryRouteCard): string {
+  if (route.warning) return '先处理限制';
+  if (route.done) return '查看胜利';
+  if (route.progress >= 70) return '冲刺主线';
+  if (route.progress >= 40) return '继续推进';
+  return '打基础';
 }
 
 export function buildVictoryRoutes(state: GameState, snapshot: AmbitionSnapshot = getAmbitionSnapshot(state)): VictoryRouteCard[] {
@@ -103,4 +122,25 @@ export function buildVictoryRoutes(state: GameState, snapshot: AmbitionSnapshot 
 
 export function bestVictoryRoute(state: GameState, snapshot: AmbitionSnapshot = getAmbitionSnapshot(state)): VictoryRouteCard {
   return buildVictoryRoutes(state, snapshot)[0];
+}
+
+export function buildVictoryRouteFocus(state: GameState, snapshot: AmbitionSnapshot = getAmbitionSnapshot(state)): VictoryRouteFocus {
+  const routes = buildVictoryRoutes(state, snapshot);
+  const primary = routes[0];
+  const runnerUp = routes[1];
+  const toneValue = primary.warning ? 'warn' : primary.done ? 'gold' : primary.progress >= 70 ? 'good' : 'info';
+  const headline = primary.done ? `${primary.label} 已完成` : primary.progress >= 70 ? `${primary.label} 接近窗口` : `${primary.label} 当前最接近`;
+  const restriction = primary.warning ? `限制：${primary.warning}。` : '';
+  const compare = runnerUp ? `备选：${runnerUp.label} ${runnerUp.progress}%。` : '';
+  const summary = `${primary.label} ${primary.progress}%（${primary.current} / ${primary.target}）。${restriction}${primary.next} ${compare}`.trim();
+  return {
+    headline,
+    summary,
+    tone: toneValue,
+    primary,
+    runnerUp,
+    routeLine: routes.map((r) => `${r.label.replace('路线', '')} ${r.progress}%`).join(' · '),
+    actionLabel: routeActionLabel(primary),
+    routes,
+  };
 }
