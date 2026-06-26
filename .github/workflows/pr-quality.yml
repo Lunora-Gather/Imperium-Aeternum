@@ -14,7 +14,7 @@ concurrency:
 
 jobs:
   verify:
-    name: Targeted tests, data validation and Pages build
+    name: Typecheck, targeted tests, validation and Pages build
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -23,16 +23,16 @@ jobs:
           node-version: 20
           cache: npm
       - run: npm ci
-      - name: TypeScript debt report (non-blocking)
+      - name: TypeScript strict gate
         run: |
           set +e
           npm run typecheck -- --pretty false > typecheck-report.txt 2>&1
           status=$?
-          echo "TypeScript debt report exit code: ${status}"
+          echo "TypeScript exit code: ${status}"
           echo "First 80 report lines:"
           sed -n '1,80p' typecheck-report.txt
-          exit 0
-      - name: Upload TypeScript debt report
+          exit ${status}
+      - name: Upload TypeScript report
         uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -45,9 +45,8 @@ jobs:
         run: npx vitest run src/store/__tests__/persistenceCompact.test.ts
       - name: Turn purity tests
         run: npx vitest run src/engine/__tests__/turnPurity.test.ts
-      - name: Long-run simulation diagnostics (non-blocking)
+      - name: Long-run simulation diagnostics
         run: npx vitest run src/engine/__tests__/longRunSimulation.test.ts
-        continue-on-error: true
       - name: Data and scenario validation
         run: npm run validate
       - name: Pages-compatible production build
