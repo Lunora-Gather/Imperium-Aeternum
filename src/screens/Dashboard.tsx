@@ -1,4 +1,4 @@
-// Dashboard v10 — 帝国总参谋部：全局诊断 / 近期路线 / 行动建议 / 国运目标
+// Dashboard v14 — 帝国总参谋部：全局诊断 / 近期路线 / 行动建议 / 国运目标 / 回合前体检
 import { useMemo } from 'react';
 import { useGameStore } from '../store/gameStore';
 import { provincesOf } from '../engine/init';
@@ -6,6 +6,7 @@ import { Panel, Btn, Tag } from '../components/ui';
 import type { TurnReport } from '../types/game';
 import type { StrategyFocusId } from '../gameplay/strategyFocus';
 import { getAmbitionSnapshot } from '../gameplay/ambitions';
+import { buildReadinessReport, type ReadinessReport, type ReadinessItem } from '../gameplay/readiness';
 import { buildStrategicBrief, type StrategicBrief, type StrategicItem } from '../gameplay/strategicAdvisor';
 
 const FOCUSES: { id: StrategyFocusId; label: string; short: string; desc: string; effect: string }[] = [
@@ -66,6 +67,21 @@ function RiskPanel({ risks }: { risks: { label: string; value: string; tone: 'wa
   return <section className="ia-dash-section"><header><div><small>Risk</small><h3>风险状态</h3></div></header><div className="ia-risk-list">{risks.length === 0 ? <div className="ia-risk-empty">暂无迫切风险</div> : risks.map((r) => <div key={r.label} className={`tone-${r.tone}`}><span>{r.label}</span><strong>{r.value}</strong></div>)}</div></section>;
 }
 
+function ReadinessButton({ item, jumpToTab }: { item: ReadinessItem; jumpToTab: (tab: string) => void }) {
+  return <button className={`tone-${item.tone === 'danger' ? 'danger' : item.tone === 'warn' ? 'warn' : 'normal'}`} onClick={() => item.tab && jumpToTab(item.tab)} disabled={!item.tab}><b>{item.title}</b><span>{item.detail}</span></button>;
+}
+
+function ReadinessPanel({ report, jumpToTab }: { report: ReadinessReport; jumpToTab: (tab: string) => void }) {
+  const visible = report.advice.length > 0 ? report.advice.slice(0, 4) : [];
+  const devWarn = report.devChecks.length;
+  return <section className="ia-dash-section" style={{ borderColor: report.tone === 'danger' ? 'var(--war)' : report.tone === 'warn' ? 'var(--warn)' : 'var(--border)' }}>
+    <header><div><small>Pre-turn</small><h3>下一回合前检查</h3></div><Tag text={`${report.label} ${report.score}`} tone={tagTone(report.tone)} /></header>
+    <div className="ia-goal-line" style={{ marginBottom: 8 }}><div><span>综合健康度</span><strong>{report.score}/100</strong></div><i><b style={{ width: `${report.score}%` }} /></i><em>{report.canAdvance ? '没有硬性阻断，仍建议先处理红黄项' : '存在高危项，推进前请先处理'}</em></div>
+    <div className="ia-action-list">{visible.length === 0 ? <div className="ia-risk-empty">暂无阻断项，可以稳步推进。</div> : visible.map((item) => <ReadinessButton key={item.id} item={item} jumpToTab={jumpToTab} />)}</div>
+    {devWarn > 0 && <div className="ia-dash-note" style={{ marginTop: 8 }}><span className={report.devChecks.some((x) => x.tone === 'danger') ? 'danger' : 'warn'}>开发体检：{devWarn} 项</span> · {report.devChecks.slice(0, 2).map((x) => x.title).join(' / ')}</div>}
+  </section>;
+}
+
 function StrategicDirectorPanel({ brief, jumpToTab }: { brief: StrategicBrief; jumpToTab: (tab: string) => void }) {
   const top = brief.urgent[0] ?? brief.opportunities[0];
   return <section className="ia-dash-section" style={{ borderColor: brief.score < 40 ? 'var(--war)' : brief.score < 60 ? 'var(--warn)' : 'var(--border)' }}>
@@ -94,6 +110,7 @@ export default function Dashboard() {
   const g = player.government;
   const focus = (((state as unknown as { strategyFocus?: StrategyFocusId }).strategyFocus) ?? 'balance') as StrategyFocusId;
   const brief = useMemo(() => buildStrategicBrief(state), [state]);
+  const readiness = useMemo(() => buildReadinessReport(state), [state]);
 
   const lastNet = state.lastReport ? state.lastReport.income.tax + state.lastReport.income.trade + state.lastReport.income.building - state.lastReport.expense.military - state.lastReport.expense.corruption : 0;
   const unrest = provs.filter((p) => p.rebellionRisk > 70 || p.unrest > 50);
@@ -130,11 +147,13 @@ export default function Dashboard() {
     action?.(id);
   };
 
+  const hasPendingEventBlocker = readiness.blockers.some((item) => item.id === 'pending-events');
+
   return <div className="ia-dashboard">
-    <div className="ia-dash-command"><div><small>Overview</small><h2 className="ia-display">国政总览</h2><p>总参谋部会先给出全局路线，再处理红色风险，最后推进回合。</p></div><div className="ia-dash-command-actions"><Btn label="新局" variant="ghost" onClick={newGame} /><Btn label="读档" variant="ghost" onClick={() => load()} disabled={!hasSave()} /><Btn label="存档" variant="ghost" onClick={() => save()} /><Btn label="下一回合 →" variant="primary" onClick={() => nextTurn()} disabled={!!state.victory.type} /></div></div>
+    <div className="ia-dash-command"><div><small>Overview</small><h2 className="ia-display">国政总览</h2><p>总参谋部会先给出全局路线，再做回合前体检，最后推进回合。</p></div><div className="ia-dash-command-actions"><Btn label="新局" variant="ghost" onClick={newGame} /><Btn label="读档" variant="ghost" onClick={() => load()} disabled={!hasSave()} /><Btn label="存档" variant="ghost" onClick={() => save()} /><Btn label="下一回合 →" variant="primary" onClick={() => nextTurn()} disabled={!!state.victory.type || hasPendingEventBlocker} title={hasPendingEventBlocker ? '先处理待决事件' : readiness.label} /></div></div>
     <div className="ia-dash-grid">
       <aside className="ia-dash-col"><Panel title="国家摘要" icon="◈"><div className="ia-dash-metrics"><Metric label="国库" value={n(player.resources.gold)} tone={player.resources.gold < 0 ? 'danger' : 'gold'} hint={lastNet ? `${lastNet >= 0 ? '+' : ''}${n(lastNet)}/年` : '—'} /><Metric label="粮储" value={n(player.resources.food)} tone={player.resources.food < 0 ? 'danger' : 'good'} /><Metric label="人口" value={n(totalPop)} /><Metric label="疆土" value={`${provs.length} 省`} /><Metric label="军力" value={`${n(armySize)} 卒`} tone={wars.length > 0 ? 'warn' : 'normal'} /><Metric label="战事" value={`${wars.length} 起`} tone={wars.length > 0 ? 'danger' : 'normal'} /></div><div className="ia-dash-sep" /><div className="ia-dash-kv"><span>政体</span><strong>{player.government.type}</strong></div><div className="ia-dash-kv"><span>国性</span><strong>{player.character}</strong></div><div className="ia-dash-kv"><span>统治者</span><strong>{player.ruler.name} · {player.ruler.age}岁</strong></div><div className="ia-dash-kv"><span>盟友倾向</span><strong>{allies} 个高关系对象</strong></div></Panel></aside>
-      <main className="ia-dash-main"><StrategicDirectorPanel brief={brief} jumpToTab={jumpToTab} /><ActionSuggestions items={actions} /><section className="ia-dash-section"><header><div><small>State</small><h3>治理指标</h3></div></header><div className="ia-dash-meter-grid"><Meter label="安定" value={g.stability} lowBad /><Meter label="法统" value={g.legitimacy} lowBad /><Meter label="治能" value={g.efficiency} lowBad /><Meter label="腐败" value={g.corruption} /><Meter label="厌战" value={player.warExhaustion} /><Meter label="补给" value={player.resources.supply} lowBad /></div></section><section className="ia-dash-section"><header><div><small>Trend</small><h3>近年趋势</h3></div></header><div className="ia-dash-trends"><Sparkline data={goldTrend} label="财政" /><Sparkline data={foodTrend} label="粮食" /><Sparkline data={stabilityTrend} label="安定" /></div></section>{state.victory.type && <section className="ia-dash-section ia-dash-victory"><h3>{state.victory.type.startsWith('win') ? '万世之业已成' : '社稷倾覆'}</h3><p>第 {state.turn} 年 · {player.name}</p></section>}</main>
+      <main className="ia-dash-main"><StrategicDirectorPanel brief={brief} jumpToTab={jumpToTab} /><ReadinessPanel report={readiness} jumpToTab={jumpToTab} /><ActionSuggestions items={actions} /><section className="ia-dash-section"><header><div><small>State</small><h3>治理指标</h3></div></header><div className="ia-dash-meter-grid"><Meter label="安定" value={g.stability} lowBad /><Meter label="法统" value={g.legitimacy} lowBad /><Meter label="治能" value={g.efficiency} lowBad /><Meter label="腐败" value={g.corruption} /><Meter label="厌战" value={player.warExhaustion} /><Meter label="补给" value={player.resources.supply} lowBad /></div></section><section className="ia-dash-section"><header><div><small>Trend</small><h3>近年趋势</h3></div></header><div className="ia-dash-trends"><Sparkline data={goldTrend} label="财政" /><Sparkline data={foodTrend} label="粮食" /><Sparkline data={stabilityTrend} label="安定" /></div></section>{state.victory.type && <section className="ia-dash-section ia-dash-victory"><h3>{state.victory.type.startsWith('win') ? '万世之业已成' : '社稷倾覆'}</h3><p>第 {state.turn} 年 · {player.name}</p></section>}</main>
       <aside className="ia-dash-col"><AmbitionPanel state={state} /><FocusPanel focus={focus} onChange={setFocus} /><RiskPanel risks={risks} /><AdvisorList title="战略机会" items={brief.opportunities} empty="暂无明确机会" jumpToTab={jumpToTab} /><section className="ia-dash-section"><header><div><small>Chronicle</small><h3>近事</h3></div></header><div className="ia-dash-log">{log.length === 0 ? <p>尚无纪事</p> : log.slice(-6).reverse().map((l, i) => <p key={`${l}-${i}`}>{l}</p>)}</div></section></aside>
     </div>
   </div>;
