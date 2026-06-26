@@ -29,6 +29,8 @@ interface ScenarioCheck {
   build: () => GameState;
 }
 
+const NEUTRAL_OWNER = 'barbarian';
+
 const SCENARIO_CHECKS: ScenarioCheck[] = [
   { id: 'classic', seed: 12345, expectedMinNations: 5, expectedMinProvinces: 30, build: () => createInitialState() },
   { id: 'world', seed: 20260626, playerNationId: 'n_med_rome', expectedMinNations: 120, expectedMinProvinces: 300, build: () => createWorldState(20260626, 'n_med_rome') },
@@ -41,18 +43,10 @@ const SCENARIO_CHECKS: ScenarioCheck[] = [
   { id: 'challenge_survival', seed: 12345, expectedMinNations: 5, expectedMinProvinces: 30, build: () => createInitialState() },
 ];
 
-function fail(acc: ValidateResult, msg: string): void {
-  acc.errors.push(msg);
-  acc.ok = false;
-}
-
-function warn(acc: ValidateResult, msg: string): void {
-  acc.warnings.push(msg);
-}
-
-function isFiniteNumber(v: unknown): v is number {
-  return typeof v === 'number' && Number.isFinite(v);
-}
+function fail(acc: ValidateResult, msg: string): void { acc.errors.push(msg); acc.ok = false; }
+function warn(acc: ValidateResult, msg: string): void { acc.warnings.push(msg); }
+function isFiniteNumber(v: unknown): v is number { return typeof v === 'number' && Number.isFinite(v); }
+function hasRuntimeOwner(state: GameState, ownerId: string): boolean { return ownerId === NEUTRAL_OWNER || !!state.nations[ownerId]; }
 
 function validateGameStateShape(acc: ValidateResult, scenario: ScenarioCheck, state: GameState): void {
   const nations = Object.values(state.nations);
@@ -82,7 +76,8 @@ function validateGameStateShape(acc: ValidateResult, scenario: ScenarioCheck, st
   }
 
   for (const p of provinces) {
-    if (!state.nations[p.ownerId] && p.ownerId !== 'barbarian') fail(acc, `剧本 ${scenario.id} 省份 ${p.id} owner ${p.ownerId} 不存在`);
+    const ownerId = String(p.ownerId);
+    if (!hasRuntimeOwner(state, ownerId)) fail(acc, `剧本 ${scenario.id} 省份 ${p.id} owner ${ownerId} 不存在`);
     if (!isFiniteNumber(p.population) || p.population < 0) fail(acc, `剧本 ${scenario.id} 省份 ${p.id} population 非法`);
     for (const k of ['assimilation', 'loyalty', 'unrest', 'rebellionRisk'] as const) {
       const v = p[k];
@@ -99,21 +94,16 @@ function validateGameStateShape(acc: ValidateResult, scenario: ScenarioCheck, st
     relKeys.add(`${r.from}|${r.to}`);
     if (!isFiniteNumber(r.relation) || r.relation < -100 || r.relation > 100) fail(acc, `剧本 ${scenario.id} 外交关系数值越界：${r.from}->${r.to}`);
   }
-  for (const r of state.relations) {
-    if (!relKeys.has(`${r.to}|${r.from}`)) warn(acc, `剧本 ${scenario.id} 外交关系缺少反向项：${r.from}->${r.to}`);
-  }
+  for (const r of state.relations) if (!relKeys.has(`${r.to}|${r.from}`)) warn(acc, `剧本 ${scenario.id} 外交关系缺少反向项：${r.from}->${r.to}`);
 }
 
 export function validateData(): ValidateResult {
   const acc: ValidateResult = { ok: true, errors: [], warnings: [] };
-
-  // 1. 经典静态数据：国家数量 = 5，玩家恰好 1
   if (NATIONS.length !== 5) fail(acc, `经典国家数应为 5，实际 ${NATIONS.length}`);
   const players = NATIONS.filter((n) => n.isPlayer);
   if (players.length !== 1) fail(acc, `经典玩家国家应 1，实际 ${players.length}`);
   if (players[0]?.id !== PLAYER_ID) fail(acc, `经典玩家 id 应为 ${PLAYER_ID}`);
 
-  // 2. 国家 capital 引用省份存在；n05 允许空首都
   for (const n of NATIONS) {
     if (n.capital !== '' && !PROVINCE_BY_ID[n.capital]) fail(acc, `国家 ${n.id} 首都 ${n.capital} 不存在`);
     if (!GOVERNMENTS[n.government]) fail(acc, `国家 ${n.id} 政体 ${n.government} 不存在`);
@@ -124,11 +114,10 @@ export function validateData(): ValidateResult {
     }
   }
 
-  // 3. 省份数量 ≥ 30，ownerId 引用国家存在或 barbarian
   if (PROVINCES.length < 30) fail(acc, `省份数应 ≥30，实际 ${PROVINCES.length}`);
-  const NATION_IDS_PLUS_BARBARIAN = new Set<string>([...NATIONS.map((n) => n.id), 'barbarian']);
+  const NATION_IDS_PLUS_BARBARIAN = new Set<string>([...NATIONS.map((n) => n.id), NEUTRAL_OWNER]);
   for (const p of PROVINCES) {
-    if (!NATION_IDS_PLUS_BARBARIAN.has(p.ownerId)) fail(acc, `省份 ${p.id} owner ${p.ownerId} 不存在`);
+    if (!NATION_IDS_PLUS_BARBARIAN.has(String(p.ownerId))) fail(acc, `省份 ${p.id} owner ${p.ownerId} 不存在`);
     for (const adj of p.adjacent) {
       if (!PROVINCE_BY_ID[adj]) fail(acc, `省份 ${p.id} 相邻 ${adj} 不存在`);
       const other = PROVINCE_BY_ID[adj];
@@ -144,7 +133,6 @@ export function validateData(): ValidateResult {
     if ((p.fortressLevel ?? 0) < 0 || (p.fortressLevel ?? 0) > 3) fail(acc, `省份 ${p.id} 要塞等级 ${(p.fortressLevel ?? 0)} 越界`);
   }
 
-  // 4. 建筑 id 唯一，前置科技存在
   const bIds = new Set<string>();
   for (const b of BUILDING_LIST) {
     if (bIds.has(b.id)) fail(acc, `建筑 id 重复 ${b.id}`);
@@ -152,7 +140,6 @@ export function validateData(): ValidateResult {
     if (b.prereqTech && !TECH_BY_ID[b.prereqTech]) fail(acc, `建筑 ${b.id} 前置科技 ${b.prereqTech} 不存在`);
   }
 
-  // 5. 科技：每条路线 5 或 8 级，prereq 链合法，level 1-N 连续
   for (const branch of ['agri', 'mil', 'admin', 'culture'] as const) {
     const list = TECHNOLOGIES.filter((t) => t.branch === branch).sort((a, b) => a.level - b.level);
     if (list.length !== 5 && list.length !== 8) fail(acc, `科技 ${branch} 应 5 或 8 级，实际 ${list.length}`);
@@ -163,14 +150,12 @@ export function validateData(): ValidateResult {
     }
   }
 
-  // 6. 政策：allowedGovernments 引用存在，prereqTech 存在
   for (const p of POLICIES) {
     if (!POLICY_BY_ID[p.id]) fail(acc, `政策索引缺失 ${p.id}`);
     for (const g of p.allowedGovernments) if (!GOVERNMENTS[g]) fail(acc, `政策 ${p.id} 政体 ${g} 不存在`);
     if (p.prereqTech && !TECH_BY_ID[p.prereqTech]) fail(acc, `政策 ${p.id} 前置科技 ${p.prereqTech} 不存在`);
   }
 
-  // 7. 事件：id 唯一，≥2 选项，引用存在
   const eIds = new Set<string>();
   if (EVENTS.length < 20) warn(acc, `事件 ${EVENTS.length} 个，建议 ≥20`);
   for (const e of EVENTS) {
@@ -185,39 +170,23 @@ export function validateData(): ValidateResult {
     if (e.trigger.factionSatBelow && !FACTIONS[e.trigger.factionSatBelow.faction]) fail(acc, `事件 ${e.id} 触发派系 ${e.trigger.factionSatBelow.faction} 不存在`);
   }
 
-  // 8. 行为映射：tendency 性格存在
   for (const b of BEHAVIOR_MAPPINGS) for (const k of Object.keys(b.tendencyGain)) if (!NATIONAL_CHARACTERS[k as keyof typeof NATIONAL_CHARACTERS]) fail(acc, `行为 ${b.actionId} 性格 ${k} 不存在`);
-
-  // 9. 派系逼宫事件 id 在事件表存在
   for (const f of Object.values(FACTIONS)) if (!EVENTS.find((e) => e.id === f.coupEventId)) fail(acc, `派系 ${f.id} 逼宫事件 ${f.coupEventId} 不存在`);
 
-  // 10. 全剧本生成校验：覆盖经典、大地图、区域剧本和随机洲固定种子
   for (const scenario of SCENARIO_CHECKS) {
-    try {
-      validateGameStateShape(acc, scenario, scenario.build());
-    } catch (e) {
-      fail(acc, `剧本 ${scenario.id} 生成异常：${e instanceof Error ? e.message : String(e)}`);
-    }
+    try { validateGameStateShape(acc, scenario, scenario.build()); }
+    catch (e) { fail(acc, `剧本 ${scenario.id} 生成异常：${e instanceof Error ? e.message : String(e)}`); }
   }
-
   return acc;
 }
 
-// 直接运行入口（ESM 兼容）
 const isMain = typeof process !== 'undefined'
   && process.argv[1]
   && (import.meta.url.endsWith((process.argv[1].replace(/\\/g, '/').split('/').pop() ?? '')));
 if (isMain) {
   const r = validateData();
-  if (r.warnings.length) {
-    console.warn('WARNINGS:');
-    r.warnings.forEach((w) => console.warn('  - ' + w));
-  }
-  if (r.errors.length) {
-    console.error('ERRORS:');
-    r.errors.forEach((e) => console.error('  - ' + e));
-    process.exit(1);
-  }
+  if (r.warnings.length) { console.warn('WARNINGS:'); r.warnings.forEach((w) => console.warn('  - ' + w)); }
+  if (r.errors.length) { console.error('ERRORS:'); r.errors.forEach((e) => console.error('  - ' + e)); process.exit(1); }
   console.log(`✅ 数据自检通过（${NATIONS.length} 经典国 / ${PROVINCES.length} 经典省 / ${BUILDING_LIST.length} 建筑 / ${TECHNOLOGIES.length} 科技 / ${POLICIES.length} 政策 / ${EVENTS.length} 事件 / ${SCENARIO_CHECKS.length} 剧本）`);
 }
 
