@@ -5,7 +5,7 @@ This document defines the release-freeze rules for turning the current release c
 ## Current target
 
 ```text
-Current build marker: V53 release-gate
+Current build marker: V53 rc-check
 Release target: 1.0 public preview
 Primary branch: main
 Deployment target: GitHub Pages
