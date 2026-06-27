@@ -1,16 +1,16 @@
-# Release / preview checklist
+# Release checklist
 
-Use this checklist whenever a new V42+ build is prepared for preview.
+Use this checklist whenever a new V42+ build is prepared for release.
 
 ## 1. Build source
 
-Current preview source branch:
+Current release source branch:
 
-- `optimize/v39-action-plan`
+- `main`
 
-Current preview deployment workflow:
+Current deployment workflow:
 
-- `Deploy Imperium Aeternum Preview`
+- `Deploy Pages`
 
 Public URL:
 
@@ -18,13 +18,11 @@ Public URL:
 
 ## 2. Expected GitHub Actions state
 
-The only Pages workflow that should be used for preview deployment is:
+The only workflow that should publish to the `github-pages` environment is:
 
-- `Deploy Imperium Aeternum Preview` on `main`
+- `Deploy Pages` on `main`
 
-The old branch workflow is intentionally disabled:
-
-- `Deploy GitHub Pages Disabled`
+PR and branch workflows should build and test only. They should not deploy to the shared Pages environment.
 
 ## 3. Smoke test after deployment
 
@@ -46,6 +44,9 @@ Open the public URL and verify:
 Before marking a preview as ready, the workflow should pass:
 
 - TypeScript typecheck.
+- Full Vitest regression suite.
+- Data and scenario validation.
+- Pages-compatible production build.
 - Strategic HQ tests.
 - War assessment tests.
 - War preview tests.
