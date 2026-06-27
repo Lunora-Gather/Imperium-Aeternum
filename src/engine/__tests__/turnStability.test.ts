@@ -63,6 +63,6 @@ describe('turn stability', () => {
     expect(state.turn).toBe(12);
     expect(state.history.length).toBe(10);
     expect(state.history[0].turn).toBe(3);
-    expect(state.history.at(-1)?.turn).toBe(12);
+    expect(state.history[state.history.length - 1].turn).toBe(12);
   });
 });
