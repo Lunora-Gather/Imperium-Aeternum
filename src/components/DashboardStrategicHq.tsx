@@ -1,7 +1,8 @@
-// V48 Dashboard 接入层：用可折叠指挥分组收纳 Governor、目标教练、总参、风险、内政、外交和战争模块。
+// V49 Dashboard 接入层：用可折叠指挥分组收纳发布准备、Governor、目标教练、总参、风险、内政、外交和战争模块。
 
 import { useMemo } from 'react';
 import DashboardCommandGroupStack from './DashboardCommandGroupStack';
+import DashboardReleaseReadiness from './DashboardReleaseReadiness';
 import DashboardGovernorAdvisor from './DashboardGovernorAdvisor';
 import DashboardOnboardingCoach from './DashboardOnboardingCoach';
 import StrategicHqPanel from './StrategicHqPanel';
@@ -21,6 +22,7 @@ export default function DashboardStrategicHq({ state, commandActions, jumpToTab 
   const groups = useMemo(() => buildDashboardCommandGroups(state, state.playerNationId), [state]);
 
   const renderItem = (id: string) => {
+    if (id === 'release') return <DashboardReleaseReadiness state={state} commandActions={commandActions} />;
     if (id === 'governor') return <DashboardGovernorAdvisor state={state} commandActions={commandActions} jumpToTab={jumpToTab} />;
     if (id === 'onboarding') return <DashboardOnboardingCoach state={state} jumpToTab={jumpToTab} />;
     if (id === 'strategic-hq') return <StrategicHqPanel plan={plan} jumpToPrimary={plan.primaryTab ? () => jumpToTab(plan.primaryTab!) : undefined} />;
