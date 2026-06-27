@@ -44,6 +44,28 @@ Fix applied:
 - Moved `governor` from the guide group into the domestic group.
 - Updated dashboard command-group tests to assert the intended placement.
 
+### QA document alignment
+
+Reviewed:
+
+- `docs/public-preview-qa.md`
+- `docs/release-checklist.md`
+
+Finding:
+
+- Manual QA still described Dashboard as a flat module list, while the current product UI is a four-group command dashboard.
+- Release checklist did not explicitly verify that Governor Advisor appears inside the domestic command group.
+
+Fix applied:
+
+- Rewrote public preview QA Dashboard section around the four command groups:
+  - 引导与本年目标
+  - 推进前风险
+  - 内政与经济
+  - 外交与战争
+- Updated release checklist to require expand/collapse checks for the command groups.
+- Added a release blocker if Governor Advisor is missing from the domestic command group.
+
 ## Non-code findings
 
 - Release marker remains `1.0.0-public-preview`; it should not be changed during final QA.
@@ -71,4 +93,4 @@ Do not create `v1.0.0-preview` until:
 1. `npm run rc:check` passes.
 2. GitHub Pages opens successfully.
 3. The deployed page shows `1.0.0-public-preview`.
-4. Manual QA passes the Dashboard, turn advancement, save/load, diplomacy, economy, and war preview smoke tests.
+4. Manual QA passes the Dashboard command groups, turn advancement, save/load, diplomacy, economy/governor, and war preview smoke tests.
