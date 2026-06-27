@@ -1,12 +1,16 @@
-// V46 Dashboard 接入层：把目标教练、帝国总参、推进前风险中枢、经济内政顾问、外交顾问和战争机会摘要组合成总览首屏决策模块。
+// V50 RC Dashboard 接入层：用可折叠指挥分组收纳发布准备、Governor、目标教练、总参、风险、内政、外交和战争模块。
 
 import { useMemo } from 'react';
+import DashboardCommandGroupStack from './DashboardCommandGroupStack';
+import DashboardReleaseReadiness from './DashboardReleaseReadiness';
+import DashboardGovernorAdvisor from './DashboardGovernorAdvisor';
 import DashboardOnboardingCoach from './DashboardOnboardingCoach';
 import StrategicHqPanel from './StrategicHqPanel';
 import DashboardTurnRiskCenter from './DashboardTurnRiskCenter';
 import DashboardEconomyAdvisor from './DashboardEconomyAdvisor';
 import DashboardDiplomacyAdvisor from './DashboardDiplomacyAdvisor';
 import DashboardWarOpportunity from './DashboardWarOpportunity';
+import { buildDashboardCommandGroups } from '../gameplay/dashboardCommandGroups';
 import { buildStrategicHqPlan } from '../gameplay/strategicHq';
 import type { GameState } from '../types/game';
 import type { CommandCenterAction } from '../gameplay/commandCenterActions';
@@ -15,16 +19,19 @@ type JumpToTab = (tab: string) => void;
 
 export default function DashboardStrategicHq({ state, commandActions, jumpToTab }: { state: GameState; commandActions: CommandCenterAction[]; jumpToTab: JumpToTab }) {
   const plan = useMemo(() => buildStrategicHqPlan(state, commandActions), [state, commandActions]);
+  const groups = useMemo(() => buildDashboardCommandGroups(state, state.playerNationId), [state]);
 
-  return <>
-    <DashboardOnboardingCoach state={state} jumpToTab={jumpToTab} />
-    <StrategicHqPanel
-      plan={plan}
-      jumpToPrimary={plan.primaryTab ? () => jumpToTab(plan.primaryTab!) : undefined}
-    />
-    <DashboardTurnRiskCenter state={state} jumpToTab={jumpToTab} />
-    <DashboardEconomyAdvisor state={state} jumpToTab={jumpToTab} />
-    <DashboardDiplomacyAdvisor state={state} jumpToTab={jumpToTab} />
-    <DashboardWarOpportunity state={state} jumpToTab={jumpToTab} />
-  </>;
+  const renderItem = (id: string) => {
+    if (id === 'release') return <DashboardReleaseReadiness state={state} commandActions={commandActions} />;
+    if (id === 'governor') return <DashboardGovernorAdvisor state={state} commandActions={commandActions} jumpToTab={jumpToTab} />;
+    if (id === 'onboarding') return <DashboardOnboardingCoach state={state} jumpToTab={jumpToTab} />;
+    if (id === 'strategic-hq') return <StrategicHqPanel plan={plan} jumpToPrimary={plan.primaryTab ? () => jumpToTab(plan.primaryTab!) : undefined} />;
+    if (id === 'turn-risk') return <DashboardTurnRiskCenter state={state} jumpToTab={jumpToTab} />;
+    if (id === 'economy') return <DashboardEconomyAdvisor state={state} jumpToTab={jumpToTab} />;
+    if (id === 'diplomacy') return <DashboardDiplomacyAdvisor state={state} jumpToTab={jumpToTab} />;
+    if (id === 'war') return <DashboardWarOpportunity state={state} jumpToTab={jumpToTab} />;
+    return null;
+  };
+
+  return <DashboardCommandGroupStack groups={groups} renderItem={renderItem} />;
 }
