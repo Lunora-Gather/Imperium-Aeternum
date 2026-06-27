@@ -11,6 +11,8 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
+    "test:stability": "vitest run src/engine/__tests__/turnStability.test.ts src/store/__tests__/persistenceRoundtrip.test.ts src/gameplay/__tests__/dashboardStability.test.ts",
+    "rc:check": "npm run typecheck && npm run validate && npm run test:stability && npm run pages:build",
     "validate": "tsx src/data/__validate__.ts",
     "export-data": "tsx scripts/export-data.ts"
   },
