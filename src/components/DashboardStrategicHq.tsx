@@ -1,6 +1,7 @@
-// V45 Dashboard 接入层：把帝国总参、推进前风险中枢、经济内政顾问、外交顾问和战争机会摘要组合成总览首屏决策模块。
+// V46 Dashboard 接入层：把目标教练、帝国总参、推进前风险中枢、经济内政顾问、外交顾问和战争机会摘要组合成总览首屏决策模块。
 
 import { useMemo } from 'react';
+import DashboardOnboardingCoach from './DashboardOnboardingCoach';
 import StrategicHqPanel from './StrategicHqPanel';
 import DashboardTurnRiskCenter from './DashboardTurnRiskCenter';
 import DashboardEconomyAdvisor from './DashboardEconomyAdvisor';
@@ -16,6 +17,7 @@ export default function DashboardStrategicHq({ state, commandActions, jumpToTab 
   const plan = useMemo(() => buildStrategicHqPlan(state, commandActions), [state, commandActions]);
 
   return <>
+    <DashboardOnboardingCoach state={state} jumpToTab={jumpToTab} />
     <StrategicHqPanel
       plan={plan}
       jumpToPrimary={plan.primaryTab ? () => jumpToTab(plan.primaryTab!) : undefined}
