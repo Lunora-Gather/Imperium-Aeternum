@@ -1,1 +1,1 @@
-export const BUILD_MARK = 'V46 onboarding-coach-deployed';
+export const BUILD_MARK = 'V47 dashboard-command-groups-deployed';
