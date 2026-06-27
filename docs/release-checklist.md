@@ -30,16 +30,20 @@ Only `main` should be treated as the canonical public release line. Old optimiza
 
 ## 3. Dashboard smoke test
 
-Open the public URL and verify the Dashboard loads without a blank page. Then confirm the command stack is visible:
+Open the public URL and verify the Dashboard loads without a blank page. Then confirm the four command groups are visible and safe to expand/collapse:
 
-- Target Coach / 目标教练.
-- Strategic HQ / 帝国总参.
-- Release Readiness / 发布就绪.
-- Pre-turn Risk Center / 推进前风险中枢.
-- Economy Advisor / 经济内政顾问.
-- Governor Advisor / 地方治理顾问.
-- Diplomacy Advisor / 外交顾问.
-- War Opportunity / 战争机会.
+- 引导与本年目标.
+  - Release Readiness / 发布就绪.
+  - Target Coach / 目标教练.
+  - Strategic HQ / 帝国总参.
+- 推进前风险.
+  - Pre-turn Risk Center / 推进前风险中枢.
+- 内政与经济.
+  - Governor Advisor / 地方治理顾问.
+  - Economy Advisor / 经济内政顾问.
+- 外交与战争.
+  - Diplomacy Advisor / 外交顾问.
+  - War Opportunity / 战争机会.
 
 ## 4. Gameplay smoke test
 
@@ -49,7 +53,7 @@ Verify the core loop:
 - Open Dashboard.
 - Follow the Target Coach first action.
 - Inspect release readiness, blockers, and warnings.
-- Open Economy/Province/Governor advice from an advisor action.
+- Open Economy/Province/Governor advice from the domestic command group.
 - Open Diplomacy page from an advisor action.
 - Open Military page from a war opportunity.
 - Select a war candidate and open War Preview.
@@ -83,7 +87,8 @@ Before marking a build as ready, the workflow should pass at minimum:
 Do not tag a release if any of these are true:
 
 - Pages opens to a blank screen.
-- Dashboard command stack is missing.
+- Dashboard command groups are missing or cannot expand/collapse.
+- Governor Advisor is missing from the domestic command group.
 - Save/load fails.
 - Ending a turn crashes.
 - War declaration or war preview crashes.
@@ -99,4 +104,4 @@ Do not tag a release if any of these are true:
 - V45: pre-turn risk center.
 - V46: target coach / onboarding coach.
 - V47-V49: governor advisor, dashboard grouping, release readiness.
-- V52: main release documentation and QA hardening.
+- V52+: main release documentation, QA hardening, and release-sprint fixes.
