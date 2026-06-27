@@ -23,7 +23,7 @@ The gate currently includes:
 Use the deployed Pages build or a local preview build.
 
 1. Open the game.
-2. Confirm the footer shows the expected build marker.
+2. Confirm the footer/build marker shows `1.0.0-public-preview`.
 3. Start the classic scenario.
 4. Confirm Dashboard opens without a blank page.
 5. Expand/collapse each command group.
@@ -70,8 +70,9 @@ Do not tag 1.0 if any of these are true:
 
 Before creating the release tag:
 
-1. Set `BUILD_MARK` to the final version, such as `1.0.0-public-preview`.
-2. Finalize `docs/RELEASE_NOTES_DRAFT.md`.
-3. Confirm README links are correct.
-4. Confirm Pages deploy is visible.
-5. Create the GitHub Release from `main`.
+1. Confirm `BUILD_MARK` is `1.0.0-public-preview`.
+2. Confirm package version is `1.0.0-preview`.
+3. Finalize `docs/RELEASE_NOTES_DRAFT.md`.
+4. Confirm README links are correct.
+5. Confirm Pages deploy is visible.
+6. Create the GitHub Release from `main`.
