@@ -19,7 +19,7 @@ Complete `docs/FINAL_QA.md`.
 Minimum required manual checks:
 
 - Open the Pages build.
-- Confirm the build marker is the final public preview marker.
+- Confirm the build marker is `1.0.0-public-preview`.
 - Start a classic scenario.
 - Confirm Dashboard renders.
 - Advance one year.
@@ -28,9 +28,10 @@ Minimum required manual checks:
 - Open Economy, Diplomacy, Military, Stats, Chronicle, and Save pages.
 - Confirm no blank page appears.
 
-## Files to finalize before tag
+## Files to verify before tag
 
 - `src/buildInfo.ts`
+- `package.json`
 - `README.md`
 - `docs/RELEASE_NOTES_DRAFT.md`
 - `docs/GITHUB_RELEASE_DRAFT.md`
@@ -38,19 +39,19 @@ Minimum required manual checks:
 
 ## Version marker
 
-Before tagging, change:
-
-```ts
-export const BUILD_MARK = 'V53 rc-check';
-```
-
-to a final marker such as:
+The expected final marker is:
 
 ```ts
 export const BUILD_MARK = '1.0.0-public-preview';
 ```
 
-Then update README and release notes to match.
+The expected package version is:
+
+```json
+"version": "1.0.0-preview"
+```
+
+Do not tag if README, Release Notes, package version, and in-game build marker disagree.
 
 ## Suggested GitHub Release settings
 
