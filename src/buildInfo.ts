@@ -1,1 +1,1 @@
-export const BUILD_MARK = 'V50 release-candidate';
+export const BUILD_MARK = 'V51 stability-suite';
