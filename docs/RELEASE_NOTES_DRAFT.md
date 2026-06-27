@@ -7,7 +7,7 @@ Imperium Aeternum is now a release-candidate historical strategy simulation focu
 ## Current build
 
 ```text
-V52 release-freeze
+V53 release-gate
 ```
 
 ## Major systems now included
@@ -27,6 +27,7 @@ V52 release-freeze
 - Release Readiness center
 - Chronicle and annual reporting
 - GitHub Pages deployment workflow
+- Unified `rc:check` release gate
 - Stability test suite for turns, saves, and dashboard advisor smoke checks
 
 ## What changed in the release-candidate phase
@@ -53,6 +54,13 @@ V52 release-freeze
 - Updated README to reflect the current release-candidate posture.
 - Added data validation to the deployment gate.
 
+### V53 Release Gate
+
+- Consolidated local and CI release checks into `npm run rc:check`.
+- Simplified the Pages workflow so it uses the same gate as local release validation.
+- Added `docs/FINAL_QA.md` for final manual browser smoke checks.
+- Refreshed README and release-freeze docs to reflect the unified gate.
+
 ## Stability policy
 
 From V52 until 1.0, the project should avoid large new systems. Work should focus on:
@@ -73,7 +81,7 @@ From V52 until 1.0, the project should avoid large new systems. Work should focu
 ## Suggested 1.0 tag criteria
 
 - `main` shows the final build marker.
+- `VITE_BASE=/Imperium-Aeternum/ npm run rc:check` passes.
 - Pages deploy is confirmed.
 - README and release notes are final.
-- Stability suite passes.
-- Manual smoke checklist in `docs/RELEASE_FREEZE.md` is complete.
+- Manual smoke checklist in `docs/FINAL_QA.md` is complete.
