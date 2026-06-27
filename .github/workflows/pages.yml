@@ -17,7 +17,7 @@ concurrency:
 
 jobs:
   build:
-    name: Build V43 preview
+    name: Build V44 preview
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -41,6 +41,7 @@ jobs:
           npx vitest run src/gameplay/__tests__/actionPlanSummary.test.ts
           npx vitest run src/gameplay/__tests__/strategicHq.test.ts
           npx vitest run src/gameplay/__tests__/economyAdvisor.test.ts
+          npx vitest run src/gameplay/__tests__/diplomacyAdvisor.test.ts
           npx vitest run src/gameplay/__tests__/warAssessment.test.ts
           npx vitest run src/gameplay/__tests__/warPreview.test.ts
           npx vitest run src/gameplay/__tests__/warOpportunityAdvisor.test.ts
@@ -64,7 +65,7 @@ jobs:
           path: dist
 
   deploy:
-    name: Deploy V43 preview
+    name: Deploy V44 preview
     needs: build
     runs-on: ubuntu-latest
     environment:
