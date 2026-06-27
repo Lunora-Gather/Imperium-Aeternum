@@ -26,7 +26,7 @@
   <img alt="TypeScript" src="https://img.shields.io/badge/TypeScript-Strict-blue?style=flat-square">
   <img alt="React" src="https://img.shields.io/badge/React-18-61dafb?style=flat-square">
   <img alt="Vite" src="https://img.shields.io/badge/Vite-8-646cff?style=flat-square">
-  <img alt="Status" src="https://img.shields.io/badge/Status-V53%20Release%20Gate-gold?style=flat-square">
+  <img alt="Status" src="https://img.shields.io/badge/Status-V53%20RC%20Check-gold?style=flat-square">
 </p>
 
 ---
@@ -46,13 +46,13 @@
 ## 当前状态
 
 ```text
-Build marker: V53 release-gate
+Build marker: V53 rc-check
 Primary branch: main
 Target: 1.0 public preview
 Deployment: GitHub Pages
 ```
 
-项目已经从功能扩张进入 **Release Freeze / Release Gate** 阶段。当前重点不再是继续堆新系统，而是稳定、验收、部署和公开展示。
+项目已经从功能扩张进入 **Release Freeze / RC Check** 阶段。当前重点不再是继续堆新系统，而是稳定、验收、部署和公开展示。
 
 当前主线已经完成：
 
