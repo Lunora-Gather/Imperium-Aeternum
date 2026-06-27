@@ -5,14 +5,15 @@ This document defines the release-freeze rules for turning the current release c
 ## Current target
 
 ```text
-Current build marker: V53 rc-check
+Current build marker: V54 public-preview-prep
 Release target: 1.0 public preview
+Suggested tag: v1.0.0-preview
 Primary branch: main
 Deployment target: GitHub Pages
 Unified gate: npm run rc:check
 ```
 
-The project is no longer in feature expansion mode. V52 and later release-candidate work should focus on stability, clarity, deployment, and documentation.
+The project is no longer in feature expansion mode. V52 and later release-candidate work should focus on stability, clarity, deployment, documentation, and final public-preview preparation.
 
 ## Freeze rules
 
@@ -62,6 +63,8 @@ A build can be considered release-ready only when all gates below are satisfied.
 - The old oversized preview PR path is closed or explicitly superseded
 - `main` is the canonical release-candidate branch
 - Final QA checklist exists at `docs/FINAL_QA.md`
+- GitHub Release draft exists at `docs/GITHUB_RELEASE_DRAFT.md`
+- Tagging checklist exists at `docs/TAGGING_CHECKLIST.md`
 
 ## Manual smoke checklist
 
@@ -87,6 +90,5 @@ Before tagging 1.0, manually verify:
 
 ## Next recommended milestones
 
-- V54: final release notes and public-facing polish
-- V55: 1.0 tag preparation
+- V55: final build marker and tag preparation
 - V56: post-release balance backlog
