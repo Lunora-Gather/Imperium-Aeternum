@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { BUILD_MARK } from '../../buildInfo';
 import { createInitialState } from '../../engine/init';
 import { processTurn } from '../../engine/turn';
 import { buildCommandCenterActions } from '../commandCenterActions';
@@ -23,7 +24,8 @@ describe('dashboard stability smoke', () => {
     expect(groups.map((g) => g.id)).toEqual(['guide', 'risk', 'domestic', 'external']);
     expect(groups.flatMap((g) => g.itemIds).every((id) => SUPPORTED_DASHBOARD_ITEMS.includes(id))).toBe(true);
     expect(governor.queue.length).toBeGreaterThan(0);
-    expect(release.buildMark).toContain('V');
+    expect(release.buildMark).toBe(BUILD_MARK);
+    expect(release.buildMark).toMatch(/^(V\d+|\d+\.\d+\.\d+)/);
     expect(release.score).toBeGreaterThanOrEqual(0);
   });
 
@@ -49,6 +51,7 @@ describe('dashboard stability smoke', () => {
     const guide = groups[0];
 
     expect(guide.id).toBe('guide');
-    expect(guide.itemIds.slice(0, 2)).toEqual(['release', 'governor']);
+    expect(guide.itemIds.slice(0, 2)).toEqual(['release', 'onboarding']);
+    expect(groups.find((g) => g.id === 'domestic')?.itemIds).toContain('governor');
   });
 });

@@ -32,6 +32,10 @@ function tone(score: number): TurnRiskTone {
   return score >= 85 ? 'good' : score >= 68 ? 'warn' : 'danger';
 }
 
+function isRecognizedReleaseMark(mark: string): boolean {
+  return /^V\d+/i.test(mark) || /^\d+\.\d+\.\d+(?:[-+][0-9A-Za-z.-]+)?$/.test(mark);
+}
+
 export function buildReleaseReadinessPlan(state: GameState, commandActions: CommandCenterAction[] = [], nationId: string = state.playerNationId): ReleaseReadinessPlan {
   const groups = buildDashboardCommandGroups(state, nationId);
   const risk = buildTurnRiskCenterPlan(state, nationId);
@@ -43,7 +47,7 @@ export function buildReleaseReadinessPlan(state: GameState, commandActions: Comm
   const hasDomestic = groups.some((g) => g.itemIds.includes('economy'));
 
   const items: ReleaseReadinessItem[] = [
-    { id: 'build', title: '构建标记', body: BUILD_MARK, tone: BUILD_MARK.includes('V') ? 'good' : 'warn' },
+    { id: 'build', title: '构建标记', body: BUILD_MARK, tone: isRecognizedReleaseMark(BUILD_MARK) ? 'good' : 'warn' },
     { id: 'dashboard', title: 'Dashboard 指挥面板', body: `当前接入 ${groupCoverage} 个可验收模块。`, tone: groupCoverage >= 7 ? 'good' : 'warn' },
     { id: 'route', title: '执政路线', body: route.primaryAction ? `首要路线：${route.primaryAction.title}` : '暂无明确首要路线。', tone: hasGovernor ? 'good' : 'warn' },
     { id: 'risk', title: '推进前检查', body: `当前准备度 ${risk.readiness}，状态 ${risk.decision}。`, tone: hasRiskGate && risk.tone !== 'danger' ? 'good' : risk.tone },

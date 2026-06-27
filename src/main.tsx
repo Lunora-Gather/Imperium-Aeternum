@@ -2,6 +2,7 @@
 // 运行时兜底：生产页若模块加载/渲染异常，不再只显示黑屏。
 
 import { createRoot } from 'react-dom/client';
+import ErrorBoundary from './components/ErrorBoundary';
 import './index.css';
 import './layout.css';
 import './restraint.css';
@@ -50,6 +51,10 @@ import('./App')
   .then(({ default: App }) => {
     const rootEl = document.getElementById('root');
     if (!rootEl) throw new Error('找不到 #root 挂载点');
-    createRoot(rootEl).render(<App />);
+    createRoot(rootEl).render(
+      <ErrorBoundary onReset={() => { window.location.reload(); }}>
+        <App />
+      </ErrorBoundary>
+    );
   })
   .catch(showFatalError);
