@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - main
+      - release/v50-rc
   workflow_dispatch:
 
 permissions:
@@ -17,13 +18,11 @@ concurrency:
 
 jobs:
   build:
-    name: Build optimized preview branch
+    name: Build V50 release candidate
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout optimized branch
+      - name: Checkout current ref
         uses: actions/checkout@v4
-        with:
-          ref: optimize/v39-action-plan
 
       - name: Setup Node
         uses: actions/setup-node@v4
@@ -43,6 +42,8 @@ jobs:
           npx vitest run src/gameplay/__tests__/actionPlanSummary.test.ts
           npx vitest run src/gameplay/__tests__/strategicHq.test.ts
           npx vitest run src/gameplay/__tests__/dashboardCommandGroups.test.ts
+          npx vitest run src/gameplay/__tests__/governorAdvisor.test.ts
+          npx vitest run src/gameplay/__tests__/releaseReadiness.test.ts
           npx vitest run src/gameplay/__tests__/onboardingCoach.test.ts
           npx vitest run src/gameplay/__tests__/economyAdvisor.test.ts
           npx vitest run src/gameplay/__tests__/diplomacyAdvisor.test.ts
@@ -70,7 +71,7 @@ jobs:
           path: dist
 
   deploy:
-    name: Deploy V47 preview
+    name: Deploy V50 release candidate
     needs: build
     runs-on: ubuntu-latest
     environment:
