@@ -1,14 +1,15 @@
 # Imperium Aeternum Release Freeze
 
-This document defines the V52 release-freeze rules for turning the current release candidate into a stable public preview.
+This document defines the release-freeze rules for turning the current release candidate into a stable public preview.
 
 ## Current target
 
 ```text
-Current build marker: V52 release-freeze
+Current build marker: V53 release-gate
 Release target: 1.0 public preview
 Primary branch: main
 Deployment target: GitHub Pages
+Unified gate: npm run rc:check
 ```
 
 The project is no longer in feature expansion mode. V52 and later release-candidate work should focus on stability, clarity, deployment, and documentation.
@@ -40,11 +41,9 @@ A build can be considered release-ready only when all gates below are satisfied.
 
 ### Code and build
 
-- `npm run typecheck` passes
-- `npm run validate` passes
-- targeted Vitest suites pass
-- `npm run pages:build` passes with `VITE_BASE=/Imperium-Aeternum/`
+- `VITE_BASE=/Imperium-Aeternum/ npm run rc:check` passes
 - Pages artifact deploys successfully
+- Footer/build marker matches the expected release marker
 
 ### Stability
 
@@ -62,6 +61,7 @@ A build can be considered release-ready only when all gates below are satisfied.
 - Dashboard first group includes release and governor guidance
 - The old oversized preview PR path is closed or explicitly superseded
 - `main` is the canonical release-candidate branch
+- Final QA checklist exists at `docs/FINAL_QA.md`
 
 ## Manual smoke checklist
 
@@ -87,7 +87,6 @@ Before tagging 1.0, manually verify:
 
 ## Next recommended milestones
 
-- V53: release bugfix sweep and workflow verification
-- V54: README screenshots and public-facing release notes
+- V54: final release notes and public-facing polish
 - V55: 1.0 tag preparation
 - V56: post-release balance backlog
