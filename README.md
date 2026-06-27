@@ -63,7 +63,7 @@ Suggested tag: v1.0.0-preview
 - `main` 已是发布候选主线
 - Dashboard 已接入发布准备、Governor、目标教练、总参、风险、经济、外交和战争模块
 - Pages workflow 直接构建 `main`
-- `npm run rc:check` 已成为本地和 CI 共用的统一发布门禁
+- `npm run rc:check` 是发布候选门禁，应在 tag 前本地或 CI 手动确认
 - 稳定性测试覆盖年度推进、存档往返和 Dashboard 顾问 smoke
 - 最终状态见 [`docs/RELEASE_STATUS.md`](docs/RELEASE_STATUS.md)
 - 发布冻结规则见 [`docs/RELEASE_FREEZE.md`](docs/RELEASE_FREEZE.md)
@@ -117,7 +117,7 @@ Suggested tag: v1.0.0-preview
 | **战争预演** | 对战争目标进行胜率、后勤、财政和外交风险评估 |
 | **目标教练** | 为新玩家生成阶段化目标和下一步行动 |
 | **存档迁移与体检** | 支持多槽位、损坏存档安全失败、旧档结构 normalize |
-| **稳定性测试门禁** | 年度推进、存档往返、Dashboard 顾问 smoke 均纳入部署检查 |
+| **稳定性测试门禁** | 年度推进、存档往返、Dashboard 顾问 smoke 均纳入发布候选检查 |
 
 ---
 
@@ -161,7 +161,7 @@ npm run pages:build
 
 ### 发布候选检查
 
-本地和 Pages workflow 共用同一个发布门禁：
+Tag 前请运行发布候选门禁：
 
 ```bash
 VITE_BASE=/Imperium-Aeternum/ npm run rc:check
@@ -174,6 +174,8 @@ VITE_BASE=/Imperium-Aeternum/ npm run rc:check
 - 年度推进 / 存档往返 / Dashboard smoke 稳定性测试
 - 顾问、经济、外交、战争和 AI 的 targeted tests
 - Pages 兼容构建
+
+当前 `Deploy Pages` workflow 负责构建并部署 `main` 到 GitHub Pages；`rc:check` 仍需在 tag 前本地或 CI 手动确认。
 
 完整发布冻结清单见 [`docs/RELEASE_FREEZE.md`](docs/RELEASE_FREEZE.md)，最终手动 QA 清单见 [`docs/FINAL_QA.md`](docs/FINAL_QA.md)。
 
@@ -220,33 +222,3 @@ V52 之后到 1.0 前，默认不再增加大型系统。
 - Pages / workflow 修复
 - README / Release Notes / 手动验收文档
 - 小范围平衡调整
-
-避免：
-
-- 大型新玩法
-- 未迁移的 save schema 变更
-- 大规模 UI 重写
-- 直接自动改存档的 AI 执行器
-- 再次拉出 100+ commit 的巨大集成分支
-
----
-
-## 设计哲学
-
-> 一个国家最大的敌人，往往是它自己的成功。
-
-扩张带来财富，也带来治理压力。  
-改革带来效率，也带来派系反弹。  
-战争带来土地，也带来债务、厌战和地方不稳。
-
-**Imperium Aeternum** 不奖励无脑扩张。  
-它奖励克制、判断、修正和长期治理。
-
-真正的胜利不是打赢所有战争，  
-而是让这个国家在你不操作的时候，依然能继续运转。
-
----
-
-## License
-
-MIT
