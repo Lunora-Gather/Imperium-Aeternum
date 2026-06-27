@@ -20,13 +20,15 @@
   <a href="docs/RELEASE_FREEZE.md">Release Freeze</a>
   ·
   <a href="docs/FINAL_QA.md">Final QA</a>
+  ·
+  <a href="docs/TAGGING_CHECKLIST.md">Tagging</a>
 </p>
 
 <p align="center">
   <img alt="TypeScript" src="https://img.shields.io/badge/TypeScript-Strict-blue?style=flat-square">
   <img alt="React" src="https://img.shields.io/badge/React-18-61dafb?style=flat-square">
   <img alt="Vite" src="https://img.shields.io/badge/Vite-8-646cff?style=flat-square">
-  <img alt="Status" src="https://img.shields.io/badge/Status-V53%20RC%20Check-gold?style=flat-square">
+  <img alt="Status" src="https://img.shields.io/badge/Status-V54%20Public%20Preview%20Prep-gold?style=flat-square">
 </p>
 
 ---
@@ -46,13 +48,14 @@
 ## 当前状态
 
 ```text
-Build marker: V53 rc-check
+Build marker: V54 public-preview-prep
 Primary branch: main
 Target: 1.0 public preview
 Deployment: GitHub Pages
+Suggested tag: v1.0.0-preview
 ```
 
-项目已经从功能扩张进入 **Release Freeze / RC Check** 阶段。当前重点不再是继续堆新系统，而是稳定、验收、部署和公开展示。
+项目已经从功能扩张进入 **Public Preview Preparation** 阶段。当前重点不再是继续堆新系统，而是稳定、验收、部署、发布说明和 1.0 tag 准备。
 
 当前主线已经完成：
 
@@ -63,6 +66,8 @@ Deployment: GitHub Pages
 - 稳定性测试覆盖年度推进、存档往返和 Dashboard 顾问 smoke
 - 发布冻结规则见 [`docs/RELEASE_FREEZE.md`](docs/RELEASE_FREEZE.md)
 - 最终 QA 清单见 [`docs/FINAL_QA.md`](docs/FINAL_QA.md)
+- GitHub Release 文案见 [`docs/GITHUB_RELEASE_DRAFT.md`](docs/GITHUB_RELEASE_DRAFT.md)
+- Tag 前检查见 [`docs/TAGGING_CHECKLIST.md`](docs/TAGGING_CHECKLIST.md)
 - Release Notes 草稿见 [`docs/RELEASE_NOTES_DRAFT.md`](docs/RELEASE_NOTES_DRAFT.md)
 
 ---
