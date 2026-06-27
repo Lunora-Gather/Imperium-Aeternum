@@ -7,7 +7,7 @@ Imperium Aeternum is now a release-candidate historical strategy simulation focu
 ## Current build
 
 ```text
-V53 release-gate
+V53 rc-check
 ```
 
 ## Major systems now included
@@ -54,7 +54,7 @@ V53 release-gate
 - Updated README to reflect the current release-candidate posture.
 - Added data validation to the deployment gate.
 
-### V53 Release Gate
+### V53 RC Check
 
 - Consolidated local and CI release checks into `npm run rc:check`.
 - Simplified the Pages workflow so it uses the same gate as local release validation.
