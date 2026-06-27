@@ -11,18 +11,20 @@
 <p align="center">
   <a href="https://lunora-gather.github.io/Imperium-Aeternum/">在线试玩</a>
   ·
+  <a href="#当前状态">当前状态</a>
+  ·
   <a href="#核心体验">核心体验</a>
   ·
   <a href="#本地运行">本地运行</a>
   ·
-  <a href="#技术栈">技术栈</a>
+  <a href="docs/RELEASE_FREEZE.md">Release Freeze</a>
 </p>
 
 <p align="center">
   <img alt="TypeScript" src="https://img.shields.io/badge/TypeScript-Strict-blue?style=flat-square">
   <img alt="React" src="https://img.shields.io/badge/React-18-61dafb?style=flat-square">
-  <img alt="Vite" src="https://img.shields.io/badge/Vite-5-646cff?style=flat-square">
-  <img alt="License" src="https://img.shields.io/badge/License-MIT-gold?style=flat-square">
+  <img alt="Vite" src="https://img.shields.io/badge/Vite-8-646cff?style=flat-square">
+  <img alt="Status" src="https://img.shields.io/badge/Status-V52%20Release%20Freeze-gold?style=flat-square">
 </p>
 
 ---
@@ -39,6 +41,28 @@
 
 ---
 
+## 当前状态
+
+```text
+Build marker: V52 release-freeze
+Primary branch: main
+Target: 1.0 public preview
+Deployment: GitHub Pages
+```
+
+项目已经从功能扩张进入 **Release Freeze** 阶段。当前重点不再是继续堆新系统，而是稳定、验收、部署和公开展示。
+
+当前主线已经完成：
+
+- `main` 已是发布候选主线
+- Dashboard 已接入发布准备、Governor、目标教练、总参、风险、经济、外交和战争模块
+- Pages workflow 直接构建 `main` / 当前分支
+- 稳定性测试覆盖年度推进、存档往返和 Dashboard 顾问 smoke
+- 发布冻结规则见 [`docs/RELEASE_FREEZE.md`](docs/RELEASE_FREEZE.md)
+- Release Notes 草稿见 [`docs/RELEASE_NOTES_DRAFT.md`](docs/RELEASE_NOTES_DRAFT.md)
+
+---
+
 ## 核心体验
 
 ### 计划 → 推进 → 复盘 → 修正计划
@@ -47,12 +71,12 @@
 
 ```text
 开局大厅
-  → 帝国路线图
-  → 回合前作战会议
-  → 下一回合预演
+  → Dashboard 指挥分组
+  → Governor Advisor 路线建议
+  → Release Readiness / 推进前风险
   → 年度结算
   → 回合后复盘
-  → 胜利路线修正
+  → 下一年路线修正
 ```
 
 每一年都不是简单地按下“下一回合”。
@@ -60,7 +84,7 @@
 你会先看到：
 
 - 当前国势是否稳定
-- 哪条胜利路线最接近
+- 哪条治理路线最值得优先处理
 - 本年是否适合推进
 - 是否应该先存档
 - 哪些风险会在下一年爆发
@@ -72,14 +96,16 @@
 
 | 系统 | 说明 |
 |---|---|
-| **帝国路线图** | 自动判断当前国势、胜利主线和三步治理计划 |
-| **回合前作战会议** | 在结束本年前给出最终决策：暂停、先存档、谨慎推进或可以推进 |
-| **下一回合预演** | 预测财政、粮食、安定、战争和地方风险 |
-| **年度复盘** | 年报后自动总结本年做对了什么、哪里恶化、下一年该修正什么 |
-| **胜利路线仪表盘** | 征服、富国、合纵、永恒四条路线动态对比 |
-| **存档体检** | 读档前检查存档健康度，支持恢复与风险提示 |
-| **动态国运目标** | 胜利条件随剧本规模和国家体量调整 |
-| **长局模拟与数据校验** | 使用测试门禁保证回合系统、存档和 Pages 构建稳定 |
+| **Dashboard 指挥分组** | 将发布准备、执政路线、目标、风险、经济、外交和战争收纳为可折叠指挥面板 |
+| **Governor Advisor** | 汇总各顾问，给出当前最优先的执政路线；目前只建议和跳转，不自动改存档 |
+| **Release Readiness** | 在游戏内显示当前构建标记、模块覆盖和发布准备状态 |
+| **帝国总参** | 自动判断当前国势、主目标和三步治理计划 |
+| **推进前风险中枢** | 在结束本年前给出最终决策：阻断、整备或可以推进 |
+| **经济 / 外交顾问** | 汇总内政、财政、粮食、外交、同盟与威胁判断 |
+| **战争预演** | 对战争目标进行胜率、后勤、财政和外交风险评估 |
+| **目标教练** | 为新玩家生成阶段化目标和下一步行动 |
+| **存档迁移与体检** | 支持多槽位、损坏存档安全失败、旧档结构 normalize |
+| **稳定性测试门禁** | 年度推进、存档往返、Dashboard 顾问 smoke 均纳入部署检查 |
 
 ---
 
@@ -111,7 +137,7 @@ npm run dev
 # 类型检查
 npm run typecheck
 
-# 运行测试
+# 运行全部测试
 npm run test
 
 # 数据校验
@@ -120,6 +146,21 @@ npm run validate
 # Pages 兼容构建
 npm run pages:build
 ```
+
+### 发布候选检查
+
+当前 Pages workflow 会执行：
+
+```bash
+npm run typecheck
+npm run validate
+npx vitest run src/engine/__tests__/turnStability.test.ts
+npx vitest run src/store/__tests__/persistenceRoundtrip.test.ts
+npx vitest run src/gameplay/__tests__/dashboardStability.test.ts
+npm run pages:build
+```
+
+完整发布冻结清单见 [`docs/RELEASE_FREEZE.md`](docs/RELEASE_FREEZE.md)。
 
 ---
 
@@ -140,10 +181,10 @@ npm run pages:build
 
 ```text
 src/
-  components/   # 通用 UI 组件
+  components/   # 通用 UI 组件与 Dashboard 指挥面板
   data/         # 国家、省份、事件、建筑、政策、法律等数据
   engine/       # 回合结算、战争、外交、AI、事件、王朝等核心逻辑
-  gameplay/     # 路线图、体检、复盘、行动建议、存档恢复等玩法辅助层
+  gameplay/     # 总参、Governor、风险、发布准备、行动建议等玩法辅助层
   screens/      # 总览、地图、年报、存档、外交、军事等页面
   store/        # 全局状态、存档、迁移和游戏入口
   types/        # TypeScript 类型定义
@@ -151,26 +192,27 @@ src/
 
 ---
 
-## 当前版本重点
+## Release Freeze 原则
 
-当前版本聚焦于一个完整的大策略体验闭环：
+V52 之后到 1.0 前，默认不再增加大型系统。
 
-```text
-开局选择
-  → 目标路线
-  → 回合前决策
-  → 风险预演
-  → 年度报告
-  → 回合后复盘
-```
+允许：
 
-这让游戏不只是“展示很多数值”，而是能主动告诉玩家：
+- bug 修复
+- 类型修复
+- 存档兼容修复
+- 测试覆盖增强
+- Pages / workflow 修复
+- README / Release Notes / 手动验收文档
+- 小范围平衡调整
 
-- 现在最重要的问题是什么
-- 为什么要先处理它
-- 不处理会有什么后果
-- 这一年推进是否成功
-- 下一年是否应该改变路线
+避免：
+
+- 大型新玩法
+- 未迁移的 save schema 变更
+- 大规模 UI 重写
+- 直接自动改存档的 AI 执行器
+- 再次拉出 100+ commit 的巨大集成分支
 
 ---
 
