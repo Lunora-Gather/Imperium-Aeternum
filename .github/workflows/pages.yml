@@ -1,64 +1,17 @@
-name: Deploy GitHub Pages
+name: Deploy GitHub Pages Disabled
 
 on:
-  push:
-    branches:
-      - main
-      - optimize/v39-action-plan
   workflow_dispatch:
 
 permissions:
   contents: read
-  pages: write
-  id-token: write
-
-concurrency:
-  group: pages
-  cancel-in-progress: false
 
 jobs:
-  build:
-    name: Build
+  disabled:
+    name: Disabled duplicate workflow
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup Node
-        uses: actions/setup-node@v4
-        with:
-          node-version: 20
-          cache: npm
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Typecheck
-        run: npm run typecheck
-
-      - name: Test
-        run: npm test
-
-      - name: Build Pages artifact
-        env:
-          VITE_BASE: /Imperium-Aeternum/
+      - name: Explain
         run: |
-          npm run pages:build
-          cp dist/index.html dist/404.html
-
-      - name: Upload artifact
-        uses: actions/upload-pages-artifact@v3
-        with:
-          path: dist
-
-  deploy:
-    name: Deploy
-    needs: build
-    runs-on: ubuntu-latest
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
-    steps:
-      - name: Deploy to GitHub Pages
-        id: deployment
-        uses: actions/deploy-pages@v4
+          echo "This duplicate Pages workflow is disabled."
+          echo "Use the main-branch workflow: Deploy Imperium Aeternum Preview."
