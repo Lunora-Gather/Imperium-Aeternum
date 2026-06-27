@@ -15,25 +15,31 @@ Pass criteria:
 - No immediate crash.
 - Dashboard is reachable.
 
-## 2. Dashboard command stack
+## 2. Dashboard command groups
 
-Open Dashboard and verify the current command stack is visible and readable:
+Open Dashboard and verify the current command groups are visible and readable:
 
-1. Target Coach / 目标教练.
-2. Strategic HQ / 帝国总参.
-3. Release Readiness / 发布就绪.
-4. Pre-turn Risk Center / 推进前风险中枢.
-5. Economy Advisor / 经济内政顾问.
-6. Governor Advisor / 地方治理顾问.
-7. Diplomacy Advisor / 外交顾问.
-8. War Opportunity / 战争机会.
+1. 引导与本年目标.
+   - Release Readiness / 发布就绪.
+   - Target Coach / 目标教练.
+   - Strategic HQ / 帝国总参.
+2. 推进前风险.
+   - Pre-turn Risk Center / 推进前风险中枢.
+3. 内政与经济.
+   - Governor Advisor / 地方治理顾问.
+   - Economy Advisor / 经济内政顾问.
+4. 外交与战争.
+   - Diplomacy Advisor / 外交顾问.
+   - War Opportunity / 战争机会.
 
 Pass criteria:
 
-- Every section renders readable text.
+- Every command group expands/collapses safely.
+- Every listed section renders readable text.
 - Clicking a recommended action changes to the expected tab when a tab is provided.
+- Governor advice appears under 内政与经济, not only under the onboarding/guide group.
 
-## 3. Economy and province loop
+## 3. Economy, governor, and province loop
 
 1. Open an economy, province, or governor recommendation from the Dashboard.
 2. Build, inspect, or resolve one available internal-affairs action if possible.
@@ -43,6 +49,7 @@ Pass criteria:
 
 - No crash when navigating.
 - Economy/governor advice remains coherent.
+- The domestic command group still renders after returning.
 
 ## 4. Diplomacy loop
 
