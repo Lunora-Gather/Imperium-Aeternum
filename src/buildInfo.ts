@@ -1,1 +1,1 @@
-export const BUILD_MARK = 'V51 stability-suite';
+export const BUILD_MARK = 'V52 release-freeze';
