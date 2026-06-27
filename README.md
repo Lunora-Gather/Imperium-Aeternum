@@ -18,13 +18,15 @@
   <a href="#本地运行">本地运行</a>
   ·
   <a href="docs/RELEASE_FREEZE.md">Release Freeze</a>
+  ·
+  <a href="docs/FINAL_QA.md">Final QA</a>
 </p>
 
 <p align="center">
   <img alt="TypeScript" src="https://img.shields.io/badge/TypeScript-Strict-blue?style=flat-square">
   <img alt="React" src="https://img.shields.io/badge/React-18-61dafb?style=flat-square">
   <img alt="Vite" src="https://img.shields.io/badge/Vite-8-646cff?style=flat-square">
-  <img alt="Status" src="https://img.shields.io/badge/Status-V52%20Release%20Freeze-gold?style=flat-square">
+  <img alt="Status" src="https://img.shields.io/badge/Status-V53%20Release%20Gate-gold?style=flat-square">
 </p>
 
 ---
@@ -44,21 +46,23 @@
 ## 当前状态
 
 ```text
-Build marker: V52 release-freeze
+Build marker: V53 release-gate
 Primary branch: main
 Target: 1.0 public preview
 Deployment: GitHub Pages
 ```
 
-项目已经从功能扩张进入 **Release Freeze** 阶段。当前重点不再是继续堆新系统，而是稳定、验收、部署和公开展示。
+项目已经从功能扩张进入 **Release Freeze / Release Gate** 阶段。当前重点不再是继续堆新系统，而是稳定、验收、部署和公开展示。
 
 当前主线已经完成：
 
 - `main` 已是发布候选主线
 - Dashboard 已接入发布准备、Governor、目标教练、总参、风险、经济、外交和战争模块
-- Pages workflow 直接构建 `main` / 当前分支
+- Pages workflow 直接构建 `main`
+- `npm run rc:check` 已成为本地和 CI 共用的统一发布门禁
 - 稳定性测试覆盖年度推进、存档往返和 Dashboard 顾问 smoke
 - 发布冻结规则见 [`docs/RELEASE_FREEZE.md`](docs/RELEASE_FREEZE.md)
+- 最终 QA 清单见 [`docs/FINAL_QA.md`](docs/FINAL_QA.md)
 - Release Notes 草稿见 [`docs/RELEASE_NOTES_DRAFT.md`](docs/RELEASE_NOTES_DRAFT.md)
 
 ---
@@ -149,18 +153,21 @@ npm run pages:build
 
 ### 发布候选检查
 
-当前 Pages workflow 会执行：
+本地和 Pages workflow 共用同一个发布门禁：
 
 ```bash
-npm run typecheck
-npm run validate
-npx vitest run src/engine/__tests__/turnStability.test.ts
-npx vitest run src/store/__tests__/persistenceRoundtrip.test.ts
-npx vitest run src/gameplay/__tests__/dashboardStability.test.ts
-npm run pages:build
+VITE_BASE=/Imperium-Aeternum/ npm run rc:check
 ```
 
-完整发布冻结清单见 [`docs/RELEASE_FREEZE.md`](docs/RELEASE_FREEZE.md)。
+该门禁包含：
+
+- TypeScript typecheck
+- 数据校验
+- 年度推进 / 存档往返 / Dashboard smoke 稳定性测试
+- 顾问、经济、外交、战争和 AI 的 targeted tests
+- Pages 兼容构建
+
+完整发布冻结清单见 [`docs/RELEASE_FREEZE.md`](docs/RELEASE_FREEZE.md)，最终手动 QA 清单见 [`docs/FINAL_QA.md`](docs/FINAL_QA.md)。
 
 ---
 
