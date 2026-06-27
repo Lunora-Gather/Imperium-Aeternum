@@ -21,11 +21,13 @@ Stage: Final QA / Tag Ready
 - Release Readiness center is integrated.
 - Stability tests cover turn processing, persistence roundtrip, and Dashboard smoke.
 - Unified release gate exists as `npm run rc:check`.
-- Pages workflow builds `main` and runs the unified gate.
+- Pages workflow builds `main`.
 - README is updated for public preview.
 - Release Notes are prepared.
 - GitHub Release draft is prepared.
 - Final QA and Tagging checklists are prepared.
+- Public preview QA script is prepared in `docs/public-preview-qa.md`.
+- Release checklist is updated in `docs/release-checklist.md`.
 
 ## Remaining hard gate
 
@@ -33,6 +35,20 @@ Do not publish the GitHub Release or create the final tag until both are true:
 
 1. `VITE_BASE=/Imperium-Aeternum/ npm run rc:check` passes.
 2. The GitHub Pages deployment is visible and shows `1.0.0-public-preview`.
+
+## Current final-QA command
+
+```bash
+npm ci
+VITE_BASE=/Imperium-Aeternum/ npm run rc:check
+```
+
+## Manual QA documents
+
+- `docs/FINAL_QA.md`
+- `docs/public-preview-qa.md`
+- `docs/release-checklist.md`
+- `docs/TAGGING_CHECKLIST.md`
 
 ## Why no more feature work before tag
 
