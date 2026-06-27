@@ -1,1 +1,1 @@
-export const BUILD_MARK = 'V54 public-preview-prep';
+export const BUILD_MARK = '1.0.0-public-preview';
