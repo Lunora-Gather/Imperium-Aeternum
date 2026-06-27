@@ -28,7 +28,7 @@
   <img alt="TypeScript" src="https://img.shields.io/badge/TypeScript-Strict-blue?style=flat-square">
   <img alt="React" src="https://img.shields.io/badge/React-18-61dafb?style=flat-square">
   <img alt="Vite" src="https://img.shields.io/badge/Vite-8-646cff?style=flat-square">
-  <img alt="Status" src="https://img.shields.io/badge/Status-V54%20Public%20Preview%20Prep-gold?style=flat-square">
+  <img alt="Status" src="https://img.shields.io/badge/Status-1.0.0%20Public%20Preview-gold?style=flat-square">
 </p>
 
 ---
@@ -48,14 +48,15 @@
 ## 当前状态
 
 ```text
-Build marker: V54 public-preview-prep
+Build marker: 1.0.0-public-preview
+Package version: 1.0.0-preview
 Primary branch: main
 Target: 1.0 public preview
 Deployment: GitHub Pages
 Suggested tag: v1.0.0-preview
 ```
 
-项目已经从功能扩张进入 **Public Preview Preparation** 阶段。当前重点不再是继续堆新系统，而是稳定、验收、部署、发布说明和 1.0 tag 准备。
+项目已经进入 **1.0 Public Preview Candidate** 阶段。当前重点不再是继续堆新系统，而是确认发布门禁、Pages 部署、最终 QA 和 GitHub Release。
 
 当前主线已经完成：
 
