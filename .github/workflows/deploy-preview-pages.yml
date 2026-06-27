@@ -4,7 +4,6 @@ on:
   push:
     branches:
       - main
-      - release/v50-rc
   workflow_dispatch:
 
 permissions:
@@ -18,7 +17,7 @@ concurrency:
 
 jobs:
   build:
-    name: Build V52 release freeze
+    name: Build V53 release gate
     runs-on: ubuntu-latest
     steps:
       - name: Checkout current ref
@@ -33,40 +32,13 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Typecheck
-        run: npm run typecheck
-
-      - name: Data validation
-        run: npm run validate
-
-      - name: Stability tests
-        run: npm run test:stability
-
-      - name: Targeted advisor and war tests
-        run: |
-          npx vitest run src/gameplay/__tests__/commandExecutionPlan.test.ts
-          npx vitest run src/gameplay/__tests__/actionPlanSummary.test.ts
-          npx vitest run src/gameplay/__tests__/strategicHq.test.ts
-          npx vitest run src/gameplay/__tests__/dashboardCommandGroups.test.ts
-          npx vitest run src/gameplay/__tests__/governorAdvisor.test.ts
-          npx vitest run src/gameplay/__tests__/releaseReadiness.test.ts
-          npx vitest run src/gameplay/__tests__/onboardingCoach.test.ts
-          npx vitest run src/gameplay/__tests__/economyAdvisor.test.ts
-          npx vitest run src/gameplay/__tests__/diplomacyAdvisor.test.ts
-          npx vitest run src/gameplay/__tests__/turnRiskCenter.test.ts
-          npx vitest run src/gameplay/__tests__/warAssessment.test.ts
-          npx vitest run src/gameplay/__tests__/warPreview.test.ts
-          npx vitest run src/gameplay/__tests__/warOpportunityAdvisor.test.ts
-          npx vitest run src/gameplay/__tests__/aiWarDecision.test.ts
-          npx vitest run src/gameplay/__tests__/aiWarActionAdapter.test.ts
-          npx vitest run src/engine/__tests__/aiWarPlannerIntegration.test.ts
-
-      - name: Build Pages artifact
+      - name: Release candidate check
         env:
           VITE_BASE: /Imperium-Aeternum/
-        run: |
-          npm run pages:build
-          cp dist/index.html dist/404.html
+        run: npm run rc:check
+
+      - name: Copy SPA fallback
+        run: cp dist/index.html dist/404.html
 
       - name: Configure Pages
         uses: actions/configure-pages@v5
@@ -77,7 +49,7 @@ jobs:
           path: dist
 
   deploy:
-    name: Deploy V52 release freeze
+    name: Deploy V53 release gate
     needs: build
     runs-on: ubuntu-latest
     environment:
