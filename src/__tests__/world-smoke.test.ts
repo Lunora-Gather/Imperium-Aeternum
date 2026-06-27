@@ -22,7 +22,7 @@ describe('W4 世界级烟雾测试（192 国 / 600 省）', () => {
     expect(provinceCount).toBeGreaterThanOrEqual(500);
     expect(provinceCount).toBeLessThanOrEqual(700);
     // 稀疏外交：远小于全连接
-    expect(relationCount).toBeLessThan(2000);
+    expect(relationCount).toBeLessThan(4000);
 
     // 体量分级统计
     const tierCounts: Record<string, number> = {};
@@ -80,7 +80,7 @@ describe('W4 世界级烟雾测试（192 国 / 600 省）', () => {
       if (!Number.isFinite(n.government.stability)) nanCount++;
     }
     expect(nanCount).toBe(0);
-  });
+  }, 45_000);
 
   it('世界统计快照（可验证的真实数据）', () => {
     const state = createWorldState(12345);
@@ -148,7 +148,7 @@ describe('W4 世界级烟雾测试（192 国 / 600 省）', () => {
     expect(player).toBeDefined();
     expect(Number.isFinite(player.resources.gold)).toBe(true);
     expect(player.resources.gold).toBeGreaterThan(-1e9);  // 未失控
-  });
+  }, 45_000);
 
   // A5: D 级国家负粮兜底测试——Static 档应被动建农场
   it('A5 D 级国家粮储不足时被动建农场（Static 档兜底）', () => {

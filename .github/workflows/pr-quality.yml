@@ -93,6 +93,8 @@ jobs:
         run: npx vitest run src/engine/__tests__/turnPurity.test.ts
       - name: Long-run simulation diagnostics
         run: npx vitest run src/engine/__tests__/longRunSimulation.test.ts
+      - name: Full regression suite
+        run: npm run test
       - name: Data and scenario validation
         run: npm run validate
       - name: Pages-compatible production build

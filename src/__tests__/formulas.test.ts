@@ -130,9 +130,9 @@ describe('§5.2 省份叛乱风险', () => {
 });
 
 describe('§5.3 战斗结算', () => {
-  it('均势推进有最小值', () => {
+  it('均势战斗保持僵持', () => {
     const r = resolveBattle(100, 100, 100, 100);
-    expect(Math.abs(r.progressDelta)).toBeGreaterThanOrEqual(3); // W-fix: 最小推进 ±3
+    expect(r.progressDelta).toBe(0);
   });
 
   it('绝对优势占领快', () => {
