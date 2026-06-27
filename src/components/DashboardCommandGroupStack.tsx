@@ -1,6 +1,6 @@
 // V47 Dashboard 指挥分组容器：把首屏顾问模块收纳成可折叠的产品化分区。
 
-import { useMemo, useState } from 'react';
+import { useMemo, useState, type ReactNode } from 'react';
 import { Tag } from './ui';
 import type { DashboardCommandGroup, DashboardGroupTone } from '../gameplay/dashboardCommandGroups';
 
@@ -12,7 +12,7 @@ function border(tone: DashboardGroupTone): string {
   return tone === 'danger' ? 'var(--war)' : tone === 'warn' ? 'var(--warn)' : 'var(--good)';
 }
 
-export default function DashboardCommandGroupStack({ groups, renderItem }: { groups: DashboardCommandGroup[]; renderItem: (id: string) => React.ReactNode }) {
+export default function DashboardCommandGroupStack({ groups, renderItem }: { groups: DashboardCommandGroup[]; renderItem: (id: string) => ReactNode }) {
   const initial = useMemo(() => Object.fromEntries(groups.map((g) => [g.id, g.defaultOpen])), [groups]);
   const [open, setOpen] = useState<Record<string, boolean>>(initial);
 
