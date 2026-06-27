@@ -66,6 +66,25 @@ Fix applied:
 - Updated release checklist to require expand/collapse checks for the command groups.
 - Added a release blocker if Governor Advisor is missing from the domestic command group.
 
+### README release-gate clarification
+
+Reviewed:
+
+- `README.md`
+- `.github/workflows/deploy-pages.yml`
+- `package.json`
+
+Finding:
+
+- README implied that the Pages workflow and local release process both use the full `rc:check` gate.
+- Current `deploy-pages.yml` performs the Pages build/deploy path, while `rc:check` remains the authoritative tag-before-release gate that must be confirmed locally or through a suitable CI run.
+
+Fix applied:
+
+- Updated README to state that `Deploy Pages` builds/deploys `main`.
+- Updated README to state that `rc:check` must be confirmed before tag.
+- Kept build marker unchanged at `1.0.0-public-preview`.
+
 ## Non-code findings
 
 - Release marker remains `1.0.0-public-preview`; it should not be changed during final QA.
