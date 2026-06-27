@@ -5,7 +5,8 @@ This document defines the release-freeze rules for turning the current release c
 ## Current target
 
 ```text
-Current build marker: V54 public-preview-prep
+Current build marker: 1.0.0-public-preview
+Package version: 1.0.0-preview
 Release target: 1.0 public preview
 Suggested tag: v1.0.0-preview
 Primary branch: main
@@ -90,5 +91,4 @@ Before tagging 1.0, manually verify:
 
 ## Next recommended milestones
 
-- V55: final build marker and tag preparation
 - V56: post-release balance backlog
