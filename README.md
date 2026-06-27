@@ -1,224 +1,117 @@
-# Imperium Aeternum · 永恒帝国
+# Imperium Aeternum
 
 <p align="center">
-  <b>一款以国家治理为核心的历史策略模拟游戏</b>
-</p>
-
-<p align="center">
-  治理一个国家数百年。扩张越快，崩溃越早。真正的胜利，是建立一台能长期运转的国家机器。
+  <b>一款以国家治理、长期稳定和战略取舍为核心的历史大策略模拟游戏。</b>
 </p>
 
 <p align="center">
   <a href="https://lunora-gather.github.io/Imperium-Aeternum/">在线试玩</a>
   ·
-  <a href="#当前状态">当前状态</a>
-  ·
   <a href="#核心体验">核心体验</a>
   ·
   <a href="#本地运行">本地运行</a>
   ·
-  <a href="docs/RELEASE_STATUS.md">Release Status</a>
-  ·
-  <a href="docs/FINAL_QA.md">Final QA</a>
-  ·
-  <a href="docs/TAGGING_CHECKLIST.md">Tagging</a>
+  <a href="#发布状态">发布状态</a>
 </p>
 
 <p align="center">
-  <img alt="TypeScript" src="https://img.shields.io/badge/TypeScript-Strict-blue?style=flat-square">
+  <img alt="TypeScript" src="https://img.shields.io/badge/TypeScript-strict-blue?style=flat-square">
   <img alt="React" src="https://img.shields.io/badge/React-18-61dafb?style=flat-square">
   <img alt="Vite" src="https://img.shields.io/badge/Vite-8-646cff?style=flat-square">
-  <img alt="Status" src="https://img.shields.io/badge/Status-1.0.0%20Public%20Preview-gold?style=flat-square">
+  <img alt="Release" src="https://img.shields.io/badge/release-v1.0.0--preview-gold?style=flat-square">
 </p>
-
----
-
-## 简介
-
-**Imperium Aeternum** 是一款大策略 / 国家治理模拟游戏。
-
-你不是单纯的将军，也不是只负责扩张的君主。你需要在财政、粮食、人口、法律、派系、战争、外交、科技、地方治理和长期稳定之间做取舍。
-
-游戏的核心不是“征服一切”，而是回答一个更困难的问题：
-
-> 当国家越来越大、系统越来越复杂时，你能否让它继续运转下去？
-
----
-
-## 当前状态
-
-```text
-Build marker: 1.0.0-public-preview
-Package version: 1.0.0-preview
-Primary branch: main
-Target: 1.0 public preview
-Deployment: GitHub Pages
-Suggested tag: v1.0.0-preview
-```
-
-项目已经进入 **1.0 Public Preview Candidate** 阶段。当前重点不再是继续堆新系统，而是确认发布门禁、Pages 部署、最终 QA 和 GitHub Release。
-
-当前主线已经完成：
-
-- `main` 已是发布候选主线
-- Dashboard 已接入发布准备、Governor、目标教练、总参、风险、经济、外交和战争模块
-- Pages workflow 直接构建 `main`
-- `npm run rc:check` 是发布候选门禁，应在 tag 前本地或 CI 手动确认
-- 稳定性测试覆盖年度推进、存档往返和 Dashboard 顾问 smoke
-- 最终状态见 [`docs/RELEASE_STATUS.md`](docs/RELEASE_STATUS.md)
-- 发布冻结规则见 [`docs/RELEASE_FREEZE.md`](docs/RELEASE_FREEZE.md)
-- 最终 QA 清单见 [`docs/FINAL_QA.md`](docs/FINAL_QA.md)
-- GitHub Release 文案见 [`docs/GITHUB_RELEASE_DRAFT.md`](docs/GITHUB_RELEASE_DRAFT.md)
-- Tag 前检查见 [`docs/TAGGING_CHECKLIST.md`](docs/TAGGING_CHECKLIST.md)
-- Release Notes 见 [`docs/RELEASE_NOTES_DRAFT.md`](docs/RELEASE_NOTES_DRAFT.md)
-- Post-1.0 backlog 见 [`docs/POST_1_0_BACKLOG.md`](docs/POST_1_0_BACKLOG.md)
-
----
 
 ## 核心体验
 
-### 计划 → 推进 → 复盘 → 修正计划
+**Imperium Aeternum** 不是单纯的扩张游戏。你需要在财政、粮食、人口、法律、派系、战争、外交、科技和地方治理之间做取舍，让国家机器在数百年的压力下继续运转。
 
-游戏现在形成了一套完整的策略闭环：
+当前 1.0 public preview 的主循环已经成型：
 
 ```text
-开局大厅
-  → Dashboard 指挥分组
-  → Governor Advisor 路线建议
-  → Release Readiness / 推进前风险
-  → 年度结算
-  → 回合后复盘
-  → 下一年路线修正
+选择剧本
+  -> Dashboard 指挥中枢
+  -> 顾问与风险判断
+  -> 执行内政、外交或军事行动
+  -> 推进年度
+  -> 阅读年报
+  -> 存档并修正下一年路线
 ```
 
-每一年都不是简单地按下“下一回合”。
+## 你可以做什么
 
-你会先看到：
+- 经营国家财政、粮食、人口、安定和合法性。
+- 在经济、外交、军事和长期稳定之间选择发展路线。
+- 使用 Dashboard 的指挥分组快速判断本年优先级。
+- 在宣战前查看战争机会、胜率、后勤和外交风险。
+- 通过年度报告复盘国家状态变化。
+- 使用多槽位本地存档继续长期局。
 
-- 当前国势是否稳定
-- 哪条治理路线最值得优先处理
-- 本年是否适合推进
-- 是否应该先存档
-- 哪些风险会在下一年爆发
-- 年报后哪些指标改善或恶化
+## 主要系统
 
----
+| 系统 | 作用 |
+| --- | --- |
+| Dashboard 指挥中枢 | 汇总目标、总参、发布状态、推进风险、经济、外交和战争建议 |
+| Governor Advisor | 给出地方治理优先级和页面跳转建议，不自动改动存档 |
+| Strategic HQ | 识别国家当前路线、主目标和三步行动计划 |
+| Pre-turn Risk Center | 在推进年度前提示硬阻断、风险和可推进状态 |
+| Economy / Diplomacy Advisors | 汇总财政、粮食、外交关系、威胁和可行动建议 |
+| War Preview | 在宣战前展示胜率、准备度、后勤压力和外部风险 |
+| Save Recovery | 支持多槽位存档、旧档 normalize 和损坏存档安全失败 |
 
-## 特色系统
+## 发布状态
 
-| 系统 | 说明 |
-|---|---|
-| **Dashboard 指挥分组** | 将发布准备、执政路线、目标、风险、经济、外交和战争收纳为可折叠指挥面板 |
-| **Governor Advisor** | 汇总各顾问，给出当前最优先的执政路线；目前只建议和跳转，不自动改存档 |
-| **Release Readiness** | 在游戏内显示当前构建标记、模块覆盖和发布准备状态 |
-| **帝国总参** | 自动判断当前国势、主目标和三步治理计划 |
-| **推进前风险中枢** | 在结束本年前给出最终决策：阻断、整备或可以推进 |
-| **经济 / 外交顾问** | 汇总内政、财政、粮食、外交、同盟与威胁判断 |
-| **战争预演** | 对战争目标进行胜率、后勤、财政和外交风险评估 |
-| **目标教练** | 为新玩家生成阶段化目标和下一步行动 |
-| **存档迁移与体检** | 支持多槽位、损坏存档安全失败、旧档结构 normalize |
-| **稳定性测试门禁** | 年度推进、存档往返、Dashboard 顾问 smoke 均纳入发布候选检查 |
+```text
+Public URL: https://lunora-gather.github.io/Imperium-Aeternum/
+Release tag: v1.0.0-preview
+Package version: 1.0.0-preview
+Build marker: 1.0.0-public-preview
+Primary branch: main
+```
 
----
-
-## 四条胜利路线
-
-| 路线 | 目标 |
-|---|---|
-| **征服路线** | 扩张疆土，同时维持足够安定 |
-| **富国路线** | 建立长期财政优势，并连续多年保持稳定 |
-| **合纵路线** | 积累影响力，经营友邦与外交网络 |
-| **永恒路线** | 在长期和平、安定与法统中延续国家机器 |
-
-真正困难的地方在于：
-
-> 每条胜利路线都会被另一套系统牵制。  
-> 征服会带来治理压力，富国会受到腐败拖累，外交会被战争打断，永恒则要求长期克制。
-
----
+当前仓库保留一个正式 Pages 部署工作流：`Deploy Pages`。它会在 `main` 推送后运行完整 `npm run rc:check`，再部署 GitHub Pages。
 
 ## 本地运行
 
 ```bash
-# 安装依赖
-npm install
-
-# 启动开发环境
+npm ci
 npm run dev
-
-# 类型检查
-npm run typecheck
-
-# 运行全部测试
-npm run test
-
-# 数据校验
-npm run validate
-
-# Pages 兼容构建
-npm run pages:build
 ```
 
-### 发布候选检查
+常用检查：
 
-Tag 前请运行发布候选门禁：
+```bash
+npm run typecheck
+npm run validate
+npm run test
+```
+
+发布候选门禁：
 
 ```bash
 VITE_BASE=/Imperium-Aeternum/ npm run rc:check
 ```
 
-该门禁包含：
-
-- TypeScript typecheck
-- 数据校验
-- 年度推进 / 存档往返 / Dashboard smoke 稳定性测试
-- 顾问、经济、外交、战争和 AI 的 targeted tests
-- Pages 兼容构建
-
-当前 `Deploy Pages` workflow 负责构建并部署 `main` 到 GitHub Pages；`rc:check` 仍需在 tag 前本地或 CI 手动确认。
-
-完整发布冻结清单见 [`docs/RELEASE_FREEZE.md`](docs/RELEASE_FREEZE.md)，最终手动 QA 清单见 [`docs/FINAL_QA.md`](docs/FINAL_QA.md)。
-
----
-
-## 技术栈
-
-- **TypeScript**
-- **React 18**
-- **Vite**
-- **Zustand**
-- **Vitest**
-- **GitHub Pages**
-- 本地存档：`localStorage`
-- 数据驱动：事件、国家、省份、建筑、政策、法律、科技
-
----
+`rc:check` 包含 TypeScript 检查、数据校验、稳定性测试、目标顾问/经济/外交/战争/AI targeted tests，以及 Pages 兼容构建。
 
 ## 项目结构
 
 ```text
 src/
-  components/   # 通用 UI 组件与 Dashboard 指挥面板
-  data/         # 国家、省份、事件、建筑、政策、法律等数据
-  engine/       # 回合结算、战争、外交、AI、事件、王朝等核心逻辑
-  gameplay/     # 总参、Governor、风险、发布准备、行动建议等玩法辅助层
-  screens/      # 总览、地图、年报、存档、外交、军事等页面
-  store/        # 全局状态、存档、迁移和游戏入口
-  types/        # TypeScript 类型定义
+  components/   通用 UI 与 Dashboard 面板
+  data/         国家、省份、事件、建筑、政策、法律、科技等数据
+  engine/       回合结算、战争、外交、AI、事件、王朝等核心逻辑
+  gameplay/     顾问、路线判断、风险中心、行动建议和发布状态
+  screens/      地图、Dashboard、年报、外交、军事、存档等页面
+  store/        全局状态、存档、迁移和游戏入口
+  types/        TypeScript 类型定义
 ```
 
----
+## 有用文档
 
-## Release Freeze 原则
+- [Release notes](docs/release-notes-v1.0.0-preview.md)
+- [Public preview QA](docs/public-preview-qa.md)
+- [Release checklist](docs/release-checklist.md)
+- [Final QA checklist](docs/FINAL_QA.md)
+- [Post-1.0 backlog](docs/POST_1_0_BACKLOG.md)
 
-V52 之后到 1.0 前，默认不再增加大型系统。
-
-允许：
-
-- bug 修复
-- 类型修复
-- 存档兼容修复
-- 测试覆盖增强
-- Pages / workflow 修复
-- README / Release Notes / 手动验收文档
-- 小范围平衡调整
+更底层的设计、公式和 ADR 文档保留在 `docs/`，用于追溯玩法规则和数据来源。

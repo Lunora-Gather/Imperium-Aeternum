@@ -1,4 +1,4 @@
-name: Deploy Imperium Aeternum Preview
+name: Deploy Pages
 
 on:
   push:
@@ -17,7 +17,7 @@ concurrency:
 
 jobs:
   build:
-    name: Build 1.0 public preview
+    name: Build public preview
     runs-on: ubuntu-latest
     steps:
       - name: Checkout current ref
@@ -32,7 +32,7 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Release candidate check
+      - name: Release candidate gate
         env:
           VITE_BASE: /Imperium-Aeternum/
         run: npm run rc:check
@@ -49,13 +49,13 @@ jobs:
           path: dist
 
   deploy:
-    name: Deploy 1.0 public preview
+    name: Deploy to GitHub Pages
     needs: build
     runs-on: ubuntu-latest
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
-      - name: Deploy
+      - name: Deploy artifact
         id: deployment
         uses: actions/deploy-pages@v4
