@@ -1,1 +1,1 @@
-export const BUILD_MARK = 'V52 release-freeze';
+export const BUILD_MARK = 'V53 rc-check';
