@@ -1,4 +1,4 @@
-# Release Notes Draft — Imperium Aeternum 1.0 Public Preview
+# Release Notes — Imperium Aeternum 1.0 Public Preview
 
 ## Headline
 
@@ -7,13 +7,14 @@ Imperium Aeternum is ready for 1.0 public-preview tagging once the final QA chec
 ## Current build
 
 ```text
-V54 public-preview-prep
+1.0.0-public-preview
 ```
 
 ## Release target
 
 ```text
 Suggested tag: v1.0.0-preview
+Package version: 1.0.0-preview
 Target branch: main
 Public artifact: GitHub Pages
 Release type: prerelease/public preview
@@ -76,6 +77,13 @@ Release type: prerelease/public preview
 - Added tag preparation checklist.
 - Updated README with public-preview preparation links.
 - Clarified the final tag target and release asset policy.
+
+### V55 Final Marker Preparation
+
+- Set the in-game build marker to `1.0.0-public-preview`.
+- Updated package version to `1.0.0-preview`.
+- Updated workflow labels for the 1.0 public preview gate.
+- Aligned README and release documentation with the final preview marker.
 
 ## Stability policy
 
