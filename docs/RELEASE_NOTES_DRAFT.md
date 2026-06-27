@@ -1,13 +1,22 @@
-# Release Notes Draft — Imperium Aeternum 1.0 Preview
+# Release Notes Draft — Imperium Aeternum 1.0 Public Preview
 
 ## Headline
 
-Imperium Aeternum is now a release-candidate historical strategy simulation focused on long-term statecraft, not simple expansion.
+Imperium Aeternum is ready for 1.0 public-preview tagging once the final QA checklist and Pages deployment are verified.
 
 ## Current build
 
 ```text
-V53 rc-check
+V54 public-preview-prep
+```
+
+## Release target
+
+```text
+Suggested tag: v1.0.0-preview
+Target branch: main
+Public artifact: GitHub Pages
+Release type: prerelease/public preview
 ```
 
 ## Major systems now included
@@ -61,6 +70,13 @@ V53 rc-check
 - Added `docs/FINAL_QA.md` for final manual browser smoke checks.
 - Refreshed README and release-freeze docs to reflect the unified gate.
 
+### V54 Public Preview Preparation
+
+- Added GitHub Release draft text.
+- Added tag preparation checklist.
+- Updated README with public-preview preparation links.
+- Clarified the final tag target and release asset policy.
+
 ## Stability policy
 
 From V52 until 1.0, the project should avoid large new systems. Work should focus on:
@@ -75,7 +91,7 @@ From V52 until 1.0, the project should avoid large new systems. Work should focu
 
 - Browser-level automated e2e tests are not yet present.
 - Governor Advisor does not execute actions automatically.
-- Long-run balance still needs manual multi-decade testing.
+- Long-run balance still needs manual multi-decade playtesting.
 - GitHub connector status checks may not show push-triggered Pages runs immediately.
 
 ## Suggested 1.0 tag criteria
@@ -85,3 +101,4 @@ From V52 until 1.0, the project should avoid large new systems. Work should focu
 - Pages deploy is confirmed.
 - README and release notes are final.
 - Manual smoke checklist in `docs/FINAL_QA.md` is complete.
+- GitHub Release body is copied from `docs/GITHUB_RELEASE_DRAFT.md`.
