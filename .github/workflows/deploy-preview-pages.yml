@@ -17,7 +17,7 @@ concurrency:
 
 jobs:
   build:
-    name: Build V53 release gate
+    name: Build 1.0 public preview
     runs-on: ubuntu-latest
     steps:
       - name: Checkout current ref
@@ -49,7 +49,7 @@ jobs:
           path: dist
 
   deploy:
-    name: Deploy V53 release gate
+    name: Deploy 1.0 public preview
     needs: build
     runs-on: ubuntu-latest
     environment:
