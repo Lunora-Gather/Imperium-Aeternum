@@ -1,6 +1,6 @@
 # Final QA Checklist
 
-This checklist is the final verification path before tagging a 1.0 public preview.
+This checklist is the final verification path for the 1.0 public preview.
 
 ## Automated gate
 
@@ -66,13 +66,13 @@ Do not tag 1.0 if any of these are true:
 - New automation that mutates the player state
 - New long-lived integration branches
 
-## Tagging preparation
+## Release confirmation
 
-Before creating the release tag:
+Before publishing or refreshing a release:
 
 1. Confirm `BUILD_MARK` is `1.0.0-public-preview`.
 2. Confirm package version is `1.0.0-preview`.
-3. Finalize `docs/RELEASE_NOTES_DRAFT.md`.
+3. Confirm `docs/release-notes-v1.0.0-preview.md` matches the current build.
 4. Confirm README links are correct.
 5. Confirm Pages deploy is visible.
-6. Create the GitHub Release from `main`.
+6. Confirm the GitHub Release points at `main` and tag `v1.0.0-preview`.
