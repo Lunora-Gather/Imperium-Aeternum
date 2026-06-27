@@ -18,6 +18,18 @@ v1.0.0-preview
 main
 ```
 
+## Build marker
+
+```text
+1.0.0-public-preview
+```
+
+## Package version
+
+```text
+1.0.0-preview
+```
+
 ## Release body
 
 Imperium Aeternum reaches its first public preview milestone: a historical grand-strategy simulation focused on long-term statecraft, internal stability, diplomacy, war risk, and annual planning.
@@ -65,7 +77,7 @@ The release gate checks:
 
 ### Manual verification before publishing
 
-Before publishing this release, complete `docs/FINAL_QA.md` and confirm that the Pages build shows the final build marker.
+Before publishing this release, complete `docs/FINAL_QA.md` and confirm that the Pages build shows `1.0.0-public-preview`.
 
 ## Release asset policy
 
