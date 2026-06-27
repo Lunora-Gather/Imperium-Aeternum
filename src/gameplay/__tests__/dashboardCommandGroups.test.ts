@@ -33,6 +33,6 @@ describe('dashboard command groups', () => {
   it('keeps each group connected to render item ids', () => {
     const groups = buildDashboardCommandGroups(createInitialState());
 
-    expect(groups.flatMap((g) => g.itemIds)).toEqual(['governor', 'onboarding', 'strategic-hq', 'turn-risk', 'economy', 'diplomacy', 'war']);
+    expect(groups.flatMap((g) => g.itemIds)).toEqual(['release', 'governor', 'onboarding', 'strategic-hq', 'turn-risk', 'economy', 'diplomacy', 'war']);
   });
 });
