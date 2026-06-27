@@ -1,4 +1,4 @@
-// V48 Dashboard 指挥分组规划：把首页顾问模块整理成可收纳的产品化布局。
+// V49 Dashboard 指挥分组规划：把首页顾问模块整理成可收纳的产品化布局。
 // 纯函数，不改 GameState；UI 根据它决定分组、默认展开和摘要文案。
 
 import type { GameState } from '../types/game';
@@ -45,7 +45,7 @@ export function buildDashboardCommandGroups(state: GameState, nationId: string =
       subtitle: coach.nextStep ? `下一步：${coach.nextStep.title} · ${coach.progress}%` : `目标完成 · ${coach.progress}%`,
       tone: coach.tone,
       defaultOpen: guideOpen,
-      itemIds: ['governor', 'onboarding', 'strategic-hq'],
+      itemIds: ['release', 'governor', 'onboarding', 'strategic-hq'],
     },
     {
       id: 'risk',
