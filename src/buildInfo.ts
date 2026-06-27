@@ -1,1 +1,1 @@
-export const BUILD_MARK = 'V43 economy-advisor-deployed';
+export const BUILD_MARK = 'V44 diplomacy-advisor-deployed';
