@@ -35,7 +35,9 @@ Minimum required manual checks:
 - `README.md`
 - `docs/RELEASE_NOTES_DRAFT.md`
 - `docs/GITHUB_RELEASE_DRAFT.md`
-- `.github/workflows/deploy-preview-pages.yml`
+- `.github/workflows/deploy-pages.yml`
+- `docs/public-preview-qa.md`
+- `docs/release-checklist.md`
 
 ## Version marker
 
