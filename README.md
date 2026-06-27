@@ -17,7 +17,7 @@
   ·
   <a href="#本地运行">本地运行</a>
   ·
-  <a href="docs/RELEASE_FREEZE.md">Release Freeze</a>
+  <a href="docs/RELEASE_STATUS.md">Release Status</a>
   ·
   <a href="docs/FINAL_QA.md">Final QA</a>
   ·
@@ -65,11 +65,13 @@ Suggested tag: v1.0.0-preview
 - Pages workflow 直接构建 `main`
 - `npm run rc:check` 已成为本地和 CI 共用的统一发布门禁
 - 稳定性测试覆盖年度推进、存档往返和 Dashboard 顾问 smoke
+- 最终状态见 [`docs/RELEASE_STATUS.md`](docs/RELEASE_STATUS.md)
 - 发布冻结规则见 [`docs/RELEASE_FREEZE.md`](docs/RELEASE_FREEZE.md)
 - 最终 QA 清单见 [`docs/FINAL_QA.md`](docs/FINAL_QA.md)
 - GitHub Release 文案见 [`docs/GITHUB_RELEASE_DRAFT.md`](docs/GITHUB_RELEASE_DRAFT.md)
 - Tag 前检查见 [`docs/TAGGING_CHECKLIST.md`](docs/TAGGING_CHECKLIST.md)
-- Release Notes 草稿见 [`docs/RELEASE_NOTES_DRAFT.md`](docs/RELEASE_NOTES_DRAFT.md)
+- Release Notes 见 [`docs/RELEASE_NOTES_DRAFT.md`](docs/RELEASE_NOTES_DRAFT.md)
+- Post-1.0 backlog 见 [`docs/POST_1_0_BACKLOG.md`](docs/POST_1_0_BACKLOG.md)
 
 ---
 
