@@ -16,7 +16,7 @@ export default function DashboardCommandGroupStack({ groups, renderItem }: { gro
   const initial = useMemo(() => Object.fromEntries(groups.map((g) => [g.id, g.defaultOpen])), [groups]);
   const [open, setOpen] = useState<Record<string, boolean>>(initial);
 
-  return <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+  return <div className="ia-command-stack">
     {groups.map((g) => {
       const expanded = open[g.id] ?? g.defaultOpen;
       return <section key={g.id} className="ia-dash-section" style={{ borderColor: border(g.tone) }}>
@@ -28,7 +28,7 @@ export default function DashboardCommandGroupStack({ groups, renderItem }: { gro
           </button>
           <Tag text={g.tone === 'danger' ? '紧急' : g.tone === 'warn' ? '注意' : '良好'} tone={tagTone(g.tone)} />
         </header>
-        {expanded && <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+        {expanded && <div className="ia-command-stack-items">
           {g.itemIds.map((id) => <div key={id}>{renderItem(id)}</div>)}
         </div>}
       </section>;

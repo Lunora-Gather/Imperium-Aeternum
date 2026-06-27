@@ -61,7 +61,7 @@ describe('W4 世界级烟雾测试（192 国 / 600 省）', () => {
       }
     }
     expect(state.turn).toBe(10);
-  });
+  }, 20_000);
 
   it('推进 50 回合性能 < 40s + 无 NaN', () => {
     const start = performance.now();

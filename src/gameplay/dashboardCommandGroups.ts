@@ -33,8 +33,8 @@ export function buildDashboardCommandGroups(state: GameState, nationId: string =
   const diplomacy = buildDiplomacyAdvisorPlan(state, nationId);
   const war = buildWarOpportunityAdvice(state, nationId);
 
-  const guideOpen = coach.tone !== 'good' || coach.progress < 100;
-  const riskOpen = risk.decision !== 'advance';
+  const guideOpen = coach.tone === 'danger' && coach.progress < 40;
+  const riskOpen = risk.tone === 'danger' || risk.decision === 'block';
   const domesticTone = worse(economy.tone, risk.blockers.some((b) => b.tab === 'economy' || b.tab === 'province') ? 'danger' : 'good');
   const externalTone = worse(diplomacy.tone, war.tone);
 
@@ -60,7 +60,7 @@ export function buildDashboardCommandGroups(state: GameState, nationId: string =
       title: '内政与经济',
       subtitle: `${economy.title} · 健康 ${economy.health}`,
       tone: domesticTone,
-      defaultOpen: domesticTone !== 'good',
+      defaultOpen: domesticTone === 'danger',
       itemIds: ['governor', 'economy'],
     },
     {
@@ -68,7 +68,7 @@ export function buildDashboardCommandGroups(state: GameState, nationId: string =
       title: '外交与战争',
       subtitle: `${diplomacy.title} / ${war.title}`,
       tone: externalTone,
-      defaultOpen: externalTone !== 'good',
+      defaultOpen: externalTone === 'danger',
       itemIds: ['diplomacy', 'war'],
     },
   ];
