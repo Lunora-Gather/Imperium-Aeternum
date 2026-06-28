@@ -150,3 +150,448 @@
 body > div[style*="position:fixed"][style*="right:8px"] {
   opacity: .22 !important;
 }
+
+/* ============================================================
+   UX layout polish — v1 public dashboard pass
+   目标：压缩首屏 chrome，减少纵向拖沓，让“看状态 -> 做决策”更快完成。
+   ============================================================ */
+
+.ia-shell {
+  width: min(1260px, calc(100vw - 28px)) !important;
+  padding-top: 6px !important;
+}
+
+.ia-topbar {
+  grid-template-columns: minmax(0, 1fr) 220px !important;
+  gap: 8px !important;
+  margin-bottom: 6px !important;
+  padding-top: 0 !important;
+}
+
+.ia-ruler-card {
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr) auto !important;
+  grid-template-areas:
+    "kicker resources"
+    "main resources" !important;
+  align-items: center !important;
+  column-gap: 14px !important;
+  padding: 7px 12px !important;
+}
+
+.ia-ruler-kicker {
+  grid-area: kicker;
+}
+
+.ia-ruler-main {
+  grid-area: main;
+  align-items: center !important;
+  gap: 10px !important;
+}
+
+.ia-ruler-title {
+  font-size: clamp(22px, 2vw, 30px) !important;
+  line-height: 1 !important;
+}
+
+.ia-ruler-kicker {
+  margin-bottom: 1px !important;
+}
+
+.ia-ruler-subline {
+  margin-top: 4px !important;
+  gap: 3px 8px !important;
+}
+
+.ia-header-actions {
+  gap: 5px !important;
+}
+
+.ia-icon-btn {
+  width: 28px !important;
+  height: 28px !important;
+}
+
+.ia-resource-dock {
+  grid-area: resources;
+  margin-top: 0 !important;
+  padding-top: 0 !important;
+  padding-left: 14px !important;
+  border-top: 0 !important;
+  border-left: 1px solid color-mix(in srgb, var(--border) 54%, transparent) !important;
+  overflow-x: visible !important;
+}
+
+.ia-resource-dock > div {
+  display: grid !important;
+  grid-template-columns: repeat(5, minmax(42px, 1fr)) !important;
+  gap: 9px !important;
+  flex-wrap: nowrap !important;
+  min-width: 330px;
+  align-items: center !important;
+}
+
+.ia-resource-dock > div > div {
+  min-width: 0;
+}
+
+.ia-resource-dock span.ia-num {
+  font-size: 15px !important;
+}
+
+.ia-resource-dock .ia-up {
+  font-size: 8px !important;
+}
+
+.ia-status-panel {
+  grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  gap: 5px !important;
+  padding: 7px !important;
+}
+
+.ia-status-row {
+  min-height: 30px !important;
+  flex-direction: row !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  padding: 5px 7px !important;
+}
+
+.ia-status-row strong {
+  align-self: auto !important;
+}
+
+.ia-main-nav {
+  top: 76px !important;
+  flex-wrap: nowrap !important;
+  overflow-x: auto !important;
+  overflow-y: hidden !important;
+  gap: 8px !important;
+  min-height: 40px !important;
+  padding: 5px 8px !important;
+  margin-bottom: 8px !important;
+  scrollbar-width: thin;
+}
+
+.ia-nav-group {
+  flex: 0 0 auto !important;
+  gap: 6px !important;
+}
+
+.ia-tab-cluster {
+  flex-wrap: nowrap !important;
+  gap: 3px !important;
+}
+
+.ia-tab-btn {
+  min-height: 27px !important;
+  padding: 3px 7px !important;
+}
+
+.ia-tab-btn kbd {
+  min-width: 14px !important;
+  height: 14px !important;
+  font-size: 8px !important;
+}
+
+.ia-nav-hint {
+  display: none !important;
+}
+
+.ia-content-shell {
+  padding: 12px !important;
+}
+
+.ia-dash-command {
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr) auto !important;
+  align-items: center !important;
+  gap: 10px !important;
+  padding: 6px 0 10px !important;
+}
+
+.ia-dash-command h2 {
+  font-size: 22px !important;
+}
+
+.ia-dash-command p {
+  max-width: 760px;
+  margin-top: 3px !important;
+  line-height: 1.45 !important;
+}
+
+.ia-dash-command-actions {
+  gap: 5px !important;
+  flex-wrap: nowrap !important;
+}
+
+.ia-dash-command-actions .ia-btn {
+  padding: 6px 10px !important;
+}
+
+.ia-dash-overview-strip {
+  gap: 6px !important;
+  margin-bottom: 10px !important;
+}
+
+.ia-dash-overview-strip .ia-dash-metric {
+  min-height: 46px !important;
+  padding: 7px 9px !important;
+}
+
+.ia-dash-metric strong {
+  font-size: 18px !important;
+}
+
+.ia-dash-grid {
+  grid-template-columns: 210px minmax(0, 1fr) 230px !important;
+  gap: 10px !important;
+}
+
+.ia-dash-col,
+.ia-dash-main {
+  gap: 10px !important;
+}
+
+.ia-dash-col {
+  top: 150px !important;
+  max-height: calc(100vh - 162px) !important;
+}
+
+.ia-dash-section {
+  border-radius: 8px !important;
+  padding: 9px !important;
+}
+
+.ia-dash-section header {
+  margin-bottom: 6px !important;
+}
+
+.ia-dash-section h3 {
+  font-size: 13px !important;
+}
+
+.ia-action-list {
+  gap: 6px !important;
+}
+
+.ia-action-list button {
+  min-height: 50px !important;
+  padding: 7px 8px !important;
+}
+
+.ia-action-list b {
+  margin-bottom: 3px !important;
+}
+
+.ia-command-stack {
+  gap: 6px !important;
+}
+
+.ia-command-stack .ia-dash-section {
+  padding: 8px !important;
+}
+
+.ia-command-stack .ia-dash-section header {
+  margin-bottom: 6px !important;
+}
+
+.ia-command-stack-items {
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)) !important;
+  gap: 7px !important;
+  max-height: 380px;
+  overflow: auto;
+  padding-right: 2px;
+}
+
+.ia-command-stack-items .ia-dash-section {
+  height: 100%;
+}
+
+.ia-command-stack-items .ia-action-list {
+  grid-template-columns: 1fr !important;
+}
+
+.ia-command-stack-items .ia-action-list span,
+.ia-dash-main .ia-card button span {
+  overflow-wrap: anywhere;
+}
+
+.ia-dash-brief-grid {
+  gap: 8px !important;
+}
+
+.ia-dash-main > .ia-dash-section,
+.ia-dash-main > .ia-dash-brief-grid,
+.ia-dash-col > .ia-dash-section,
+.ia-dash-col > section {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 240px;
+}
+
+.ia-menu {
+  width: min(1160px, calc(100vw - 28px)) !important;
+  overflow-x: hidden;
+}
+
+.ia-menu .ia-card,
+.ia-menu .ia-card > div {
+  min-width: 0;
+}
+
+.ia-menu-hero {
+  margin-bottom: 14px !important;
+}
+
+.ia-scenario-grid {
+  grid-template-columns: repeat(auto-fit, minmax(245px, 1fr)) !important;
+}
+
+@media (max-width: 1040px) {
+  .ia-topbar {
+    grid-template-columns: 1fr !important;
+    position: relative !important;
+  }
+
+  .ia-ruler-card {
+    grid-template-columns: 1fr !important;
+    grid-template-areas:
+      "kicker"
+      "main"
+      "resources" !important;
+  }
+
+  .ia-resource-dock {
+    margin-top: 6px !important;
+    padding-top: 5px !important;
+    padding-left: 0 !important;
+    border-top: 1px solid color-mix(in srgb, var(--border) 54%, transparent) !important;
+    border-left: 0 !important;
+    overflow-x: auto !important;
+  }
+
+  .ia-resource-dock > div {
+    display: flex !important;
+    min-width: 0;
+  }
+
+  .ia-main-nav {
+    top: 0 !important;
+  }
+
+  .ia-status-panel {
+    grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+  }
+
+  .ia-dash-grid {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) !important;
+  }
+
+  .ia-dash-main {
+    grid-column: 1 / -1;
+    order: -1;
+  }
+
+  .ia-dash-col {
+    position: static !important;
+    max-height: none !important;
+    overflow: visible !important;
+  }
+}
+
+@media (max-width: 720px) {
+  .ia-shell {
+    width: calc(100vw - 16px) !important;
+    padding-left: 0 !important;
+    padding-right: 0 !important;
+  }
+
+  .ia-dash-command {
+    grid-template-columns: 1fr !important;
+  }
+
+  .ia-ruler-main {
+    flex-direction: row !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+    gap: 8px !important;
+  }
+
+  .ia-header-actions {
+    align-self: center !important;
+    flex-wrap: nowrap !important;
+    gap: 4px !important;
+  }
+
+  .ia-icon-btn {
+    width: 26px !important;
+    height: 26px !important;
+  }
+
+  .ia-ruler-title {
+    font-size: 24px !important;
+  }
+
+  .ia-ruler-subline {
+    font-size: 10px !important;
+  }
+
+  .ia-resource-dock > div {
+    gap: 12px !important;
+    flex-wrap: nowrap !important;
+  }
+
+  .ia-resource-dock span.ia-num {
+    font-size: 15px !important;
+  }
+
+  .ia-status-panel {
+    grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+    gap: 4px !important;
+  }
+
+  .ia-main-nav {
+    position: sticky !important;
+    top: 0 !important;
+    min-height: 38px !important;
+    scrollbar-width: none;
+  }
+
+  .ia-main-nav::-webkit-scrollbar {
+    display: none;
+  }
+
+  .ia-nav-group {
+    flex-direction: row !important;
+    align-items: center !important;
+  }
+
+  .ia-nav-label {
+    display: none !important;
+  }
+
+  .ia-tab-btn {
+    min-width: max-content;
+  }
+
+  .ia-dash-command-actions {
+    flex-wrap: wrap !important;
+    justify-content: flex-start !important;
+  }
+
+  .ia-dash-overview-strip {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+
+  .ia-dash-grid,
+  .ia-dash-brief-grid,
+  .ia-command-stack-items,
+  .ia-action-list {
+    grid-template-columns: 1fr !important;
+  }
+
+  .ia-command-stack-items {
+    max-height: none;
+    overflow: visible;
+  }
+}
