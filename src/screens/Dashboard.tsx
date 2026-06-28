@@ -78,7 +78,7 @@ function CouncilPanel({ council, jumpToTab }: { council: PreTurnCouncil; jumpToT
   return <section className="ia-dash-section" style={{ borderColor: toneBorder(council.tone) }}>
     <header><div><small>Council</small><h3>回合前作战会议</h3></div><div style={{ display: 'flex', gap: 5, flexWrap: 'wrap', justifyContent: 'flex-end' }}><Tag text={council.title.replace('会议结论：', '')} tone={tagTone(council.tone)} /><Tag text={`把握 ${council.confidence}`} tone={tagTone(council.tone)} /></div></header>
     <div className="ia-goal-line" style={{ marginBottom: 8 }}><div><span>{council.title}</span><strong>{council.progress}/100</strong></div><i><b style={{ width: `${council.progress}%` }} /></i><em>{council.verdict}</em></div>
-    <div className="ia-action-list">{visible.length === 0 ? <div className="ia-risk-empty">会议无额外事项，可以按预演推进。</div> : visible.slice(0, 4).map((item) => <button key={item.id} className={`tone-${item.tone === 'danger' ? 'danger' : item.tone === 'warn' ? 'warn' : 'normal'}`} onClick={() => jumpToTab(item.tab)}><b>{item.priority === 'must' ? `必须：${item.title}` : item.priority === 'should' ? `建议：${item.title}` : item.title}</b><span>{item.body}</span></button>)}</div>
+    <div className="ia-action-list">{visible.length === 0 ? <div className="ia-risk-empty">会议无额外事项，可以按预演推进。</div> : visible.slice(0, 3).map((item) => <button key={item.id} className={`tone-${item.tone === 'danger' ? 'danger' : item.tone === 'warn' ? 'warn' : 'normal'}`} onClick={() => jumpToTab(item.tab)}><b>{item.priority === 'must' ? `必须：${item.title}` : item.priority === 'should' ? `建议：${item.title}` : item.title}</b><span>{item.body}</span></button>)}</div>
     <div className="ia-dash-note" style={{ marginTop: 8 }}>{council.footer}</div>
   </section>;
 }
@@ -94,7 +94,7 @@ function TurnPreviewPanel({ preview, jumpToTab }: { preview: TurnPreview; jumpTo
 
 function CommandCenterPanel({ items, jumpToTab }: { items: CommandCenterAction[]; jumpToTab: (tab: string) => void }) {
   const primary = items[0];
-  return <section className="ia-dash-section ia-dash-actions" style={{ borderColor: primary?.tone === 'danger' ? 'var(--war)' : primary?.tone === 'warn' ? 'var(--warn)' : 'var(--border)' }}><header><div><small>Command</small><h3>行动中心</h3></div>{primary && <Tag text={actionSourceLabel(primary.source)} tone={primary.tone === 'danger' ? 'danger' : primary.tone === 'warn' ? 'warn' : 'info'} />}</header><div className="ia-action-list">{items.map((a, i) => <button key={`${a.id}-${i}`} className={`tone-${a.tone}`} onClick={() => jumpToTab(a.tab)}><b>{i === 0 ? `优先：${a.label}` : a.label}</b><span>{a.desc}</span></button>)}</div></section>;
+  return <section className="ia-dash-section ia-dash-actions" style={{ borderColor: primary?.tone === 'danger' ? 'var(--war)' : primary?.tone === 'warn' ? 'var(--warn)' : 'var(--border)' }}><header><div><small>Command</small><h3>行动中心</h3></div>{primary && <Tag text={actionSourceLabel(primary.source)} tone={primary.tone === 'danger' ? 'danger' : primary.tone === 'warn' ? 'warn' : 'info'} />}</header><div className="ia-action-list">{items.slice(0, 3).map((a, i) => <button key={`${a.id}-${i}`} className={`tone-${a.tone}`} onClick={() => jumpToTab(a.tab)}><b>{i === 0 ? `优先：${a.label}` : a.label}</b><span>{a.desc}</span></button>)}</div></section>;
 }
 
 function RiskPanel({ risks }: { risks: { label: string; value: string; tone: 'warn' | 'danger' | 'good' }[] }) {
@@ -192,7 +192,25 @@ export default function Dashboard() {
   const hasPendingEventBlocker = readiness.blockers.some((item) => item.id === 'pending-events');
 
   return <div className="ia-dashboard">
-    <div className="ia-dash-command"><div><small>Overview</small><h2 className="ia-display">国政总览</h2><p>{council.verdict}</p></div><div className="ia-dash-command-actions"><Btn label="新局" variant="ghost" onClick={newGame} /><Btn label="读档" variant="ghost" onClick={() => load()} disabled={!hasSave()} /><Btn label="存档" variant="ghost" onClick={() => save()} /><Btn label="下一回合 →" variant="primary" onClick={() => nextTurn()} disabled={!!state.victory.type || hasPendingEventBlocker} title={hasPendingEventBlocker ? '先处理待决事件' : council.title} /></div></div>
+    <section className="ia-dash-hero" style={{ borderColor: toneBorder(council.tone) }}>
+      <div className="ia-dash-hero-main">
+        <small>Overview</small>
+        <h2 className="ia-display">国政总览</h2>
+        <p>{council.verdict}</p>
+        <div className="ia-dash-hero-tags">
+          <Tag text={council.title.replace('会议结论：', '')} tone={tagTone(council.tone)} />
+          <Tag text={`体检 ${readiness.score}/100`} tone={tagTone(readiness.tone)} />
+          <Tag text={turnPreview.canAdvance ? '本年可推进' : '先处理风险'} tone={turnPreview.canAdvance ? 'good' : 'danger'} />
+          <Tag text={`${victoryFocus.primary.label} ${victoryFocus.primary.progress}%`} tone={tagTone(victoryFocus.tone)} />
+        </div>
+      </div>
+      <div className="ia-dash-command-actions">
+        <Btn label="新局" variant="ghost" onClick={newGame} />
+        <Btn label="读档" variant="ghost" onClick={() => load()} disabled={!hasSave()} />
+        <Btn label="存档" variant="ghost" onClick={() => save()} />
+        <Btn label="下一回合 →" variant="primary" onClick={() => nextTurn()} disabled={!!state.victory.type || hasPendingEventBlocker} title={hasPendingEventBlocker ? '先处理待决事件' : council.title} />
+      </div>
+    </section>
     <div className="ia-dash-overview-strip">
       <Metric label="国库" value={n(player.resources.gold)} tone={player.resources.gold < 0 ? 'danger' : 'gold'} hint={lastNet ? `${lastNet >= 0 ? '+' : ''}${n(lastNet)}/年` : '—'} />
       <Metric label="粮储" value={n(player.resources.food)} tone={player.resources.food < 0 ? 'danger' : 'good'} />
@@ -201,6 +219,11 @@ export default function Dashboard() {
       <Metric label="军力" value={`${n(armySize)} 卒`} tone={wars.length > 0 ? 'warn' : 'normal'} />
       <Metric label="体检" value={`${readiness.score}/100`} tone={readiness.tone === 'danger' ? 'danger' : readiness.tone === 'warn' ? 'warn' : 'good'} />
     </div>
+    <section className="ia-dash-priority-grid" aria-label="总览优先决策">
+      <CommandCenterPanel items={commandActions} jumpToTab={jumpToTab} />
+      <CouncilPanel council={council} jumpToTab={jumpToTab} />
+      <TurnPreviewPanel preview={turnPreview} jumpToTab={jumpToTab} />
+    </section>
     <div className="ia-dash-grid">
       <aside className="ia-dash-col ia-dash-col--left">
         <Panel title="国家摘要" icon="◈"><div className="ia-dash-kv"><span>政体</span><strong>{player.government.type}</strong></div><div className="ia-dash-kv"><span>国性</span><strong>{player.character}</strong></div><div className="ia-dash-kv"><span>统治者</span><strong>{player.ruler.name} · {player.ruler.age}岁</strong></div><div className="ia-dash-kv"><span>盟友倾向</span><strong>{allies} 个高关系对象</strong></div></Panel>
@@ -210,8 +233,7 @@ export default function Dashboard() {
       <main className="ia-dash-main">
         <DashboardStrategicHq state={state} commandActions={commandActions} jumpToTab={jumpToTab} />
         <RoadmapPanel roadmap={roadmap} jumpToTab={jumpToTab} />
-        <div className="ia-dash-brief-grid"><CouncilPanel council={council} jumpToTab={jumpToTab} /><TurnPreviewPanel preview={turnPreview} jumpToTab={jumpToTab} /></div>
-        <div className="ia-dash-brief-grid"><CommandCenterPanel items={commandActions} jumpToTab={jumpToTab} /><ReadinessPanel report={readiness} jumpToTab={jumpToTab} /></div>
+        <ReadinessPanel report={readiness} jumpToTab={jumpToTab} />
         {state.victory.type && <section className="ia-dash-section ia-dash-victory"><h3>{state.victory.type.startsWith('win') ? '万世之业已成' : '社稷倾覆'}</h3><p>第 {state.turn} 年 · {player.name}</p></section>}
       </main>
       <aside className="ia-dash-col ia-dash-col--right">

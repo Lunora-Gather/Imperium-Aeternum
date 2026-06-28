@@ -28,8 +28,110 @@
 .ia-dash-command p { margin: 5px 0 0; color: var(--text-mute); font-size: 12px; }
 .ia-dash-command-actions { display: flex; gap: 7px; flex-wrap: wrap; justify-content: flex-end; }
 
+.ia-dash-hero {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 16px;
+  align-items: end;
+  margin-bottom: 8px;
+  padding: 13px 15px;
+  border: 1px solid color-mix(in srgb, var(--border) 70%, transparent);
+  border-radius: 10px;
+  background:
+    linear-gradient(135deg, color-mix(in srgb, var(--gold) 10%, transparent), transparent 38%),
+    color-mix(in srgb, var(--bg-inset) 40%, transparent);
+  overflow: hidden;
+}
+
+.ia-dash-hero::before {
+  content: '';
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 3px;
+  background: color-mix(in srgb, currentColor 18%, var(--gold));
+  opacity: .72;
+}
+
+.ia-dash-hero-main {
+  min-width: 0;
+}
+
+.ia-dash-hero small {
+  display: block;
+  color: var(--text-dim);
+  font-size: 9px;
+  letter-spacing: .14em;
+  text-transform: uppercase;
+  margin-bottom: 4px;
+}
+
+.ia-dash-hero h2 {
+  margin: 0;
+  font-size: clamp(24px, 2vw, 31px);
+  color: var(--text);
+}
+
+.ia-dash-hero p {
+  max-width: 760px;
+  margin: 5px 0 0;
+  color: var(--text-mute);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.ia-dash-hero-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin-top: 8px;
+}
+
 .ia-dash-overview-strip { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 8px; margin-bottom: 12px; }
 .ia-dash-overview-strip .ia-dash-metric { min-height: 50px; }
+
+.ia-dash-priority-grid {
+  display: grid;
+  grid-template-columns: minmax(280px, 1.08fr) minmax(250px, 1fr) minmax(235px, .88fr);
+  gap: 10px;
+  align-items: stretch;
+  margin-bottom: 12px;
+}
+
+.ia-dash-priority-grid > .ia-dash-section {
+  min-height: 100%;
+  padding: 11px;
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--bg-raised) 30%, transparent), transparent),
+    color-mix(in srgb, var(--bg-panel) 82%, transparent);
+}
+
+.ia-dash-priority-grid .ia-action-list {
+  grid-template-columns: 1fr;
+  gap: 6px;
+}
+
+.ia-dash-priority-grid .ia-action-list button {
+  min-height: 46px;
+  padding: 7px 9px;
+}
+
+.ia-dash-priority-grid .ia-action-list b {
+  margin-bottom: 2px;
+}
+
+.ia-dash-priority-grid .ia-card {
+  background: color-mix(in srgb, var(--bg-inset) 36%, transparent);
+}
+
+.ia-dash-priority-grid .ia-goal-line {
+  padding-top: 3px;
+}
+
+.ia-dash-priority-grid .ia-dash-note {
+  margin-top: 6px;
+  padding-top: 6px;
+}
 
 .ia-dash-grid { display: grid; grid-template-columns: 235px minmax(0, 1fr) 250px; gap: 12px; align-items: start; }
 .ia-dash-col, .ia-dash-main { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
@@ -47,6 +149,15 @@
 .ia-dash-section h3 { margin: 0; color: var(--text); font-size: 14px; font-weight: 650; letter-spacing: .03em; }
 .ia-dash-muted, .ia-dash-note { margin: 0; color: var(--text-mute); font-size: 11px; line-height: 1.55; }
 .ia-dash-note { margin-top: 7px; padding-top: 7px; border-top: 1px solid color-mix(in srgb, var(--border) 52%, transparent); }
+
+.ia-dash-col > section {
+  margin-bottom: 0 !important;
+  padding: 12px !important;
+}
+
+.ia-dash-col > section > header {
+  margin-bottom: 10px !important;
+}
 
 .ia-dash-metrics { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
 .ia-dash-metric { min-height: 58px; padding: 9px 10px; border: 1px solid color-mix(in srgb, var(--border) 54%, transparent); border-radius: 8px; background: color-mix(in srgb, var(--bg-inset) 40%, transparent); }
@@ -129,12 +240,14 @@
 
 @media (max-width: 1100px) {
   .ia-dash-overview-strip { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .ia-dash-priority-grid { grid-template-columns: 1fr; }
   .ia-dash-grid { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
   .ia-dash-main { grid-column: 1 / -1; order: -1; }
   .ia-dash-col { position: static; max-height: none; overflow: visible; padding-right: 0; }
 }
 
 @media (max-width: 720px) {
+  .ia-dash-hero { grid-template-columns: 1fr; padding: 12px; }
   .ia-dash-command { flex-direction: column; align-items: stretch; }
   .ia-dash-command-actions { justify-content: flex-start; }
   .ia-dash-overview-strip { grid-template-columns: repeat(2, minmax(0, 1fr)); }
