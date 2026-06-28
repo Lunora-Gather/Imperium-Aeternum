@@ -150,6 +150,10 @@ export default function App() {
     document.documentElement.setAttribute('data-theme', theme === 'night' ? '' : theme);
   }, [theme]);
 
+  useEffect(() => {
+    window.requestAnimationFrame(() => window.scrollTo({ top: 0, left: 0 }));
+  }, [scene, tab]);
+
   const toggleTheme = useCallback(() => {
     setTheme((t) => {
       const order: ('night' | 'day' | 'bamboo' | 'ink')[] = ['night', 'day', 'bamboo', 'ink'];
