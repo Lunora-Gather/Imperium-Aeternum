@@ -66,7 +66,7 @@ export const NATIONS: NationDef[] = [
   {
     id: 'n02', name: '维尼托联邦', isPlayer: false, tier: 'B',
     government: 'republic', character: 'commerce',
-    capital: 'p05',
+    capital: 'p07',
     initGold: 500, initFood: 350, initWood: 100, initIron: 60,
     initTaxRate: 0.18,
     initTech: { agri: 1, mil: 1, admin: 2 },
@@ -84,7 +84,7 @@ export const NATIONS: NationDef[] = [
   {
     id: 'n03', name: '叙拉古', isPlayer: false, tier: 'B',
     government: 'republic', character: 'technocracy',
-    capital: 'p06',
+    capital: 'p13',
     initGold: 350, initFood: 300, initWood: 70, initIron: 40,
     initTaxRate: 0.16,
     initTech: { agri: 2, mil: 1, admin: 2 },
@@ -102,7 +102,7 @@ export const NATIONS: NationDef[] = [
   {
     id: 'n04', name: '潘诺尼亚帝国', isPlayer: false, tier: 'A',
     government: 'empire', character: 'authoritarian',
-    capital: 'p10',
+    capital: 'p19',
     initGold: 400, initFood: 380, initWood: 120, initIron: 80,
     initTaxRate: 0.20,
     initTech: { agri: 1, mil: 2, admin: 1 },
@@ -121,7 +121,7 @@ export const NATIONS: NationDef[] = [
   {
     id: 'n05', name: '蛮族联盟', isPlayer: false, tier: 'C',
     government: 'junta', character: 'militarism',
-    capital: '',  // 无开局首都
+    capital: 'p27',  // 昔提亚联盟王庭
     initGold: 200, initFood: 200, initWood: 50, initIron: 30,
     initTaxRate: 0.10,
     initTech: { agri: 1, mil: 1, admin: 1 },

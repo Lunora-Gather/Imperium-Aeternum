@@ -15,7 +15,6 @@ import type { ProvinceDef } from '../data/provinces';
 import { GOVERNMENTS } from '../data/governments';
 import { FACTIONS } from '../data/factions';
 import { NATIONAL_CHARACTERS } from '../data/national-characters';
-import { genId } from '../utils/id';
 import { generateWorld, type WorldGenResult } from './worldgen';
 
 function buildClasses(totalPop: number, ratio: Province['classes'] extends never ? never : {
@@ -78,7 +77,7 @@ function buildResources(n: typeof NATIONS[number]): ResourceStockpile {
 function buildArmy(n: typeof NATIONS[number]): Army[] {
   if (!n.capital) return [];
   return [{
-    id: genId('army'),
+    id: `initial_army_${n.id}`,
     ownerId: n.id,
     location: n.capital,
     size: n.initArmy.size,
@@ -166,10 +165,13 @@ export function createInitialState(): GameState {
     version: SAVE_VERSION,
     turn: 0,
     seed: 12345,
+    entityIdCounter: 0,
     playerNationId: PLAYER_ID,
     nations: buildNations(),
     provinces: buildProvinces(PLAYER_ID),
     relations: buildRelations(),
+    diplomaticSummits: [],
+    diplomaticAccords: [],
     wars: [],
     triggeredEvents: [],
     eventCooldowns: [],
@@ -178,10 +180,8 @@ export function createInitialState(): GameState {
     lastReport: null,
     history: [],
     victory: { type: null },
-    stableTurnsCount: 0,
     bankruptTurns: 0,
     lowStabilityTurns: 0,
-    highEconomyStableTurns: 0,
     chronicle: [],
   };
   buildRelationMap(state);
@@ -217,7 +217,7 @@ export function createWorldState(seed: number, playerNationId?: string, regionFi
       },
       factions: buildFactions(nd.government),
       tech: { agri: nd.initTech.agri, mil: nd.initTech.mil, admin: nd.initTech.admin, culture: 0, researchProgress: null },
-      army: nd.capital ? [{ id: genId('army'), ownerId: nd.id, location: nd.capital, size: nd.initArmy.size, morale: nd.initArmy.morale, training: nd.initArmy.training, equipment: nd.initArmy.equipment, supply: 80 }] : [],
+      army: nd.capital ? [{ id: `initial_army_${nd.id}`, ownerId: nd.id, location: nd.capital, size: nd.initArmy.size, morale: nd.initArmy.morale, training: nd.initArmy.training, equipment: nd.initArmy.equipment, supply: 80 }] : [],
       activePolicies: [],
       activeLaws: [],
       activeTradeRoutes: [],
@@ -265,10 +265,13 @@ export function createWorldState(seed: number, playerNationId?: string, regionFi
     version: SAVE_VERSION,
     turn: 0,
     seed,
+    entityIdCounter: 0,
     playerNationId: playerId,
     nations,
     provinces,
     relations,
+    diplomaticSummits: [],
+    diplomaticAccords: [],
     wars: [],
     triggeredEvents: [],
     eventCooldowns: [],
@@ -277,10 +280,8 @@ export function createWorldState(seed: number, playerNationId?: string, regionFi
     lastReport: null,
     history: [],
     victory: { type: null },
-    stableTurnsCount: 0,
     bankruptTurns: 0,
     lowStabilityTurns: 0,
-    highEconomyStableTurns: 0,
     chronicle: [],
   };
   buildRelationMap(state);

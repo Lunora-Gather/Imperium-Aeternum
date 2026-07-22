@@ -5,6 +5,8 @@ import { provincesOf } from '../engine/init';
 import { listAllSlots, clearAllSaves, SAVE_VERSION, type getSlotMeta } from '../store/persistence';
 import { inspectAllSaveSlots, type SaveRecoveryPreview } from '../gameplay/saveRecovery';
 import { Panel, Btn, Tag, Divider } from '../components/ui';
+import { AccountButton } from '../components/account/AccountPanel';
+import { useAccountStore } from '../store/accountStore';
 
 type SlotMeta = NonNullable<ReturnType<typeof getSlotMeta>>;
 
@@ -34,11 +36,13 @@ export default function SaveLoadScreen() {
   const [slots, setSlots] = useState<ReturnType<typeof listAllSlots>>([]);
   const [previews, setPreviews] = useState<SaveRecoveryPreview[]>([]);
   const [pickSlot, setPickSlot] = useState<number | null>(null);
+  const account = useAccountStore();
   const refresh = () => {
     setSlots(listAllSlots());
     setPreviews(inspectAllSaveSlots());
   };
   useEffect(() => { refresh(); }, [state.turn, log.length]);
+  useEffect(() => { void account.initialize(); }, [account.initialize]);
 
   const fmtTime = (iso: string) => { const d = new Date(iso); if (Number.isNaN(d.getTime())) return '未知时间'; return d.toLocaleString('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' }); };
   const doClearAll = () => { if (!window.confirm('确认删除全部浏览器本地存档？此操作不能恢复。')) return; clearAllSaves(); refresh(); };
@@ -58,6 +62,7 @@ export default function SaveLoadScreen() {
           : riskyNow ? { text: '当前局势有风险，建议手动保存一个安全点。', tone: 'warn' as const }
             : empty > 0 ? { text: '存档结构正常，仍有空槽可做分支路线。', tone: 'good' as const }
               : { text: '槽位已满，覆盖前先确认年份和国家。', tone: 'info' as const };
+  const cloudBySlot = new Map(account.cloudSaves.map((save) => [save.slot, save]));
 
   return <div>
     <Panel title="存档恢复体检" accent>
@@ -68,6 +73,14 @@ export default function SaveLoadScreen() {
         <Health label="风险/损坏" value={risky + broken} tone={risky + broken > 0 ? 'danger' : 'good'} />
       </div>
       <div className="ia-card" style={{ padding: 10, borderLeft: `3px solid var(--${advice.tone === 'danger' ? 'war' : advice.tone === 'warn' ? 'warn' : advice.tone === 'good' ? 'good' : 'border'})` }}><Tag text="建议" tone={advice.tone} /><span style={{ marginLeft: 8, fontSize: 12, color: 'var(--text-mute)' }}>{advice.text}</span></div>
+    </Panel>
+
+    <Panel title="云端同步" accent>
+      {!account.user ? <div className="ia-card" style={{ padding: 12, display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}><div><strong>当前为游客模式</strong><div className="dim" style={{ fontSize: 11, marginTop: 3 }}>本地存档完整可用；登录后可将槽位同步到 Appwrite 私有云端。</div></div><AccountButton /></div> : <>
+        <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'center', marginBottom: 10, flexWrap: 'wrap' }}><div><Tag text="已登录" tone="good" /><span style={{ marginLeft: 7, fontSize: 11, color: 'var(--text-mute)' }}>{account.user.email}</span></div><Btn label="刷新云端" variant="ghost" onClick={() => void account.refreshCloudSaves()} /></div>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: 8 }}>{[0, 1, 2, 3, 4].map((slot) => { const local = slots.find((entry) => entry.slot === slot)?.meta; const cloud = cloudBySlot.get(slot); const busy = account.busySlot === slot; const conflict = account.conflictSlot === slot; return <div key={slot} className="ia-card" style={{ padding: 9, borderColor: conflict ? 'var(--warn)' : cloud ? 'var(--good)' : undefined }}><div style={{ display: 'flex', justifyContent: 'space-between', gap: 6 }}><strong style={{ fontSize: 12 }}>槽位 {slot}{slot === 0 ? '（自动）' : ''}</strong><Tag text={cloud ? '云端已有' : '云端为空'} tone={cloud ? 'good' : 'info'} /></div><div className="dim" style={{ fontSize: 10, lineHeight: 1.5, margin: '5px 0 7px' }}>本地：{local ? `${local.nationName ?? '未知'} · 第 ${local.turn + 1} 年` : '空'}<br />云端：{cloud ? `${cloud.nationName} · 第 ${cloud.turn + 1} 年` : '空'}</div><div style={{ display: 'flex', gap: 5, flexWrap: 'wrap' }}><Btn label={busy ? '同步中…' : '上传'} variant="ghost" disabled={!local || busy} onClick={() => void account.uploadSlot(slot)} /><Btn label="下载" variant="ghost" disabled={!cloud || busy} onClick={() => void account.downloadSlot(slot).then((ok) => { if (ok) refresh(); })} />{conflict && <><Btn label="确认覆盖云端" warn onClick={() => void account.uploadSlot(slot, true)} /><Btn label="确认覆盖本地" warn onClick={() => void account.downloadSlot(slot, true).then((ok) => { if (ok) refresh(); })} /></>}</div></div>; })}</div>
+        {account.message && <div style={{ marginTop: 9, fontSize: 11, color: account.conflictSlot !== null ? 'var(--warn)' : 'var(--text-mute)' }}>{account.message}</div>}
+      </>}
     </Panel>
 
     <Panel title="存档管理" accent>

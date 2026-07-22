@@ -1,6 +1,6 @@
 // Imperium Aeternum — App shell
 // V23：主导航使用统一 NavigationTab 合约，避免各模块手写 tab 字符串漂移。
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { lazy, Suspense, useState, useEffect, useCallback, useRef } from 'react';
 import { useGameStore } from './store/gameStore';
 import { playSfx, useSfxMute } from './utils/audio';
 import { BUILD_MARK } from './buildInfo';
@@ -10,23 +10,25 @@ import { isNavigationTab, type NavigationTab } from './gameplay/navigationTabs';
 
 import { provincesOf } from './engine/init';
 import { ResourceStrip } from './components/ui';
-import ScenarioSelect from './screens/ScenarioSelect';
-import WorldMap from './screens/WorldMap';
-import Dashboard from './screens/Dashboard';
-import ProvinceScreen from './screens/ProvinceScreen';
-import EconomyScreen from './screens/EconomyScreen';
-import PopulationScreen from './screens/PopulationScreen';
-import PoliticsScreen from './screens/PoliticsScreen';
-import MilitaryScreen from './screens/MilitaryScreen';
-import DiplomacyScreen from './screens/DiplomacyScreen';
-import TechnologyScreen from './screens/TechnologyScreen';
-import StatsScreen from './screens/StatsScreen';
-import TurnReportScreen from './screens/TurnReportScreen';
-import ChronicleScreen from './screens/ChronicleScreen';
-import SaveLoadScreen from './screens/SaveLoadScreen';
-import EventModal from './screens/EventModal';
 import LogToast from './components/LogToast';
 import ErrorBoundary from './components/ErrorBoundary';
+import { AccountButton } from './components/account/AccountPanel';
+
+const ScenarioSelect = lazy(() => import('./screens/ScenarioSelect'));
+const WorldMap = lazy(() => import('./screens/WorldMap'));
+const Dashboard = lazy(() => import('./screens/Dashboard'));
+const ProvinceScreen = lazy(() => import('./screens/ProvinceScreen'));
+const EconomyScreen = lazy(() => import('./screens/EconomyScreen'));
+const PopulationScreen = lazy(() => import('./screens/PopulationScreen'));
+const PoliticsScreen = lazy(() => import('./screens/PoliticsScreen'));
+const MilitaryScreen = lazy(() => import('./screens/MilitaryScreen'));
+const DiplomacyScreen = lazy(() => import('./screens/DiplomacyScreen'));
+const TechnologyScreen = lazy(() => import('./screens/TechnologyScreen'));
+const StatsScreen = lazy(() => import('./screens/StatsScreen'));
+const TurnReportScreen = lazy(() => import('./screens/TurnReportScreen'));
+const ChronicleScreen = lazy(() => import('./screens/ChronicleScreen'));
+const SaveLoadScreen = lazy(() => import('./screens/SaveLoadScreen'));
+const EventModal = lazy(() => import('./screens/EventModal'));
 
 type Tab = NavigationTab;
 
@@ -52,6 +54,10 @@ const TAB_GROUPS: { group: string; tabs: { id: Tab; label: string; key: string; 
   ]},
 ];
 const ALL_TABS = TAB_GROUPS.flatMap((g) => g.tabs);
+
+function ScreenFallback() {
+  return <div className="ia-display" style={{ minHeight: 180, display: 'grid', placeItems: 'center', color: 'var(--text-dim)' }}>正在展开卷宗…</div>;
+}
 
 export default function App() {
   const [tab, setTab] = useState<Tab>('dashboard');
@@ -213,7 +219,7 @@ export default function App() {
     return () => window.removeEventListener('keydown', onKey);
   }, [onKey]);
 
-  if (scene === 'menu') return <ScenarioSelect />;
+  if (scene === 'menu') return <Suspense fallback={<ScreenFallback />}><ScenarioSelect /></Suspense>;
   if (!player) {
     return (
       <div className="ia-shell" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh' }}>
@@ -247,6 +253,7 @@ export default function App() {
               </div>
             </div>
             <div className="ia-header-actions">
+              <AccountButton compact />
               <button className="ia-icon-btn ia-icon-btn--gold" onClick={toggleTheme} title={`主题：${theme}`} aria-label="切换主题">
                 {theme === 'night' ? '☾' : theme === 'day' ? '☀' : theme === 'bamboo' ? '筠' : '墨'}
               </button>
@@ -298,23 +305,25 @@ export default function App() {
 
       <main className="ia-content-shell ia-fade">
         <ErrorBoundary onReset={() => goToTab('dashboard', false)}>
-          {tab === 'dashboard' && <Dashboard />}
-          {tab === 'map' && <WorldMap />}
-          {tab === 'province' && <ProvinceScreen />}
-          {tab === 'economy' && <EconomyScreen />}
-          {tab === 'population' && <PopulationScreen />}
-          {tab === 'politics' && <PoliticsScreen />}
-          {tab === 'military' && <MilitaryScreen />}
-          {tab === 'diplomacy' && <DiplomacyScreen />}
-          {tab === 'tech' && <TechnologyScreen />}
-          {tab === 'stats' && <StatsScreen />}
-          {tab === 'report' && <TurnReportScreen onContinue={() => goToTab(preReportTab, false)} />}
-          {tab === 'chronicle' && <ChronicleScreen />}
-          {tab === 'save' && <SaveLoadScreen />}
+          <Suspense fallback={<ScreenFallback />}>
+            {tab === 'dashboard' && <Dashboard />}
+            {tab === 'map' && <WorldMap />}
+            {tab === 'province' && <ProvinceScreen />}
+            {tab === 'economy' && <EconomyScreen />}
+            {tab === 'population' && <PopulationScreen />}
+            {tab === 'politics' && <PoliticsScreen />}
+            {tab === 'military' && <MilitaryScreen />}
+            {tab === 'diplomacy' && <DiplomacyScreen />}
+            {tab === 'tech' && <TechnologyScreen />}
+            {tab === 'stats' && <StatsScreen />}
+            {tab === 'report' && <TurnReportScreen onContinue={() => goToTab(preReportTab, false)} />}
+            {tab === 'chronicle' && <ChronicleScreen />}
+            {tab === 'save' && <SaveLoadScreen />}
+          </Suspense>
         </ErrorBoundary>
       </main>
 
-      {state.pendingEvents.some((p) => p.nationId === pid) && <EventModal />}
+      {state.pendingEvents.some((p) => p.nationId === pid) && <Suspense fallback={null}><EventModal /></Suspense>}
       <LogToast />
 
       <footer className="ia-footer ia-display ia-up">

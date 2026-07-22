@@ -2,20 +2,8 @@
 // 解决：世界剧本/大国开局时，旧的“7省征服胜利、2000金经济胜利”过于固定。
 // V13：把进度同步从 UI wrapper 里抽成可复用函数，避免新局、读档、回合链顺序导致右侧目标条滞后。
 
-import { useGameStore } from '../store/gameStore';
-import type { GameState } from '../types/game';
-
-export interface AmbitionMeta {
-  playerNationId: string;
-  startTurn: number;
-  startProvinces: number;
-  startGold: number;
-  worldProvinces: number;
-  economyTurns: number;
-  peaceTurns: number;
-  lastProgressTurn?: number;
-  warnedPremature?: boolean;
-}
+import type { AmbitionMeta, GameState } from '../types/game';
+export type { AmbitionMeta } from '../types/game';
 
 export interface AmbitionSnapshot {
   conquest: { current: number; target: number; done: boolean };
@@ -25,9 +13,7 @@ export interface AmbitionSnapshot {
   worldScale: 'local' | 'regional' | 'world';
 }
 
-type StateWithAmbition = GameState & { ambitionMeta?: AmbitionMeta };
-
-let installed = false;
+type StateWithAmbition = GameState;
 
 function playerId(state: GameState): string {
   if (state.playerNationId && state.nations[state.playerNationId]) return state.playerNationId;
@@ -43,8 +29,9 @@ function goodRelationCount(state: GameState, id: string): number {
 }
 
 function scaleOf(total: number): AmbitionSnapshot['worldScale'] {
-  if (total <= 40) return 'local';
-  if (total <= 180) return 'regional';
+  // 经典剧本有 50 省；各区域剧本约 66–224 省，完整世界约 577 省。
+  if (total <= 60) return 'local';
+  if (total <= 260) return 'regional';
   return 'world';
 }
 
@@ -63,12 +50,19 @@ function makeMeta(state: GameState): AmbitionMeta {
   };
 }
 
-function normalizeMetaForState(state: GameState, meta: AmbitionMeta): AmbitionMeta {
+function normalizeMetaForState(state: GameState, meta: NonNullable<GameState['ambitionMeta']>): AmbitionMeta {
+  const pid = playerId(state);
+  const player = state.nations[pid];
   return {
-    ...meta,
+    playerNationId: meta.playerNationId,
+    startTurn: meta.startTurn ?? state.turn,
+    startProvinces: Math.max(1, Math.round(meta.startProvinces ?? provinceCount(state, pid))),
+    startGold: Math.max(0, Math.round(meta.startGold ?? player?.resources.gold ?? 0)),
+    worldProvinces: meta.worldProvinces,
     lastProgressTurn: meta.lastProgressTurn ?? state.turn,
     economyTurns: Math.max(0, Math.round(meta.economyTurns ?? 0)),
     peaceTurns: Math.max(0, Math.round(meta.peaceTurns ?? 0)),
+    warnedPremature: meta.warnedPremature,
   };
 }
 
@@ -88,7 +82,7 @@ function ensureMetaForWrite(state: StateWithAmbition): AmbitionMeta {
   } else {
     state.ambitionMeta = normalizeMetaForState(state, state.ambitionMeta);
   }
-  return state.ambitionMeta;
+  return state.ambitionMeta as AmbitionMeta;
 }
 
 function targets(meta: AmbitionMeta) {
@@ -100,14 +94,14 @@ function targets(meta: AmbitionMeta) {
       : Math.min(meta.worldProvinces, Math.max(meta.startProvinces + 10, Math.ceil(meta.worldProvinces * 0.12), Math.ceil(meta.startProvinces * 1.7)));
 
   const economyTarget = worldScale === 'local'
-    ? Math.max(2000, meta.startGold + 1700)
+    ? Math.max(5000, meta.startGold + 4000, meta.startGold * 8)
     : worldScale === 'regional'
-      ? Math.max(3200, meta.startGold + 2600)
-      : Math.max(5000, meta.startGold + 4200);
+      ? Math.max(12000, meta.startGold + 9000, meta.startGold * 8)
+      : Math.max(25000, meta.startGold + 20000, meta.startGold * 10);
 
   const influenceTarget = worldScale === 'local' ? 150 : worldScale === 'regional' ? 190 : 240;
   const goodTarget = worldScale === 'local' ? 3 : worldScale === 'regional' ? 5 : 8;
-  const economyNeedTurns = worldScale === 'local' ? 6 : worldScale === 'regional' ? 8 : 10;
+  const economyNeedTurns = worldScale === 'local' ? 8 : worldScale === 'regional' ? 10 : 12;
   const eternalTarget = worldScale === 'local' ? 80 : worldScale === 'regional' ? 100 : 120;
   return { conquestTarget, economyTarget, influenceTarget, goodTarget, economyNeedTurns, eternalTarget, worldScale };
 }
@@ -184,55 +178,4 @@ export function applyAmbitionsAfterTurn(state: GameState): { state: GameState; n
   }
 
   return { state: next, note };
-}
-
-function syncStoreAmbitions(advanceTurn: boolean): void {
-  const cur = useGameStore.getState() as unknown as { state: GameState; scene?: string; logMsg?: (msg: string) => void };
-  if (cur.scene && cur.scene !== 'playing') return;
-  const applied = advanceTurn ? applyAmbitionsAfterTurn(cur.state) : { state: syncAmbitionMeta(cur.state) };
-  useGameStore.setState({ state: applied.state } as never);
-  if ('note' in applied && applied.note) cur.logMsg?.(applied.note);
-}
-
-export function installAmbitionSystem(): void {
-  if (installed) return;
-  installed = true;
-  const store = useGameStore.getState() as unknown as {
-    startScenario?: (id: string) => void;
-    startWithNation?: (nationId: string) => void;
-    load?: () => boolean;
-    loadFromSlot?: (slot: number) => boolean;
-    nextTurn?: () => unknown;
-  };
-  const originalStartScenario = store.startScenario;
-  const originalStartWithNation = store.startWithNation;
-  const originalLoad = store.load;
-  const originalLoadFromSlot = store.loadFromSlot;
-  const originalNextTurn = store.nextTurn;
-
-  useGameStore.setState({
-    startScenario: (id: string) => {
-      originalStartScenario?.(id);
-      syncStoreAmbitions(false);
-    },
-    startWithNation: (nationId: string) => {
-      originalStartWithNation?.(nationId);
-      syncStoreAmbitions(false);
-    },
-    load: () => {
-      const ok = originalLoad?.() ?? false;
-      if (ok) syncStoreAmbitions(false);
-      return ok;
-    },
-    loadFromSlot: (slot: number) => {
-      const ok = originalLoadFromSlot?.(slot) ?? false;
-      if (ok) syncStoreAmbitions(false);
-      return ok;
-    },
-    nextTurn: () => {
-      const result = originalNextTurn?.();
-      if (result !== null) syncStoreAmbitions(true);
-      return result;
-    },
-  } as never);
 }

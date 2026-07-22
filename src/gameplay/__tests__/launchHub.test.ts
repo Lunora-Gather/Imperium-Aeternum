@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { SCENARIOS } from '../../store/gameStore';
+import { SCENARIOS } from '../../store/scenarioCatalog';
 import { getScenarioProfile, nationStyleTags, pickBestContinueSave, recommendedScenarioIds, summarizeSavePreviews } from '../launchHub';
 import type { SaveRecoveryPreview } from '../saveRecovery';
 

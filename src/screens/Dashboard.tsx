@@ -139,7 +139,7 @@ function ChronicleDigestPanel({ digest }: { digest: ChronicleDigest }) {
 }
 
 export default function Dashboard() {
-  const { state, nextTurn, save, load, hasSave, newGame, jumpToTab } = useGameStore();
+  const { state, nextTurn, save, load, hasSave, newGame, jumpToTab, setStrategyFocus } = useGameStore();
   const pid = useGameStore((s) => s.state.playerNationId);
   const player = useGameStore((s) => s.state.nations[pid]);
   if (!player) return <Panel title="国政总览"><p className="dim">玩家国家缺失，请读档或开始新局。</p></Panel>;
@@ -150,7 +150,7 @@ export default function Dashboard() {
   const wars = state.wars.filter((w) => w.attackerId === pid || w.defenderId === pid);
   const hist = state.history;
   const g = player.government;
-  const focus = (((state as unknown as { strategyFocus?: StrategyFocusId }).strategyFocus) ?? 'balance') as StrategyFocusId;
+  const focus: StrategyFocusId = state.strategyFocus ?? 'balance';
   const brief = useMemo(() => buildStrategicBrief(state), [state]);
   const readiness = useMemo(() => buildReadinessReport(state), [state]);
   const reportActions = useMemo(() => buildTurnReportActions(state, { brief }), [state, brief]);
@@ -184,10 +184,7 @@ export default function Dashboard() {
     return out;
   }, [player.resources.gold, player.resources.food, player.warExhaustion, g.stability, g.legitimacy, g.corruption, unrest.length, brief.risks.length, brief.score]);
 
-  const setFocus = (id: StrategyFocusId) => {
-    const action = (useGameStore.getState() as unknown as { setStrategyFocus?: (id: StrategyFocusId) => void }).setStrategyFocus;
-    action?.(id);
-  };
+  const setFocus = (id: StrategyFocusId) => setStrategyFocus(id);
 
   const hasPendingEventBlocker = readiness.blockers.some((item) => item.id === 'pending-events');
 

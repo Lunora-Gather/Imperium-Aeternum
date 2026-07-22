@@ -11,8 +11,10 @@ import type { FactionId } from '../data/factions';
 
 // 判定触发条件是否满足
 export function checkTrigger(trigger: EventTrigger, nation: Nation, state: GameState): boolean {
+  if (trigger.isPlayerOnly && nation.id !== state.playerNationId) return false;
   if (trigger.minTurn !== undefined && state.turn < trigger.minTurn) return false;
   if (trigger.maxTurn !== undefined && state.turn > trigger.maxTurn) return false;
+  if (trigger.minGold !== undefined && nation.resources.gold < trigger.minGold) return false;
   if (trigger.minStability !== undefined && nation.government.stability < trigger.minStability) return false;
   if (trigger.maxStability !== undefined && nation.government.stability > trigger.maxStability) return false;
   if (trigger.maxLegitimacy !== undefined && nation.government.legitimacy > trigger.maxLegitimacy) return false;
@@ -58,19 +60,79 @@ export function checkTrigger(trigger: EventTrigger, nation: Nation, state: GameS
   return true;
 }
 
+function recordBelongsToNation(
+  record: { nationId?: string },
+  nationId: string,
+  state: GameState,
+): boolean {
+  // v4/v5 saves did not scope event history. Preserve that history for the
+  // saved player without letting it suppress events for every AI nation.
+  return record.nationId !== undefined
+    ? record.nationId === nationId
+    : nationId === state.playerNationId;
+}
+
+export interface EventAvailabilityIndex {
+  triggeredByNation: Map<string, Set<string>>;
+  cooldownByNation: Map<string, Map<string, number>>;
+}
+
+function addTriggered(index: EventAvailabilityIndex, nationId: string, eventId: string): void {
+  const events = index.triggeredByNation.get(nationId);
+  if (events) events.add(eventId);
+  else index.triggeredByNation.set(nationId, new Set([eventId]));
+}
+
+export function createEventAvailabilityIndex(state: GameState): EventAvailabilityIndex {
+  const index: EventAvailabilityIndex = {
+    triggeredByNation: new Map(),
+    cooldownByNation: new Map(),
+  };
+  for (const entry of state.triggeredEvents) {
+    addTriggered(index, entry.nationId ?? state.playerNationId, entry.eventId);
+  }
+  for (const entry of state.eventCooldowns) {
+    const nationId = entry.nationId ?? state.playerNationId;
+    const cooldowns = index.cooldownByNation.get(nationId);
+    if (cooldowns) {
+      cooldowns.set(entry.eventId, Math.max(cooldowns.get(entry.eventId) ?? -Infinity, entry.lastTriggeredTurn));
+    } else {
+      index.cooldownByNation.set(nationId, new Map([[entry.eventId, entry.lastTriggeredTurn]]));
+    }
+  }
+  return index;
+}
+
 // 检查冷却与唯一性
-function isAvailable(event: EventDef, nation: Nation, state: GameState): boolean {
-  if (event.unique && state.triggeredEvents.some((t) => t.eventId === event.id)) return false;
-  const cd = state.eventCooldowns.find((c) => c.eventId === event.id);
-  if (cd && state.turn - cd.lastTriggeredTurn < event.cooldown) return false;
+export function isEventAvailable(
+  event: EventDef,
+  nation: Nation,
+  state: GameState,
+  availability = createEventAvailabilityIndex(state),
+): boolean {
+  const cooldownTurn = availability.cooldownByNation.get(nation.id)?.get(event.id);
+  // Cooldown records are not subject to the 1000-entry recent-event log cap,
+  // so they are the durable unique-event source of truth. Triggered history is
+  // retained as a compatibility fallback for legacy or partially recovered saves.
+  if (event.unique && (
+    cooldownTurn !== undefined
+    || availability.triggeredByNation.get(nation.id)?.has(event.id)
+  )) return false;
+  if (cooldownTurn !== undefined && state.turn - cooldownTurn < event.cooldown) return false;
   return true;
 }
 
 // 每回合抽取要触发的事件（候选池 + 权重）
-export function rollEvents(nation: Nation, state: GameState, rng: () => number, maxTrigger = 2): string[] {
+export function rollEvents(
+  nation: Nation,
+  state: GameState,
+  rng: () => number,
+  maxTrigger = 2,
+  availability = createEventAvailabilityIndex(state),
+): string[] {
   const candidates: { item: string; weight: number }[] = [];
   for (const e of EVENTS) {
-    if (!isAvailable(e, nation, state)) continue;
+    if (!isEventAvailable(e, nation, state, availability)) continue;
     if (!checkTrigger(e.trigger, nation, state)) continue;
     candidates.push({ item: e.id, weight: e.weight });
   }
@@ -84,56 +146,6 @@ export function rollEvents(nation: Nation, state: GameState, rng: () => number, 
   return out;
 }
 
-// 应用事件效果
-export function applyEffect(nation: Nation, effect: EventEffect, state: GameState): void {
-  if (effect.gold) nation.resources.gold += effect.gold;
-  if (effect.food) nation.resources.food += effect.food;
-  if (effect.wood) nation.resources.wood += effect.wood;
-  if (effect.iron) nation.resources.iron += effect.iron;
-  if (effect.stability) nation.government.stability = clamp(nation.government.stability + effect.stability, 0, 100);
-  if (effect.legitimacy) nation.government.legitimacy = clamp(nation.government.legitimacy + effect.legitimacy, 0, 100);
-  if (effect.corruption) nation.government.corruption = clamp(nation.government.corruption + effect.corruption, 0, 100);
-  if (effect.efficiency) nation.government.efficiency = clamp(nation.government.efficiency + effect.efficiency, 0, 100);
-  if (effect.warExhaustion) nation.warExhaustion = clamp(nation.warExhaustion + effect.warExhaustion, 0, 100);
-  if (effect.influence) nation.resources.influence += effect.influence;
-  if (effect.taxRate) nation.taxRate = clamp(nation.taxRate + effect.taxRate, 0, 0.5);
-  if (effect.adminPt) nation.resources.adminPt += effect.adminPt;
-  if (effect.sciPt) nation.resources.sciPt += effect.sciPt;
-  if (effect.relation) {
-    const r = getRelationObj(nation.id, effect.relation!.target, state);
-    if (r) r.relation = clamp(r.relation + effect.relation.delta, -100, 100);
-  }
-  if (effect.factionSat) {
-    for (const fr of effect.factionSat) {
-      const f = nation.factions.find((x) => x.id === fr.faction);
-      if (f) f.satisfaction = clamp(f.satisfaction + fr.delta, 0, 100);
-    }
-  }
-  if (effect.population) {
-    // 从所有省份按比例扣/加
-    const provs = provincesOf(nation.id, state.provinces);
-    if (effect.population < 0) {
-      const loss = -effect.population;
-      let remaining = loss;
-      for (const p of provs) {
-        if (remaining <= 0) break;
-        const take = Math.min(p.population, Math.round(remaining / provs.length));
-        p.population -= take;
-        remaining -= take;
-      }
-    } else {
-      for (const p of provs) p.population += Math.round(effect.population / provs.length);
-    }
-  }
-  // C1 事件链：选项触发下一事件，立即入队 pendingEvents
-  if (effect.triggerEvent) {
-    const nextEv = EVENT_BY_ID[effect.triggerEvent];
-    if (nextEv && !state.pendingEvents.some((p) => p.eventId === effect.triggerEvent && p.nationId === nation.id)) {
-      state.pendingEvents.push({ nationId: nation.id, eventId: effect.triggerEvent });
-    }
-  }
-}
-
 // AI 选择选项（按 aiWeight）
 export function aiChooseOption(event: EventDef, rng: () => number): number {
   const items = event.options.map((o: { aiWeight?: number }, i: number) => ({ item: i, weight: o.aiWeight ?? 1 }));
@@ -141,20 +153,38 @@ export function aiChooseOption(event: EventDef, rng: () => number): number {
   return pick ?? 0;
 }
 
-// 记录事件触发
-export function recordEvent(state: GameState, nationId: string, eventId: string, optionIndex: number): void {
-  state.triggeredEvents.push({ eventId, turn: state.turn, optionIndex });
-  // 冷却记录（覆盖）
-  const cd = state.eventCooldowns.find((c) => c.eventId === eventId);
-  if (cd) cd.lastTriggeredTurn = state.turn;
-  else state.eventCooldowns.push({ eventId, lastTriggeredTurn: state.turn });
+/** Resolves chained events for AI nations so AI-only pending queues cannot leak forever. */
+export function resolvePendingEventsForAI(nation: Nation, state: GameState, rng: () => number, maxChain = 8): string[] {
+  const resolved: string[] = [];
+  const seen = new Set<string>();
+  for (let step = 0; step < maxChain; step += 1) {
+    const index = state.pendingEvents.findIndex((pending) => pending.nationId === nation.id);
+    if (index < 0) break;
+    const pending = state.pendingEvents[index];
+    state.pendingEvents.splice(index, 1);
+    if (seen.has(pending.eventId)) continue;
+    seen.add(pending.eventId);
+    const event = EVENT_BY_ID[pending.eventId];
+    if (!event) continue;
+    const optionIndex = aiChooseOption(event, rng);
+    const option = event.options[optionIndex];
+    if (option) applyEffect(nation, option.effects, state);
+    recordEvent(state, nation.id, event.id, optionIndex);
+    resolved.push(event.id);
+  }
+  // Malformed cyclic chains must not leave an invisible AI queue behind.
+  state.pendingEvents = state.pendingEvents.filter((pending) => pending.nationId !== nation.id);
+  return resolved;
 }
 
 // ── C1 纯函数版本（不 mutate，返回 delta/final 供 processTurn 合并） ──
 
-// applyEffectPure：返回 nation deltas + prov pop deltas + relations overrides + faction sat finals + new pendingEvents + new triggeredEvents + new cooldowns
+// applyEffectPure：返回资源增量、受限值终值、关系/派系/人口覆盖与新待决事件。
 export interface ApplyEffectPureResult {
-  nationDelta: Partial<Record<'gold' | 'food' | 'wood' | 'iron' | 'influence' | 'adminPt' | 'sciPt' | 'warExhaustion' | 'taxRate', number>>;
+  resourceDeltas: Partial<Record<'gold' | 'food' | 'wood' | 'iron' | 'influence' | 'adminPt' | 'sciPt', number>>;
+  warExhaustionFinal?: number;
+  taxRateFinal?: number;
+  assimilationModFinal?: number;
   govFinal?: { stability?: number; legitimacy?: number; corruption?: number; efficiency?: number };
   relationOverrides: Record<string, { relation: number }>; // key=`${from}->${to}`
   factionSatFinals: Record<string, number>; // factionId → final satisfaction
@@ -168,17 +198,20 @@ export function applyEffectPure(
   state: GameState,
 ): ApplyEffectPureResult {
   const res: ApplyEffectPureResult = {
-    nationDelta: {}, relationOverrides: {}, factionSatFinals: {}, provPopDeltas: {}, newPendingEvents: [],
+    resourceDeltas: {}, relationOverrides: {}, factionSatFinals: {}, provPopDeltas: {}, newPendingEvents: [],
   };
-  if (effect.gold) res.nationDelta.gold = effect.gold;
-  if (effect.food) res.nationDelta.food = effect.food;
-  if (effect.wood) res.nationDelta.wood = effect.wood;
-  if (effect.iron) res.nationDelta.iron = effect.iron;
-  if (effect.influence) res.nationDelta.influence = effect.influence;
-  if (effect.adminPt) res.nationDelta.adminPt = effect.adminPt;
-  if (effect.sciPt) res.nationDelta.sciPt = effect.sciPt;
-  if (effect.warExhaustion) res.nationDelta.warExhaustion = clamp(nation.warExhaustion + effect.warExhaustion, 0, 100);
-  if (effect.taxRate) res.nationDelta.taxRate = clamp(nation.taxRate + effect.taxRate, 0, 0.5);
+  if (effect.gold) res.resourceDeltas.gold = effect.gold;
+  if (effect.food) res.resourceDeltas.food = effect.food;
+  if (effect.wood) res.resourceDeltas.wood = effect.wood;
+  if (effect.iron) res.resourceDeltas.iron = effect.iron;
+  if (effect.influence) res.resourceDeltas.influence = effect.influence;
+  if (effect.adminPt) res.resourceDeltas.adminPt = effect.adminPt;
+  if (effect.sciPt) res.resourceDeltas.sciPt = effect.sciPt;
+  if (effect.warExhaustion) res.warExhaustionFinal = clamp(nation.warExhaustion + effect.warExhaustion, 0, 100);
+  if (effect.taxRate) res.taxRateFinal = clamp(nation.taxRate + effect.taxRate, 0, 0.5);
+  if (effect.assimilationMod) {
+    res.assimilationModFinal = (nation.policyMods?.assimilationMod ?? 0) + effect.assimilationMod;
+  }
   const govF: ApplyEffectPureResult['govFinal'] = {};
   if (effect.stability) govF.stability = clamp(nation.government.stability + effect.stability, 0, 100);
   if (effect.legitimacy) govF.legitimacy = clamp(nation.government.legitimacy + effect.legitimacy, 0, 100);
@@ -197,40 +230,122 @@ export function applyEffectPure(
   }
   if (effect.population) {
     const provs = provincesOf(nation.id, state.provinces);
-    if (effect.population < 0) {
-      const loss = -effect.population;
-      let remaining = loss;
-      for (const p of provs) {
-        if (remaining <= 0) break;
-        const take = Math.min(p.population, Math.round(remaining / provs.length));
-        res.provPopDeltas[p.id] = (res.provPopDeltas[p.id] ?? 0) - take;
+    const populationDelta = Math.round(effect.population);
+    if (populationDelta < 0) {
+      let remaining = Math.min(
+        -populationDelta,
+        provs.reduce((sum, province) => sum + Math.max(0, province.population), 0),
+      );
+      for (let index = 0; index < provs.length && remaining > 0; index += 1) {
+        const province = provs[index];
+        const remainingProvinceCount = provs.length - index;
+        const take = Math.min(
+          Math.max(0, province.population),
+          Math.ceil(remaining / remainingProvinceCount),
+        );
+        res.provPopDeltas[province.id] = (res.provPopDeltas[province.id] ?? 0) - take;
         remaining -= take;
       }
-    } else {
-      for (const p of provs) res.provPopDeltas[p.id] = (res.provPopDeltas[p.id] ?? 0) + Math.round(effect.population / provs.length);
+    } else if (populationDelta > 0 && provs.length > 0) {
+      const perProvince = Math.floor(populationDelta / provs.length);
+      let remainder = populationDelta % provs.length;
+      for (const province of provs) {
+        const delta = perProvince + (remainder > 0 ? 1 : 0);
+        remainder = Math.max(0, remainder - 1);
+        if (delta !== 0) res.provPopDeltas[province.id] = delta;
+      }
     }
   }
   if (effect.triggerEvent) {
     const nextEv = EVENT_BY_ID[effect.triggerEvent];
-    if (nextEv && !state.pendingEvents.some((p) => p.eventId === effect.triggerEvent && p.nationId === nation.id)) {
+    const alreadyQueued = state.pendingEvents.some((pending) =>
+      pending.eventId === effect.triggerEvent && pending.nationId === nation.id,
+    );
+    const alreadyResolvedThisTurn = state.triggeredEvents.some((entry) =>
+      entry.eventId === effect.triggerEvent
+      && entry.turn === state.turn
+      && recordBelongsToNation(entry, nation.id, state),
+    );
+    if (nextEv && !alreadyQueued && !alreadyResolvedThisTurn) {
       res.newPendingEvents.push({ nationId: nation.id, eventId: effect.triggerEvent });
     }
   }
   return res;
 }
 
+export function applyEffectResult(nation: Nation, state: GameState, result: ApplyEffectPureResult): void {
+  const resources = ['gold', 'food', 'wood', 'iron', 'influence', 'adminPt', 'sciPt'] as const;
+  for (const resource of resources) {
+    const delta = result.resourceDeltas[resource];
+    if (delta !== undefined) nation.resources[resource] += delta;
+  }
+  if (result.warExhaustionFinal !== undefined) nation.warExhaustion = result.warExhaustionFinal;
+  if (result.taxRateFinal !== undefined) nation.taxRate = result.taxRateFinal;
+  if (result.assimilationModFinal !== undefined) {
+    nation.policyMods ??= {};
+    nation.policyMods.assimilationMod = result.assimilationModFinal;
+  }
+  if (result.govFinal) Object.assign(nation.government, result.govFinal);
+  for (const [key, final] of Object.entries(result.relationOverrides)) {
+    const separator = key.indexOf('->');
+    const relation = separator >= 0
+      ? getRelationObj(key.slice(0, separator), key.slice(separator + 2), state)
+      : undefined;
+    if (relation) relation.relation = final.relation;
+  }
+  for (const [factionId, satisfaction] of Object.entries(result.factionSatFinals)) {
+    const faction = nation.factions.find((entry) => entry.id === factionId);
+    if (faction) faction.satisfaction = satisfaction;
+  }
+  for (const [provinceId, delta] of Object.entries(result.provPopDeltas)) {
+    const province = state.provinces[provinceId];
+    if (province) province.population = Math.max(0, province.population + delta);
+  }
+  state.pendingEvents.push(...result.newPendingEvents);
+}
+
+// Mutable compatibility boundary; all event-effect rules live in applyEffectPure.
+export function applyEffect(nation: Nation, effect: EventEffect, state: GameState): void {
+  applyEffectResult(nation, state, applyEffectPure(nation, effect, state));
+}
+
 // recordEventPure：返回新 triggeredEvents 条目 + cooldown 更新（覆盖或新增）
 export interface RecordEventPureResult {
-  newTriggeredEntry: { eventId: string; turn: number; optionIndex: number };
-  cooldownUpdate: { eventId: string; lastTriggeredTurn: number; isNew: boolean };
+  newTriggeredEntry: { nationId: string; eventId: string; turn: number; optionIndex: number };
+  cooldownUpdate: { nationId: string; eventId: string; lastTriggeredTurn: number; isNew: boolean };
 }
 
 export function recordEventPure(state: GameState, nationId: string, eventId: string, optionIndex: number): RecordEventPureResult {
-  const existing = state.eventCooldowns.find((c) => c.eventId === eventId);
+  const existing = state.eventCooldowns.find((entry) =>
+    entry.eventId === eventId && recordBelongsToNation(entry, nationId, state),
+  );
   return {
-    newTriggeredEntry: { eventId, turn: state.turn, optionIndex },
-    cooldownUpdate: { eventId, lastTriggeredTurn: state.turn, isNew: !existing },
+    newTriggeredEntry: { nationId, eventId, turn: state.turn, optionIndex },
+    cooldownUpdate: { nationId, eventId, lastTriggeredTurn: state.turn, isNew: !existing },
   };
+}
+
+export function applyRecordEventResult(state: GameState, result: RecordEventPureResult): void {
+  state.triggeredEvents.push(result.newTriggeredEntry);
+  const update = result.cooldownUpdate;
+  const existing = state.eventCooldowns.find((entry) =>
+    entry.eventId === update.eventId && recordBelongsToNation(entry, update.nationId, state),
+  );
+  if (existing) {
+    existing.nationId = update.nationId;
+    existing.lastTriggeredTurn = update.lastTriggeredTurn;
+  } else {
+    state.eventCooldowns.push({
+      nationId: update.nationId,
+      eventId: update.eventId,
+      lastTriggeredTurn: update.lastTriggeredTurn,
+    });
+  }
+}
+
+// Mutable compatibility boundary; all event-history rules live in recordEventPure.
+export function recordEvent(state: GameState, nationId: string, eventId: string, optionIndex: number): void {
+  applyRecordEventResult(state, recordEventPure(state, nationId, eventId, optionIndex));
 }
 
 export { EVENT_BY_ID, EVENTS, mulberry32 };

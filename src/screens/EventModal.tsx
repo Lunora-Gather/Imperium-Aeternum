@@ -1,9 +1,10 @@
 // EventModal v4 — 事件后果预览更完整：即时数值 + 长期治理影响 + 快捷键
-import { useEffect } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 import { useGameStore } from '../store/gameStore';
-import { EVENT_BY_ID, applyEffect, recordEvent } from '../engine/events';
+import { EVENT_BY_ID } from '../engine/events';
 import { Tag } from '../components/ui';
 import type { EventEffect } from '../data/events';
+import { discardPendingEvent, resolvePendingEventChoice } from '../gameplay/pendingEventResolution';
 
 const CATEGORY_TONE: Record<string, 'danger' | 'warn' | 'info' | 'good'> = {
   crisis: 'danger', military: 'danger', religion: 'warn',
@@ -77,32 +78,30 @@ export default function EventModal() {
   const pid = state.playerNationId;
   const pending = state.pendingEvents.find((p) => p.nationId === pid) ?? null;
   const ev = pending ? EVENT_BY_ID[pending.eventId] : null;
+  const dialogRef = useRef<HTMLDivElement>(null);
 
-  const clearPending = () => {
+  const clearPending = useCallback(() => {
     if (!pending) return;
-    state.pendingEvents = state.pendingEvents.filter((p) => p !== pending);
-    useGameStore.setState((s) => ({ state: { ...s.state } }));
-  };
+    const current = useGameStore.getState().state;
+    const next = discardPendingEvent(current, pid, pending.eventId);
+    if (next !== current) useGameStore.setState({ state: next });
+  }, [pending, pid]);
 
-  const choose = (idx: number) => {
+  const choose = useCallback((idx: number) => {
     if (!pending || !ev) return;
-    const opt = ev.options[idx];
-    if (opt) {
-      applyEffect(state.nations[pid], opt.effects, state);
-      logMsg(`事件 ${ev.title}：选择「${opt.text}」`);
-    }
-    recordEvent(state, pid, pending.eventId, idx);
-    state.pendingEvents = state.pendingEvents.filter((p) => p !== pending);
-    useGameStore.setState((s) => ({ state: { ...s.state } }));
-  };
+    const current = useGameStore.getState().state;
+    const result = resolvePendingEventChoice(current, pid, pending.eventId, idx);
+    if (!result.resolved) return;
+    useGameStore.setState({ state: result.state });
+    logMsg(`事件 ${result.eventTitle}：选择「${result.optionText}」`);
+  }, [ev, logMsg, pending, pid]);
 
   useEffect(() => {
     if (pending && !ev) {
       logMsg(`事件已失效：${pending.eventId}，已跳过`);
       clearPending();
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pending?.eventId, !!ev]);
+  }, [clearPending, ev, logMsg, pending]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -110,11 +109,19 @@ export default function EventModal() {
       if (e.key === '1' && ev.options.length >= 1) { e.preventDefault(); choose(0); }
       else if (e.key === '2' && ev.options.length >= 2) { e.preventDefault(); choose(1); }
       else if (e.key === '3' && ev.options.length >= 3) { e.preventDefault(); choose(2); }
+      else if (e.key === 'Tab') {
+        const buttons = Array.from(dialogRef.current?.querySelectorAll<HTMLButtonElement>('button:not([disabled])') ?? []);
+        if (buttons.length === 0) return;
+        const first = buttons[0];
+        const last = buttons[buttons.length - 1];
+        if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+        else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+      }
     };
+    dialogRef.current?.querySelector<HTMLButtonElement>('button:not([disabled])')?.focus();
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pending?.eventId, ev?.options.length]);
+  }, [choose, ev, pending]);
 
   if (!pending || !ev) return null;
 
@@ -127,7 +134,7 @@ export default function EventModal() {
       background: 'rgba(0,0,0,0.75)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 200,
       backdropFilter: 'blur(2px)',
     }}>
-      <div style={{
+      <div ref={dialogRef} role="dialog" aria-modal="true" aria-labelledby="event-dialog-title" aria-describedby="event-dialog-description" style={{
         background: 'var(--bg-panel)', borderRadius: 10, padding: 18, maxWidth: 620, width: '92%',
         border: `1px solid var(--${tone === 'danger' ? 'war' : tone === 'warn' ? 'warn' : tone === 'good' ? 'good' : 'border-gold'})`,
         boxShadow: '0 8px 28px rgba(0,0,0,0.38)',
@@ -138,10 +145,10 @@ export default function EventModal() {
             <div style={{ fontSize: 11, color: 'var(--text-dim)', marginBottom: 2 }}>
               <Tag text={ev.category} tone={tone} />
             </div>
-            <h3 style={{ margin: 0, fontSize: 18, fontWeight: 700 }}>{ev.title}</h3>
+            <h3 id="event-dialog-title" style={{ margin: 0, fontSize: 18, fontWeight: 700 }}>{ev.title}</h3>
           </div>
         </div>
-        <p style={{ color: 'var(--text)', marginBottom: 14, fontSize: 14, lineHeight: 1.6 }}>{ev.description}</p>
+        <p id="event-dialog-description" style={{ color: 'var(--text)', marginBottom: 14, fontSize: 14, lineHeight: 1.6 }}>{ev.description}</p>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
           {ev.options.map((opt, i) => {
             const sums = effectSummary(opt.effects);

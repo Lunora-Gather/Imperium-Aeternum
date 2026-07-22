@@ -1,7 +1,7 @@
 // V34 难度与挑战体系：把剧本难度转成开局前可读的挑战阶梯、风险解释和检查清单。
 // 纯函数，不改 GameState；ScenarioSelect 展示，测试复用。
 
-import type { ScenarioId } from '../store/gameStore';
+import type { ScenarioId } from '../store/scenarioCatalog';
 import type { LaunchTone } from './launchHub';
 
 export type DifficultyBand = 'relaxed' | 'standard' | 'hard' | 'hardcore' | 'unknown';

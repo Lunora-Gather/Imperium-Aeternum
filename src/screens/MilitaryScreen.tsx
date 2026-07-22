@@ -33,15 +33,16 @@ function peaceTermsText(war: War, state: GameState, pid: string): { txt: string;
   return out;
 }
 
-function PeaceTermsBtn({ war, state, pid, makePeace, logMsg }: {
+function PeaceTermsBtn({ war, state, pid, makePeace }: {
   war: War; state: GameState; pid: string;
-  makePeace: (id: string) => boolean; logMsg: (m: string) => void;
+  makePeace: (id: string) => boolean;
 }) {
   const [show, setShow] = useState(false);
   const terms = peaceTermsText(war, state, pid);
+  const player = state.nations[pid];
   return (
     <div style={{ position: 'relative' }} onMouseEnter={() => setShow(true)} onMouseLeave={() => setShow(false)}>
-      <Btn label="求和" variant="ghost" onClick={() => { if (makePeace(war.id)) logMsg('议和成功'); }} />
+      <Btn label="求和 1政30影" variant="ghost" onClick={() => makePeace(war.id)} disabled={player.resources.adminPt < 1 || player.resources.influence < 30} />
       {show && (
         <div style={{ position: 'absolute', bottom: '100%', right: 0, marginBottom: 4, background: 'var(--bg-panel)', border: '1px solid var(--border-hi)', borderRadius: 6, padding: 8, minWidth: 140, zIndex: 50, fontSize: 11, boxShadow: '0 4px 12px rgba(0,0,0,0.4)' }}>
           <div style={{ fontSize: 9, color: 'var(--text-dim)', marginBottom: 4, letterSpacing: '0.05em' }}>和约条件（进度 {Math.round(war.progress)}%）</div>
@@ -126,7 +127,7 @@ function BattleReportModal({ war, onClose }: { war: War; onClose: () => void }) 
 }
 
 export default function MilitaryScreen() {
-  const { state, recruit, makePeace, declareWar: storeDeclareWar, logMsg } = useGameStore();
+  const { state, recruit, makePeace, declareWar: storeDeclareWar } = useGameStore();
   const pid = useGameStore((s) => s.state.playerNationId);
   const player = useGameStore((s) => s.state.nations[pid]);
   const provs = player ? provincesOf(pid, state.provinces) : [];
@@ -211,7 +212,7 @@ export default function MilitaryScreen() {
         const attacking = w.attackerId === pid;
         return <div key={w.id} className="ia-card" style={{ marginBottom: 8, padding: 10 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}><div><Tag text={attacking ? '进攻' : '防守'} tone={attacking ? 'danger' : 'warn'} /><strong style={{ marginLeft: 6, fontSize: 13 }}>{prov?.name ?? w.targetProvinceId}</strong></div><span className="dim" style={{ fontSize: 11 }}>第 {w.turns} 回合</span></div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}><span style={{ fontSize: 11, color: 'var(--text-mute)', width: 36 }}>进度</span><div style={{ flex: 1 }}><Bar value={w.progress} kind="high" /></div><strong style={{ fontSize: 13, color: 'var(--border-hi)', width: 40, textAlign: 'right' }}>{Math.round(w.progress)}%</strong><Btn label="战报" variant="ghost" onClick={() => setReportWar(w)} /><PeaceTermsBtn war={w} state={state} pid={pid} makePeace={makePeace} logMsg={logMsg} /></div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}><span style={{ fontSize: 11, color: 'var(--text-mute)', width: 36 }}>进度</span><div style={{ flex: 1 }}><Bar value={w.progress} kind="high" /></div><strong style={{ fontSize: 13, color: 'var(--border-hi)', width: 40, textAlign: 'right' }}>{Math.round(w.progress)}%</strong><Btn label="战报" variant="ghost" onClick={() => setReportWar(w)} /><PeaceTermsBtn war={w} state={state} pid={pid} makePeace={makePeace} /></div>
         </div>;
       })}
     </Panel>
@@ -235,7 +236,7 @@ export default function MilitaryScreen() {
         const ratio = armyTotal > 0 ? armyTotal / Math.max(1, enemyArmy) : 0;
         const advantage = ratio >= 1.5 ? { txt: '占优', tone: 'good' as const } : ratio >= 0.8 ? { txt: '均势', tone: 'warn' as const } : { txt: '劣势', tone: 'danger' as const };
         const selected = previewTarget?.defenderId === adj.ownerId && previewTarget?.provinceId === adj.id;
-        return <div key={`${p.id}-${adj.id}`} style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr 60px 70px 70px', gap: 8, padding: '8px 0', borderBottom: '1px solid var(--border)', alignItems: 'center' }}><span style={{ fontSize: 12 }}>邻省 <strong>{adj.name}</strong> <span className="dim">属 {enemy?.name ?? adj.ownerId}</span></span><span style={{ fontSize: 12, color: `var(--${tone === 'danger' ? 'war' : tone === 'warn' ? 'warn' : 'good'})` }}>关系 {Math.round(relation)}</span><span style={{ fontSize: 12 }}><span style={{ color: 'var(--good)' }}>{armyTotal}</span><span className="dim" style={{ margin: '0 4px' }}>vs</span><span style={{ color: 'var(--war)' }}>{enemyArmy}</span></span><Tag text={advantage.txt} tone={advantage.tone} /><Btn label={selected ? '已预演' : '预演'} variant="ghost" onClick={() => setPreviewTarget({ defenderId: adj.ownerId, provinceId: adj.id })} /><Btn label="宣战" warn onClick={() => doDeclare(adj.ownerId, adj.id)} /></div>;
+        return <div key={`${p.id}-${adj.id}`} style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr 60px 70px 82px', gap: 8, padding: '8px 0', borderBottom: '1px solid var(--border)', alignItems: 'center' }}><span style={{ fontSize: 12 }}>邻省 <strong>{adj.name}</strong> <span className="dim">属 {enemy?.name ?? adj.ownerId}</span></span><span style={{ fontSize: 12, color: `var(--${tone === 'danger' ? 'war' : tone === 'warn' ? 'warn' : 'good'})` }}>关系 {Math.round(relation)}</span><span style={{ fontSize: 12 }}><span style={{ color: 'var(--good)' }}>{armyTotal}</span><span className="dim" style={{ margin: '0 4px' }}>vs</span><span style={{ color: 'var(--war)' }}>{enemyArmy}</span></span><Tag text={advantage.txt} tone={advantage.tone} /><Btn label={selected ? '已预演' : '预演'} variant="ghost" onClick={() => setPreviewTarget({ defenderId: adj.ownerId, provinceId: adj.id })} /><Btn label="宣战 1政" warn onClick={() => doDeclare(adj.ownerId, adj.id)} disabled={player.resources.adminPt < 1 || rel?.treaty === 'alliance'} /></div>;
       })}</div>
     </Panel>
 

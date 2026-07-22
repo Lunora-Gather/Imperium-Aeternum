@@ -1,0 +1,90 @@
+{
+  "version": 4,
+  "createdAt": "2026-04-04T00:00:00.000Z",
+  "gameState": {
+    "version": 4,
+    "turn": 24,
+    "seed": 271828,
+    "playerNationId": "legacy_nation",
+    "nations": {
+      "legacy_nation": {
+        "id": "legacy_nation",
+        "name": "旧日王国",
+        "isPlayer": true,
+        "tier": "A",
+        "government": { "type": "monarchy", "legitimacy": 64, "stability": 62, "efficiency": 56, "corruption": 16 },
+        "character": "balanced",
+        "tendency": { "militarism": 0, "commerce": 0, "religiosity": 0, "technocracy": 0, "authoritarian": 0, "welfare": 0, "feudal": 0, "revolutionary": 0, "maritime": 0, "centralization": 0, "isolationist": 0, "expansionist": 0, "scholarly": 0, "mercantilist": 0 },
+        "activeCharacterBonuses": [],
+        "capital": "legacy_capital",
+        "ruler": { "name": "旧王奥勒留", "ability": 54, "age": 59, "reignYears": 23 },
+        "taxRate": 0.14,
+        "resources": { "gold": 1400, "food": 1700, "wood": 180, "iron": 120, "adminPt": 5, "sciPt": 90, "influence": 70, "supply": 130 },
+        "factions": [
+          { "id": "nobles", "power": 25, "satisfaction": 58 },
+          { "id": "merchants", "power": 20, "satisfaction": 59 },
+          { "id": "military", "power": 20, "satisfaction": 55 },
+          { "id": "commoners", "power": 25, "satisfaction": 61 },
+          { "id": "clergy", "power": 10, "satisfaction": 57 }
+        ],
+        "tech": { "agri": 3, "mil": 2, "admin": 3, "culture": 2, "researchProgress": null },
+        "army": [{ "id": "entity_y_army", "ownerId": "legacy_nation", "location": "legacy_capital", "size": 240, "morale": 72, "training": 60, "equipment": 58, "supply": 85 }],
+        "activePolicies": [],
+        "activeLaws": [],
+        "activeTradeRoutes": [],
+        "embargoedRoutes": [],
+        "warExhaustion": 0,
+        "influence": 70,
+        "atWar": false,
+        "defeated": false
+      }
+    },
+    "provinces": {
+      "legacy_capital": {
+        "id": "legacy_capital",
+        "name": "旧都",
+        "terrain": "plain",
+        "ownerId": "legacy_nation",
+        "isCapital": true,
+        "agriBase": 1.7,
+        "culture": "latin",
+        "religion": "polytheism",
+        "population": 1600,
+        "classes": [
+          { "classId": "peasants", "count": 880, "satisfaction": 60 },
+          { "classId": "workers", "count": 240, "satisfaction": 58 },
+          { "classId": "merchants", "count": 160, "satisfaction": 62 },
+          { "classId": "soldiers", "count": 128, "satisfaction": 59 },
+          { "classId": "scholars", "count": 64, "satisfaction": 61 },
+          { "classId": "nobles", "count": 80, "satisfaction": 58 },
+          { "classId": "clergy", "count": 48, "satisfaction": 59 }
+        ],
+        "assimilation": 100,
+        "loyalty": 78,
+        "unrest": 4,
+        "rebellionRisk": 1,
+        "buildings": [{ "id": "entity_z_building", "defId": "market", "provinceId": "legacy_capital", "level": 3 }],
+        "garrison": 240,
+        "baseResources": { "wood": 8, "iron": 4 },
+        "adjacent": [],
+        "distToPlayerCapital": 0,
+        "x": 100,
+        "y": 100
+      }
+    },
+    "relations": [],
+    "wars": [],
+    "triggeredEvents": [],
+    "eventCooldowns": [],
+    "pendingEvents": [],
+    "pendingEventOptions": null,
+    "lastReport": null,
+    "history": [],
+    "victory": { "type": null },
+    "stableTurnsCount": 9,
+    "bankruptTurns": 0,
+    "lowStabilityTurns": 0,
+    "highEconomyStableTurns": 7,
+    "chronicle": []
+  }
+}

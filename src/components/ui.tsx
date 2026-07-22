@@ -124,9 +124,10 @@ export function Stat({ label, value, warn, kind = 'minor', accent, icon }: {
 }
 
 // ── Btn ──
-export function Btn({ label, onClick, disabled, warn, variant, title, icon }: {
+export function Btn({ label, onClick, disabled, warn, variant, title, icon, type = 'button' }: {
   label: string; onClick: () => void; disabled?: boolean; warn?: boolean;
   variant?: 'primary' | 'warn' | 'good' | 'ghost'; title?: string; icon?: string;
+  type?: 'button' | 'submit';
 }) {
   const cls = warn ? 'ia-btn ia-btn--warn'
     : variant === 'primary' ? 'ia-btn ia-btn--primary'
@@ -134,7 +135,7 @@ export function Btn({ label, onClick, disabled, warn, variant, title, icon }: {
     : variant === 'ghost' ? 'ia-btn ia-btn--ghost'
     : 'ia-btn';
   return (
-    <button className={cls} onClick={onClick} disabled={disabled} title={title}>
+    <button type={type} className={cls} onClick={onClick} disabled={disabled} title={title}>
       {icon && <span style={{ marginRight: 6, opacity: 0.8 }}>{icon}</span>}{label}
     </button>
   );

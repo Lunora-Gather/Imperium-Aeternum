@@ -1,7 +1,7 @@
 // V24 开局大厅智能层：剧本推荐、存档健康摘要、最佳继续档选择。
 // 纯函数优先，供标题页和测试复用；不直接读写 localStorage。
 
-import type { ScenarioId } from '../store/gameStore';
+import type { ScenarioId } from '../store/scenarioCatalog';
 import type { SaveRecoveryPreview, SaveRecoveryStatus } from './saveRecovery';
 
 export type LaunchTone = 'good' | 'warn' | 'danger' | 'info' | 'gold';

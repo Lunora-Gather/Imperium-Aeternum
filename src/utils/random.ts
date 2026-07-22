@@ -24,10 +24,13 @@ export function weightedPick<T>(rng: () => number, items: { item: T; weight: num
   if (total <= 0) return null;
   let r = rng() * total;
   for (const it of items) {
-    r -= Math.max(0, it.weight);
-    if (r <= 0) return it.item;
+    const weight = Math.max(0, it.weight);
+    if (weight <= 0) continue;
+    if (r < weight) return it.item;
+    r -= weight;
   }
-  return items[items.length - 1]?.item ?? null;
+  // Defensive fallback for a non-conforming RNG returning 1 exactly.
+  return [...items].reverse().find((item) => item.weight > 0)?.item ?? null;
 }
 
 // 工具：从数组随机抽 n 个

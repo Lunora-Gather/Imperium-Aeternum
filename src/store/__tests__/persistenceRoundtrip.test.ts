@@ -1,8 +1,9 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { createInitialState } from '../../engine/init';
 import { processTurn } from '../../engine/turn';
-import { loadGameFromSlot, migrate, readSaveGameFromSlot, saveGameToSlot, deleteSlot } from '../persistence';
+import { compactGameStateForSave, loadGameFromSlot, migrate, readSaveGameFromSlot, saveGameToSlot, deleteSlot } from '../persistence';
 import { SAVE_VERSION, type SaveGame } from '../../types/game';
+import { allocateEntityId } from '../../utils/id';
 
 class MemoryStorage implements Storage {
   private data = new Map<string, string>();
@@ -33,6 +34,23 @@ describe('persistence roundtrip', () => {
     expect(loaded?.lastReport?.turn).toBe(1);
   });
 
+  it('never mutates the live state while compacting or saving', () => {
+    const state = createInitialState();
+    state.nations[state.playerNationId].activePolicies.push({ policyId: 'free_trade', enactedTurn: 0 });
+    const snapshot = JSON.stringify({ ...state, _relMap: undefined });
+    const playerRef = state.nations[state.playerNationId];
+
+    const compact = compactGameStateForSave(state);
+    const saved = saveGameToSlot(state, 1);
+
+    expect(saved.ok).toBe(true);
+    expect(JSON.stringify({ ...state, _relMap: undefined })).toBe(snapshot);
+    expect(state.nations[state.playerNationId]).toBe(playerRef);
+    expect(compact).not.toBe(state);
+    expect(compact.nations[state.playerNationId]).not.toBe(playerRef);
+    expect(compact.nations[state.playerNationId].policyMods?.influenceMod).toBeCloseTo(1.03);
+  });
+
   it('returns null for a corrupt save slot instead of throwing', () => {
     localStorage.setItem('imperium-aeternum-save-2', '{not-json');
 
@@ -57,6 +75,18 @@ describe('persistence roundtrip', () => {
     expect(Array.isArray(migrated.gameState.history)).toBe(true);
     expect(migrated.gameState.victory).toEqual({ type: null });
     expect(migrated.gameState.relations.some((r) => r.from === migrated.gameState.relations[0].to && r.to === migrated.gameState.relations[0].from)).toBe(true);
+  });
+
+  it('migrates the persisted entity sequence past ids already present in a v4 save', () => {
+    const state = createInitialState() as any;
+    delete state.entityIdCounter;
+    state.provinces.p01.buildings.push({ id: 'entity_z_building', defId: 'farm', provinceId: 'p01', level: 1 });
+    const legacy = { version: 4, createdAt: 'legacy', gameState: state } as SaveGame;
+
+    const migrated = migrate(legacy);
+
+    expect(migrated.gameState.entityIdCounter).toBe(35);
+    expect(allocateEntityId(migrated.gameState, 'army')).toBe('entity_10_army');
   });
 
   it('can delete a slot after saving', () => {

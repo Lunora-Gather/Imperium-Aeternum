@@ -4,6 +4,7 @@ import { useGameStore } from '../store/gameStore';
 import { provincesOf } from '../engine/init';
 import { BUILDINGS } from '../data/buildings';
 import { TECHNOLOGIES } from '../data/technologies';
+import { computeBuildingYield } from '../engine/economy';
 import { Panel, StatRow, Btn, Tag, StatusDot, Divider } from '../components/ui';
 import type { BuildingId } from '../data/buildings';
 import type { Nation, Province } from '../types/game';
@@ -34,11 +35,16 @@ function provStatus(p: Province): 'good' | 'warn' | 'danger' | 'neutral' {
 function riskScore(p: Province): number {
   return Math.round(p.rebellionRisk * 1.2 + p.unrest + Math.max(0, 50 - p.loyalty) * 0.8 + Math.max(0, 45 - p.assimilation) * 0.35);
 }
-function yieldText(bid: BuildingId): string {
-  const y = BUILDINGS[bid].yield;
+function formatYield(value: number): string {
+  return Number.isInteger(value) ? String(value) : value.toFixed(1).replace(/\.0$/, '');
+}
+function yieldText(bid: BuildingId, province: Province, level = 1): string {
+  const y = computeBuildingYield(bid, level, province.terrain);
   const parts = [
-    y.gold ? `+${y.gold}金` : '', y.food ? `+${y.food}粮` : '', y.influence ? `+${y.influence}影` : '',
-    y.sciPt ? `+${y.sciPt}科` : '', y.supply ? `+${y.supply}补` : '', y.adminPt ? `+${y.adminPt}政` : '',
+    y.gold ? `+${formatYield(y.gold)}金` : '', y.food ? `+${formatYield(y.food)}粮` : '',
+    y.wood ? `+${formatYield(y.wood)}木` : '', y.iron ? `+${formatYield(y.iron)}铁` : '',
+    y.influence ? `+${formatYield(y.influence)}影` : '', y.sciPt ? `+${formatYield(y.sciPt)}科` : '',
+    y.supply ? `+${formatYield(y.supply)}补` : '', y.adminPt ? `+${formatYield(y.adminPt)}政` : '',
   ].filter(Boolean);
   return parts.join(' ') || '治理加成';
 }
@@ -114,14 +120,14 @@ export default function ProvinceScreen() {
         const goldOk = player.resources.gold >= b.costGold;
         return (
           <button key={bid} className="ia-btn" onClick={() => build(prov.id, bid)} disabled={!goldOk || isLocked}
-            title={isLocked ? `需科技：${techLabel(b.prereqTech)}` : yieldText(bid)}
+            title={isLocked ? `需科技：${techLabel(b.prereqTech)}` : `${prov.terrain} · ${yieldText(bid, prov)}`}
             style={{ flexDirection: 'column', alignItems: 'stretch', textAlign: 'left', fontSize: 12, padding: 8 }}>
             <div style={{ fontWeight: 600 }}>{b.name}</div>
             <div style={{ fontSize: 10, color: 'var(--text-dim)', marginTop: 2 }}>
               {b.costGold}金{b.costWood > 0 ? `·${b.costWood}木` : ''}{b.costIron > 0 ? `·${b.costIron}铁` : ''}
               {isLocked && <span style={{ color: 'var(--war)' }}> · 🔒{techLabel(b.prereqTech)}</span>}
             </div>
-            <div style={{ fontSize: 9, color: isLocked ? 'var(--text-dim)' : 'var(--good)', marginTop: 2 }}>{yieldText(bid)}</div>
+            <div style={{ fontSize: 9, color: isLocked ? 'var(--text-dim)' : 'var(--good)', marginTop: 2 }}>{yieldText(bid, prov)}</div>
           </button>
         );
       })}
@@ -178,7 +184,7 @@ export default function ProvinceScreen() {
                 const upgCost = def ? Math.round(def.costGold * 0.6 * b.level) : 0;
                 const canUpg = b.level < 3 && player.resources.gold >= upgCost;
                 const demolishRefund = def ? Math.round(def.costGold * 0.3 * b.level) : 0;
-                return <div key={b.id} style={{ display: 'inline-flex', gap: 4, alignItems: 'center', flexWrap: 'wrap' }}><Tag text={`${def?.name ?? b.defId} Lv${b.level}`} tone={b.level >= 3 ? 'good' : 'info'} />{b.level < 3 && <Btn label={`↑${upgCost}金`} variant="ghost" onClick={() => upgradeBuilding(prov.id, b.id)} disabled={!canUpg} />}<Btn label={`拆除 +${demolishRefund}金`} variant="ghost" warn onClick={() => demolishBuilding(prov.id, b.id)} /></div>;
+                return <div key={b.id} style={{ display: 'inline-flex', gap: 4, alignItems: 'center', flexWrap: 'wrap' }}><Tag text={`${def?.name ?? b.defId} Lv${b.level}`} tone={b.level >= 3 ? 'good' : 'info'} /><span className="dim" style={{ fontSize: 10 }}>{def ? yieldText(def.id, prov, b.level) : ''}</span>{b.level < 3 && <Btn label={`↑${upgCost}金`} variant="ghost" onClick={() => upgradeBuilding(prov.id, b.id)} disabled={!canUpg} />}<Btn label={`拆除 +${demolishRefund}金`} variant="ghost" warn onClick={() => demolishBuilding(prov.id, b.id)} /></div>;
               })}
             </div>
           </div>

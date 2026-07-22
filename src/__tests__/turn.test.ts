@@ -3,7 +3,7 @@
 
 import { describe, it, expect } from 'vitest';
 import { createInitialState } from '../engine/init';
-import { processTurn, processTurnPure } from '../engine/turn';
+import { processTurn } from '../engine/turn';
 import { saveGame, loadGame } from '../store/persistence';
 import { PLAYER_ID } from '../data/nations';
 import { moveArmy, declareWar, makePeace } from '../engine/military';
@@ -91,7 +91,7 @@ describe('阶段 5a 烟雾测试', () => {
     expect(l.nations[PLAYER_ID].government.stability).toBe(state.nations[PLAYER_ID].government.stability);
   });
 
-  it('seed 推进确定性：相同初态推进相同回合得相同结果', () => {
+  it('seed 推进确定性：相同初态推进相同回合得到完全相同的可序列化状态', () => {
     const s1 = createInitialState();
     const s2 = createInitialState();
     let a = s1, b = s2;
@@ -99,8 +99,18 @@ describe('阶段 5a 烟雾测试', () => {
       a = processTurn(a).state;
       b = processTurn(b).state;
     }
-    expect(a.nations[PLAYER_ID].resources.gold).toBe(b.nations[PLAYER_ID].resources.gold);
-    expect(a.nations[PLAYER_ID].government.stability).toBe(b.nations[PLAYER_ID].government.stability);
+    expect({ ...a, _relMap: undefined }).toEqual({ ...b, _relMap: undefined });
+  });
+
+  it('纯回合入口对同一个输入重复调用产生完全相同的结果', () => {
+    const input = createInitialState();
+
+    const first = processTurn(input).state;
+    const second = processTurn(input).state;
+
+    expect({ ...first, _relMap: undefined }).toEqual({ ...second, _relMap: undefined });
+    expect(input.turn).toBe(0);
+    expect(input.entityIdCounter).toBe(0);
   });
 
   it('省份与国家数据自洽', () => {
@@ -137,7 +147,7 @@ describe('阶段 5a 烟雾测试', () => {
     // 调动前目标省无军队
     const destBefore = player.army.find((a) => a.location === target.id);
     expect(destBefore).toBeUndefined();
-    const r = moveArmy(player, capitalArmy.id, target.id, capitalProv, target);
+    const r = moveArmy(state, player, capitalArmy.id, target.id, capitalProv, target);
     expect(r.ok).toBe(true);
     // 原军队消失、目标省出现军队且兵力相等
     expect(player.army.find((a) => a.id === capitalArmy.id)).toBeUndefined();
@@ -161,7 +171,7 @@ describe('阶段 5a 烟雾测试', () => {
     // 再找一个非 farSelf 相邻的己省（必不相邻且非首都枢纽）
     const anotherFar = playerProvs.find((p) => p.id !== farSelf.id && p.id !== player.capital && !farSelf.adjacent.includes(p.id));
     if (!anotherFar) return;
-    const r = moveArmy(player, armyAtCapital.id, anotherFar.id, capitalProv, anotherFar);
+    const r = moveArmy(state, player, armyAtCapital.id, anotherFar.id, capitalProv, anotherFar);
     // capital→anotherFar 若 anotherFar 不在 capital 相邻则拒绝
     if (!capitalProv.adjacent.includes(anotherFar.id)) {
       expect(r.ok).toBe(false);
@@ -197,6 +207,12 @@ describe('A1 叛乱机制', () => {
     expect(next.nations[rebelId].rebelOf).toBe(PLAYER_ID);
     expect(next.provinces[provId].ownerId).toBe(rebelId);
     expect(next.provinces[provId].garrison).toBe(0);
+    expect(next.lastReport?.provinceChanges).toContainEqual({
+      id: provId,
+      name: tp.name,
+      from: PLAYER_ID,
+      to: rebelId,
+    });
   });
 
   it('叛军 rebellionDecay 每 5 回合归零后省归顺原主', () => {
@@ -220,6 +236,12 @@ describe('A1 叛乱机制', () => {
     expect(state.provinces[provId].ownerId).toBe(PLAYER_ID);
     // 归顺后 loyalty 重置为 40，但后续 culture 结算可能微调，接受 ≥30
     expect(state.provinces[provId].loyalty).toBeGreaterThanOrEqual(30);
+    expect(state.lastReport?.provinceChanges).toContainEqual({
+      id: provId,
+      name: tp.name,
+      from: rebelId,
+      to: PLAYER_ID,
+    });
   });
 
   it('相邻同文化省连锁——叛乱省旁同文化省 rebellionRisk 抬升或保持', () => {
@@ -411,12 +433,12 @@ describe('C5 确定性重放', () => {
   });
 });
 
-// C1 processTurnPure 50 回合对照测试（验证长回合下与原 processTurn 等价）
-describe('C1 processTurnPure 50 回合对照', () => {
-  it('processTurnPure 推进 50 回合无 NaN/崩溃', () => {
+// 正式回合入口的长程契约：稳定、确定、不会修改传入快照。
+describe('processTurn 50 回合契约', () => {
+  it('推进 50 回合无 NaN/崩溃', () => {
     let state = createInitialState();
     for (let i = 0; i < 50; i++) {
-      const { state: next } = processTurnPure(state);
+      const { state: next } = processTurn(state);
       state = next;
       const p = state.nations[PLAYER_ID];
       expect(Number.isFinite(p.resources.gold)).toBe(true);
@@ -427,13 +449,15 @@ describe('C1 processTurnPure 50 回合对照', () => {
     expect(state.turn).toBe(50);
   });
 
-  it('processTurnPure 与 processTurn 50 回合后 player 关键字段一致（同种子）', () => {
-    let s1 = createInitialState();
+  it('同一初态推进 50 回合结果完全确定，且初始快照不被修改', () => {
+    const input1 = createInitialState();
+    let s1 = input1;
     let s2 = createInitialState();
+    const before = structuredClone(input1);
     s2.seed = s1.seed;
     for (let i = 0; i < 50; i++) {
       const r1 = processTurn(s1);
-      const r2 = processTurnPure(s2);
+      const r2 = processTurn(s2);
       s1 = r1.state;
       s2 = r2.state;
     }
@@ -460,5 +484,6 @@ describe('C1 processTurnPure 50 回合对照', () => {
       expect(pp2.loyalty).toBeCloseTo(pp1.loyalty, 0);
       expect(pp2.unrest).toBeCloseTo(pp1.unrest, 0);
     });
+    expect(input1).toEqual(before);
   });
 });

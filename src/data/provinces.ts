@@ -182,7 +182,7 @@ export const PROVINCES: ProvinceDef[] = [
     distToPlayerCapital: 6, elevation: 'low', climate: 'cold', hasRiver: false, isTradeNode: true, tradeNodeTier: 2, x: 600, y: 200 },
 
   // ── 蛮族联盟 n05（p27-p32 边缘蛮区）──
-  { id: 'p27', name: '昔提亚', terrain: 'tundra', type: 'land', ownerId: 'n05', isCapital: false,
+  { id: 'p27', name: '昔提亚', terrain: 'tundra', type: 'capital', ownerId: 'n05', isCapital: true,
     agriBase: 0.2, culture: 'slavic', religion: 'animism', initPop: 200, initClassRatio: POOR_RATIO,
     baseResources: { wood: 8, iron: 15 }, adjacent: ['p15', 'p22', 'p28'],
     distToPlayerCapital: 7, elevation: 'low', climate: 'cold', hasRiver: true, isTradeNode: false, x: 640, y: 580 },
