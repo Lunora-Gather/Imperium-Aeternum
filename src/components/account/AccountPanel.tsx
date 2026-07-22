@@ -47,7 +47,7 @@ function AccountModal({ onClose }: { onClose: () => void }) {
         <div>
           <div className="ia-up" style={{ color: 'var(--gold)', fontSize: 11 }}>Imperium Account</div>
           <h2 id="ia-account-title" className="ia-display" style={{ margin: '4px 0' }}>账号与云端纪元</h2>
-          <p style={{ color: 'var(--text-mute)', fontSize: 11, margin: 0 }}>游客模式始终可玩；登录只用于跨设备私有云存档。</p>
+          <p style={{ color: 'var(--text-mute)', fontSize: 11, margin: 0 }}>游客模式始终可玩；登录后可使用跨设备云存档、共享版图、好友与聊天。</p>
         </div>
         <Btn label="关闭" variant="ghost" onClick={onClose} />
       </div>

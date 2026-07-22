@@ -1,0 +1,28 @@
+{
+  "world": {
+    "$id": "living-world-1",
+    "templateId": "world-v1",
+    "name": "万邦纪元 · 一号世界",
+    "status": "forming",
+    "phase": "planning",
+    "turn": 0,
+    "revision": 0,
+    "nationCount": 205,
+    "snapshotFileId": null,
+    "planningDeadlineAt": "2026-12-31T23:59:59.000Z",
+    "planningWindowSeconds": 86400,
+    "pauseWhenEmpty": true,
+    "caretakerEnabled": true,
+    "maxNationsPerUser": 3
+  },
+  "openNations": [
+    {"nationId":"n_me_persia","nationName":"波斯帝国"},
+    {"nationId":"n_ea_qin","nationName":"秦帝国"},
+    {"nationId":"n_med_rome","nationName":"罗马"},
+    {"nationId":"n_med_carthage","nationName":"迦太基"},
+    {"nationId":"n_ea_han","nationName":"汉"},
+    {"nationId":"n_sa_maurya","nationName":"孔雀帝国"},
+    {"nationId":"n_am_inca","nationName":"印加"},
+    {"nationId":"n_we_frank","nationName":"法兰克"}
+  ]
+}

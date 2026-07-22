@@ -10,6 +10,8 @@ import { buildLaunchHandbook, type LaunchHandbook } from '../gameplay/launchHand
 import { BUILD_MARK } from '../buildInfo';
 import { Btn, Tag } from '../components/ui';
 import { AccountButton } from '../components/account/AccountPanel';
+import { SharedWorldButton } from '../components/sharedWorld/SharedWorldLobby';
+import { SocialButton } from '../components/social/SocialPanel';
 
 const THEMES = [
   { id: 'night', label: '暗夜', icon: '☾' },
@@ -75,7 +77,7 @@ export default function ScenarioSelect() {
   }
 
   return <div className="ia-menu ia-menu--launch">
-    <div className="ia-menu-toolbar"><div className="ia-menu-version"><Tag text={BUILD_MARK} tone="gold" /><Tag text={`存档 v${SAVE_VERSION}`} tone="info" /><Tag text={saveSummary.headline} tone={saveSummary.tone} /></div><div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}><AccountButton /><ThemeSwitch theme={theme} applyTheme={applyTheme} /></div></div>
+    <div className="ia-menu-toolbar"><div className="ia-menu-version"><Tag text={BUILD_MARK} tone="gold" /><Tag text={`存档 v${SAVE_VERSION}`} tone="info" /><Tag text={saveSummary.headline} tone={saveSummary.tone} /></div><div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}><SocialButton /><AccountButton /><ThemeSwitch theme={theme} applyTheme={applyTheme} /></div></div>
     <header className="ia-launch-hero">
       <div className="ia-launch-copy">
         <div className="ia-up ia-menu-kicker">Grand Strategy Chronicle</div>
@@ -84,6 +86,7 @@ export default function ScenarioSelect() {
         <div className="ia-menu-subtitle">治理一个国家数百年。扩张越快，崩溃越早。真正的胜利是建立一个能长期运转的国家机器。</div>
         <div className="ia-launch-actions">
           <Btn label={saveSummary.best ? `继续槽位 ${saveSummary.best.slot}` : '开始推荐剧本'} variant="primary" onClick={saveSummary.best ? continueBest : () => startPickedScenario(featuredScenario.id)} />
+          <SharedWorldButton />
           <Btn label="查看全部剧本" variant="ghost" onClick={() => document.getElementById('scenario-library')?.scrollIntoView({ behavior: 'smooth', block: 'start' })} />
         </div>
       </div>

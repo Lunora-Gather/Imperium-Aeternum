@@ -64,3 +64,16 @@
 - `PARTIAL` 事件弹窗已具备 dialog 语义、初始焦点和 Tab 焦点环；移动端仍待专项检查。
 - `DONE` 固定 v3/v4 JSON 旧档 fixture 经真实槽位加载、v5 迁移、不变量与继续推进验证。
 - `DONE` 回合性能与构建体积预算均进入 `rc:check`；体积门禁覆盖入口、App、最大 JS、JS 总量与 CSS 总量。
+
+## Phase 5：共享活版图 — IN PROGRESS
+
+- `DONE` 建立版图实例、成员、国家控制租约、命令信封与统一世界时钟模型。
+- `DONE` 无人在线暂停；有人在线时离线玩家国由保守 AI 托管、无主国由完整 AI 自动推进。
+- `DONE` Appwrite 控制权/社交网关、数据表、快照桶和首张版图 seed 纳入版本控制。
+- `DONE` 版图大厅、国家占用与认领/释放、好友码和版图聊天室前端入口。
+- `NEXT` 将共享玩家视角从单机 `playerNationId` 解耦为 `activeNationId` 会话。
+- `NEXT` 实现服务端命令日志与权威 World Resolver，真正推进公共世界快照。
+- `PLANNED` 在线心跳、准备状态、托管策略配置、聊天屏蔽举报与管理后台。
+- `PLANNED` 多版图模板和同账号跨版图国家切换。
+
+详细规则与边界只维护在 [`SHARED-WORLD.md`](SHARED-WORLD.md)，路线图不重复展开设计正文。
