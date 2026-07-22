@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import type { AuthUser } from '../services/appwrite/authService';
 import {
   describeAppwriteError,
+  completePasswordRecovery,
   completeVerifiedRegistration,
   getCurrentUser,
   loginWithPassword,
@@ -19,7 +20,7 @@ import {
 import { isAppwriteConfigured } from '../services/appwrite/config';
 
 type AccountStatus = 'idle' | 'loading' | 'authenticated' | 'guest';
-export type OtpPurpose = 'login' | 'register';
+export type OtpPurpose = 'login' | 'register' | 'recovery';
 
 interface AccountStore {
   configured: boolean;
@@ -37,6 +38,7 @@ interface AccountStore {
   requestOtp: (email: string, purpose: OtpPurpose) => Promise<boolean>;
   verifyLoginOtp: (secret: string) => Promise<boolean>;
   completeRegistration: (secret: string, password: string, name: string) => Promise<boolean>;
+  recoverPassword: (secret: string, password: string) => Promise<boolean>;
   resetOtp: () => void;
   logout: () => Promise<void>;
   refreshCloudSaves: () => Promise<void>;
@@ -94,7 +96,12 @@ export const useAccountStore = create<AccountStore>((set, get) => ({
     set({ status: 'loading', message: null });
     try {
       const pendingOtpUserId = await requestEmailOtp(email.trim());
-      set({ pendingOtpUserId, pendingOtpEmail: email.trim(), pendingOtpPurpose: purpose, status: 'guest', message: purpose === 'register' ? '验证邮件已发送；输入 6 位验证码后才会完成注册' : '6 位登录验证码已发送，15 分钟内有效' });
+      const message = purpose === 'register'
+        ? '验证邮件已发送；输入 6 位验证码后才会完成注册'
+        : purpose === 'recovery'
+          ? '找回验证码已发送；验证后即可设置新密码'
+          : '6 位登录验证码已发送，15 分钟内有效';
+      set({ pendingOtpUserId, pendingOtpEmail: email.trim(), pendingOtpPurpose: purpose, status: 'guest', message });
       return true;
     } catch (error) {
       set({ status: 'guest', message: describeAppwriteError(error) });
@@ -130,6 +137,24 @@ export const useAccountStore = create<AccountStore>((set, get) => ({
     try {
       const user = await completeVerifiedRegistration(userId, secret.trim(), password, name);
       set({ user, status: 'authenticated', pendingOtpUserId: null, pendingOtpEmail: null, pendingOtpPurpose: null, message: '邮箱验证成功，账号已创建' });
+      return true;
+    } catch (error) {
+      set({ status: 'guest', message: describeAppwriteError(error) });
+      return false;
+    }
+  },
+
+  recoverPassword: async (secret, password) => {
+    const userId = get().pendingOtpUserId;
+    if (!userId || get().pendingOtpPurpose !== 'recovery') {
+      set({ message: '请先发送找回验证码' });
+      return false;
+    }
+    set({ status: 'loading', message: null });
+    try {
+      const user = await completePasswordRecovery(userId, secret.trim(), password);
+      set({ user, status: 'authenticated', pendingOtpUserId: null, pendingOtpEmail: null, pendingOtpPurpose: null, message: '密码已更新，并已安全登录' });
+      await get().refreshCloudSaves();
       return true;
     } catch (error) {
       set({ status: 'guest', message: describeAppwriteError(error) });
