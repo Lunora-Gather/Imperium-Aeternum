@@ -2,10 +2,10 @@ import { create } from 'zustand';
 import type { AuthUser } from '../services/appwrite/authService';
 import {
   describeAppwriteError,
+  completeVerifiedRegistration,
   getCurrentUser,
   loginWithPassword,
   logoutCurrentSession,
-  registerWithPassword,
   requestEmailOtp,
   verifyEmailOtp,
 } from '../services/appwrite/authService';
@@ -19,21 +19,25 @@ import {
 import { isAppwriteConfigured } from '../services/appwrite/config';
 
 type AccountStatus = 'idle' | 'loading' | 'authenticated' | 'guest';
+export type OtpPurpose = 'login' | 'register';
 
 interface AccountStore {
   configured: boolean;
   status: AccountStatus;
   user: AuthUser | null;
   pendingOtpUserId: string | null;
+  pendingOtpEmail: string | null;
+  pendingOtpPurpose: OtpPurpose | null;
   cloudSaves: CloudSaveRow[];
   busySlot: number | null;
   conflictSlot: number | null;
   message: string | null;
   initialize: () => Promise<void>;
   login: (email: string, password: string) => Promise<boolean>;
-  register: (email: string, password: string, name: string) => Promise<boolean>;
-  requestOtp: (email: string) => Promise<boolean>;
-  verifyOtp: (secret: string) => Promise<boolean>;
+  requestOtp: (email: string, purpose: OtpPurpose) => Promise<boolean>;
+  verifyLoginOtp: (secret: string) => Promise<boolean>;
+  completeRegistration: (secret: string, password: string, name: string) => Promise<boolean>;
+  resetOtp: () => void;
   logout: () => Promise<void>;
   refreshCloudSaves: () => Promise<void>;
   uploadSlot: (slot: number, force?: boolean) => Promise<boolean>;
@@ -48,6 +52,8 @@ export const useAccountStore = create<AccountStore>((set, get) => ({
   status: 'idle',
   user: null,
   pendingOtpUserId: null,
+  pendingOtpEmail: null,
+  pendingOtpPurpose: null,
   cloudSaves: [],
   busySlot: null,
   conflictSlot: null,
@@ -75,7 +81,7 @@ export const useAccountStore = create<AccountStore>((set, get) => ({
     set({ status: 'loading', message: null });
     try {
       const user = await loginWithPassword(email.trim(), password);
-      set({ user, status: 'authenticated', pendingOtpUserId: null, message: '登录成功' });
+      set({ user, status: 'authenticated', pendingOtpUserId: null, pendingOtpEmail: null, pendingOtpPurpose: null, message: '登录成功' });
       await get().refreshCloudSaves();
       return true;
     } catch (error) {
@@ -84,23 +90,11 @@ export const useAccountStore = create<AccountStore>((set, get) => ({
     }
   },
 
-  register: async (email, password, name) => {
-    set({ status: 'loading', message: null });
-    try {
-      const user = await registerWithPassword(email.trim(), password, name);
-      set({ user, status: 'authenticated', pendingOtpUserId: null, message: '账号已创建并登录' });
-      return true;
-    } catch (error) {
-      set({ status: 'guest', message: describeAppwriteError(error) });
-      return false;
-    }
-  },
-
-  requestOtp: async (email) => {
+  requestOtp: async (email, purpose) => {
     set({ status: 'loading', message: null });
     try {
       const pendingOtpUserId = await requestEmailOtp(email.trim());
-      set({ pendingOtpUserId, status: 'guest', message: '6 位验证码已发送，15 分钟内有效' });
+      set({ pendingOtpUserId, pendingOtpEmail: email.trim(), pendingOtpPurpose: purpose, status: 'guest', message: purpose === 'register' ? '验证邮件已发送；输入 6 位验证码后才会完成注册' : '6 位登录验证码已发送，15 分钟内有效' });
       return true;
     } catch (error) {
       set({ status: 'guest', message: describeAppwriteError(error) });
@@ -108,7 +102,7 @@ export const useAccountStore = create<AccountStore>((set, get) => ({
     }
   },
 
-  verifyOtp: async (secret) => {
+  verifyLoginOtp: async (secret) => {
     const userId = get().pendingOtpUserId;
     if (!userId) {
       set({ message: '请先发送邮箱验证码' });
@@ -117,7 +111,7 @@ export const useAccountStore = create<AccountStore>((set, get) => ({
     set({ status: 'loading', message: null });
     try {
       const user = await verifyEmailOtp(userId, secret.trim());
-      set({ user, status: 'authenticated', pendingOtpUserId: null, message: '验证码登录成功' });
+      set({ user, status: 'authenticated', pendingOtpUserId: null, pendingOtpEmail: null, pendingOtpPurpose: null, message: '邮箱验证通过，已安全登录' });
       await get().refreshCloudSaves();
       return true;
     } catch (error) {
@@ -126,11 +120,30 @@ export const useAccountStore = create<AccountStore>((set, get) => ({
     }
   },
 
+  completeRegistration: async (secret, password, name) => {
+    const userId = get().pendingOtpUserId;
+    if (!userId || get().pendingOtpPurpose !== 'register') {
+      set({ message: '请先发送注册验证码' });
+      return false;
+    }
+    set({ status: 'loading', message: null });
+    try {
+      const user = await completeVerifiedRegistration(userId, secret.trim(), password, name);
+      set({ user, status: 'authenticated', pendingOtpUserId: null, pendingOtpEmail: null, pendingOtpPurpose: null, message: '邮箱验证成功，账号已创建' });
+      return true;
+    } catch (error) {
+      set({ status: 'guest', message: describeAppwriteError(error) });
+      return false;
+    }
+  },
+
+  resetOtp: () => set({ pendingOtpUserId: null, pendingOtpEmail: null, pendingOtpPurpose: null, message: null }),
+
   logout: async () => {
     try {
       await logoutCurrentSession();
     } finally {
-      set({ user: null, status: 'guest', cloudSaves: [], pendingOtpUserId: null, message: '已退出登录' });
+      set({ user: null, status: 'guest', cloudSaves: [], pendingOtpUserId: null, pendingOtpEmail: null, pendingOtpPurpose: null, message: '已退出登录' });
     }
   },
 

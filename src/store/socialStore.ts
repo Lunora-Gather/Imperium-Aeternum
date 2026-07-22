@@ -17,6 +17,7 @@ interface SocialStore {
   messages: Record<string, WorldChatMessage[]>;
   loading: boolean;
   message: string | null;
+  reset: () => void;
   initialize: () => Promise<void>;
   addByCode: (friendCode: string) => Promise<boolean>;
   respond: (friendshipId: string, accept: boolean) => Promise<void>;
@@ -27,6 +28,7 @@ interface SocialStore {
 
 export const useSocialStore = create<SocialStore>((set, get) => ({
   profile: null, friendships: [], messages: {}, loading: false, message: null,
+  reset: () => set({ profile: null, friendships: [], messages: {}, loading: false, message: null }),
   initialize: async () => {
     set({ loading: true, message: null });
     try {
@@ -58,13 +60,15 @@ export const useSocialStore = create<SocialStore>((set, get) => ({
   refreshMessages: async (worldId) => {
     try {
       const messages = await listWorldMessages(worldId);
-      set((state) => ({ messages: { ...state.messages, [worldId]: messages } }));
+      set((state) => ({ messages: { ...state.messages, [worldId]: messages }, message: null }));
     } catch (error) { set({ message: error instanceof Error ? error.message : '版图聊天加载失败' }); }
   },
   sendMessage: async (worldId, body, nationId) => {
     const text = body.trim();
     if (!text) return false;
+    set({ loading: true, message: null });
     try { await sendWorldMessage(worldId, text, nationId); await get().refreshMessages(worldId); return true; }
     catch (error) { set({ message: error instanceof Error ? error.message : '消息发送失败' }); return false; }
+    finally { set({ loading: false }); }
   },
 }));

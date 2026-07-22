@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { useAccountStore } from '../../store/accountStore';
 import { useSharedWorldStore } from '../../store/sharedWorldStore';
 import { subscribeToWorldLobby } from '../../services/appwrite/sharedWorldService';
@@ -10,7 +11,7 @@ export function SharedWorldButton() {
   const [open, setOpen] = useState(false);
   return <>
     <button className="ia-btn ia-btn--ghost ia-world-entry-btn" onClick={() => setOpen(true)}>◎ 共享活版图</button>
-    {open && <SharedWorldLobby onClose={() => setOpen(false)} />}
+    {open && createPortal(<SharedWorldLobby onClose={() => setOpen(false)} />, document.body)}
   </>;
 }
 
@@ -56,7 +57,7 @@ function SharedWorldLobby({ onClose }: { onClose: () => void }) {
 function WorldList({ worlds, loading, onSelect }: { worlds: SharedWorldInstance[]; loading: boolean; onSelect: (id: string) => void }) {
   if (loading) return <div className="ia-world-empty">正在读取版图纪元…</div>;
   if (!worlds.length) return <div className="ia-world-empty"><strong>首张共享版图正在筹备</strong><p>基础设施已经接入；版图开放后会在这里显示世界年份、控制人数和可认领国家。</p></div>;
-  return <div className="ia-world-list">{worlds.map((world) => <button key={world.id} className="ia-world-card" onClick={() => onSelect(world.id)}>
+  return <div className="ia-world-list">{worlds.map((world) => <button key={world.id} className="ia-world-card" onClick={(event) => { event.stopPropagation(); onSelect(world.id); }}>
     <div><Tag text={world.status === 'active' ? '运行中' : world.status === 'paused' ? '已暂停' : '筹备中'} tone={world.status === 'active' ? 'good' : 'warn'} /><span>第 {world.turn + 1} 年</span></div>
     <strong className="ia-display">{world.name}</strong>
     <p>{world.nationCount} 国共享同一历史进程 · 无人控制国家由 AI 自主推进</p>
@@ -68,6 +69,7 @@ function WorldDetail({ world, controls, userId, mineCount, busyNationId, onBack,
   return <>
     <div className="ia-world-detail-head"><button className="ia-btn ia-btn--ghost" onClick={onBack}>← 版图列表</button><div><strong>{world.name}</strong><span>第 {world.turn + 1} 年 · 修订 {world.revision}</span></div><Tag text={`我控制 ${mineCount}/${world.tickPolicy.maxNationsPerUser}`} tone="info" /></div>
     <div className="ia-world-rule-strip"><span>有人在线才推进</span><span>离线国家保守托管</span><span>AI 国家持续发展</span><span>统一年度结算</span></div>
+    {controls.length > 0 && <WorldChatPanel worldId={world.id} nationId={controls.find((control) => control.controllerUserId === userId)?.nationId} />}
     <div className="ia-world-nations">{controls.map((control) => {
       const isMine = control.controllerUserId === userId;
       const available = control.status === 'available' || !control.controllerUserId;
@@ -77,6 +79,5 @@ function WorldDetail({ world, controls, userId, mineCount, busyNationId, onBack,
         {isMine ? <Btn label={busyNationId === control.nationId ? '处理中…' : '释放控制'} warn disabled={busyNationId !== null} onClick={() => onRelease(control.nationId)} /> : available ? <Btn label={mineCount >= world.tickPolicy.maxNationsPerUser ? '已达本版图上限' : busyNationId === control.nationId ? '认领中…' : '认领国家'} variant="primary" disabled={busyNationId !== null || mineCount >= world.tickPolicy.maxNationsPerUser} onClick={() => onClaim(control.nationId)} /> : null}
       </article>;
     })}</div>
-    <WorldChatPanel worldId={world.id} nationId={controls.find((control) => control.controllerUserId === userId)?.nationId} />
   </>;
 }

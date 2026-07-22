@@ -9,7 +9,8 @@
 | [`../README.md`](../README.md) | 产品定位、运行方式和发布状态 |
 | [`maintenance/README.md`](maintenance/README.md) | 当前架构、核心入口、验证命令和改动规则 |
 | [`maintenance/ROADMAP.md`](maintenance/ROADMAP.md) | 后续底层、玩法、体验和发布路线 |
-| [`maintenance/SHARED-WORLD.md`](maintenance/SHARED-WORLD.md) | 共享版图、国家控制、自动推进、好友与聊天的唯一当前设计 |
+| [`maintenance/SHARED-WORLD.md`](maintenance/SHARED-WORLD.md) | 共享版图、国家控制与自动推进的当前设计 |
+| [`maintenance/AUTH-AND-SOCIAL.md`](maintenance/AUTH-AND-SOCIAL.md) | 邮箱验证注册、账号反馈、好友与版图聊天体验 |
 | [`maintenance/BUG-AUDIT-CHECKLIST.md`](maintenance/BUG-AUDIT-CHECKLIST.md) | 漏洞复现、检查、修复和回归清单 |
 | [`04-architecture.md`](04-architecture.md) | 引擎与模块的详细历史架构说明 |
 | [`formulas.md`](formulas.md) | 数值公式 |

@@ -6,7 +6,7 @@
 - Web 平台：`localhost`、`127.0.0.1`、`lunora-gather.github.io`
 - TablesDB：数据库 `imperium_game`，表 `cloud_saves`
 - Storage：桶 `cloud_saves`，5 MB、仅 JSON、gzip、加密、文件级权限
-- 登录方式：邮箱密码（主入口）、邮箱 OTP（备选）
+- 登录方式：新注册强制邮箱 OTP；已验证账号可使用邮箱密码或 OTP 登录
 
 `appwrite.config.json` 是基础设施的可复现配置。变更前先拉取并审阅差异，变更后再推送：
 
@@ -32,6 +32,8 @@ appwrite push buckets --all --force
 ## 认证策略
 
 当前会话最长 30 天、每用户最多 10 个会话，启用 3 次密码历史、常见弱密码检查、个人信息检查和新会话告警。手机、匿名、邀请和 Magic URL 均关闭。Appwrite Cloud 默认邮件通道可以发送 OTP；`smtpEnabled: false` 表示尚未接入自定义 SMTP 和品牌模板，不代表邮箱 OTP 被关闭。
+
+注册边界为“OTP 建立已验证会话后再设置昵称和密码”。不得恢复 `account.create → password session` 的直接注册路径；详细状态机与 UI 准入见 [`AUTH-AND-SOCIAL.md`](AUTH-AND-SOCIAL.md)。
 
 ## 故障排查
 

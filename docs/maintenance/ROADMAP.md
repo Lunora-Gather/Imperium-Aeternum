@@ -65,12 +65,13 @@
 - `DONE` 固定 v3/v4 JSON 旧档 fixture 经真实槽位加载、v5 迁移、不变量与继续推进验证。
 - `DONE` 回合性能与构建体积预算均进入 `rc:check`；体积门禁覆盖入口、App、最大 JS、JS 总量与 CSS 总量。
 
-## Phase 5：共享活版图 — IN PROGRESS
+## Phase 5：共享活版图 — FOUNDATION RELEASED / RESOLVER IN PROGRESS
 
 - `DONE` 建立版图实例、成员、国家控制租约、命令信封与统一世界时钟模型。
 - `DONE` 无人在线暂停；有人在线时离线玩家国由保守 AI 托管、无主国由完整 AI 自动推进。
 - `DONE` Appwrite 控制权/社交网关、数据表、快照桶和首张版图 seed 纳入版本控制。
 - `DONE` 版图大厅、国家占用与认领/释放、好友码和版图聊天室前端入口。
+- `DONE` 强制邮箱 OTP 注册、账号交互反馈、好友通知入口和版图频道体验达到发布准入。
 - `NEXT` 将共享玩家视角从单机 `playerNationId` 解耦为 `activeNationId` 会话。
 - `NEXT` 实现服务端命令日志与权威 World Resolver，真正推进公共世界快照。
 - `PLANNED` 在线心跳、准备状态、托管策略配置、聊天屏蔽举报与管理后台。
