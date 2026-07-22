@@ -7,7 +7,8 @@ const budgets = {
   largestJavaScript: 400 * KIB,
   // Full feature inventory includes the lazy Appwrite web SDK; initial-route budgets stay unchanged.
   totalJavaScript: 1024 * KIB,
-  totalCss: 85 * KIB,
+  // Verified auth and responsive social/chat surfaces add intentional UI states; retain bounded headroom.
+  totalCss: 92 * KIB,
   entryJavaScript: 180 * KIB,
   appJavaScript: 25 * KIB,
   accountJavaScript: 140 * KIB,

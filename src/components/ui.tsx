@@ -124,8 +124,8 @@ export function Stat({ label, value, warn, kind = 'minor', accent, icon }: {
 }
 
 // ── Btn ──
-export function Btn({ label, onClick, disabled, warn, variant, title, icon, type = 'button' }: {
-  label: string; onClick: () => void; disabled?: boolean; warn?: boolean;
+export function Btn({ label, onClick, disabled, busy, warn, variant, title, icon, type = 'button' }: {
+  label: string; onClick?: () => void; disabled?: boolean; busy?: boolean; warn?: boolean;
   variant?: 'primary' | 'warn' | 'good' | 'ghost'; title?: string; icon?: string;
   type?: 'button' | 'submit';
 }) {
@@ -135,8 +135,8 @@ export function Btn({ label, onClick, disabled, warn, variant, title, icon, type
     : variant === 'ghost' ? 'ia-btn ia-btn--ghost'
     : 'ia-btn';
   return (
-    <button type={type} className={cls} onClick={onClick} disabled={disabled} title={title}>
-      {icon && <span style={{ marginRight: 6, opacity: 0.8 }}>{icon}</span>}{label}
+    <button type={type} className={cls} onClick={onClick} disabled={disabled || busy} title={title} aria-busy={busy || undefined}>
+      {busy ? <span className="ia-btn-spinner" aria-hidden="true" /> : icon && <span style={{ marginRight: 6, opacity: 0.8 }}>{icon}</span>}{label}
     </button>
   );
 }

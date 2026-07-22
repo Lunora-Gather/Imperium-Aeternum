@@ -257,6 +257,12 @@ h1, h2, h3, h4 { font-family: var(--font-display); font-weight: 600; letter-spac
 }
 .ia-btn:active:not(:disabled) { transform: translateY(0); box-shadow: none; }
 .ia-btn:disabled { opacity: 0.3; cursor: not-allowed; }
+.ia-btn, button { -webkit-tap-highlight-color: transparent; touch-action: manipulation; }
+button:active:not(:disabled) { transform: translateY(1px) scale(0.985); filter: brightness(1.08); }
+.ia-btn[aria-busy="true"] { cursor: progress; }
+.ia-btn-spinner { width: 12px; height: 12px; margin-right: 7px; display: inline-block; vertical-align: -2px; border: 2px solid currentColor; border-right-color: transparent; border-radius: 50%; animation: ia-spin .65s linear infinite; }
+@keyframes ia-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .ia-btn-spinner { animation-duration: 1.4s; } }
 
 /* 按钮渐变用主题变量，白天自动反转 */
 :root { --btn-primary-top: #4a3a1e; --btn-primary-bot: #2e2412; --btn-primary-top-h: #5a4828; --btn-primary-bot-h: #3a2e16; --btn-primary-fg: #f5e8c4;
