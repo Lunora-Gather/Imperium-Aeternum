@@ -269,6 +269,17 @@ button:focus-visible, .ia-btn:focus-visible, .ia-tab-btn:focus-visible, .ia-icon
 .ia-auth-field > span em { color: var(--good); font-style: normal; }
 .ia-auth-field .ia-input { width: 100%; min-height: 42px; border-radius: 9px; transition: border-color .16s, box-shadow .16s, background .16s; }
 .ia-auth-field .ia-input:focus { border-color: var(--border-gold); box-shadow: 0 0 0 3px color-mix(in srgb, var(--gold) 10%, transparent); background: color-mix(in srgb, var(--bg-inset) 88%, var(--gold) 3%); }
+.ia-auth-field .ia-input:-webkit-autofill,
+.ia-auth-field .ia-input:-webkit-autofill:hover {
+  -webkit-text-fill-color: var(--text);
+  caret-color: var(--text);
+  -webkit-box-shadow: 0 0 0 1000px var(--bg-inset) inset;
+  transition: background-color 9999s ease-out 0s;
+}
+.ia-auth-field .ia-input:-webkit-autofill:focus {
+  -webkit-text-fill-color: var(--text);
+  -webkit-box-shadow: 0 0 0 1000px color-mix(in srgb, var(--bg-inset) 96%, var(--gold) 4%) inset, 0 0 0 3px color-mix(in srgb, var(--gold) 10%, transparent);
+}
 .ia-auth-field small { color: var(--text-dim); font-size: 9.5px; }
 .ia-auth-field.is-valid small { color: var(--good); }
 .ia-auth-field.is-invalid small { color: var(--danger); }
@@ -286,6 +297,11 @@ button:focus-visible, .ia-btn:focus-visible, .ia-tab-btn:focus-visible, .ia-icon
 .ia-auth-mail-sent button, .ia-auth-resend { border: 0; background: transparent; color: var(--gold); font: 10px var(--font-body); cursor: pointer; }
 .ia-auth-resend { justify-self: center; padding: 5px 8px; }
 .ia-auth-resend:disabled { color: var(--text-dim); cursor: default; }
+.ia-auth-recovery-link { justify-self: end; margin-top: -6px; padding: 2px 0; border: 0; background: transparent; color: var(--gold); font: 10px var(--font-body); cursor: pointer; }
+.ia-auth-recovery-head { display: grid; grid-template-columns: auto 1fr; gap: 4px 10px; margin-top: 17px; padding: 12px; border: 1px solid var(--border); border-radius: 11px; background: var(--bg-inset); }
+.ia-auth-recovery-head button { grid-row: 1 / 3; align-self: center; min-width: 30px; height: 30px; border: 1px solid var(--border); border-radius: 50%; background: var(--bg-raised); color: var(--gold); cursor: pointer; }
+.ia-auth-recovery-head strong { color: var(--text); font-size: 12px; }
+.ia-auth-recovery-head p { margin: 0; color: var(--text-dim); font-size: 9.5px; line-height: 1.45; }
 .ia-auth-status { display: flex; gap: 9px; align-items: flex-start; margin: 10px 24px 0; padding: 10px 12px; border: 1px solid var(--border); border-radius: 10px; background: var(--bg-inset); color: var(--text-mute); }
 .ia-auth-status > span { width: 18px; height: 18px; flex: 0 0 auto; display: grid; place-items: center; border-radius: 50%; background: color-mix(in srgb, var(--gold) 14%, transparent); color: var(--gold); font-size: 10px; }
 .ia-auth-status p { margin: 1px 0 0; font-size: 10.5px; line-height: 1.45; }

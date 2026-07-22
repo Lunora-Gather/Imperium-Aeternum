@@ -11,7 +11,7 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock('../client', () => ({ getAppwriteServices: () => ({ account: mocks }) }));
 
-import { completeVerifiedRegistration, loginWithPassword } from '../authService';
+import { completePasswordRecovery, completeVerifiedRegistration, loginWithPassword } from '../authService';
 
 describe('verified Appwrite account flow', () => {
   beforeEach(() => {
@@ -41,6 +41,21 @@ describe('verified Appwrite account flow', () => {
   it('cleans up the temporary session if registration finalization fails', async () => {
     mocks.updatePassword.mockRejectedValueOnce(new Error('password rejected'));
     await expect(completeVerifiedRegistration('u3', '123456', 'weak', '执政官')).rejects.toThrow('password rejected');
+    expect(mocks.deleteSession).toHaveBeenCalledWith({ sessionId: 'current' });
+  });
+
+  it('updates a password only after a recovery OTP verifies an existing password account', async () => {
+    mocks.get.mockResolvedValue({ $id: 'u4', emailVerification: true, passwordUpdate: '2026-07-22T00:00:00.000Z' });
+    await completePasswordRecovery('u4', '654321', 'NewImperium42');
+    expect(mocks.createSession).toHaveBeenCalledWith({ userId: 'u4', secret: '654321' });
+    expect(mocks.updatePassword).toHaveBeenCalledWith({ password: 'NewImperium42' });
+    expect(mocks.createSession.mock.invocationCallOrder[0]).toBeLessThan(mocks.updatePassword.mock.invocationCallOrder[0]);
+  });
+
+  it('does not turn an unknown OTP-only account into a recovered password account', async () => {
+    mocks.get.mockResolvedValue({ $id: 'u5', emailVerification: true, passwordUpdate: '' });
+    await expect(completePasswordRecovery('u5', '654321', 'NewImperium42')).rejects.toThrow('没有可找回');
+    expect(mocks.updatePassword).not.toHaveBeenCalled();
     expect(mocks.deleteSession).toHaveBeenCalledWith({ sessionId: 'current' });
   });
 });

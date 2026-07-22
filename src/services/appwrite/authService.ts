@@ -52,6 +52,20 @@ export async function completeVerifiedRegistration(userId: string, secret: strin
   }
 }
 
+export async function completePasswordRecovery(userId: string, secret: string, password: string): Promise<AuthUser> {
+  const { account } = getAppwriteServices();
+  await account.createSession({ userId, secret });
+  try {
+    const user = await requireVerifiedUser(await account.get());
+    if (!user.passwordUpdate) throw new Error('该邮箱没有可找回的密码账号，请注册新账号');
+    await account.updatePassword({ password });
+    return await requireVerifiedUser(await account.get());
+  } catch (error) {
+    await account.deleteSession({ sessionId: 'current' }).catch(() => undefined);
+    throw error;
+  }
+}
+
 export async function logoutCurrentSession(): Promise<void> {
   await getAppwriteServices().account.deleteSession({ sessionId: 'current' });
 }
