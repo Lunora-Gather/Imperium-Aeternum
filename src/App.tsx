@@ -39,6 +39,7 @@ const ChronicleScreen = lazy(() => import('./screens/ChronicleScreen'));
 const SaveLoadScreen = lazy(() => import('./screens/SaveLoadScreen'));
 const EventModal = lazy(() => import('./screens/EventModal'));
 const NoviceJourneyPanel = lazy(() => import('./components/NoviceJourneyPanel'));
+const NoviceJourneyCompletion = lazy(() => import('./components/NoviceJourneyCompletion'));
 
 type Tab = NavigationTab;
 
@@ -91,6 +92,8 @@ export default function App() {
   const [tutorialStep, setTutorialStep] = useState(0);
   const [noviceJourney, setNoviceJourney] = useState<NoviceJourneyProgress>(loadNoviceJourney);
   const [noviceCollapsed, setNoviceCollapsed] = useState(false);
+  const [showNoviceCompletion, setShowNoviceCompletion] = useState(false);
+  const previousNoviceStatus = useRef(noviceJourney.status);
   const [theme, setTheme] = useState<'night' | 'day' | 'bamboo' | 'ink'>(() => {
     try {
       const saved = localStorage.getItem('ia-theme');
@@ -167,6 +170,14 @@ export default function App() {
       return next;
     });
   }, [state.turn, tab, localSaveAvailable]);
+
+  useEffect(() => {
+    if (previousNoviceStatus.current === 'active' && noviceJourney.status === 'completed') {
+      setShowNoviceCompletion(true);
+      setNoviceCollapsed(false);
+    }
+    previousNoviceStatus.current = noviceJourney.status;
+  }, [noviceJourney.status]);
 
   useEffect(() => {
     if (pendingTab) {
@@ -409,6 +420,18 @@ export default function App() {
             onComplete={completeCurrentNoviceStep}
             onToggleCollapsed={() => setNoviceCollapsed((value) => !value)}
             onDismiss={dismissNoviceJourney}
+          />
+        </Suspense>
+      )}
+
+      {showNoviceCompletion && !showHelp && (
+        <Suspense fallback={null}>
+          <NoviceJourneyCompletion
+            onClose={() => setShowNoviceCompletion(false)}
+            onReview={() => {
+              setShowNoviceCompletion(false);
+              goToTab('dashboard');
+            }}
           />
         </Suspense>
       )}
