@@ -7,6 +7,7 @@ import { LAWS, LAWS_BY_CATEGORY, LAW_CATEGORY_LABEL } from '../data/laws';
 import type { LawCategory } from '../data/laws';
 import { Panel, StatRow, Btn, Tag, Divider } from '../components/ui';
 import type { PolicyId } from '../data/policies';
+import { hasTech } from '../gameplay/actions';
 
 const factionLabel = (id: string): string => ({ nobles: '贵族', merchants: '商人', military: '军方', commoners: '民众', clergy: '神职' }[id] ?? id);
 
@@ -87,14 +88,16 @@ export default function PoliticsScreen() {
               {POLICIES.map((p) => {
                 const already = activePolicyIds.has(p.id);
                 const govOk = p.allowedGovernments.length === 0 || p.allowedGovernments.includes(player.government.type);
-                const techOk = !p.prereqTech || player.tech.admin >= 3;
+                const techOk = hasTech(player, p.prereqTech);
                 const goldOk = player.resources.gold >= p.costGold;
-                const can = !already && govOk && techOk && goldOk;
+                const apOk = player.resources.adminPt >= p.costAction;
+                const can = !already && govOk && techOk && goldOk && apOk;
                 const blockers: string[] = [];
                 if (!govOk) blockers.push('政体不符');
-                if (!techOk) blockers.push('需行政Lv3');
+                if (!techOk) blockers.push(`需${p.prereqTech ?? '前置科技'}`);
                 if (!goldOk) blockers.push('金不足');
-                return <PolicyCard key={p.id} title={p.name} desc={p.description} already={already} can={can} cost={p.costGold} blocker={blockers[0]} factionReaction={p.factionReaction} onClick={() => enact(p.id)} />;
+                if (!apOk) blockers.push(`需${p.costAction}行动点`);
+                return <PolicyCard key={p.id} title={p.name} desc={p.description} already={already} can={can} cost={p.costGold} actionCost={p.costAction} blocker={blockers[0]} factionReaction={p.factionReaction} onClick={() => enact(p.id)} />;
               })}
             </div>
           </Panel>
@@ -113,8 +116,9 @@ export default function PoliticsScreen() {
                   const techOk = player.tech.admin >= l.prereqAdminLevel;
                   const conflict = l.conflictsWith?.some((c) => activeLawIds.has(c));
                   const goldOk = player.resources.gold >= l.costGold;
-                  const can = !already && govOk && techOk && !conflict && goldOk;
-                  const blocker = !govOk ? '政体不符' : !techOk ? `需行政Lv${l.prereqAdminLevel}` : conflict ? '互斥法律已推行' : !goldOk ? '金不足' : null;
+                  const apOk = player.resources.adminPt >= 2;
+                  const can = !already && govOk && techOk && !conflict && goldOk && apOk;
+                  const blocker = !govOk ? '政体不符' : !techOk ? `需行政Lv${l.prereqAdminLevel}` : conflict ? '互斥法律已推行' : !goldOk ? '金不足' : !apOk ? '需2行动点' : null;
                   return <LawCard key={l.id} title={l.name} desc={l.description} effects={l.effects} already={already} can={can} cost={l.costGold} blocker={blocker} factionReaction={l.factionReaction} onClick={() => doEnactLaw(l.id)} />;
                 })}
               </div>
@@ -132,8 +136,8 @@ function Guide({ title, body, tone, onClick }: { title: string; body: string; to
   return <div className="ia-card" style={{ padding: 10, borderLeft: `3px solid var(--${tone === 'danger' ? 'war' : tone === 'warn' ? 'warn' : tone === 'good' ? 'good' : 'border'})` }}>{content}</div>;
 }
 
-function PolicyCard({ title, desc, already, can, cost, blocker, factionReaction, onClick }: { title: string; desc: string; already: boolean; can: boolean; cost: number; blocker?: string | null; factionReaction: Record<string, number>; onClick: () => void }) {
-  return <div className="ia-card" style={{ padding: 10, opacity: can || already ? 1 : 0.7, border: already ? '1px solid var(--good)' : can ? '1px solid var(--border-gold)' : '1px solid var(--border)' }}><div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 6 }}><strong style={{ fontSize: 13 }}>{title}</strong>{already ? <Tag text="已推行" tone="good" /> : blocker ? <Tag text={blocker} tone="danger" /> : <Tag text={`${cost}金`} tone="info" />}</div><p className="dim" style={{ fontSize: 11, margin: '0 0 8px 0', lineHeight: 1.5 }}>{desc}</p><FactionBadges reaction={factionReaction} /><Btn label={already ? '已推行' : '推行'} variant={can ? 'primary' : 'ghost'} onClick={onClick} disabled={!can} /></div>;
+function PolicyCard({ title, desc, already, can, cost, actionCost, blocker, factionReaction, onClick }: { title: string; desc: string; already: boolean; can: boolean; cost: number; actionCost: number; blocker?: string | null; factionReaction: Record<string, number>; onClick: () => void }) {
+  return <div className="ia-card" style={{ padding: 10, opacity: can || already ? 1 : 0.7, border: already ? '1px solid var(--good)' : can ? '1px solid var(--border-gold)' : '1px solid var(--border)' }}><div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 6 }}><strong style={{ fontSize: 13 }}>{title}</strong>{already ? <Tag text="已推行" tone="good" /> : blocker ? <Tag text={blocker} tone="danger" /> : <Tag text={`${actionCost}政 · ${cost}金`} tone="info" />}</div><p className="dim" style={{ fontSize: 11, margin: '0 0 8px 0', lineHeight: 1.5 }}>{desc}</p><FactionBadges reaction={factionReaction} /><Btn label={already ? '已推行' : '推行'} variant={can ? 'primary' : 'ghost'} onClick={onClick} disabled={!can} /></div>;
 }
 
 function LawCard({ title, desc, effects, already, can, cost, blocker, factionReaction, onClick }: { title: string; desc: string; effects: Record<string, number | undefined>; already: boolean; can: boolean; cost: number; blocker?: string | null; factionReaction: Record<string, number>; onClick: () => void }) {

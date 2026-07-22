@@ -54,7 +54,7 @@ describe('save recovery previews', () => {
 
     expect(localStorage.getItem(key(1))).toBe(rawBefore);
     expect(['repairable', 'risky']).toContain(preview.status);
-    expect(preview.repairs).toContain('升级存档架构 v3 → v4');
+    expect(preview.repairs).toContain(`升级存档架构 v3 → v${SAVE_VERSION}`);
     expect(preview.repairs).toEqual(expect.arrayContaining(['清理临时外交缓存', '移除无效或重复战争']));
     expect(preview.score).toBeGreaterThanOrEqual(0);
   });

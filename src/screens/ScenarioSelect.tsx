@@ -1,6 +1,7 @@
 // 剧本选择页 v35 — 开局大厅：玩法速查手册 + 难度挑战阶梯 + 存档健康继续
 import { useMemo, useState } from 'react';
-import { useGameStore, SCENARIOS, type ScenarioId } from '../store/gameStore';
+import { useGameStore } from '../store/gameStore';
+import { SCENARIOS, type ScenarioId } from '../store/scenarioCatalog';
 import { clearAllSaves, SAVE_VERSION } from '../store/persistence';
 import { inspectAllSaveSlots, type SaveRecoveryPreview } from '../gameplay/saveRecovery';
 import { getScenarioProfile, nationStyleTags, recommendedScenarioIds, summarizeSavePreviews, type LaunchTone } from '../gameplay/launchHub';
@@ -8,6 +9,7 @@ import { buildScenarioChallengeGuide, recommendedChallengePath, summarizeChallen
 import { buildLaunchHandbook, type LaunchHandbook } from '../gameplay/launchHandbook';
 import { BUILD_MARK } from '../buildInfo';
 import { Btn, Tag } from '../components/ui';
+import { AccountButton } from '../components/account/AccountPanel';
 
 const THEMES = [
   { id: 'night', label: '暗夜', icon: '☾' },
@@ -73,7 +75,7 @@ export default function ScenarioSelect() {
   }
 
   return <div className="ia-menu ia-menu--launch">
-    <div className="ia-menu-toolbar"><div className="ia-menu-version"><Tag text={BUILD_MARK} tone="gold" /><Tag text={`存档 v${SAVE_VERSION}`} tone="info" /><Tag text={saveSummary.headline} tone={saveSummary.tone} /></div><ThemeSwitch theme={theme} applyTheme={applyTheme} /></div>
+    <div className="ia-menu-toolbar"><div className="ia-menu-version"><Tag text={BUILD_MARK} tone="gold" /><Tag text={`存档 v${SAVE_VERSION}`} tone="info" /><Tag text={saveSummary.headline} tone={saveSummary.tone} /></div><div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}><AccountButton /><ThemeSwitch theme={theme} applyTheme={applyTheme} /></div></div>
     <header className="ia-launch-hero">
       <div className="ia-launch-copy">
         <div className="ia-up ia-menu-kicker">Grand Strategy Chronicle</div>

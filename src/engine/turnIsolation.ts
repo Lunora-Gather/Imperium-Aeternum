@@ -3,15 +3,15 @@
 
 import type { GameState, TurnReport } from '../types/game';
 import { processTurn } from './turn';
+import { cloneGameState } from './stateClone';
 
 export function cloneGameStateForTurn(state: GameState): GameState {
-  // GameState 目前是纯数据结构；_relMap 是运行时缓存，必须丢弃并允许后续重建。
-  return JSON.parse(JSON.stringify({ ...state, _relMap: undefined })) as GameState;
+  return cloneGameState(state);
 }
 
 export function processTurnIsolated(state: GameState): { state: GameState; report: TurnReport } {
-  const working = cloneGameStateForTurn(state);
-  const result = processTurn(working);
+  // processTurn 本身已建立输入隔离；保留此 API 作为旧调用方的语义化入口。
+  const result = processTurn(state);
   result.state._relMap = undefined;
   return result;
 }

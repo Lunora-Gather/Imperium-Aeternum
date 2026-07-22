@@ -33,14 +33,14 @@
 | 4 | `Math.random()` 选政策，破坏可复现 | ai.ts L334 | → `mulberry32(state.seed^turn^nationId)` 确定性 rng |
 | 5 | `nation.factions.sort()` 原地 mutate 源数组（factions 被永久排序） | ai.ts L211 | → `[...nation.factions].sort()` 不 mutate |
 
-**根因**：ai.ts 历史上用裸 `Date.now()`/`Math.random()`，而 military.ts 已用统一的 `genId()`（utils/id.ts，带 counter 防碰撞）。两套 id 生成不统一 + ai 破坏 seed 决定性。现统一到 `genId()` + 确定性 rng。
+**当时根因与修复**：ai.ts 历史上用裸 `Date.now()`/`Math.random()`，随后曾统一到进程级 `genId()`。2026-07 的后续审计证明该方案仍破坏跨会话回放，现已由 v5 存档内 `entityIdCounter` + `allocateEntityId()` 完全取代。
 
 ### 确认非 bug（误判排除）
 
 | 项 | 结论 |
 |----|------|
 | `economy.ts` L150 `gold += gold * goldMod/100` | 正确——`welfare.goldMod: -15` 是百分比（非倍率），语义一致 |
-| `genId()` 内部用 `Date.now()` | 可接受——counter 保证唯一性，且 id 不需跨 session 可复现（只有 rng 需要可复现） |
+| `genId()` 内部用 `Date.now()` | **已推翻并修复**——实体 ID 属于 GameState，同种子同动作必须跨会话完全一致。 |
 
 ---
 
@@ -55,7 +55,7 @@
 
 | # | 问题 | 位置 | 严重度 | 决策 |
 |---|------|------|--------|------|
-| 1 | **孤儿军队**：军事胜利割省后，败方军队可能滞留在不再拥有的省份。`moveArmy` 校验 `toProvince.ownerId !== nation.id` 拦截调出，但败方无法把孤儿军调回己省（软锁）。 | military.ts L240（割省）vs L64（调动校验） | 低（边缘场景：需失省且该省有军队） | **记录不修**——发生概率低，修复需在割省时主动迁移败方军队，改动面大且当前 context 预算紧。压力测试阶段验证发生频率后再定。 |
+| 1 | **孤儿军队**：军事胜利割省后，败方军队可能滞留在失去的省份。 | 历史 military.ts | 低 | **后续已修复**——割地时迁移至剩余本国省；无领土则解散并写入史册，状态净化另有兜底。 |
 
 ### 确认非 bug
 
@@ -111,7 +111,7 @@
 ### 本轮（循环审查）文件
 | 文件 | 改动 |
 |------|------|
-| `engine/ai.ts` | +genId import；8 处 Date.now/Math.random id → genId()；1 处 Math.random 政策选 → 确定性 rng；1 处 .sort() mutate → 不 mutate |
+| `engine/ai.ts` | 当时将 8 处 Date.now/Math.random id → genId()；现已再次迁移为存档内 `allocateEntityId()`；政策选择使用确定性 rng。 |
 
 ### 累计（UX 审查 + P0-P3 + 循环审查）
 - **40 处编辑，13 个文件**

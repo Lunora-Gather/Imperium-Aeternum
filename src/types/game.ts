@@ -121,6 +121,33 @@ export interface DiplomaticRelation {
   truceTurns: number;
 }
 
+export type SummitAgenda = 'trade' | 'security' | 'normalization' | 'technology';
+export type SummitStance = 'conciliatory' | 'pragmatic' | 'firm';
+export type SummitOutcome = 'rejected' | 'breakdown' | 'stalemate' | 'agreement' | 'breakthrough';
+
+export interface DiplomaticSummitRecord {
+  id: string;
+  turn: number;
+  initiatorId: NationId;
+  targetId: NationId;
+  agenda: SummitAgenda;
+  stance: SummitStance;
+  outcome: SummitOutcome;
+  score: number;
+  summary: string;
+  commitments: string[];
+}
+
+export interface DiplomaticAccord {
+  id: string;
+  partyA: NationId;
+  partyB: NationId;
+  agenda: SummitAgenda;
+  startedTurn: number;
+  expiresTurn: number;
+  strength: 1 | 2;
+}
+
 // ── 国家性格倾向值 ──
 export interface NationalTendency {
   militarism: number;
@@ -188,12 +215,16 @@ export interface Ruler {
 
 // ── 事件触发冷却记录 ──
 export interface EventCooldown {
+  /** Missing only on legacy saves; new records are always scoped to one nation. */
+  nationId?: NationId;
   eventId: string;
   lastTriggeredTurn: number;
 }
 
 // ── 已触发的唯一事件 ──
 export interface TriggeredEvent {
+  /** Missing only on legacy saves; new records are always scoped to one nation. */
+  nationId?: NationId;
   eventId: string;
   turn: number;
   optionIndex: number;
@@ -276,16 +307,63 @@ export interface ChronicleEntry {
   actorId?: string;            // 可选当事国 id（milestone 类用）
 }
 
+// ── 长期目标与战略状态 ──
+export type StrategyFocusId = 'balance' | 'stability' | 'prosperity' | 'military' | 'diplomacy' | 'reform';
+export type AIFocusKind = 'expansion' | 'trade' | 'recovery' | 'defense' | 'research';
+
+export interface AIStrategyEntry {
+  kind: AIFocusKind;
+  sinceTurn: number;
+  targetId?: string;
+  intensity: number;
+}
+
+export interface AITerritoryMemory {
+  coreProvinceId?: string;
+  desiredProvinceId?: string;
+  revengeProvinceId?: string;
+  pressure: number;
+  lastUpdated: number;
+}
+
+export interface AIMemoryEntry {
+  rivalId?: string;
+  rivalScore: number;
+  partnerId?: string;
+  partnerScore: number;
+  watchId?: string;
+  watchScore: number;
+  territory?: AITerritoryMemory;
+  lastUpdated: number;
+}
+
+export interface AmbitionMeta {
+  playerNationId: string;
+  startTurn: number;
+  startProvinces: number;
+  startGold: number;
+  worldProvinces: number;
+  economyTurns: number;
+  peaceTurns: number;
+  lastProgressTurn?: number;
+  warnedPremature?: boolean;
+}
+
+export type PersistedAmbitionMeta = Partial<AmbitionMeta> & Pick<AmbitionMeta, 'playerNationId' | 'worldProvinces'>;
+
 // ── 全局游戏状态 ──
 export interface GameState {
   version: number;                  // 存档 schema 版本
   turn: number;                     // 当前回合（0 起，回合末 +1）
   seed: number;                     // seeded RNG 种子
+  entityIdCounter: number;          // 存档内实体 id 序列，保证确定性回放
   playerNationId: string;           // 玩家国家 id（替代硬编码 PLAYER_ID）
   nations: Record<string, Nation>;  // W1.1: Record<NationId,Nation> → Record<string,Nation>（支持 192 国数据驱动）
   provinces: Record<string, Province>;
   relations: DiplomaticRelation[];  // 双向都存，便于 UI 和外交行动 O(1) 查询
   _relMap?: Map<string, DiplomaticRelation>;  // E9: transient 索引，key=`${from}|${to}`，不序列化
+  diplomaticSummits: DiplomaticSummitRecord[];
+  diplomaticAccords: DiplomaticAccord[];
   wars: War[];
   triggeredEvents: TriggeredEvent[];
   eventCooldowns: EventCooldown[];
@@ -294,11 +372,13 @@ export interface GameState {
   lastReport: TurnReport | null;
   history: TurnReport[];            // E10: 最近 10 回合报告（sparkline 用）
   victory: { type: string | null };
-  stableTurnsCount: number;         // 连续稳定回合（永恒胜利用）
   bankruptTurns: number;            // 国库破产连续回合
   lowStabilityTurns: number;        // 稳定度过低连续回合
-  highEconomyStableTurns: number;   // 经济胜利连续回合
   chronicle: ChronicleEntry[];      // E12: 史册（里程碑叙事，上限 50）
+  strategyFocus?: StrategyFocusId;
+  aiStrategyMeta?: Record<string, AIStrategyEntry>;
+  aiMemory?: Record<string, AIMemoryEntry>;
+  ambitionMeta?: PersistedAmbitionMeta;
 }
 
 // ── 存档 ──
@@ -308,5 +388,5 @@ export interface SaveGame {
   gameState: GameState;
 }
 
-// v4：存档加载时规范化世界状态，补双向外交关系、缺失数组和无效玩家国兜底。
-export const SAVE_VERSION = 4;
+// v6：加入可持久化的元首会谈记录与双边协议。
+export const SAVE_VERSION = 6;

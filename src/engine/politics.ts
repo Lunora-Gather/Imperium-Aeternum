@@ -139,7 +139,7 @@ export function changeGovernment(nation: Nation, newGov: GovernmentId, state: Ga
 }
 
 // 推行政策
-export function enactPolicy(nation: Nation, policyId: PolicyId, state: GameState): { ok: boolean; reason?: string } {
+export function canEnactPolicy(nation: Nation, policyId: PolicyId): { ok: boolean; reason?: string } {
   const def = POLICIES.find((p) => p.id === policyId);
   if (!def) return { ok: false, reason: '政策不存在' };
   if (nation.activePolicies.some((p) => p.policyId === policyId)) {
@@ -152,16 +152,25 @@ export function enactPolicy(nation: Nation, policyId: PolicyId, state: GameState
     return { ok: false, reason: '缺少前置科技' };
   }
   if (nation.resources.gold < def.costGold) return { ok: false, reason: '金不足' };
+  return { ok: true };
+}
+
+export function enactPolicy(nation: Nation, policyId: PolicyId, state: GameState): { ok: boolean; reason?: string } {
+  const eligibility = canEnactPolicy(nation, policyId);
+  if (!eligibility.ok) return eligibility;
+  const def = POLICIES.find((p) => p.id === policyId)!;
 
   nation.resources.gold -= def.costGold;
   nation.activePolicies.push({ policyId, enactedTurn: state.turn });
 
   // 应用 effects 到国家修正
-  if (def.effects.taxEffMod) nation.government.efficiency = Math.round(nation.government.efficiency * (def.effects.taxEffMod ?? 1));
   if (def.effects.corruptionMod) nation.government.corruption = clamp(nation.government.corruption + def.effects.corruptionMod, 0, 100);
   if (def.effects.stabilityMod) nation.government.stability = clamp(nation.government.stability + def.effects.stabilityMod, 0, 100);
   if (def.effects.efficiencyMod) nation.government.efficiency = clamp(nation.government.efficiency + def.effects.efficiencyMod, 0, 100);
   if (def.effects.taxRateMod) nation.taxRate = clamp(nation.taxRate + (def.effects.taxRateMod ?? 0), 0, 0.5);
+
+  // 从已推行政策重建持续修正，避免重复调用、AI 与旧存档走出不同结果。
+  nation.policyMods = derivePolicyMods(nation);
 
   // 派系反应
   for (const [fid, delta] of Object.entries(def.factionReaction)) {
@@ -172,10 +181,31 @@ export function enactPolicy(nation: Nation, policyId: PolicyId, state: GameState
 }
 
 function hasTech(nation: Nation, techId: string): boolean {
-  // 简化：检查对应路线等级
-  if (techId === 'admin_lv3') return nation.tech.admin >= 3;
-  if (techId === 'admin_lv2') return nation.tech.admin >= 2;
-  return true;
+  const match = /^(agri|mil|admin|culture)_lv(\d+)$/.exec(techId);
+  if (!match) return false;
+  const branch = match[1] as 'agri' | 'mil' | 'admin' | 'culture';
+  return nation.tech[branch] >= Number(match[2]);
+}
+
+export function derivePolicyMods(nation: Nation): NonNullable<Nation['policyMods']> {
+  const mods: NonNullable<Nation['policyMods']> = {};
+  for (const active of nation.activePolicies) {
+    const effects = POLICIES.find((policy) => policy.id === active.policyId)?.effects;
+    if (!effects) continue;
+    if (effects.taxEffMod) mods.taxEffMod = (mods.taxEffMod ?? 1) * effects.taxEffMod;
+    if (effects.combatMod) mods.combatMod = (mods.combatMod ?? 1) * effects.combatMod;
+    if (effects.mobilizationMod) mods.mobilizationMod = (mods.mobilizationMod ?? 1) * effects.mobilizationMod;
+    if (effects.popGrowthMod) mods.popGrowthMod = (mods.popGrowthMod ?? 1) * effects.popGrowthMod;
+    if (effects.influenceMod) {
+      // 早期数据用 “+3/-3” 百分点，扩展数据用 “1.15” 倍率；在引擎边界统一语义。
+      const influenceMultiplier = Math.abs(effects.influenceMod) >= 2
+        ? 1 + effects.influenceMod / 100
+        : effects.influenceMod;
+      mods.influenceMod = (mods.influenceMod ?? 1) * influenceMultiplier;
+    }
+    if (effects.assimilationMod) mods.assimilationMod = (mods.assimilationMod ?? 0) + effects.assimilationMod;
+  }
+  return mods;
 }
 
 // ── C2: 推行法律 ──

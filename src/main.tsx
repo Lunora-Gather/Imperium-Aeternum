@@ -10,15 +10,6 @@ import './quiet.css';
 import './dashboard.css';
 import './palette.css';
 import { BUILD_MARK } from './buildInfo';
-import { installLogicGuard } from './gameplay/logicGuard';
-import { installAmbitionSystem } from './gameplay/ambitions';
-import { installStrategyFocus } from './gameplay/strategyFocus';
-import { installStateHygiene } from './gameplay/stateHygiene';
-
-installLogicGuard();
-installAmbitionSystem();
-installStrategyFocus();
-installStateHygiene();
 
 function showFatalError(error: unknown) {
   const root = document.getElementById('root');

@@ -9,9 +9,11 @@ import { provincesOf, getRelationObj } from './init';
 import { makePeace } from './military';
 import { clamp } from '../utils/math';
 import { mulberry32 } from '../utils/random';
-import { genId } from '../utils/id';
-import type { PolicyId } from '../data/policies';
+import { allocateEntityId } from '../utils/id';
+import { POLICIES } from '../data/policies';
+import { canEnactPolicy, enactPolicy } from './politics';
 import { mergeAiWarActionPlan } from '../gameplay/aiWarActionAdapter';
+import { hasActiveNonAggressionAccord } from './summits';
 
 export function defaultAIWeights(tier: NationTier): NationDef['aiWeights'] {
   const base = { taxUp: 1.0, buildFarm: 1.0, suppress: 0.8, expandArmy: 0.8, alliance: 1.0, declareWar: 0.6, research: 1.0 };
@@ -49,6 +51,7 @@ function isAttackableProvince(nation: Nation, state: GameState, provinceId: stri
   if (!defender || defender.defeated) return null;
   const rel = getRelationObj(nation.id, target.ownerId, state);
   if (rel?.treaty === 'alliance') return null;
+  if (hasActiveNonAggressionAccord(state, nation.id, target.ownerId)) return null;
   if (rel?.treaty === 'truce' && rel.truceTurns > 0) return null;
   if (state.wars.some((w) => (w.attackerId === nation.id && w.defenderId === target.ownerId) || (w.attackerId === target.ownerId && w.defenderId === nation.id))) return null;
   const ownFront = provincesOf(nation.id, state.provinces).some((p) => p.adjacent.includes(target.id));
@@ -197,7 +200,7 @@ function moveCapitalArmyToFront(nation: Nation, state: GameState, targetProvince
   if (!capitalArmy || frontProv.id === capitalArmy.location) return;
   let dest = nation.army.find((a) => a.location === frontProv.id);
   if (!dest) {
-    dest = { id: genId('army'), ownerId: nation.id, location: frontProv.id, size: 0, morale: 60, training: 50, equipment: 50, supply: 80 };
+    dest = { id: allocateEntityId(state, 'army'), ownerId: nation.id, location: frontProv.id, size: 0, morale: 60, training: 50, equipment: 50, supply: 80 };
     nation.army.push(dest);
   }
   dest.size += capitalArmy.size;
@@ -211,13 +214,13 @@ export function executeAIAction(nation: Nation, action: AIAction, state: GameSta
     case 'build_farm': {
       if (!action.target) break;
       const p = state.provinces[action.target];
-      if (p && nation.resources.gold >= 50) { nation.resources.gold -= 50; p.buildings.push({ id: genId('b'), defId: 'farm', provinceId: p.id, level: 1 }); }
+      if (p && nation.resources.gold >= 50) { nation.resources.gold -= 50; p.buildings.push({ id: allocateEntityId(state, 'building'), defId: 'farm', provinceId: p.id, level: 1 }); }
       break;
     }
     case 'build_market': {
       if (!action.target) break;
       const p = state.provinces[action.target];
-      if (p && nation.resources.gold >= 80) { nation.resources.gold -= 80; p.buildings.push({ id: genId('b'), defId: 'market', provinceId: p.id, level: 1 }); }
+      if (p && nation.resources.gold >= 80) { nation.resources.gold -= 80; p.buildings.push({ id: allocateEntityId(state, 'building'), defId: 'market', provinceId: p.id, level: 1 }); }
       break;
     }
     case 'recruit': {
@@ -226,7 +229,7 @@ export function executeAIAction(nation: Nation, action: AIAction, state: GameSta
       if (p && nation.resources.gold >= 75 && nation.resources.supply >= 10 && p.population > 50) {
         nation.resources.gold -= 75; nation.resources.supply -= 10; p.population -= 50;
         let army = nation.army.find((a) => a.location === action.target);
-        if (!army) { army = { id: genId('army'), ownerId: nation.id, location: action.target, size: 0, morale: 60, training: 50, equipment: 50, supply: 80 }; nation.army.push(army); }
+        if (!army) { army = { id: allocateEntityId(state, 'army'), ownerId: nation.id, location: action.target, size: 0, morale: 60, training: 50, equipment: 50, supply: 80 }; nation.army.push(army); }
         army.size += 50;
       }
       break;
@@ -260,8 +263,10 @@ export function executeAIAction(nation: Nation, action: AIAction, state: GameSta
       const target = targetProvince ?? fallbackTarget ?? null;
       if (!target) break;
       const defenderId = target.ownerId;
+      if (state.wars.some((war) => [war.attackerId, war.defenderId].includes(nation.id) && [war.attackerId, war.defenderId].includes(defenderId))) break;
+      if (hasActiveNonAggressionAccord(state, nation.id, defenderId)) break;
       moveCapitalArmyToFront(nation, state, target.id);
-      state.wars.push({ id: genId('war'), attackerId: nation.id, defenderId, targetProvinceId: target.id, progress: 0, turns: 0, battleReports: [] });
+      state.wars.push({ id: allocateEntityId(state, 'war'), attackerId: nation.id, defenderId, targetProvinceId: target.id, progress: 0, turns: 0, battleReports: [] });
       nation.atWar = true;
       const defender = state.nations[defenderId];
       if (defender) defender.atWar = true;
@@ -296,20 +301,12 @@ export function executeAIAction(nation: Nation, action: AIAction, state: GameSta
       break;
     }
     case 'enact_policy': {
-      const POLICIES_AI: { id: string; costGold: number; allowedGovernments: string[]; effects: Record<string, unknown> }[] = [
-        { id: 'census', costGold: 150, allowedGovernments: ['empire', 'monarchy'], effects: {} },
-        { id: 'merchant_guild', costGold: 120, allowedGovernments: ['republic', 'merchant_republic', 'monarchy'], effects: {} },
-        { id: 'military_reform', costGold: 200, allowedGovernments: ['empire', 'monarchy', 'junta'], effects: {} },
-        { id: 'infrastructure_plan', costGold: 220, allowedGovernments: [], effects: {} },
-        { id: 'education_reform', costGold: 200, allowedGovernments: [], effects: {} },
-        { id: 'welfare', costGold: 150, allowedGovernments: [], effects: {} },
-      ];
-      const avail = POLICIES_AI.filter((p) => nation.resources.gold >= p.costGold && !nation.activePolicies.some((ap) => ap.policyId === p.id) && (p.allowedGovernments.length === 0 || p.allowedGovernments.includes(nation.government.type)));
+      const aiPolicyIds = new Set(['census', 'merchant_guild', 'military_reform', 'infrastructure_plan', 'education_reform', 'welfare']);
+      const avail = POLICIES.filter((policy) => aiPolicyIds.has(policy.id) && canEnactPolicy(nation, policy.id).ok);
       if (avail.length > 0) {
         const prng = mulberry32((state.seed ^ 0x5DEECE) ^ (state.turn * 31) ^ (nation.id.length * 7));
         const pick = avail[Math.floor(prng() * avail.length)];
-        nation.resources.gold -= pick.costGold;
-        nation.activePolicies.push({ policyId: pick.id as PolicyId, enactedTurn: state.turn });
+        enactPolicy(nation, pick.id, state);
       }
       break;
     }
@@ -329,7 +326,7 @@ export function processAITurnLite(nation: Nation, state: GameState, rng: () => n
     if (provs.length > 0) {
       const p = provs[Math.floor(rng() * provs.length)];
       const bType = rng() > 0.5 ? 'farm' : 'market';
-      p.buildings.push({ id: genId('b'), defId: bType, provinceId: p.id, level: 1 });
+      p.buildings.push({ id: allocateEntityId(state, 'building'), defId: bType, provinceId: p.id, level: 1 });
       nation.resources.gold -= 50;
     }
   }
@@ -351,7 +348,7 @@ export function processAITurnStatic(nation: Nation, state: GameState): void {
         const bf = b.buildings.filter((x) => x.defId === 'farm').length;
         return af - bf;
       })[0];
-      if (target && target.buildings.filter((x) => x.defId === 'farm').length < 3) target.buildings.push({ id: genId('b'), defId: 'farm', provinceId: target.id, level: 1 });
+      if (target && target.buildings.filter((x) => x.defId === 'farm').length < 3) target.buildings.push({ id: allocateEntityId(state, 'building'), defId: 'farm', provinceId: target.id, level: 1 });
     }
   }
 }

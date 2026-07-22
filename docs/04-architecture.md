@@ -46,7 +46,7 @@ Types（types/game.ts）     ← 所有 interface
   pendingEventOptions: null;
   lastReport: TurnReport | null;
   victory: { type: string | null };
-  stableTurnsCount, bankruptTurns, lowStabilityTurns, highEconomyStableTurns: number;
+  entityIdCounter, bankruptTurns, lowStabilityTurns: number;
 }
 ```
 
@@ -170,8 +170,8 @@ Types（types/game.ts）     ← 所有 interface
 ### `engine/dynasty.ts` — 王朝系统
 `tryBirthHeir` / `ageRulers` / `reignLegitimacy`：继承人生成、统治者老化即位、在位年数影响合法性。
 
-### `engine/migration.ts` — 存档迁移
-`migrate(save)`：按版本号顺序应用迁移函数。`SAVE_VERSION` 在 `types/game.ts`。
+### `store/persistence.ts` — 存档与迁移
+`migrate(save)` 按版本号顺序应用迁移函数，`SAVE_VERSION` 在 `types/game.ts`。本地导入与云端下载共用同一迁移、规范化和压缩入口，远端数据不会绕过存档边界直接进入运行状态。
 
 ---
 
@@ -191,8 +191,9 @@ Zustand store。`pid(s)` helper = `s.playerNationId || PLAYER_ID`。
 | `establishTradeRoute` | C3 建立贸易路线 |
 | `upgradeBuilding` | 建筑升级（成本 = costGold × 0.6 × level，max 3） |
 | `save / load / clearSave / hasSave` | localStorage 存档 |
+| `conveneDiplomaticSummit` | 校验前提并事务化提交峰会结果与协议 |
 
-`persistence.ts`：读写 localStorage + 版本校验 + migrate。
+`persistence.ts`：读写 localStorage + 版本校验 + migrate。`accountStore.ts` 管理用户会话与云槽位状态；游戏 store 仅通过 `gameplay/cloudSyncCoordinator.ts` 异步触发同步，不直接依赖 Appwrite SDK。
 
 ---
 
@@ -215,6 +216,8 @@ Zustand store。`pid(s)` helper = `s.playerNationId || PLAYER_ID`。
 | `EventModal` | 事件弹窗+选项效果提示 |
 | `TurnReportScreen` | 回合报告叙事流 |
 | `SaveLoadScreen` | 存档管理 |
+
+账号弹窗位于 `components/account/`。`services/appwrite/` 只包含 Appwrite Client、Account、TablesDB 与 Storage 适配；浏览器端只保存公开项目标识，不包含 API key。云端元数据和 JSON 文件都使用用户专属行/文件权限。
 
 `components/ui.tsx`：通用组件（Panel/Stat/StatRow/Btn/Tag/Bar/Divider/StatusDot/ResourceStrip）。
 
@@ -248,15 +251,14 @@ App.tsx
 
 ## 7. 测试
 
-```
-npm test → 48/48
-  formulas.test    27 tests  （公式手算对照）
-  worldgen.test     7 tests  （世界生成）
-  turn.test         6 tests  （5 国回合结算）
-  world-smoke.test  8 tests  （205 国烟雾 + A2/A5/C1 新测试）
-npm run typecheck → ✅
-npm run validate  → ✅ 103 事件 0 错误
-```
+`npm run rc:check` 是唯一发布门禁，当前覆盖 66 个测试文件、366 项测试，并串联：
+
+- TypeScript 类型检查与 325 个事件的数据校验
+- 单元、事务、不变量、纯函数、存档迁移和云存档边界测试
+- 经典、区域、完整世界的稳定性与性能模拟
+- GitHub Pages 生产构建与首屏/懒加载分块体积预算
+
+具体数量会随功能增长，以 CI 当次输出为准，不在此维护逐文件静态清单。
 
 ---
 

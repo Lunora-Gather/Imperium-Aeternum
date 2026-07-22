@@ -2,6 +2,7 @@
 // 只读纯函数，不修改 GameState；适合总览 UI、测试和未来调试面板复用。
 
 import type { GameState, Nation, Province } from '../types/game';
+import { isValidProvinceOwner } from './stateOwnership';
 
 export type ReadinessTone = 'good' | 'warn' | 'danger';
 export type ReadinessAudience = 'player' | 'developer';
@@ -114,7 +115,7 @@ export function buildReadinessReport(state: GameState): ReadinessReport {
   }
 
   // 开发者视角：轻量状态一致性检查，不阻断普通体验，但会拉低体检分。
-  const invalidProvinceOwners = Object.values(state.provinces).filter((p) => !state.nations[p.ownerId]);
+  const invalidProvinceOwners = Object.values(state.provinces).filter((p) => !isValidProvinceOwner(state, p.ownerId));
   if (invalidProvinceOwners.length > 0) add({ id: 'invalid-province-owner', title: '省份 ownerId 无效', detail: `${invalidProvinceOwners.length} 个省份指向不存在的国家。`, tone: 'danger', audience: 'developer', tab: 'map' }, 18);
 
   const invalidWars = state.wars.filter((w) => !state.nations[w.attackerId] || !state.nations[w.defenderId] || !state.provinces[w.targetProvinceId]);

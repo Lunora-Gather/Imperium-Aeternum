@@ -57,6 +57,8 @@
 | Economy / Diplomacy Advisors | 汇总财政、粮食、外交关系、威胁和可行动建议 |
 | War Preview | 在宣战前展示胜率、准备度、后勤压力和外部风险 |
 | Save Recovery | 支持多槽位存档、旧档 normalize 和损坏存档安全失败 |
+| 元首峰会 | 只有关系、信任、国内稳定、资源和冷却期满足时才能举行；协议会持续影响后续国势 |
+| Appwrite 账号 | 密码登录优先、邮箱验证码备选；游客仍可离线游玩，登录后可同步 5 个私有云存档槽位 |
 
 ## 发布状态
 
@@ -81,6 +83,10 @@ npm run dev
 
 ```bash
 npm run typecheck
+npm run test:invariants
+npm run simulate:stability
+npm run simulate:benchmark
+npm run check:bundle
 npm run validate
 npm run test
 ```
@@ -91,7 +97,7 @@ npm run test
 VITE_BASE=/Imperium-Aeternum/ npm run rc:check
 ```
 
-`rc:check` 包含 TypeScript 检查、数据校验、稳定性测试、目标顾问/经济/外交/战争/AI targeted tests，以及 Pages 兼容构建。
+`rc:check` 包含 TypeScript 检查、数据校验、完整 Vitest 回归套件、经典/区域/世界稳定性与性能模拟、Pages 兼容构建及构建体积预算。
 
 ## 项目结构
 
@@ -101,13 +107,20 @@ src/
   data/         国家、省份、事件、建筑、政策、法律、科技等数据
   engine/       回合结算、战争、外交、AI、事件、王朝等核心逻辑
   gameplay/     顾问、路线判断、风险中心、行动建议和发布状态
+    actions/     事务化玩家命令（内政、外交、军事、政治、省份）
   screens/      地图、Dashboard、年报、外交、军事、存档等页面
+  services/     Appwrite 客户端、认证与云存档基础设施适配器（无服务端密钥）
   store/        全局状态、存档、迁移和游戏入口
   types/        TypeScript 类型定义
 ```
 
 ## 有用文档
 
+- [文档导航](docs/README.md)
+- [维护手册](docs/maintenance/README.md)
+- [后续完善路线图](docs/maintenance/ROADMAP.md)
+- [漏洞检查清单](docs/maintenance/BUG-AUDIT-CHECKLIST.md)
+- [Appwrite 账号与云存档维护](docs/maintenance/APPWRITE_SETUP.md)
 - [Release notes](docs/release-notes-v1.0.0-preview.md)
 - [Public preview QA](docs/public-preview-qa.md)
 - [Release checklist](docs/release-checklist.md)

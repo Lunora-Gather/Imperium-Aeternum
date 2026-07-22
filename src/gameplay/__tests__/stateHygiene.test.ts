@@ -34,6 +34,35 @@ function report(turn: number, nationId: string): TurnReport {
 }
 
 describe('state hygiene repair chain', () => {
+  it('preserves neutral barbarian provinces instead of transferring them to the player', () => {
+    const state = createInitialState();
+    const neutralBefore = Object.values(state.provinces).filter((province) => province.ownerId === 'barbarian').length;
+    const playerBefore = Object.values(state.provinces).filter((province) => province.ownerId === state.playerNationId).length;
+
+    const repaired = sanitizeState(state);
+
+    expect(neutralBefore).toBeGreaterThan(0);
+    expect(Object.values(repaired.provinces).filter((province) => province.ownerId === 'barbarian')).toHaveLength(neutralBefore);
+    expect(Object.values(repaired.provinces).filter((province) => province.ownerId === state.playerNationId)).toHaveLength(playerBefore);
+  });
+
+  it('does not share long-term strategy metadata with the input state', () => {
+    const state = createInitialState();
+    state.strategyFocus = 'military';
+    state.aiStrategyMeta = { n02: { kind: 'defense', sinceTurn: 0, intensity: 2 } };
+    state.aiMemory = { n02: { rivalScore: 20, partnerScore: 10, watchScore: 30, lastUpdated: 0, territory: { pressure: 15, lastUpdated: 0 } } };
+    state.ambitionMeta = { playerNationId: state.playerNationId, worldProvinces: Object.keys(state.provinces).length, startTurn: 0 };
+
+    const repaired = sanitizeState(state);
+    repaired.aiStrategyMeta!.n02.intensity = 5;
+    repaired.aiMemory!.n02.territory!.pressure = 90;
+    repaired.ambitionMeta!.startTurn = 8;
+
+    expect(state.aiStrategyMeta.n02.intensity).toBe(2);
+    expect(state.aiMemory.n02.territory!.pressure).toBe(15);
+    expect(state.ambitionMeta.startTurn).toBe(0);
+  });
+
   it('does not mutate its input while repairing scalar ranges', () => {
     const state = createInitialState();
     const before = clone(state);

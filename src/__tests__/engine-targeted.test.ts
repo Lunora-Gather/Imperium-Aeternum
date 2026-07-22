@@ -1,17 +1,17 @@
 // C3: 引擎针对性测试扩充——economy/politics/military/diplomacy 各 ≥3 个
 import { describe, it, expect } from 'vitest';
 import { createInitialState } from '../engine/init';
-import { settleEconomy, establishTradeRoute, settleEconomyPure } from '../engine/economy';
+import { computeBuildingYields, settleEconomy, establishTradeRoute, settleEconomyPure } from '../engine/economy';
 import { settlePolitics, settlePoliticsPure, changeGovernment, enactPolicy, enactLaw } from '../engine/politics';
 import { settleTechnology, settleTechnologyPure, startResearch } from '../engine/technology';
 import { settleCultureReligion, settleCultureReligionPure } from '../engine/culture';
 import { settleDiplomacy, settleDiplomacyPure, improveRelation, establishTrade, espionage, formAlliance } from '../engine/diplomacy';
-import { declareWar, makePeace, recruit, moveArmy, settleWarsPure } from '../engine/military';
+import { applySettleWarsResult, declareWar, makePeace, recruit, moveArmy, settleWars, settleWarsPure } from '../engine/military';
 import { draftFromPopulation, settlePopulation, settlePopulationPure } from '../engine/population';
 import { checkTrigger, rollEvents, applyEffect, applyEffectPure, recordEvent, recordEventPure } from '../engine/events';
 import { ageRulers, ageRulersPure } from '../engine/dynasty';
 import { lawPerTurnEffects, lawPerTurnEffectsPure } from '../engine/politics';
-import { processTurn, processTurnPure } from '../engine/turn';
+import { processTurn } from '../engine/turn';
 import { PLAYER_ID } from '../data/nations';
 import type { GameState } from '../types/game';
 import { mulberry32 } from '../utils/random';
@@ -33,6 +33,35 @@ describe('C3 economy 针对性', () => {
     player.government.corruption = 50;
     const r = settleEconomy(player, state);
     expect(r.corruptionLoss).toBeGreaterThan(0);
+  });
+
+  it('行政点恢复只结算一次基础值与建筑产出', () => {
+    const state = createInitialState();
+    const player = state.nations[PLAYER_ID];
+    state.provinces.p01.buildings.push({ id: 'admin-court', defId: 'courthouse', provinceId: 'p01', level: 1 });
+    player.resources.adminPt = 0;
+    const expected = 3 + Math.floor(player.government.efficiency / 25) + 3;
+
+    settleEconomy(player, state);
+
+    expect(player.resources.adminPt).toBe(expected);
+  });
+
+  it('建筑产出按等级与地形缩放，并覆盖食物、木材等完整资源表', () => {
+    const state = createInitialState();
+    const province = state.provinces.p01;
+    province.terrain = 'plain';
+    province.buildings = [
+      { id: 'market-l2', defId: 'market', provinceId: province.id, level: 2 },
+      { id: 'workshop-l3', defId: 'workshop', provinceId: province.id, level: 3 },
+      { id: 'farm-l2', defId: 'farm', provinceId: province.id, level: 2 },
+    ];
+
+    const yields = computeBuildingYields([province]);
+
+    expect(yields.gold).toBeCloseTo(30 * 2 + 4 * 3 * 1.2);
+    expect(yields.wood).toBeCloseTo(6 * 3 * 1.2);
+    expect(yields.food).toBeCloseTo(50 * 2 * 1.5);
   });
 
   it('内战期间税收 ×0.7', () => {
@@ -85,7 +114,7 @@ describe('C3 military 针对性', () => {
     const prov = Object.values(state.provinces).find((p) => p.ownerId === PLAYER_ID);
     if (!prov) return;
     const goldBefore = player.resources.gold;
-    const ok = recruit(player, prov, 50);
+    const ok = recruit(state, player, prov, 50);
     if (ok) expect(player.resources.gold).toBeLessThanOrEqual(goldBefore);
   });
 
@@ -102,6 +131,47 @@ describe('C3 military 针对性', () => {
     const ownerBefore = target.ownerId;
     makePeace(state, war);
     expect(state.provinces[target.id].ownerId).not.toBe(ownerBefore);
+  });
+
+  it('和约把双向关系稳定为敌对停战，而不是错误夹到中立值', () => {
+    const state = createInitialState();
+    const defender = Object.values(state.nations).find((nation) => nation.id !== PLAYER_ID)!;
+    const target = Object.values(state.provinces).find((province) => province.ownerId === defender.id)!;
+    const war = declareWar(state, PLAYER_ID, defender.id, target.id)!;
+    war.progress = 50;
+
+    makePeace(state, war);
+
+    const pair = state.relations.filter((relation) => [PLAYER_ID, defender.id].includes(relation.from) && [PLAYER_ID, defender.id].includes(relation.to));
+    expect(pair).toHaveLength(2);
+    expect(pair.every((relation) => relation.treaty === 'truce' && relation.truceTurns === 10 && relation.relation === -45 && relation.trust <= 25)).toBe(true);
+  });
+
+  it('拒绝同一国家对的反向重复战争', () => {
+    const state = createInitialState();
+    const defender = Object.values(state.nations).find((nation) => nation.id !== PLAYER_ID)!;
+    const defenderTarget = Object.values(state.provinces).find((province) => province.ownerId === defender.id)!;
+    const playerTarget = Object.values(state.provinces).find((province) => province.ownerId === PLAYER_ID)!;
+
+    expect(declareWar(state, PLAYER_ID, defender.id, defenderTarget.id)).toBeTruthy();
+    expect(declareWar(state, defender.id, PLAYER_ID, playerTarget.id)).toBeNull();
+    expect(state.wars).toHaveLength(1);
+  });
+
+  it('负国库不会生成反向赔款', () => {
+    const state = createInitialState();
+    const attacker = state.nations[PLAYER_ID];
+    const defender = Object.values(state.nations).find((nation) => nation.id !== PLAYER_ID)!;
+    const target = Object.values(state.provinces).find((province) => province.ownerId === defender.id)!;
+    const war = declareWar(state, attacker.id, defender.id, target.id)!;
+    war.progress = 70;
+    defender.resources.gold = -50;
+    const attackerGold = attacker.resources.gold;
+
+    makePeace(state, war);
+
+    expect(defender.resources.gold).toBe(-50);
+    expect(attacker.resources.gold).toBe(attackerGold);
   });
 
   it('孤儿军队撤退——割省后败军不滞留', () => {
@@ -243,7 +313,7 @@ describe('C3 military 补充', () => {
     if (!to) return;
     player.army = [{ id: 'a1', ownerId: PLAYER_ID, location: from.id, size: 50, morale: 50, training: 30, equipment: 30, supply: 50 }];
     const goldBefore = player.resources.gold;
-    const r = moveArmy(player, 'a1', to.id, from, to);
+    const r = moveArmy(state, player, 'a1', to.id, from, to);
     expect(r.ok).toBe(true);
     expect(player.resources.gold).toBeLessThan(goldBefore);  // 扣金
   });
@@ -340,6 +410,8 @@ describe('C1 settleEconomyPure 纯函数对照', () => {
     const state2 = createInitialState();
     const p1 = state1.nations[PLAYER_ID];
     const p2 = state2.nations[PLAYER_ID];
+    state1.provinces.p01.buildings.push({ id: 'road-a', defId: 'road', provinceId: 'p01', level: 2 });
+    state2.provinces.p01.buildings.push({ id: 'road-a', defId: 'road', provinceId: 'p01', level: 2 });
     // 记录原值
     const origGold = p1.resources.gold, origFood = p1.resources.food, origSciPt = p1.resources.sciPt;
     const origAdminPt = p1.resources.adminPt, origInfluence = p1.resources.influence;
@@ -587,6 +659,27 @@ describe('C1 settleWarsPure 纯函数对照', () => {
     expect(pureResult.peaceWarIds).toEqual(pureResult.peaceWarIds);
     expect(Object.keys(pureResult.warUpdates).length).toBeGreaterThan(0);
   });
+
+  it('纯结果合并器与旧结算在完整战斗状态上完全一致', () => {
+    const left = createInitialState();
+    const right = createInitialState();
+    const playerProvince = Object.values(left.provinces).find((province) => province.ownerId === PLAYER_ID && province.adjacent.some((id) => left.provinces[id]?.ownerId !== PLAYER_ID))!;
+    const targetId = playerProvince.adjacent.find((id) => left.provinces[id]?.ownerId !== PLAYER_ID)!;
+    const defenderId = left.provinces[targetId].ownerId;
+    for (const state of [left, right]) {
+      const attacker = state.nations[PLAYER_ID];
+      const defender = state.nations[defenderId];
+      attacker.army = [{ id: 'attacker', ownerId: attacker.id, location: playerProvince.id, size: 900, morale: 70, training: 60, equipment: 60, supply: 80 }];
+      defender.army = [{ id: 'defender', ownerId: defender.id, location: targetId, size: 850, morale: 68, training: 58, equipment: 58, supply: 80 }];
+      state.provinces[targetId].garrison = 0;
+      declareWar(state, attacker.id, defender.id, targetId);
+    }
+
+    settleWars(left);
+    applySettleWarsResult(right, settleWarsPure(right));
+
+    expect({ ...right, _relMap: undefined }).toEqual({ ...left, _relMap: undefined });
+  });
 });
 
 // C1: applyEffectPure 纯函数对照测试
@@ -599,12 +692,12 @@ describe('C1 applyEffectPure 纯函数对照', () => {
     const effect = { gold: 50, food: 20, stability: 5, corruption: -3, warExhaustion: 10, taxRate: 0.05 };
     applyEffect(p1, effect, state1);
     const pure = applyEffectPure(p2, effect, state2);
-    expect(p2.resources.gold + (pure.nationDelta.gold ?? 0)).toBe(p1.resources.gold);
-    expect(p2.resources.food + (pure.nationDelta.food ?? 0)).toBe(p1.resources.food);
+    expect(p2.resources.gold + (pure.resourceDeltas.gold ?? 0)).toBe(p1.resources.gold);
+    expect(p2.resources.food + (pure.resourceDeltas.food ?? 0)).toBe(p1.resources.food);
     expect(pure.govFinal?.stability).toBe(p1.government.stability);
     expect(pure.govFinal?.corruption).toBe(p1.government.corruption);
-    expect(pure.nationDelta.warExhaustion).toBe(p1.warExhaustion);
-    expect(pure.nationDelta.taxRate).toBe(p1.taxRate);
+    expect(pure.warExhaustionFinal).toBe(p1.warExhaustion);
+    expect(pure.taxRateFinal).toBe(p1.taxRate);
   });
 
   it('applyEffectPure 不 mutate nation/state', () => {
@@ -664,6 +757,24 @@ describe('C1 ageRulersPure 纯函数对照', () => {
     ageRulersPure(p, mulberry32(42));
     expect(JSON.stringify({ ruler: p.ruler, gov: p.government })).toBe(before);
   });
+
+  it('ageRulersPure 在无嗣死亡时返回完整的新统治者数据并与旧实现一致', () => {
+    const state1 = createInitialState();
+    const state2 = createInitialState();
+    const p1 = state1.nations[PLAYER_ID];
+    const p2 = state2.nations[PLAYER_ID];
+    p1.ruler = { name: '旧王', ability: 60, age: 80, reignYears: 30 };
+    p2.ruler = { ...p1.ruler };
+    const alwaysZero = () => 0;
+
+    const legacy = ageRulers(p1, alwaysZero);
+    const pure = ageRulersPure(p2, alwaysZero);
+
+    expect(pure.died).toBe(true);
+    expect(pure.eventLog).toBe(legacy.eventLog);
+    expect(pure.rulerFinal).toEqual(p1.ruler);
+    expect(pure.govLegitimacyDelta).toBe(-10);
+  });
 });
 
 // C1: lawPerTurnEffectsPure 纯函数对照测试
@@ -692,15 +803,15 @@ describe('C1 lawPerTurnEffectsPure 纯函数对照', () => {
   });
 });
 
-// C1: processTurnPure 渐进式对照测试（6 子引擎 Pure + 6 子引擎保留原版本）
-describe('C1 processTurnPure 渐进式对照', () => {
-  it('processTurnPure 与 processTurn 产出 player 关键字段一致（同种子）', () => {
+// 正式回合入口契约：输入隔离、确定性、报告与新状态一致。
+describe('processTurn 正式入口契约', () => {
+  it('不修改输入，且相同种子产出相同玩家状态', () => {
     const state1 = createInitialState();
     const state2 = createInitialState();
-    // 同种子保证 RNG 一致
+    const before = structuredClone(state1);
     state2.seed = state1.seed;
     const r1 = processTurn(state1);
-    const r2 = processTurnPure(state2);
+    const r2 = processTurn(state2);
     const p1 = r1.state.nations[PLAYER_ID];
     const p2 = r2.state.nations[PLAYER_ID];
     // 关键字段对照（容许浮点误差）
@@ -718,14 +829,18 @@ describe('C1 processTurnPure 渐进式对照', () => {
     expect(p2.government.efficiency).toBeCloseTo(p1.government.efficiency, 0);
     expect(p2.taxRate).toBeCloseTo(p1.taxRate, 2);
     expect(p2.warExhaustion).toBeCloseTo(p1.warExhaustion, 0);
+    expect(state1).toEqual(before);
+    expect(r1.state).not.toBe(state1);
+    expect(r1.state.nations).not.toBe(state1.nations);
+    expect(r1.state.provinces).not.toBe(state1.provinces);
   });
 
-  it('processTurnPure 与 processTurn 产出 player 省份关键字段一致', () => {
+  it('相同种子产出相同玩家省份状态', () => {
     const state1 = createInitialState();
     const state2 = createInitialState();
     state2.seed = state1.seed;
     const r1 = processTurn(state1);
-    const r2 = processTurnPure(state2);
+    const r2 = processTurn(state2);
     const provs1 = Object.values(r1.state.provinces).filter((p) => p.ownerId === PLAYER_ID);
     const provs2 = Object.values(r2.state.provinces).filter((p) => p.ownerId === PLAYER_ID);
     expect(provs2.length).toBe(provs1.length);
@@ -740,19 +855,12 @@ describe('C1 processTurnPure 渐进式对照', () => {
     });
   });
 
-  it('processTurnPure 与 processTurn 产出 report 关键字段一致', () => {
+  it('报告属于当前玩家并与新回合一致', () => {
     const state1 = createInitialState();
-    const state2 = createInitialState();
-    state2.seed = state1.seed;
     const r1 = processTurn(state1);
-    const r2 = processTurnPure(state2);
-    expect(r2.report.turn).toBe(r1.report.turn);
-    expect(r2.report.income.tax).toBe(r1.report.income.tax);
-    expect(r2.report.income.trade).toBe(r1.report.income.trade);
-    expect(r2.report.income.building).toBe(r1.report.income.building);
-    expect(r2.report.foodDelta).toBe(r1.report.foodDelta);
-    expect(r2.report.popDelta).toBe(r1.report.popDelta);
-    expect(r2.report.stabilityDelta).toBe(r1.report.stabilityDelta);
-    expect(r2.report.legitimacyDelta).toBe(r1.report.legitimacyDelta);
+    expect(r1.report.turn).toBe(r1.state.turn);
+    expect(r1.report.nationId).toBe(r1.state.playerNationId);
+    expect(r1.state.lastReport).toEqual(r1.report);
+    expect(r1.state.history[r1.state.history.length - 1]).toEqual(r1.report);
   });
 });

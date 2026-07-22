@@ -1,8 +1,12 @@
 // Imperium Aeternum — 存档读写 + 版本迁移 + 多槽位
-// 阶段 5a → B3 多槽位 + B7 迁移 + v4 状态规范化
+// 阶段 5a → B3 多槽位 + B7 迁移 + v6 会谈协议状态
 
 import type { SaveGame, GameState, DiplomaticRelation } from '../types/game';
 import { SAVE_VERSION } from '../types/game';
+import { derivePolicyMods } from '../engine/politics';
+import { cloneGameState } from '../engine/stateClone';
+import { entitySequenceFromId } from '../utils/id';
+import { EVENT_BY_ID } from '../data/events';
 
 // B3: 5 槽位存档（槽位 0 = 自动存档，1-4 = 手动）
 const STORAGE_KEY_BASE = 'imperium-aeternum-save';
@@ -38,6 +42,17 @@ function reverseRelation(r: DiplomaticRelation): DiplomaticRelation {
   return { from: r.to, to: r.from, relation: r.relation, trust: r.trust, threat: r.threat, tradeDep: r.tradeDep, treaty: r.treaty, truceTurns: r.truceTurns };
 }
 
+function maxPersistedEntitySequence(state: GameState): number {
+  let max = 0;
+  const inspect = (id: unknown) => { max = Math.max(max, entitySequenceFromId(id)); };
+  for (const nation of Object.values(state.nations)) nation.army?.forEach((army) => inspect(army.id));
+  for (const province of Object.values(state.provinces)) province.buildings?.forEach((building) => inspect(building.id));
+  state.wars?.forEach((war) => inspect(war.id));
+  state.diplomaticSummits?.forEach((summit) => inspect(summit.id));
+  state.diplomaticAccords?.forEach((accord) => inspect(accord.id));
+  return max;
+}
+
 // v4：集中修复旧存档/旧世界生成留下的结构问题。
 // 目标不是改变玩家进度，而是让旧档继续能跑：补数组、补资源字段、补双向外交、修无效玩家国。
 export function normalizeGameState(gs: GameState): GameState {
@@ -45,7 +60,12 @@ export function normalizeGameState(gs: GameState): GameState {
   const state = gs as MutableGameState;
 
   state.version = SAVE_VERSION;
+  state.entityIdCounter = Math.max(0, Math.round(num(state.entityIdCounter)), maxPersistedEntitySequence(gs));
+  delete state['stableTurnsCount'];
+  delete state['highEconomyStableTurns'];
   state.wars = Array.isArray(state.wars) ? state.wars : [];
+  state.diplomaticSummits = Array.isArray(state.diplomaticSummits) ? state.diplomaticSummits : [];
+  state.diplomaticAccords = Array.isArray(state.diplomaticAccords) ? state.diplomaticAccords : [];
   state.triggeredEvents = Array.isArray(state.triggeredEvents) ? state.triggeredEvents : [];
   state.eventCooldowns = Array.isArray(state.eventCooldowns) ? state.eventCooldowns : [];
   state.pendingEvents = Array.isArray(state.pendingEvents) ? state.pendingEvents : [];
@@ -53,10 +73,8 @@ export function normalizeGameState(gs: GameState): GameState {
   state.history = Array.isArray(state.history) ? state.history : [];
   state.lastReport = state.lastReport ?? null;
   state.victory = state.victory ?? { type: null };
-  state.stableTurnsCount = num(state.stableTurnsCount);
   state.bankruptTurns = num(state.bankruptTurns);
   state.lowStabilityTurns = num(state.lowStabilityTurns);
-  state.highEconomyStableTurns = num(state.highEconomyStableTurns);
   state.chronicle = Array.isArray(state.chronicle) ? state.chronicle : [];
 
   if (!gs.playerNationId || !gs.nations[gs.playerNationId]) {
@@ -68,6 +86,7 @@ export function normalizeGameState(gs: GameState): GameState {
     n.isPlayer = n.id === gs.playerNationId;
     n.activeCharacterBonuses = Array.isArray(n.activeCharacterBonuses) ? n.activeCharacterBonuses : [];
     n.activePolicies = Array.isArray(n.activePolicies) ? n.activePolicies : [];
+    n.policyMods = derivePolicyMods(n);
     n.activeLaws = Array.isArray(n.activeLaws) ? n.activeLaws : [];
     n.activeTradeRoutes = Array.isArray(n.activeTradeRoutes) ? n.activeTradeRoutes : [];
     n.embargoedRoutes = Array.isArray(n.embargoedRoutes) ? n.embargoedRoutes : [];
@@ -133,26 +152,30 @@ export function normalizeGameState(gs: GameState): GameState {
   return gs;
 }
 
-function pruneRecordByLastUpdated(value: unknown, keep: number): unknown {
-  if (!value || typeof value !== 'object' || Array.isArray(value)) return value;
-  const entries = Object.entries(value as Record<string, { lastUpdated?: number }>);
+function pruneRecordByRecency<T extends { lastUpdated?: number; sinceTurn?: number }>(value: Record<string, T> | undefined, keep: number): Record<string, T> | undefined {
+  if (!value) return value;
+  const entries = Object.entries(value);
   if (entries.length <= keep) return value;
-  return Object.fromEntries(entries.sort((a, b) => num(b[1]?.lastUpdated) - num(a[1]?.lastUpdated)).slice(0, keep));
+  return Object.fromEntries(entries.sort((a, b) => num(b[1]?.lastUpdated ?? b[1]?.sinceTurn) - num(a[1]?.lastUpdated ?? a[1]?.sinceTurn)).slice(0, keep));
 }
 
 // O13: 保存前瘦身。只删除可再生/陈旧/已限长数据，不改变玩家正在看的核心局势。
 export function compactGameStateForSave(gs: GameState): GameState {
-  const compact = normalizeGameState({ ...gs, _relMap: undefined });
+  const compact = normalizeGameState(cloneGameState(gs));
   compact.history = (compact.history ?? []).slice(-10);
   compact.triggeredEvents = (compact.triggeredEvents ?? []).slice(-1000);
-  compact.eventCooldowns = (compact.eventCooldowns ?? []).slice(-500);
+  compact.eventCooldowns = (compact.eventCooldowns ?? []).filter((entry) => {
+    const event = EVENT_BY_ID[entry.eventId];
+    return !!event && (event.unique || compact.turn - entry.lastTriggeredTurn < event.cooldown);
+  });
+  compact.diplomaticSummits = (compact.diplomaticSummits ?? []).slice(-120);
+  compact.diplomaticAccords = compact.diplomaticAccords ?? [];
   compact.chronicle = (compact.chronicle ?? []).slice(-80);
   compact.wars = (compact.wars ?? []).map((w) => ({ ...w, battleReports: (w.battleReports ?? []).slice(-20) }));
 
-  const dyn = compact as MutableGameState;
-  dyn.aiMemory = pruneRecordByLastUpdated(dyn.aiMemory, 180);
-  dyn.aiStrategyMeta = pruneRecordByLastUpdated(dyn.aiStrategyMeta, 180);
-  dyn._relMap = undefined;
+  compact.aiMemory = pruneRecordByRecency(compact.aiMemory, 180);
+  compact.aiStrategyMeta = pruneRecordByRecency(compact.aiStrategyMeta, 180);
+  compact._relMap = undefined;
   return compact;
 }
 
@@ -195,10 +218,13 @@ const migrations: { from: number; to: number; apply: (s: SaveGame) => SaveGame }
     },
   },
   { from: 3, to: 4, apply: (s) => ({ ...s, version: 4, gameState: normalizeGameState(s.gameState) }) },
+  { from: 4, to: 5, apply: (s) => ({ ...s, version: 5, gameState: normalizeGameState(s.gameState) }) },
+  { from: 5, to: 6, apply: (s) => ({ ...s, version: 6, gameState: normalizeGameState(s.gameState) }) },
 ];
 
 export function migrate(save: SaveGame): SaveGame {
-  let cur = save;
+  // 迁移是工具链/预检也会调用的公共入口，不能污染调用方持有的旧存档对象。
+  let cur: SaveGame = { ...save, gameState: cloneGameState(save.gameState) };
   if (!cur.version || cur.version < 1) cur = { ...cur, version: 1 };
   while (cur.version < SAVE_VERSION) {
     const m = migrations.find((x) => x.from === cur.version);
@@ -235,6 +261,24 @@ export function readSaveGameFromSlot(slot: number): SlotReadResult {
     return { ok: true, raw, save: JSON.parse(raw) as SaveGame, sizeKB: Math.round(raw.length / 1024) };
   } catch (e) {
     return { ok: false, error: `存档解析失败：${(e as Error).message}` };
+  }
+}
+
+export function importSaveGameToSlot(slot: number, raw: string): { ok: true; state: GameState } | { ok: false; error: string } {
+  try {
+    if (!Number.isInteger(slot) || slot < 0 || slot >= SLOT_COUNT) return { ok: false, error: '无效存档槽位' };
+    if (typeof localStorage === 'undefined') return { ok: false, error: 'localStorage 不可用' };
+    const parsed = JSON.parse(raw) as SaveGame;
+    const migrated = migrate(parsed);
+    const normalized: SaveGame = {
+      version: SAVE_VERSION,
+      createdAt: parsed.createdAt || new Date().toISOString(),
+      gameState: compactGameStateForSave(migrated.gameState),
+    };
+    localStorage.setItem(SLOT_KEY(slot), JSON.stringify(normalized));
+    return { ok: true, state: normalized.gameState };
+  } catch (error) {
+    return { ok: false, error: `云存档导入失败：${(error as Error).message}` };
   }
 }
 

@@ -6,6 +6,7 @@ import { Panel, Stat, Btn, Tag } from '../components/ui';
 import type { DiplomaticRelation, Nation } from '../types/game';
 import { getAIStrategyInfo } from '../gameplay/strategyFocus';
 import { buildDiplomaticIntelBrief, buildDiplomaticIntelBoard, buildNationStyleProfile, type DiplomaticIntelBrief, type NationStyleProfile } from '../gameplay/nationIntel';
+import { SummitPanel } from './diplomacy/SummitPanel';
 
 const TREATY_TONE: Record<string, 'danger' | 'warn' | 'info' | 'good'> = { war: 'danger', truce: 'warn', none: 'info', trade: 'good', alliance: 'good' };
 const TREATY_LABEL: Record<string, string> = { none: '无', trade: '贸易', alliance: '同盟', war: '战争', truce: '停战' };
@@ -53,11 +54,12 @@ function DiplomacyGraph({ onNodeClick, nodes }: { onNodeClick: (nationId: string
 }
 
 export default function DiplomacyScreen() {
-  const { state, espionage, dynasticMarriage, culturalExport, improveRelation, formTrade, formAlliance } = useGameStore();
+  const { state, espionage, dynasticMarriage, culturalExport, improveRelation, formTrade, formAlliance, conveneDiplomaticSummit } = useGameStore();
   const pid = useGameStore((s) => s.state.playerNationId);
   const player = useGameStore((s) => s.state.nations[pid]);
   const [view, setView] = useState<'list' | 'graph'>('list');
   const [intelTarget, setIntelTarget] = useState<string | null>(null);
+  const [summitTarget, setSummitTarget] = useState<string | null>(null);
   const [focusNation, setFocusNation] = useState<string | null>(null);
   const [graphExpanded, setGraphExpanded] = useState(false);
 
@@ -89,6 +91,7 @@ export default function DiplomacyScreen() {
   const graphNodes = (graphExpanded ? graphSorted : graphSorted.slice(0, 8)).map((x) => ({ n: x.n, rel: x.rel }));
   let tradeCount = 0, allyCount = 0, warCount = 0;
   for (const r of state.relations) if (r.from === pid) { if (r.treaty === 'trade') tradeCount++; else if (r.treaty === 'alliance') allyCount++; else if (r.treaty === 'war') warCount++; }
+  const accordCount = state.diplomaticAccords.filter((accord) => accord.expiresTurn >= state.turn && (accord.partyA === pid || accord.partyB === pid)).length;
 
   const intelBoard = buildDiplomaticIntelBoard(state, 4);
   const threats = [...rows].filter((x) => x.intel.riskScore >= 50 || x.rel.treaty === 'war').sort((a, b) => b.intel.riskScore - a.intel.riskScore).slice(0, 3);
@@ -111,7 +114,7 @@ export default function DiplomacyScreen() {
     </Panel>
 
     <Panel title="外交总览" accent actions={<div style={{ display: 'flex', gap: 4 }}><Btn label="列表" variant={view === 'list' ? 'primary' : 'ghost'} onClick={() => setView('list')} /><Btn label="图谱" variant={view === 'graph' ? 'primary' : 'ghost'} onClick={() => setView('graph')} /></div>}>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 10, marginBottom: 12 }}><Stat kind="core" accent="var(--stable)" label="影响力" value={player.resources.influence} /><Stat kind="core" accent="var(--good)" label="贸易协定" value={tradeCount} /><Stat kind="core" accent="var(--border-hi)" label="同盟" value={allyCount} /><Stat kind="core" accent="var(--war)" label="战争" value={warCount} /></div>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: 10, marginBottom: 12 }}><Stat kind="core" accent="var(--stable)" label="影响力" value={player.resources.influence} /><Stat kind="core" accent="var(--good)" label="贸易协定" value={tradeCount} /><Stat kind="core" accent="var(--border-hi)" label="同盟" value={allyCount} /><Stat kind="core" accent="var(--gold)" label="元首协议" value={accordCount} /><Stat kind="core" accent="var(--war)" label="战争" value={warCount} /></div>
       {view === 'graph' && <div className="ia-fade-in"><p className="dim" style={{ fontSize: 11, marginBottom: 8, textAlign: 'center' }}>玩家居中，邻国按关系值环形布局。金=同盟 · 绿=贸易 · 红=战争 · 灰=中立。</p><DiplomacyGraph onNodeClick={pick} nodes={graphNodes} />{graphSorted.length > 8 && <div style={{ textAlign: 'center', marginTop: 6 }}><button className="ia-btn ia-btn--ghost" onClick={() => setGraphExpanded((x) => !x)} style={{ fontSize: 11 }}>{graphExpanded ? '收起（仅显前 8）' : `展开全部（${graphSorted.length}）`}</button></div>}</div>}
     </Panel>
 
@@ -127,7 +130,8 @@ export default function DiplomacyScreen() {
         <RelBar label="关系" value={rel.relation} tone={relTone} />
         <RelBar label="信任" value={rel.trust} tone={rel.trust > 50 ? 'good' : rel.trust > 20 ? 'warn' : 'danger'} />
         <RelBar label="威胁" value={rel.threat} tone={rel.threat > 50 ? 'danger' : rel.threat > 20 ? 'warn' : 'good'} invert />
-        <div style={{ display: 'flex', gap: 4, marginTop: 10, flexWrap: 'wrap' }}><Btn label="改善 20影" variant="ghost" onClick={() => improveRelation(n.id)} disabled={player.resources.influence < 20} /><Btn label="贸易 30影" variant="ghost" onClick={() => formTrade(n.id)} disabled={player.resources.influence < 30 || rel.relation < 0 || rel.treaty === 'war'} /><Btn label="同盟 50影" variant="ghost" onClick={() => formAlliance(n.id)} disabled={player.resources.influence < 50 || rel.relation < 50 || rel.treaty === 'war'} /><Btn label="联姻 30影80金" variant="ghost" onClick={() => dynasticMarriage(n.id)} disabled={player.resources.influence < 30 || player.resources.gold < 80 || rel.relation < 20 || rel.treaty === 'war'} /><Btn label="文化输出 30科" variant="ghost" onClick={() => culturalExport(n.id)} disabled={player.resources.sciPt < 30 || rel.treaty === 'war'} /><Btn label={intelTarget === n.id ? '✦情报' : '情报 40影'} variant={intelTarget === n.id ? 'primary' : 'ghost'} onClick={() => setIntelTarget(intelTarget === n.id ? null : n.id)} disabled={player.resources.influence < 40 || rel.treaty === 'alliance'} /></div>
+        <div style={{ display: 'flex', gap: 4, marginTop: 10, flexWrap: 'wrap' }}><Btn label={summitTarget === n.id ? '收起会谈' : '元首会谈'} variant={summitTarget === n.id ? 'primary' : 'ghost'} onClick={() => { setSummitTarget(summitTarget === n.id ? null : n.id); setIntelTarget(null); }} /><Btn label="改善 1政20影" variant="ghost" onClick={() => improveRelation(n.id)} disabled={player.resources.adminPt < 1 || player.resources.influence < 20 || rel.treaty === 'war' || rel.treaty === 'truce'} /><Btn label="贸易 1政30影" variant="ghost" onClick={() => formTrade(n.id)} disabled={player.resources.adminPt < 1 || player.resources.influence < 30 || rel.relation < 0 || rel.treaty !== 'none'} /><Btn label="同盟 2政50影" variant="ghost" onClick={() => formAlliance(n.id)} disabled={player.resources.adminPt < 2 || player.resources.influence < 50 || rel.relation < 50 || rel.treaty === 'war' || rel.treaty === 'truce' || rel.treaty === 'alliance'} /><Btn label="联姻 2政30影80金" variant="ghost" onClick={() => dynasticMarriage(n.id)} disabled={player.resources.adminPt < 2 || player.resources.influence < 30 || player.resources.gold < 80 || rel.relation < 20 || rel.treaty === 'war' || rel.treaty === 'truce'} /><Btn label="文化输出 1政30科" variant="ghost" onClick={() => culturalExport(n.id)} disabled={player.resources.adminPt < 1 || player.tech.culture < 5 || player.resources.sciPt < 30 || rel.treaty === 'war' || rel.treaty === 'truce'} /><Btn label={intelTarget === n.id ? '✦情报' : '情报 2政40影'} variant={intelTarget === n.id ? 'primary' : 'ghost'} onClick={() => setIntelTarget(intelTarget === n.id ? null : n.id)} disabled={player.resources.adminPt < 2 || player.resources.influence < 40 || rel.treaty === 'alliance'} /></div>
+        {summitTarget === n.id && <SummitPanel state={state} target={n} onClose={() => setSummitTarget(null)} onConvene={conveneDiplomaticSummit} />}
         {intelTarget === n.id && <div className="ia-fade-in" style={{ marginTop: 8, padding: 8, background: 'var(--bg-inset)', borderRadius: 6, border: '1px solid var(--warn)' }}><div style={{ fontSize: 11, color: 'var(--warn)', fontWeight: 700, marginBottom: 6 }}>情报行动 · 会影响双方信任</div><div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}><Btn label="科技情报" variant="ghost" onClick={() => { espionage(n.id, 'steal_tech'); setIntelTarget(null); }} /><Btn label="地方扰动" variant="ghost" onClick={() => { espionage(n.id, 'foment_rebellion'); setIntelTarget(null); }} /><Btn label="军情观察" variant="ghost" onClick={() => { espionage(n.id, 'spy_military'); setIntelTarget(null); }} /></div></div>}
       </div>;
     })}</div></Panel>}

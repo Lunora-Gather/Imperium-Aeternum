@@ -78,7 +78,7 @@ export function reignLegitimacy(nation: Nation): number {
 // ── C1 纯函数版本（不 mutate，返回 final/delta 供 processTurn 合并） ──
 
 export interface AgeRulersPureResult {
-  rulerFinal: { age: number; reignYears: number; heir?: { name: string; ability: number; age: number } | undefined; newRuler?: boolean };
+  rulerFinal: Ruler;
   govLegitimacyDelta?: number; // 继承时合法性变化（负值）
   died: boolean;
   newRulerName?: string;
@@ -103,7 +103,7 @@ export function ageRulersPure(nation: Nation, rng: () => number): AgeRulersPureR
   // 死亡判定
   const deathChance = newAge < 60 ? 0 : (newAge - 60) * 0.04 + 0.02;
   if (rng() >= deathChance) {
-    return { died: false, rulerFinal: { age: newAge, reignYears: newReign, heir: heirFinal } };
+    return { died: false, rulerFinal: { ...r, age: newAge, reignYears: newReign, heir: heirFinal } };
   }
 
   // 继承处理（mutate-free）
@@ -114,7 +114,7 @@ export function ageRulersPure(nation: Nation, rng: () => number): AgeRulersPureR
       died: true,
       newRulerName: heir.name,
       eventLog: `${oldName} 驾崩，太子 ${heir.name} 即位（治能 ${heir.ability}）`,
-      rulerFinal: { age: heir.age, reignYears: 0, heir: undefined, newRuler: true },
+      rulerFinal: { name: heir.name, ability: heir.ability, age: heir.age, reignYears: 0 },
     };
   }
   // 无继承人或未成年 → 新统治者随机生成
@@ -126,7 +126,7 @@ export function ageRulersPure(nation: Nation, rng: () => number): AgeRulersPureR
       died: true,
       newRulerName: successorName,
       eventLog: `${oldName} 驾崩，太子年幼，${successorName} 摄政即位（治能 ${successorAbility}），法统动摇`,
-      rulerFinal: { age: successorAge, reignYears: 0, heir: undefined, newRuler: true },
+      rulerFinal: { name: successorName, ability: successorAbility, age: successorAge, reignYears: 0 },
       govLegitimacyDelta: -15,
     };
   }
@@ -134,7 +134,7 @@ export function ageRulersPure(nation: Nation, rng: () => number): AgeRulersPureR
     died: true,
     newRulerName: successorName,
     eventLog: `${oldName} 驾崩无嗣，${successorName} 继位（治能 ${successorAbility}）`,
-    rulerFinal: { age: successorAge, reignYears: 0, heir: undefined, newRuler: true },
+    rulerFinal: { name: successorName, ability: successorAbility, age: successorAge, reignYears: 0 },
     govLegitimacyDelta: -10,
   };
 }

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { createInitialState } from '../../engine/init';
+import { EVENTS } from '../../data/events';
 import { compactGameStateForSave } from '../persistence';
 
 describe('compactGameStateForSave', () => {
@@ -24,7 +25,11 @@ describe('compactGameStateForSave', () => {
       provinceChanges: [],
     }));
     state.triggeredEvents = Array.from({ length: 1200 }, (_, i) => ({ eventId: `e_${i}`, turn: i, optionIndex: 0 }));
-    state.eventCooldowns = Array.from({ length: 700 }, (_, i) => ({ eventId: `cool_${i}`, lastTriggeredTurn: i }));
+    state.turn = 1000;
+    state.eventCooldowns = [
+      { eventId: EVENTS[0].id, lastTriggeredTurn: 999 },
+      { eventId: 'removed_event', lastTriggeredTurn: 999 },
+    ];
     state.chronicle = Array.from({ length: 100 }, (_, i) => ({ turn: i, kind: 'founding', title: `t${i}`, desc: `d${i}` }));
     state._relMap = new Map();
 
@@ -35,7 +40,7 @@ describe('compactGameStateForSave', () => {
     expect(compact._relMap).toBeUndefined();
     expect(compact.history).toHaveLength(10);
     expect(compact.triggeredEvents).toHaveLength(1000);
-    expect(compact.eventCooldowns).toHaveLength(500);
+    expect(compact.eventCooldowns).toEqual([{ eventId: EVENTS[0].id, lastTriggeredTurn: 999 }]);
     expect(compact.chronicle).toHaveLength(80);
   });
 });

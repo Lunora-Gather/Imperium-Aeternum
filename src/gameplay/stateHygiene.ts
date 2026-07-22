@@ -1,10 +1,9 @@
 // 状态净化链：防止长局、读档、AI 行动和 UI wrapper 让 GameState 越玩越脏。
 // V15：导出纯函数，不污染输入；新局、选国、读档、槽位读档、每回合后都统一走安全修复。
 
-import { useGameStore } from '../store/gameStore';
 import type { DiplomaticRelation, GameState, Nation, Province, War } from '../types/game';
-
-let installed = false;
+import { EVENT_BY_ID } from '../data/events';
+import { isValidProvinceOwner } from './stateOwnership';
 
 function finite(v: number, fallback = 0): number {
   return Number.isFinite(v) ? v : fallback;
@@ -61,6 +60,15 @@ function cloneState(state: GameState): GameState {
     nations: Object.fromEntries(Object.entries(state.nations).map(([id, nation]) => [id, cloneNation(nation)])),
     provinces: Object.fromEntries(Object.entries(state.provinces).map(([id, province]) => [id, cloneProvince(province)])),
     relations: Array.isArray(state.relations) ? state.relations.map((r) => ({ ...r })) : [],
+    diplomaticSummits: Array.isArray(state.diplomaticSummits)
+      ? state.diplomaticSummits.map((summit) => ({
+        ...summit,
+        commitments: Array.isArray(summit.commitments) ? [...summit.commitments] : [],
+      }))
+      : [],
+    diplomaticAccords: Array.isArray(state.diplomaticAccords)
+      ? state.diplomaticAccords.map((accord) => ({ ...accord }))
+      : [],
     wars: Array.isArray(state.wars) ? state.wars.map(cloneWar) : [],
     triggeredEvents: Array.isArray(state.triggeredEvents) ? state.triggeredEvents.map((e) => ({ ...e })) : [],
     eventCooldowns: Array.isArray(state.eventCooldowns) ? state.eventCooldowns.map((e) => ({ ...e })) : [],
@@ -70,6 +78,9 @@ function cloneState(state: GameState): GameState {
     history: Array.isArray(state.history) ? state.history.map((r) => JSON.parse(JSON.stringify(r)) as typeof r) : [],
     victory: { ...(state.victory ?? { type: null }) },
     chronicle: Array.isArray(state.chronicle) ? state.chronicle.map((c) => ({ ...c })) : [],
+    aiStrategyMeta: state.aiStrategyMeta ? Object.fromEntries(Object.entries(state.aiStrategyMeta).map(([id, entry]) => [id, { ...entry }])) : undefined,
+    aiMemory: state.aiMemory ? Object.fromEntries(Object.entries(state.aiMemory).map(([id, memory]) => [id, { ...memory, territory: memory.territory ? { ...memory.territory } : undefined }])) : undefined,
+    ambitionMeta: state.ambitionMeta ? { ...state.ambitionMeta } : undefined,
     _relMap: undefined,
   };
 }
@@ -143,10 +154,9 @@ export function sanitizeState(state: GameState): GameState {
   next.version = Math.max(1, Math.round(finite(next.version, 1)));
   next.turn = Math.max(0, Math.round(finite(next.turn)));
   next.seed = Math.round(finite(next.seed));
-  next.stableTurnsCount = Math.max(0, Math.round(finite(next.stableTurnsCount)));
+  next.entityIdCounter = Math.max(0, Math.round(finite(next.entityIdCounter)));
   next.bankruptTurns = Math.max(0, Math.round(finite(next.bankruptTurns)));
   next.lowStabilityTurns = Math.max(0, Math.round(finite(next.lowStabilityTurns)));
-  next.highEconomyStableTurns = Math.max(0, Math.round(finite(next.highEconomyStableTurns)));
   next.victory = next.victory ?? { type: null };
 
   if (!next.playerNationId || !next.nations[next.playerNationId]) {
@@ -175,7 +185,7 @@ export function sanitizeState(state: GameState): GameState {
   }
 
   for (const p of Object.values(next.provinces)) {
-    if (!next.nations[p.ownerId]) {
+    if (!isValidProvinceOwner(next, p.ownerId)) {
       const fallback = next.nations[next.playerNationId] ?? Object.values(next.nations)[0];
       if (fallback) p.ownerId = fallback.id;
     }
@@ -191,7 +201,9 @@ export function sanitizeState(state: GameState): GameState {
 
   for (const n of Object.values(next.nations)) {
     const owned = Object.values(next.provinces).filter((p) => p.ownerId === n.id);
-    const fallback = owned.find((p) => p.id === n.capital) ?? owned[0];
+    const currentCapital = owned.find((p) => p.id === n.capital);
+    const fallback = currentCapital ?? owned.find((p) => p.isCapital) ?? owned[0];
+    if (!currentCapital && fallback) n.capital = fallback.id;
     n.army = n.army
       .map((a) => {
         const loc = next.provinces[a.location];
@@ -229,58 +241,105 @@ export function sanitizeState(state: GameState): GameState {
   for (const n of Object.values(next.nations)) n.atWar = activeWarNations.has(n.id);
 
   next.relations = sanitizeRelations(next.relations, next.nations, next.wars);
-  next.pendingEvents = next.pendingEvents.filter((e) => next.nations[e.nationId]);
-  if (next.pendingEventOptions && !next.nations[next.pendingEventOptions.nationId]) next.pendingEventOptions = null;
+
+  const summitAgendas = new Set(['trade', 'security', 'normalization', 'technology']);
+  const summitStances = new Set(['conciliatory', 'pragmatic', 'firm']);
+  const summitOutcomes = new Set(['rejected', 'breakdown', 'stalemate', 'agreement', 'breakthrough']);
+  next.diplomaticSummits = next.diplomaticSummits
+    .filter((summit) =>
+      summit
+      && typeof summit.id === 'string'
+      && !!next.nations[summit.initiatorId]
+      && !!next.nations[summit.targetId]
+      && summit.initiatorId !== summit.targetId
+      && summitAgendas.has(summit.agenda)
+      && summitStances.has(summit.stance)
+      && summitOutcomes.has(summit.outcome),
+    )
+    .map((summit) => ({
+      ...summit,
+      turn: Math.round(clamp(finite(summit.turn), 0, next.turn)),
+      score: clamp(Math.round(finite(summit.score, 50)), 0, 100),
+      summary: String(summit.summary ?? ''),
+      commitments: Array.isArray(summit.commitments)
+        ? summit.commitments.filter((item): item is string => typeof item === 'string').slice(0, 8)
+        : [],
+    }))
+    .slice(-120);
+
+  const accordIds = new Set<string>();
+  next.diplomaticAccords = next.diplomaticAccords.filter((accord) => {
+    if (
+      !accord
+      || typeof accord.id !== 'string'
+      || accordIds.has(accord.id)
+      || !next.nations[accord.partyA]
+      || !next.nations[accord.partyB]
+      || accord.partyA === accord.partyB
+      || !summitAgendas.has(accord.agenda)
+      || ![1, 2].includes(accord.strength)
+    ) return false;
+    accordIds.add(accord.id);
+    accord.startedTurn = Math.round(clamp(finite(accord.startedTurn), 0, next.turn));
+    accord.expiresTurn = Math.max(accord.startedTurn, Math.round(finite(accord.expiresTurn, next.turn)));
+    return accord.expiresTurn >= next.turn;
+  });
+
+  // Event history became nation-scoped after v5. Legacy unscoped entries belong
+  // to the saved player; corrupt cross-references are discarded deterministically.
+  next.triggeredEvents = next.triggeredEvents
+    .filter((entry) =>
+      entry
+      && typeof entry.eventId === 'string'
+      && (entry.nationId === undefined || !!next.nations[entry.nationId]),
+    )
+    .map((entry) => ({
+      ...entry,
+      nationId: entry.nationId ?? next.playerNationId,
+      turn: Math.round(clamp(finite(entry.turn), 0, next.turn)),
+      optionIndex: Math.max(0, Math.round(finite(entry.optionIndex))),
+    }));
+
+  const cooldownByKey = new Map<string, GameState['eventCooldowns'][number]>();
+  for (const entry of next.eventCooldowns) {
+    if (!entry || typeof entry.eventId !== 'string') continue;
+    if (entry.nationId !== undefined && !next.nations[entry.nationId]) continue;
+    const nationId = entry.nationId ?? next.playerNationId;
+    const normalized = {
+      nationId,
+      eventId: entry.eventId,
+      lastTriggeredTurn: Math.round(clamp(finite(entry.lastTriggeredTurn), 0, next.turn)),
+    };
+    const key = `${nationId}|${entry.eventId}`;
+    const existing = cooldownByKey.get(key);
+    const event = EVENT_BY_ID[entry.eventId];
+    const stillRelevant = !!event && (
+      event.unique
+      || next.turn - normalized.lastTriggeredTurn < event.cooldown
+    );
+    if (stillRelevant && (!existing || normalized.lastTriggeredTurn > existing.lastTriggeredTurn)) {
+      cooldownByKey.set(key, normalized);
+    }
+  }
+  next.eventCooldowns = [...cooldownByKey.values()];
+
+  const pendingKeys = new Set<string>();
+  next.pendingEvents = next.pendingEvents.filter((entry) => {
+    if (!entry || !next.nations[entry.nationId] || !EVENT_BY_ID[entry.eventId]) return false;
+    const key = `${entry.nationId}|${entry.eventId}`;
+    if (pendingKeys.has(key)) return false;
+    pendingKeys.add(key);
+    return true;
+  });
+  if (
+    next.pendingEventOptions
+    && (
+      !next.nations[next.pendingEventOptions.nationId]
+      || !EVENT_BY_ID[next.pendingEventOptions.eventId]
+    )
+  ) next.pendingEventOptions = null;
   next.history = next.history.slice(-12);
   next.chronicle = next.chronicle.slice(-60);
   next._relMap = undefined;
   return next;
-}
-
-function sanitizeStoreState(): void {
-  const state = useGameStore.getState().state;
-  useGameStore.setState({ state: sanitizeState(state) });
-}
-
-export function installStateHygiene(): void {
-  if (installed) return;
-  installed = true;
-  const store = useGameStore.getState() as unknown as {
-    startScenario?: (id: string) => void;
-    startWithNation?: (nationId: string) => void;
-    load?: () => boolean;
-    loadFromSlot?: (slot: number) => boolean;
-    nextTurn?: () => unknown;
-  };
-  const originalStartScenario = store.startScenario;
-  const originalStartWithNation = store.startWithNation;
-  const originalLoad = store.load;
-  const originalLoadFromSlot = store.loadFromSlot;
-  const originalNextTurn = store.nextTurn;
-
-  useGameStore.setState({
-    startScenario: (id: string) => {
-      originalStartScenario?.(id);
-      sanitizeStoreState();
-    },
-    startWithNation: (nationId: string) => {
-      originalStartWithNation?.(nationId);
-      sanitizeStoreState();
-    },
-    load: () => {
-      const ok = originalLoad?.() ?? false;
-      if (ok) sanitizeStoreState();
-      return ok;
-    },
-    loadFromSlot: (slot: number) => {
-      const ok = originalLoadFromSlot?.(slot) ?? false;
-      if (ok) sanitizeStoreState();
-      return ok;
-    },
-    nextTurn: () => {
-      const result = originalNextTurn?.();
-      sanitizeStoreState();
-      return result;
-    },
-  } as never);
 }
