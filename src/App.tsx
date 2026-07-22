@@ -7,6 +7,15 @@ import { BUILD_MARK } from './buildInfo';
 import { getOnboardingStep, nextOnboardingIndex, onboardingProgress, prevOnboardingIndex } from './gameplay/onboarding';
 import { pushPageHistory, resetPageHistory, resolveBackTarget } from './gameplay/pageHistory';
 import { isNavigationTab, type NavigationTab } from './gameplay/navigationTabs';
+import {
+  completeNoviceJourneyStep,
+  createNoviceJourney,
+  getNextNoviceJourneyStep,
+  normalizeNoviceJourney,
+  noviceJourneyProgress,
+  reconcileNoviceJourney,
+  type NoviceJourneyProgress,
+} from './gameplay/noviceJourney';
 
 import { provincesOf } from './engine/init';
 import { ResourceStrip } from './components/ui';
@@ -29,6 +38,8 @@ const TurnReportScreen = lazy(() => import('./screens/TurnReportScreen'));
 const ChronicleScreen = lazy(() => import('./screens/ChronicleScreen'));
 const SaveLoadScreen = lazy(() => import('./screens/SaveLoadScreen'));
 const EventModal = lazy(() => import('./screens/EventModal'));
+const NoviceJourneyPanel = lazy(() => import('./components/NoviceJourneyPanel'));
+const NoviceJourneyCompletion = lazy(() => import('./components/NoviceJourneyCompletion'));
 
 type Tab = NavigationTab;
 
@@ -54,6 +65,20 @@ const TAB_GROUPS: { group: string; tabs: { id: Tab; label: string; key: string; 
   ]},
 ];
 const ALL_TABS = TAB_GROUPS.flatMap((g) => g.tabs);
+const NOVICE_JOURNEY_KEY = 'ia-novice-journey-v1';
+
+function loadNoviceJourney(): NoviceJourneyProgress {
+  try {
+    const stored = localStorage.getItem(NOVICE_JOURNEY_KEY);
+    if (stored) return normalizeNoviceJourney(JSON.parse(stored));
+    if (localStorage.getItem('ia-tutorial-done')) return createNoviceJourney('dismissed');
+  } catch { /* use a safe first-run default */ }
+  return createNoviceJourney();
+}
+
+function persistNoviceJourney(progress: NoviceJourneyProgress): void {
+  try { localStorage.setItem(NOVICE_JOURNEY_KEY, JSON.stringify(progress)); } catch { /* non-critical preference */ }
+}
 
 function ScreenFallback() {
   return <div className="ia-display" style={{ minHeight: 180, display: 'grid', placeItems: 'center', color: 'var(--text-dim)' }}>正在展开卷宗…</div>;
@@ -65,6 +90,10 @@ export default function App() {
   const [preReportTab, setPreReportTab] = useState<Tab>('dashboard');
   const [showHelp, setShowHelp] = useState(false);
   const [tutorialStep, setTutorialStep] = useState(0);
+  const [noviceJourney, setNoviceJourney] = useState<NoviceJourneyProgress>(loadNoviceJourney);
+  const [noviceCollapsed, setNoviceCollapsed] = useState(false);
+  const [showNoviceCompletion, setShowNoviceCompletion] = useState(false);
+  const previousNoviceStatus = useRef(noviceJourney.status);
   const [theme, setTheme] = useState<'night' | 'day' | 'bamboo' | 'ink'>(() => {
     try {
       const saved = localStorage.getItem('ia-theme');
@@ -73,7 +102,7 @@ export default function App() {
     return 'night';
   });
 
-  const { state, nextTurn, scene, justProcessedTurn, clearTurnFlag, pendingTab, consumePendingTab, backToMenu } = useGameStore();
+  const { state, nextTurn, scene, justProcessedTurn, clearTurnFlag, pendingTab, consumePendingTab, backToMenu, hasSave } = useGameStore();
   const pid = state.playerNationId;
   const player = state.nations[pid];
   const provs = player ? provincesOf(pid, state.provinces) : [];
@@ -100,15 +129,29 @@ export default function App() {
     setTab(resolved.target);
   }, [tab, tabHistory]);
 
-  const finishHelp = useCallback(() => {
+  const dismissGuidance = useCallback(() => {
     setShowHelp(false);
     setTutorialStep(0);
+    const dismissed = { ...noviceJourney, status: 'dismissed' as const };
+    setNoviceJourney(dismissed);
+    persistNoviceJourney(dismissed);
     try { localStorage.setItem('ia-tutorial-done', '1'); } catch { /* ignore */ }
-  }, []);
+  }, [noviceJourney]);
+
+  const startNoviceJourney = useCallback(() => {
+    const started = createNoviceJourney();
+    setNoviceJourney(started);
+    persistNoviceJourney(started);
+    setNoviceCollapsed(false);
+    setShowHelp(false);
+    setTutorialStep(0);
+    goToTab('dashboard');
+    try { localStorage.setItem('ia-tutorial-done', '1'); } catch { /* ignore */ }
+  }, [goToTab]);
 
   useEffect(() => {
     try {
-      if (!localStorage.getItem('ia-tutorial-done')) {
+      if (!localStorage.getItem('ia-tutorial-done') && noviceJourney.status === 'active' && noviceJourney.completed.length === 0) {
         setShowHelp(true);
         setTutorialStep(0);
       }
@@ -116,7 +159,25 @@ export default function App() {
       setShowHelp(true);
       setTutorialStep(0);
     }
-  }, []);
+  }, [noviceJourney.status, noviceJourney.completed.length]);
+
+  const localSaveAvailable = hasSave();
+  useEffect(() => {
+    setNoviceJourney((current) => {
+      const next = reconcileNoviceJourney(current, { turn: state.turn, currentTab: tab, hasLocalSave: localSaveAvailable });
+      if (JSON.stringify(next) === JSON.stringify(current)) return current;
+      persistNoviceJourney(next);
+      return next;
+    });
+  }, [state.turn, tab, localSaveAvailable]);
+
+  useEffect(() => {
+    if (previousNoviceStatus.current === 'active' && noviceJourney.status === 'completed') {
+      setShowNoviceCompletion(true);
+      setNoviceCollapsed(false);
+    }
+    previousNoviceStatus.current = noviceJourney.status;
+  }, [noviceJourney.status]);
 
   useEffect(() => {
     if (pendingTab) {
@@ -230,9 +291,29 @@ export default function App() {
 
   const helpProgress = onboardingProgress(tutorialStep);
   const helpStep = getOnboardingStep(tutorialStep);
+  const noviceStep = getNextNoviceJourneyStep(noviceJourney);
+  const noviceProgress = noviceJourneyProgress(noviceJourney);
   const goHelpTab = () => {
+    if (noviceJourney.status !== 'active') {
+      const started = createNoviceJourney();
+      setNoviceJourney(started);
+      persistNoviceJourney(started);
+    }
     if (isNavigationTab(helpStep.tab)) goToTab(helpStep.tab);
     setShowHelp(false);
+  };
+
+  const completeCurrentNoviceStep = () => {
+    if (!noviceStep || noviceStep.completion !== 'manual' || tab !== noviceStep.tab) return;
+    const next = completeNoviceJourneyStep(noviceJourney, noviceStep.id);
+    setNoviceJourney(next);
+    persistNoviceJourney(next);
+  };
+
+  const dismissNoviceJourney = () => {
+    const next = { ...noviceJourney, status: 'dismissed' as const };
+    setNoviceJourney(next);
+    persistNoviceJourney(next);
   };
 
   return (
@@ -291,7 +372,7 @@ export default function App() {
             <span className="ia-nav-label ia-up">{g.group}</span>
             <div className="ia-tab-cluster">
               {g.tabs.map((t) => (
-                <button key={t.id} onClick={() => goToTab(t.id)} title={`快捷键 ${t.key}`} className={`ia-tab-btn ${tab === t.id ? 'is-active' : ''}`}>
+                <button key={t.id} onClick={() => goToTab(t.id)} title={`快捷键 ${t.key}`} className={`ia-tab-btn ${tab === t.id ? 'is-active' : ''} ${noviceStep?.tab === t.id && noviceJourney.status === 'active' ? 'is-tutorial-target' : ''}`}>
                   <span className="ia-tab-icon">{t.icon}</span>
                   <span>{t.label}</span>
                   <kbd>{t.key}</kbd>
@@ -326,13 +407,42 @@ export default function App() {
       {state.pendingEvents.some((p) => p.nationId === pid) && <Suspense fallback={null}><EventModal /></Suspense>}
       <LogToast />
 
+      {noviceJourney.status === 'active' && noviceStep && !showHelp && (
+        <Suspense fallback={null}>
+          <NoviceJourneyPanel
+            step={noviceStep}
+            current={noviceProgress.current}
+            total={noviceProgress.total}
+            percent={noviceProgress.percent}
+            currentTab={tab}
+            collapsed={noviceCollapsed}
+            onGo={() => goToTab(noviceStep.tab)}
+            onComplete={completeCurrentNoviceStep}
+            onToggleCollapsed={() => setNoviceCollapsed((value) => !value)}
+            onDismiss={dismissNoviceJourney}
+          />
+        </Suspense>
+      )}
+
+      {showNoviceCompletion && !showHelp && (
+        <Suspense fallback={null}>
+          <NoviceJourneyCompletion
+            onClose={() => setShowNoviceCompletion(false)}
+            onReview={() => {
+              setShowNoviceCompletion(false);
+              goToTab('dashboard');
+            }}
+          />
+        </Suspense>
+      )}
+
       <footer className="ia-footer ia-display ia-up">
         Imperium Aeternum · 永恒帝国 · {BUILD_MARK}
       </footer>
 
       {showHelp && scene === 'playing' && (
-        <div className="ia-modal-backdrop" onClick={finishHelp}>
-          <div className="ia-help-card" onClick={(e) => e.stopPropagation()}>
+        <div className="ia-modal-backdrop" onClick={() => setShowHelp(false)}>
+          <div className="ia-help-card" role="dialog" aria-modal="true" aria-label="治国路线说明" onClick={(e) => e.stopPropagation()}>
             <div className="ia-display ia-help-title">✦ 治国路线 · 第 {helpProgress.current} / {helpProgress.total} 步</div>
             <div className="ia-help-step-title">{helpStep.title}</div>
             <div className="ia-help-step-body">{helpStep.body}</div>
@@ -340,10 +450,10 @@ export default function App() {
               推荐页面：{ALL_TABS.find((x) => x.id === helpStep.tab)?.label ?? helpStep.tab}{helpStep.shortcut ? ` · 快捷键 ${helpStep.shortcut}` : ''}
             </div>
             <div className="ia-help-actions">
-              <button className="ia-btn ia-btn--ghost" onClick={finishHelp}>不再提示</button>
+              <button className="ia-btn ia-btn--ghost" onClick={dismissGuidance}>不再提示</button>
               {tutorialStep > 0 && <button className="ia-btn" onClick={() => setTutorialStep((s) => prevOnboardingIndex(s))}>上一步</button>}
               <button className="ia-btn" onClick={goHelpTab}>{helpStep.cta}</button>
-              {!helpProgress.done ? <button className="ia-btn ia-btn--primary" onClick={() => setTutorialStep((s) => nextOnboardingIndex(s))}>下一步</button> : <button className="ia-btn ia-btn--primary" onClick={finishHelp}>开始治国</button>}
+              {!helpProgress.done ? <button className="ia-btn ia-btn--primary" onClick={() => setTutorialStep((s) => nextOnboardingIndex(s))}>下一步</button> : <button className="ia-btn ia-btn--primary" onClick={startNoviceJourney}>开始实战引导</button>}
             </div>
           </div>
         </div>
