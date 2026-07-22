@@ -178,11 +178,69 @@
 .ia-novice-complete > strong { display: block; color: var(--gold); font-family: var(--font-display); font-size: 17px; }
 .ia-novice-complete-mark { width: 42px; height: 42px; margin: 10px auto; display: grid; place-items: center; border-radius: 50%; border: 1px solid var(--good); background: color-mix(in srgb, var(--good) 12%, transparent); color: var(--good); font-size: 22px; }
 .ia-novice-next { padding: 9px 10px; border-radius: 9px; background: var(--bg-inset); color: var(--text-mute); font-size: 11px; line-height: 1.55; text-align: left; }
+.ia-world-entry-btn { border-color: color-mix(in srgb, var(--good) 58%, var(--border)); color: var(--good); }
+.ia-shared-world-modal { width: min(920px, calc(100vw - 24px)); max-height: calc(100vh - 32px); overflow-y: auto; padding: 20px; border: 1px solid var(--border-gold); border-radius: 18px; background: linear-gradient(165deg, var(--bg-raised), var(--bg-panel)); box-shadow: 0 24px 80px rgba(0,0,0,.6); }
+.ia-shared-world-head, .ia-world-detail-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 14px; }
+.ia-shared-world-head span { color: var(--good); font-size: 9px; }
+.ia-shared-world-head h2 { margin: 4px 0; color: var(--gold); }
+.ia-shared-world-head p { margin: 0; color: var(--text-mute); font-size: 12px; }
+.ia-world-empty { margin-top: 18px; padding: 30px; text-align: center; border: 1px dashed var(--border); border-radius: 14px; color: var(--text-mute); }
+.ia-world-empty strong { display: block; color: var(--text); margin-bottom: 7px; }
+.ia-world-list { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 12px; margin-top: 18px; }
+.ia-world-card { padding: 16px; text-align: left; border: 1px solid var(--border); border-radius: 14px; background: var(--bg-inset); color: var(--text); cursor: pointer; }
+.ia-world-card:hover { border-color: var(--border-gold); }
+.ia-world-card > div { display: flex; justify-content: space-between; align-items: center; color: var(--text-dim); font-size: 10px; }
+.ia-world-card > strong { display: block; margin-top: 13px; font-size: 18px; color: var(--gold); }
+.ia-world-card p { color: var(--text-mute); font-size: 11px; line-height: 1.6; }
+.ia-world-card em { color: var(--good); font-size: 11px; font-style: normal; }
+.ia-world-detail-head { align-items: center; margin-top: 16px; padding: 10px; background: var(--bg-inset); border-radius: 12px; }
+.ia-world-detail-head > div { display: grid; gap: 3px; flex: 1; }
+.ia-world-detail-head span { color: var(--text-dim); font-size: 10px; }
+.ia-world-rule-strip { display: flex; gap: 6px; flex-wrap: wrap; margin: 12px 0; }
+.ia-world-rule-strip span { padding: 5px 8px; border: 1px solid var(--border); border-radius: 999px; color: var(--text-mute); font-size: 10px; }
+.ia-world-nations { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 9px; }
+.ia-world-nation { padding: 12px; border: 1px solid var(--border); border-radius: 12px; background: color-mix(in srgb, var(--bg-inset) 86%, transparent); }
+.ia-world-nation.is-mine { border-color: var(--border-gold); }
+.ia-world-nation.is-open { border-color: color-mix(in srgb, var(--good) 45%, var(--border)); }
+.ia-world-nation > div { display: flex; justify-content: space-between; gap: 8px; align-items: center; }
+.ia-world-nation p { min-height: 35px; color: var(--text-mute); font-size: 10.5px; line-height: 1.55; }
+.ia-world-message { margin-top: 10px; padding: 8px 10px; border-radius: 8px; background: var(--bg-inset); color: var(--text-mute); font-size: 11px; }
+.ia-social-modal { width: min(620px, calc(100vw - 24px)); max-height: calc(100vh - 32px); overflow-y: auto; padding: 20px; border: 1px solid var(--border-gold); border-radius: 18px; background: linear-gradient(165deg, var(--bg-raised), var(--bg-panel)); box-shadow: 0 24px 80px rgba(0,0,0,.6); }
+.ia-social-modal > header { display: flex; justify-content: space-between; gap: 12px; align-items: flex-start; }
+.ia-social-modal > header span { color: var(--gold); font-size: 9px; }
+.ia-social-modal h2 { margin: 4px 0 0; }
+.ia-social-code { display: flex; justify-content: space-between; gap: 16px; align-items: center; margin-top: 16px; padding: 13px; border: 1px solid var(--border); border-radius: 12px; background: var(--bg-inset); }
+.ia-social-code > div { display: grid; gap: 3px; }
+.ia-social-code span, .ia-social-code p { color: var(--text-dim); font-size: 10px; }
+.ia-social-code strong { color: var(--gold); font-family: var(--font-mono); letter-spacing: .16em; }
+.ia-social-code p { margin: 0; }
+.ia-social-add, .ia-world-chat-compose { display: flex; gap: 7px; margin-top: 10px; }
+.ia-social-add .ia-input, .ia-world-chat-compose .ia-input { min-width: 0; flex: 1; }
+.ia-social-section { margin-top: 16px; }
+.ia-social-section h3 { margin: 0 0 7px; color: var(--text-mute); font-size: 11px; }
+.ia-social-section article { display: flex; justify-content: space-between; align-items: center; gap: 9px; padding: 9px 10px; border-top: 1px solid var(--border); }
+.ia-social-section article > div, .ia-social-section article > span { display: flex; align-items: center; gap: 7px; }
+.ia-world-chat { margin-top: 16px; padding: 13px; border: 1px solid var(--border); border-radius: 14px; background: var(--bg-inset); }
+.ia-world-chat-head { display: flex; justify-content: space-between; gap: 10px; align-items: center; }
+.ia-world-chat-head > div { display: grid; gap: 2px; }
+.ia-world-chat-head span { color: var(--good); font-size: 9px; }
+.ia-world-chat-head em { color: var(--text-dim); font-size: 10px; font-style: normal; }
+.ia-world-chat-log { height: 210px; overflow-y: auto; margin-top: 9px; padding: 8px; border-radius: 9px; background: color-mix(in srgb, var(--bg-panel) 72%, transparent); }
+.ia-world-chat-log article { padding: 7px 3px; border-bottom: 1px solid color-mix(in srgb, var(--border) 55%, transparent); }
+.ia-world-chat-log article > div { display: flex; justify-content: space-between; gap: 8px; }
+.ia-world-chat-log strong { color: var(--gold); font-size: 11px; }
+.ia-world-chat-log time { color: var(--text-dim); font-size: 9px; }
+.ia-world-chat-log p { margin: 3px 0 0; color: var(--text-soft); font-size: 11px; line-height: 1.55; white-space: pre-wrap; overflow-wrap: anywhere; }
 
 @media (max-width: 640px) {
   .ia-novice-coach { right: 9px; bottom: 9px; width: calc(100vw - 18px); max-height: min(520px, calc(100vh - 18px)); overflow-y: auto; padding: 13px; }
   .ia-novice-pill { right: 9px; bottom: 9px; }
   .ia-novice-actions .ia-btn { flex: 1 1 130px; }
+  .ia-world-list, .ia-world-nations { grid-template-columns: 1fr; }
+  .ia-shared-world-head { flex-direction: column; }
+  .ia-world-detail-head { align-items: flex-start; flex-wrap: wrap; }
+  .ia-social-code { align-items: flex-start; flex-direction: column; }
+  .ia-social-add, .ia-world-chat-compose { flex-direction: column; }
 }
 .ia-card { box-shadow: inset 0 1px 0 rgba(201,164,78,0.045); }
 .ia-card:hover { border-color: color-mix(in srgb, var(--border-bright) 72%, var(--border)); }

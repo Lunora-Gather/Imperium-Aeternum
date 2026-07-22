@@ -1,179 +1,78 @@
 {
-    "organizationId": "6a43f0258aa8d0072575",
-    "projectId": "imperium-aeternum",
-    "projectName": "Imperium Aeternum",
-    "settings": {
-        "services": {
-            "account": true,
-            "avatars": true,
-            "databases": true,
-            "locale": true,
-            "health": true,
-            "storage": true,
-            "teams": true,
-            "users": true,
-            "sites": true,
-            "functions": true,
-            "graphql": true,
-            "messaging": true
-        },
-        "protocols": {
-            "rest": true,
-            "graphql": true,
-            "websocket": true
-        },
-        "auth": {
-            "methods": {
-                "jwt": true,
-                "phone": false,
-                "invites": false,
-                "anonymous": false,
-                "email-otp": true,
-                "magic-url": false,
-                "email-password": true
-            },
-            "security": {
-                "duration": 2592000,
-                "limit": null,
-                "sessionsLimit": 10,
-                "passwordHistory": 3,
-                "passwordDictionary": true,
-                "personalDataCheck": true,
-                "sessionAlerts": true,
-                "mockNumbers": []
-            }
-        }
+  "organizationId": "6a43f0258aa8d0072575",
+  "projectId": "imperium-aeternum",
+  "projectName": "Imperium Aeternum",
+  "settings": {
+    "services": {"account":true,"avatars":true,"databases":true,"locale":true,"health":true,"storage":true,"teams":true,"users":true,"sites":true,"functions":true,"graphql":true,"messaging":true},
+    "protocols": {"rest":true,"graphql":true,"websocket":true},
+    "auth": {
+      "methods": {"jwt":true,"phone":false,"invites":false,"anonymous":false,"email-otp":true,"magic-url":false,"email-password":true},
+      "security": {"duration":2592000,"limit":null,"sessionsLimit":10,"passwordHistory":3,"passwordDictionary":true,"personalDataCheck":true,"sessionAlerts":true,"mockNumbers":[]}
+    }
+  },
+  "tablesDB": [{"$id":"imperium_game","name":"Imperium Game Data","enabled":true}],
+  "tables": [
+    {
+      "$id":"cloud_saves","$permissions":["create(\"users\")"],"databaseId":"imperium_game","name":"Private Cloud Saves","enabled":true,"rowSecurity":true,
+      "columns":[
+        {"key":"userId","type":"varchar","required":true,"array":false,"size":64,"default":null,"encrypt":false},
+        {"key":"slot","type":"integer","required":true,"array":false,"default":null,"min":0,"max":4},
+        {"key":"fileId","type":"varchar","required":true,"array":false,"size":36,"default":null,"encrypt":false},
+        {"key":"saveVersion","type":"integer","required":true,"array":false,"default":null,"min":1,"max":9223372036854775807},
+        {"key":"turn","type":"integer","required":true,"array":false,"default":null,"min":0,"max":9223372036854775807},
+        {"key":"nationName","type":"varchar","required":true,"array":false,"size":128,"default":null,"encrypt":false},
+        {"key":"deviceId","type":"varchar","required":true,"array":false,"size":64,"default":null,"encrypt":false},
+        {"key":"contentHash","type":"varchar","required":true,"array":false,"size":64,"default":null,"encrypt":false},
+        {"key":"clientUpdatedAt","type":"datetime","required":true,"array":false,"default":null,"format":""}
+      ],
+      "indexes":[{"key":"slot_idx","type":"key","status":"available","columns":["slot"],"orders":["ASC"]}]
     },
-    "tablesDB": [
-        {
-            "$id": "imperium_game",
-            "name": "Imperium Game Data",
-            "enabled": true
-        }
-    ],
-    "tables": [
-        {
-            "$id": "cloud_saves",
-            "$permissions": [
-                "create(\"users\")"
-            ],
-            "databaseId": "imperium_game",
-            "name": "Private Cloud Saves",
-            "enabled": true,
-            "rowSecurity": true,
-            "columns": [
-                {
-                    "key": "userId",
-                    "type": "varchar",
-                    "required": true,
-                    "array": false,
-                    "size": 64,
-                    "default": null,
-                    "encrypt": false
-                },
-                {
-                    "key": "slot",
-                    "type": "integer",
-                    "required": true,
-                    "array": false,
-                    "default": null,
-                    "min": 0,
-                    "max": 4
-                },
-                {
-                    "key": "fileId",
-                    "type": "varchar",
-                    "required": true,
-                    "array": false,
-                    "size": 36,
-                    "default": null,
-                    "encrypt": false
-                },
-                {
-                    "key": "saveVersion",
-                    "type": "integer",
-                    "required": true,
-                    "array": false,
-                    "default": null,
-                    "min": 1,
-                    "max": 9223372036854775807
-                },
-                {
-                    "key": "turn",
-                    "type": "integer",
-                    "required": true,
-                    "array": false,
-                    "default": null,
-                    "min": 0,
-                    "max": 9223372036854775807
-                },
-                {
-                    "key": "nationName",
-                    "type": "varchar",
-                    "required": true,
-                    "array": false,
-                    "size": 128,
-                    "default": null,
-                    "encrypt": false
-                },
-                {
-                    "key": "deviceId",
-                    "type": "varchar",
-                    "required": true,
-                    "array": false,
-                    "size": 64,
-                    "default": null,
-                    "encrypt": false
-                },
-                {
-                    "key": "contentHash",
-                    "type": "varchar",
-                    "required": true,
-                    "array": false,
-                    "size": 64,
-                    "default": null,
-                    "encrypt": false
-                },
-                {
-                    "key": "clientUpdatedAt",
-                    "type": "datetime",
-                    "required": true,
-                    "array": false,
-                    "default": null,
-                    "format": ""
-                }
-            ],
-            "indexes": [
-                {
-                    "key": "slot_idx",
-                    "type": "key",
-                    "status": "available",
-                    "columns": [
-                        "slot"
-                    ],
-                    "orders": [
-                        "ASC"
-                    ]
-                }
-            ]
-        }
-    ],
-    "buckets": [
-        {
-            "$id": "cloud_saves",
-            "$permissions": [
-                "create(\"users\")"
-            ],
-            "fileSecurity": true,
-            "name": "Private Cloud Save Payloads",
-            "enabled": true,
-            "maximumFileSize": 5242880,
-            "allowedFileExtensions": [
-                "json"
-            ],
-            "compression": "gzip",
-            "encryption": true,
-            "antivirus": false
-        }
-    ]
+    {
+      "$id":"shared_worlds","$permissions":["read(\"users\")"],"databaseId":"imperium_game","name":"Shared Living Worlds","enabled":true,"rowSecurity":false,
+      "columns":[
+        {"key":"templateId","type":"varchar","required":true,"array":false,"size":64,"default":null,"encrypt":false},{"key":"name","type":"varchar","required":true,"array":false,"size":128,"default":null,"encrypt":false},{"key":"status","type":"varchar","required":true,"array":false,"size":16,"default":null,"encrypt":false},{"key":"phase","type":"varchar","required":true,"array":false,"size":16,"default":null,"encrypt":false},
+        {"key":"turn","type":"integer","required":true,"array":false,"default":null,"min":0,"max":9223372036854775807},{"key":"revision","type":"integer","required":true,"array":false,"default":null,"min":0,"max":9223372036854775807},{"key":"nationCount","type":"integer","required":true,"array":false,"default":null,"min":1,"max":1000},
+        {"key":"snapshotFileId","type":"varchar","required":false,"array":false,"size":36,"default":null,"encrypt":false},{"key":"planningDeadlineAt","type":"datetime","required":true,"array":false,"default":null,"format":""},{"key":"planningWindowSeconds","type":"integer","required":true,"array":false,"default":null,"min":60,"max":604800},{"key":"pauseWhenEmpty","type":"boolean","required":true,"array":false,"default":null},{"key":"caretakerEnabled","type":"boolean","required":true,"array":false,"default":null},{"key":"maxNationsPerUser","type":"integer","required":true,"array":false,"default":null,"min":1,"max":20}
+      ],
+      "indexes":[{"key":"world_status_name","type":"key","status":"available","columns":["status","name"],"orders":["ASC","ASC"]}]
+    },
+    {
+      "$id":"world_memberships","$permissions":[],"databaseId":"imperium_game","name":"Shared World Memberships","enabled":true,"rowSecurity":true,
+      "columns":[{"key":"pairKey","type":"varchar","required":true,"array":false,"size":96,"default":null,"encrypt":false},{"key":"worldId","type":"varchar","required":true,"array":false,"size":36,"default":null,"encrypt":false},{"key":"userId","type":"varchar","required":true,"array":false,"size":36,"default":null,"encrypt":false},{"key":"role","type":"varchar","required":true,"array":false,"size":16,"default":null,"encrypt":false},{"key":"joinedAt","type":"datetime","required":true,"array":false,"default":null,"format":""},{"key":"lastSeenAt","type":"datetime","required":true,"array":false,"default":null,"format":""}],
+      "indexes":[{"key":"membership_pair","type":"unique","status":"available","columns":["pairKey"],"orders":["ASC"]},{"key":"membership_world","type":"key","status":"available","columns":["worldId"],"orders":["ASC"]},{"key":"membership_user","type":"key","status":"available","columns":["userId"],"orders":["ASC"]}]
+    },
+    {
+      "$id":"nation_controls","$permissions":["read(\"users\")"],"databaseId":"imperium_game","name":"Nation Control Leases","enabled":true,"rowSecurity":false,
+      "columns":[{"key":"worldId","type":"varchar","required":true,"array":false,"size":36,"default":null,"encrypt":false},{"key":"nationId","type":"varchar","required":true,"array":false,"size":64,"default":null,"encrypt":false},{"key":"nationName","type":"varchar","required":true,"array":false,"size":128,"default":null,"encrypt":false},{"key":"controllerUserId","type":"varchar","required":false,"array":false,"size":36,"default":null,"encrypt":false},{"key":"status","type":"varchar","required":true,"array":false,"size":16,"default":null,"encrypt":false},{"key":"claimedAt","type":"datetime","required":false,"array":false,"default":null,"format":""},{"key":"releasedAt","type":"datetime","required":false,"array":false,"default":null,"format":""},{"key":"leaseExpiresAt","type":"datetime","required":false,"array":false,"default":null,"format":""},{"key":"lastActiveAt","type":"datetime","required":false,"array":false,"default":null,"format":""},{"key":"version","type":"integer","required":true,"array":false,"default":null,"min":0,"max":9223372036854775807}],
+      "indexes":[{"key":"control_world_nation","type":"unique","status":"available","columns":["worldId","nationId"],"orders":["ASC","ASC"]},{"key":"control_world_name","type":"key","status":"available","columns":["worldId","nationName"],"orders":["ASC","ASC"]},{"key":"control_owner","type":"key","status":"available","columns":["worldId","controllerUserId","status"],"orders":["ASC","ASC","ASC"]}]
+    },
+    {
+      "$id":"world_commands","$permissions":[],"databaseId":"imperium_game","name":"Authoritative World Commands","enabled":true,"rowSecurity":true,
+      "columns":[{"key":"worldId","type":"varchar","required":true,"array":false,"size":36,"default":null,"encrypt":false},{"key":"nationId","type":"varchar","required":true,"array":false,"size":64,"default":null,"encrypt":false},{"key":"userId","type":"varchar","required":true,"array":false,"size":36,"default":null,"encrypt":false},{"key":"turn","type":"integer","required":true,"array":false,"default":null,"min":0,"max":9223372036854775807},{"key":"baseRevision","type":"integer","required":true,"array":false,"default":null,"min":0,"max":9223372036854775807},{"key":"commandType","type":"varchar","required":true,"array":false,"size":32,"default":null,"encrypt":false},{"key":"idempotencyKey","type":"varchar","required":true,"array":false,"size":64,"default":null,"encrypt":false},{"key":"payload","type":"mediumtext","required":true,"array":false,"default":null},{"key":"status","type":"varchar","required":true,"array":false,"size":16,"default":null,"encrypt":false},{"key":"createdAt","type":"datetime","required":true,"array":false,"default":null,"format":""}],
+      "indexes":[{"key":"command_idempotency","type":"unique","status":"available","columns":["idempotencyKey"],"orders":["ASC"]},{"key":"command_world_turn","type":"key","status":"available","columns":["worldId","turn","status"],"orders":["ASC","ASC","ASC"]}]
+    },
+    {
+      "$id":"game_profiles","$permissions":[],"databaseId":"imperium_game","name":"Private Searchable Game Profiles","enabled":true,"rowSecurity":true,
+      "columns":[{"key":"userId","type":"varchar","required":true,"array":false,"size":36,"default":null,"encrypt":false},{"key":"displayName","type":"varchar","required":true,"array":false,"size":64,"default":null,"encrypt":false},{"key":"friendCode","type":"varchar","required":true,"array":false,"size":12,"default":null,"encrypt":false},{"key":"createdAt","type":"datetime","required":true,"array":false,"default":null,"format":""},{"key":"lastSeenAt","type":"datetime","required":true,"array":false,"default":null,"format":""}],
+      "indexes":[{"key":"profile_user","type":"unique","status":"available","columns":["userId"],"orders":["ASC"]},{"key":"profile_friend_code","type":"unique","status":"available","columns":["friendCode"],"orders":["ASC"]}]
+    },
+    {
+      "$id":"friendships","$permissions":[],"databaseId":"imperium_game","name":"Private Friendships","enabled":true,"rowSecurity":true,
+      "columns":[{"key":"pairKey","type":"varchar","required":true,"array":false,"size":80,"default":null,"encrypt":false},{"key":"requesterId","type":"varchar","required":true,"array":false,"size":36,"default":null,"encrypt":false},{"key":"addresseeId","type":"varchar","required":true,"array":false,"size":36,"default":null,"encrypt":false},{"key":"requesterName","type":"varchar","required":true,"array":false,"size":64,"default":null,"encrypt":false},{"key":"addresseeName","type":"varchar","required":true,"array":false,"size":64,"default":null,"encrypt":false},{"key":"status","type":"varchar","required":true,"array":false,"size":16,"default":null,"encrypt":false},{"key":"createdAt","type":"datetime","required":true,"array":false,"default":null,"format":""},{"key":"respondedAt","type":"datetime","required":false,"array":false,"default":null,"format":""}],
+      "indexes":[{"key":"friend_pair","type":"unique","status":"available","columns":["pairKey"],"orders":["ASC"]},{"key":"friend_created","type":"key","status":"available","columns":["createdAt"],"orders":["DESC"]}]
+    },
+    {
+      "$id":"world_messages","$permissions":[],"databaseId":"imperium_game","name":"World Member Chat","enabled":true,"rowSecurity":true,
+      "columns":[{"key":"worldId","type":"varchar","required":true,"array":false,"size":36,"default":null,"encrypt":false},{"key":"userId","type":"varchar","required":true,"array":false,"size":36,"default":null,"encrypt":false},{"key":"displayName","type":"varchar","required":true,"array":false,"size":64,"default":null,"encrypt":false},{"key":"nationId","type":"varchar","required":false,"array":false,"size":64,"default":null,"encrypt":false},{"key":"body","type":"text","required":true,"array":false,"default":null},{"key":"createdAt","type":"datetime","required":true,"array":false,"default":null,"format":""}],
+      "indexes":[{"key":"message_world_time","type":"key","status":"available","columns":["worldId","createdAt"],"orders":["ASC","DESC"]},{"key":"message_rate","type":"key","status":"available","columns":["worldId","userId","createdAt"],"orders":["ASC","ASC","DESC"]}]
+    }
+  ],
+  "buckets": [
+    {"$id":"cloud_saves","$permissions":["create(\"users\")"],"fileSecurity":true,"name":"Private Cloud Save Payloads","enabled":true,"maximumFileSize":5242880,"allowedFileExtensions":["json"],"compression":"gzip","encryption":true,"antivirus":false},
+    {"$id":"world_snapshots","$permissions":[],"fileSecurity":true,"name":"Authoritative World Snapshots","enabled":true,"maximumFileSize":20971520,"allowedFileExtensions":["json","gz"],"compression":"gzip","encryption":true,"antivirus":false}
+  ],
+  "functions": [
+    {"$id":"shared-world-gateway","name":"Shared World Gateway","enabled":true,"logging":true,"runtime":"node-22","execute":["users"],"events":[],"schedule":"","timeout":15,"entrypoint":"src/main.js","commands":"npm install","scopes":["rows.read","rows.write"],"buildSpecification":"s-2vcpu-2gb","runtimeSpecification":"s-1vcpu-512mb","deploymentRetention":7,"path":"functions/shared-world-gateway"},
+    {"$id":"social-gateway","name":"Social and World Chat Gateway","enabled":true,"logging":true,"runtime":"node-22","execute":["users"],"events":[],"schedule":"","timeout":15,"entrypoint":"src/main.js","commands":"npm install","scopes":["rows.read","rows.write","users.read"],"buildSpecification":"s-2vcpu-2gb","runtimeSpecification":"s-1vcpu-512mb","deploymentRetention":7,"path":"functions/social-gateway"}
+  ]
 }
