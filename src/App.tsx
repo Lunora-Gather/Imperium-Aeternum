@@ -22,6 +22,8 @@ import { ResourceStrip } from './components/ui';
 import LogToast from './components/LogToast';
 import ErrorBoundary from './components/ErrorBoundary';
 import { AccountButton } from './components/account/AccountPanel';
+import { LocaleSwitch } from './components/LocaleSwitch';
+import { useI18n } from './i18n';
 
 const ScenarioSelect = lazy(() => import('./screens/ScenarioSelect'));
 const WorldMap = lazy(() => import('./screens/WorldMap'));
@@ -81,10 +83,12 @@ function persistNoviceJourney(progress: NoviceJourneyProgress): void {
 }
 
 function ScreenFallback() {
-  return <div className="ia-display" style={{ minHeight: 180, display: 'grid', placeItems: 'center', color: 'var(--text-dim)' }}>正在展开卷宗…</div>;
+  const { t } = useI18n();
+  return <div className="ia-display" style={{ minHeight: 180, display: 'grid', placeItems: 'center', color: 'var(--text-dim)' }}>{t('正在展开卷宗…')}</div>;
 }
 
 export default function App() {
+  const { t } = useI18n();
   const [tab, setTab] = useState<Tab>('dashboard');
   const [tabHistory, setTabHistory] = useState<Tab[]>([]);
   const [preReportTab, setPreReportTab] = useState<Tab>('dashboard');
@@ -232,12 +236,12 @@ export default function App() {
   }, []);
 
   const safeBackToMenu = useCallback(() => {
-    const ok = window.confirm('返回标题页？当前进度不会自动保存。建议先到“存档”页保存。');
+    const ok = window.confirm(t('返回标题页？当前进度不会自动保存。建议先到“存档”页保存。'));
     if (!ok) return;
     setTabHistory(resetPageHistory<Tab>());
     setTab('dashboard');
     backToMenu();
-  }, [backToMenu]);
+  }, [backToMenu, t]);
 
   const onKey = useCallback((e: KeyboardEvent) => {
     if (scene !== 'playing') return;
@@ -284,7 +288,7 @@ export default function App() {
   if (!player) {
     return (
       <div className="ia-shell" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh' }}>
-        <div className="ia-display" style={{ color: 'var(--gold)', fontSize: 18 }}>载入中...</div>
+        <div className="ia-display" style={{ color: 'var(--gold)', fontSize: 18 }}>{t('载入中...')}</div>
       </div>
     );
   }
@@ -323,65 +327,66 @@ export default function App() {
           <div className="ia-ruler-kicker ia-up">Imperium Aeternum</div>
           <div className="ia-ruler-main">
             <div>
-              <h1 className="ia-ruler-title">{player?.name ?? '未名之国'}</h1>
+              <h1 className="ia-ruler-title">{player?.name ?? t('未名之国')}</h1>
               <div className="ia-ruler-subline">
                 <span>Anno · {state.turn + 1}</span>
-                <span>永恒帝国</span>
-                <span>{player?.ruler?.name ? `君主 · ${player.ruler.name}` : '君主 · 无名'}</span>
-                {atWar && <span className="danger">⚔ 战时</span>}
-                {pendingCount > 0 && <span className="warn">✦ 待决事件 {pendingCount}</span>}
-                {state.victory.type && <span className={state.victory.type.startsWith('win') ? 'good' : 'danger'}>{state.victory.type.startsWith('win') ? '🏆 已胜利' : '💀 已陨落'}</span>}
+                <span>{t('永恒帝国')}</span>
+                <span>{player?.ruler?.name ? `Ruler · ${player.ruler.name}` : t('君主 · 无名')}</span>
+                {atWar && <span className="danger">⚔ {t('战时')}</span>}
+                {pendingCount > 0 && <span className="warn">✦ {t('待决事件 {{count}}', { count: pendingCount })}</span>}
+                {state.victory.type && <span className={state.victory.type.startsWith('win') ? 'good' : 'danger'}>{state.victory.type.startsWith('win') ? `🏆 ${t('已胜利')}` : `💀 ${t('已陨落')}`}</span>}
               </div>
             </div>
             <div className="ia-header-actions">
               <AccountButton compact />
-              <button className="ia-icon-btn ia-icon-btn--gold" onClick={toggleTheme} title={`主题：${theme}`} aria-label="切换主题">
+              <LocaleSwitch compact />
+              <button className="ia-icon-btn ia-icon-btn--gold" onClick={toggleTheme} title={t('切换主题')} aria-label={t('切换主题')}>
                 {theme === 'night' ? '☾' : theme === 'day' ? '☀' : theme === 'bamboo' ? '筠' : '墨'}
               </button>
-              <button className="ia-icon-btn" onClick={() => { setShowHelp(true); setTutorialStep(0); }} title="治国引导" aria-label="治国引导">?</button>
-              <button className="ia-icon-btn" onClick={sfxMute.toggle} title={sfxMute.muted ? '音效已关（点击开启）' : '音效已开（点击静音）'} aria-label="音效开关">{sfxMute.muted ? '🔇' : '🔊'}</button>
-              <button className="ia-icon-btn ia-icon-btn--back" onClick={goBackPage} title="返回上一页；没有上一页则回总览" aria-label="返回上一页">↩</button>
-              <button className="ia-icon-btn ia-icon-btn--back" onClick={safeBackToMenu} title="返回标题页" aria-label="返回标题页">⌂</button>
+              <button className="ia-icon-btn" onClick={() => { setShowHelp(true); setTutorialStep(0); }} title={t('治国引导')} aria-label={t('治国引导')}>?</button>
+              <button className="ia-icon-btn" onClick={sfxMute.toggle} title={t(sfxMute.muted ? '音效已关（点击开启）' : '音效已开（点击静音）')} aria-label={t('音效开关')}>{sfxMute.muted ? '🔇' : '🔊'}</button>
+              <button className="ia-icon-btn ia-icon-btn--back" onClick={goBackPage} title={t('返回上一页')} aria-label={t('返回上一页')}>↩</button>
+              <button className="ia-icon-btn ia-icon-btn--back" onClick={safeBackToMenu} title={t('返回标题页')} aria-label={t('返回标题页')}>⌂</button>
             </div>
           </div>
 
           {player && (
             <div className="ia-resource-dock">
               <ResourceStrip items={[
-                { label: '国库', value: player.resources.gold, warn: player.resources.gold < 0, color: 'var(--gold)', icon: '◉' },
-                { label: '粮储', value: player.resources.food, warn: player.resources.food < 0, color: 'var(--food)', icon: '✦' },
-                { label: '子民', value: totalPop, color: 'var(--text)', icon: '◯' },
-                { label: '安定', value: player.government.stability, warn: player.government.stability < 30, color: 'var(--stable)', icon: '◈' },
-                { label: '疆土', value: provs.length, color: 'var(--accent)', icon: '⬡' },
+                { label: t('国库'), value: player.resources.gold, warn: player.resources.gold < 0, color: 'var(--gold)', icon: '◉' },
+                { label: t('粮储'), value: player.resources.food, warn: player.resources.food < 0, color: 'var(--food)', icon: '✦' },
+                { label: t('子民'), value: totalPop, color: 'var(--text)', icon: '◯' },
+                { label: t('安定'), value: player.government.stability, warn: player.government.stability < 30, color: 'var(--stable)', icon: '◈' },
+                { label: t('疆土'), value: provs.length, color: 'var(--accent)', icon: '⬡' },
               ]} />
             </div>
           )}
         </section>
 
         <aside className="ia-status-panel">
-          <div className="ia-status-row"><span>行政点</span><strong>{Math.round(player?.resources.adminPt ?? 0)}</strong></div>
-          <div className="ia-status-row"><span>科研点</span><strong>{Math.round(player?.resources.sciPt ?? 0)}</strong></div>
-          <div className="ia-status-row"><span>影响力</span><strong>{Math.round(player?.resources.influence ?? 0)}</strong></div>
-          <div className="ia-status-row"><span>净收入</span><strong className={netIncome === null ? '' : netIncome >= 0 ? 'good' : 'danger'}>{netIncome === null ? '—' : `${netIncome >= 0 ? '+' : ''}${Math.round(netIncome)}/年`}</strong></div>
+          <div className="ia-status-row"><span>{t('行政点')}</span><strong>{Math.round(player?.resources.adminPt ?? 0)}</strong></div>
+          <div className="ia-status-row"><span>{t('科研点')}</span><strong>{Math.round(player?.resources.sciPt ?? 0)}</strong></div>
+          <div className="ia-status-row"><span>{t('影响力')}</span><strong>{Math.round(player?.resources.influence ?? 0)}</strong></div>
+          <div className="ia-status-row"><span>{t('净收入')}</span><strong className={netIncome === null ? '' : netIncome >= 0 ? 'good' : 'danger'}>{netIncome === null ? '—' : `${netIncome >= 0 ? '+' : ''}${Math.round(netIncome)}/年`}</strong></div>
         </aside>
       </header>
 
-      <nav className="ia-main-nav" aria-label="主导航">
+      <nav className="ia-main-nav" aria-label={t('主导航')}>
         {TAB_GROUPS.map((g) => (
           <div className="ia-nav-group" key={g.group}>
-            <span className="ia-nav-label ia-up">{g.group}</span>
+            <span className="ia-nav-label ia-up">{t(g.group)}</span>
             <div className="ia-tab-cluster">
-              {g.tabs.map((t) => (
-                <button key={t.id} onClick={() => goToTab(t.id)} title={`快捷键 ${t.key}`} className={`ia-tab-btn ${tab === t.id ? 'is-active' : ''} ${noviceStep?.tab === t.id && noviceJourney.status === 'active' ? 'is-tutorial-target' : ''}`}>
-                  <span className="ia-tab-icon">{t.icon}</span>
-                  <span>{t.label}</span>
-                  <kbd>{t.key}</kbd>
+              {g.tabs.map((tabInfo) => (
+                <button key={tabInfo.id} onClick={() => goToTab(tabInfo.id)} title={t('快捷键 {{key}}', { key: tabInfo.key })} className={`ia-tab-btn ${tab === tabInfo.id ? 'is-active' : ''} ${noviceStep?.tab === tabInfo.id && noviceJourney.status === 'active' ? 'is-tutorial-target' : ''}`}>
+                  <span className="ia-tab-icon">{tabInfo.icon}</span>
+                  <span>{t(tabInfo.label)}</span>
+                  <kbd>{tabInfo.key}</kbd>
                 </button>
               ))}
             </div>
           </div>
         ))}
-        <div className="ia-nav-hint">Esc / ↩ 返回上一页 · 空格下一回合 · T 经济 · {BUILD_MARK}</div>
+        <div className="ia-nav-hint">{t('Esc / ↩ 返回上一页 · 空格下一回合 · T 经济 · {{build}}', { build: BUILD_MARK })}</div>
       </nav>
 
       <main className="ia-content-shell ia-fade">
