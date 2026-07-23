@@ -28,5 +28,21 @@ export interface WorldChatMessage {
   displayName: string;
   nationId: string | null;
   body: string;
+  kind: 'text' | 'image';
+  mediaFileId: string | null;
+  mediaMime: string | null;
+  createdAt: string;
+}
+
+export interface DirectMessage {
+  id: string;
+  conversationKey: string;
+  senderId: string;
+  recipientId: string;
+  senderName: string;
+  body: string;
+  kind: 'text' | 'image';
+  mediaFileId: string | null;
+  mediaMime: string | null;
   createdAt: string;
 }

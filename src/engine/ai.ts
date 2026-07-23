@@ -373,11 +373,11 @@ function isPlayerNeighbor(nationId: string, state: GameState, neighborSet?: Set<
   return playerProvs.some((p) => p.adjacent.some((adj) => state.provinces[adj]?.ownerId === nationId));
 }
 
-export function processAITurn(state: GameState): GameState {
+export function processAITurn(state: GameState, excludedNationIds: ReadonlySet<string> = new Set()): GameState {
   const rng = mulberry32(state.seed ^ 0x5DEECE66D);
   const playerNeighbors = buildPlayerNeighborSet(state);
   for (const nation of Object.values(state.nations) as Nation[]) {
-    if (nation.isPlayer) continue;
+    if (nation.isPlayer || excludedNationIds.has(nation.id)) continue;
     if (nation.defeated) continue;
     const tier = nation.tier;
     if (tier === 'S' || tier === 'A' || isPlayerNeighbor(nation.id, state, playerNeighbors)) processAITurnFull(nation, state, rng);

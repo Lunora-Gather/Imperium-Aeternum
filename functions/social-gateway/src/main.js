@@ -1,10 +1,15 @@
-import { Client, ID, Permission, Query, Role, TablesDB, Users } from 'node-appwrite';
+import { Client, ID, Permission, Query, Role, Storage, TablesDB, Users } from 'node-appwrite';
+import { InputFile } from 'node-appwrite/file';
 
 const DATABASE_ID = 'imperium_game';
 const PROFILE_TABLE = 'game_profiles';
 const FRIENDSHIP_TABLE = 'friendships';
 const MEMBERSHIP_TABLE = 'world_memberships';
 const MESSAGE_TABLE = 'world_messages';
+const DIRECT_MESSAGE_TABLE = 'direct_messages';
+const MEDIA_BUCKET = 'world_chat_media';
+const MAX_IMAGE_BYTES = 2 * 1024 * 1024;
+const ALLOWED_IMAGE_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/gif']);
 
 function hash(value) {
   let result = 0x811c9dc5;
@@ -19,7 +24,7 @@ const readForUsers = (ids) => [...new Set(ids)].slice(0, 100).map((id) => Permis
 
 function services(req) {
   const client = new Client().setEndpoint(process.env.APPWRITE_FUNCTION_API_ENDPOINT).setProject(process.env.APPWRITE_FUNCTION_PROJECT_ID).setKey(req.headers['x-appwrite-key']);
-  return { db: new TablesDB(client), users: new Users(client) };
+  return { db: new TablesDB(client), users: new Users(client), storage: new Storage(client) };
 }
 
 async function ensureProfile(db, users, userId) {
@@ -47,13 +52,53 @@ async function worldMembers(db, worldId) {
   return result.rows.map((row) => row.userId);
 }
 
+function hasValidImageSignature(buffer, mime) {
+  if (mime === 'image/jpeg') return buffer[0] === 0xff && buffer[1] === 0xd8 && buffer[2] === 0xff;
+  if (mime === 'image/png') return buffer.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]));
+  if (mime === 'image/gif') return ['GIF87a', 'GIF89a'].includes(buffer.subarray(0, 6).toString('ascii'));
+  if (mime === 'image/webp') return buffer.subarray(0, 4).toString('ascii') === 'RIFF' && buffer.subarray(8, 12).toString('ascii') === 'WEBP';
+  return false;
+}
+
+function safeImageName(fileName, mime, fallback) {
+  const extension = { 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp', 'image/gif': 'gif' }[mime];
+  const stem = String(fileName ?? fallback).replace(/\.[^.]+$/, '').replace(/[^a-zA-Z0-9_-]/g, '_').slice(0, 100) || fallback;
+  return `${stem}.${extension}`;
+}
+
+async function enforceMessageRate(db, worldId, userId) {
+  const recent = await db.listRows({ databaseId: DATABASE_ID, tableId: MESSAGE_TABLE, queries: [Query.equal('worldId', worldId), Query.equal('userId', userId), Query.orderDesc('createdAt'), Query.limit(1)], total: false });
+  if (recent.rows[0] && Date.now() - Date.parse(recent.rows[0].createdAt) < 1800) throw new Error('发送太快，请稍后再试');
+}
+
+async function requireFriendship(db, userId, friendUserId) {
+  if (!friendUserId || friendUserId === userId) throw new Error('好友目标无效');
+  const id = friendshipId(userId, friendUserId);
+  const relation = await db.getRow({ databaseId: DATABASE_ID, tableId: FRIENDSHIP_TABLE, rowId: id });
+  if (relation.status !== 'accepted' || ![relation.requesterId, relation.addresseeId].includes(userId)) throw new Error('只有已接受的好友可以私聊');
+  return relation;
+}
+
+async function enforceDirectRate(db, key, userId) {
+  const recent = await db.listRows({ databaseId: DATABASE_ID, tableId: DIRECT_MESSAGE_TABLE, queries: [Query.equal('conversationKey', key), Query.equal('senderId', userId), Query.orderDesc('createdAt'), Query.limit(1)], total: false });
+  if (recent.rows[0] && Date.now() - Date.parse(recent.rows[0].createdAt) < 1200) throw new Error('发送太快，请稍后再试');
+}
+
+async function createDirectMessage(db, userId, friendUserId, senderName, data) {
+  return db.createRow({ databaseId: DATABASE_ID, tableId: DIRECT_MESSAGE_TABLE, rowId: ID.unique(), data: { conversationKey: pairKey(userId, friendUserId), senderId: userId, recipientId: friendUserId, senderName, createdAt: new Date().toISOString(), ...data }, permissions: readForUsers([userId, friendUserId]) });
+}
+
+async function createWorldMessage(db, members, data) {
+  return db.createRow({ databaseId: DATABASE_ID, tableId: MESSAGE_TABLE, rowId: ID.unique(), data, permissions: readForUsers(members) });
+}
+
 export default async ({ req, res, error }) => {
   try {
     const userId = req.headers['x-appwrite-user-id'];
     if (!userId) return res.json({ ok: false, message: '需要登录后使用社交功能' }, 401);
     const body = req.bodyJson ?? {};
     const { action } = body;
-    const { db, users } = services(req);
+    const { db, users, storage } = services(req);
     const self = await ensureProfile(db, users, userId);
     if (action === 'ensure_profile') return res.json({ ok: true, profile: self });
     if (action === 'find_profile') {
@@ -91,16 +136,73 @@ export default async ({ req, res, error }) => {
       const messages = await db.listRows({ databaseId: DATABASE_ID, tableId: MESSAGE_TABLE, queries: [Query.equal('worldId', worldId), Query.orderDesc('createdAt'), Query.limit(50)], total: false });
       return res.json({ ok: true, messages: messages.rows });
     }
+    if (action === 'list_direct_messages') {
+      const friendUserId = String(body.friendUserId ?? '');
+      await requireFriendship(db, userId, friendUserId);
+      const messages = await db.listRows({ databaseId: DATABASE_ID, tableId: DIRECT_MESSAGE_TABLE, queries: [Query.equal('conversationKey', pairKey(userId, friendUserId)), Query.orderDesc('createdAt'), Query.limit(50)], total: false });
+      return res.json({ ok: true, messages: messages.rows });
+    }
+    if (action === 'send_direct_message') {
+      const friendUserId = String(body.friendUserId ?? '');
+      const text = String(body.body ?? '').trim();
+      await requireFriendship(db, userId, friendUserId);
+      if (!text || text.length > 500) throw new Error('消息需要在 1–500 字之间');
+      await enforceDirectRate(db, pairKey(userId, friendUserId), userId);
+      const direct = await createDirectMessage(db, userId, friendUserId, self.displayName, { body: text, kind: 'text', mediaFileId: null, mediaMime: null });
+      return res.json({ ok: true, message: direct });
+    }
     if (action === 'send_world_message') {
       const worldId = String(body.worldId ?? '');
       const text = String(body.body ?? '').trim();
       await requireMembership(db, worldId, userId);
       if (!text || text.length > 500) throw new Error('消息需要在 1–500 字之间');
-      const recent = await db.listRows({ databaseId: DATABASE_ID, tableId: MESSAGE_TABLE, queries: [Query.equal('worldId', worldId), Query.equal('userId', userId), Query.orderDesc('createdAt'), Query.limit(1)], total: false });
-      if (recent.rows[0] && Date.now() - Date.parse(recent.rows[0].createdAt) < 2500) throw new Error('发送太快，请稍后再试');
+      await enforceMessageRate(db, worldId, userId);
       const members = await worldMembers(db, worldId);
-      await db.createRow({ databaseId: DATABASE_ID, tableId: MESSAGE_TABLE, rowId: ID.unique(), data: { worldId, userId, displayName: self.displayName, nationId: body.nationId ? String(body.nationId) : null, body: text, createdAt: new Date().toISOString() }, permissions: readForUsers(members) });
-      return res.json({ ok: true });
+      const message = await createWorldMessage(db, members, { worldId, userId, displayName: self.displayName, nationId: body.nationId ? String(body.nationId) : null, body: text, kind: 'text', mediaFileId: null, mediaMime: null, createdAt: new Date().toISOString() });
+      return res.json({ ok: true, message });
+    }
+    if (action === 'send_world_image') {
+      const worldId = String(body.worldId ?? '');
+      const caption = String(body.caption ?? '').trim().slice(0, 300);
+      const mime = String(body.mime ?? '').toLowerCase();
+      await requireMembership(db, worldId, userId);
+      await enforceMessageRate(db, worldId, userId);
+      if (!ALLOWED_IMAGE_TYPES.has(mime)) throw new Error('仅支持 JPG、PNG、WebP 或 GIF 图片');
+      const buffer = Buffer.from(String(body.base64 ?? ''), 'base64');
+      if (buffer.length <= 0 || buffer.length > MAX_IMAGE_BYTES) throw new Error('图片大小需要在 2MB 以内');
+      if (!hasValidImageSignature(buffer, mime)) throw new Error('图片内容与文件类型不匹配');
+      const members = await worldMembers(db, worldId);
+      const fileId = ID.unique();
+      const safeName = safeImageName(body.fileName, mime, 'world-image');
+      await storage.createFile({ bucketId: MEDIA_BUCKET, fileId, file: InputFile.fromBuffer(buffer, safeName), permissions: readForUsers(members) });
+      try {
+        const message = await createWorldMessage(db, members, { worldId, userId, displayName: self.displayName, nationId: body.nationId ? String(body.nationId) : null, body: caption || '图片', kind: 'image', mediaFileId: fileId, mediaMime: mime, createdAt: new Date().toISOString() });
+        return res.json({ ok: true, message });
+      } catch (messageError) {
+        await storage.deleteFile({ bucketId: MEDIA_BUCKET, fileId }).catch(() => undefined);
+        throw messageError;
+      }
+    }
+    if (action === 'send_direct_image') {
+      const friendUserId = String(body.friendUserId ?? '');
+      const caption = String(body.caption ?? '').trim().slice(0, 300);
+      const mime = String(body.mime ?? '').toLowerCase();
+      await requireFriendship(db, userId, friendUserId);
+      await enforceDirectRate(db, pairKey(userId, friendUserId), userId);
+      if (!ALLOWED_IMAGE_TYPES.has(mime)) throw new Error('仅支持 JPG、PNG、WebP 或 GIF 图片');
+      const buffer = Buffer.from(String(body.base64 ?? ''), 'base64');
+      if (buffer.length <= 0 || buffer.length > MAX_IMAGE_BYTES) throw new Error('图片大小需要在 2MB 以内');
+      if (!hasValidImageSignature(buffer, mime)) throw new Error('图片内容与文件类型不匹配');
+      const fileId = ID.unique();
+      const safeName = safeImageName(body.fileName, mime, 'direct-image');
+      await storage.createFile({ bucketId: MEDIA_BUCKET, fileId, file: InputFile.fromBuffer(buffer, safeName), permissions: readForUsers([userId, friendUserId]) });
+      try {
+        const direct = await createDirectMessage(db, userId, friendUserId, self.displayName, { body: caption || '图片', kind: 'image', mediaFileId: fileId, mediaMime: mime });
+        return res.json({ ok: true, message: direct });
+      } catch (messageError) {
+        await storage.deleteFile({ bucketId: MEDIA_BUCKET, fileId }).catch(() => undefined);
+        throw messageError;
+      }
     }
     return res.json({ ok: false, message: '不支持的社交操作' }, 400);
   } catch (cause) {

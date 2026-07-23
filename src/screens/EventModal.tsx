@@ -4,7 +4,7 @@ import { useGameStore } from '../store/gameStore';
 import { EVENT_BY_ID } from '../engine/events';
 import { Tag } from '../components/ui';
 import type { EventEffect } from '../data/events';
-import { discardPendingEvent, resolvePendingEventChoice } from '../gameplay/pendingEventResolution';
+import { discardPendingEvent } from '../gameplay/pendingEventResolution';
 
 const CATEGORY_TONE: Record<string, 'danger' | 'warn' | 'info' | 'good'> = {
   crisis: 'danger', military: 'danger', religion: 'warn',
@@ -74,7 +74,7 @@ function consequenceText(eff: EventEffect): string {
 }
 
 export default function EventModal() {
-  const { state, logMsg } = useGameStore();
+  const { state, logMsg, resolveEvent } = useGameStore();
   const pid = state.playerNationId;
   const pending = state.pendingEvents.find((p) => p.nationId === pid) ?? null;
   const ev = pending ? EVENT_BY_ID[pending.eventId] : null;
@@ -89,12 +89,8 @@ export default function EventModal() {
 
   const choose = useCallback((idx: number) => {
     if (!pending || !ev) return;
-    const current = useGameStore.getState().state;
-    const result = resolvePendingEventChoice(current, pid, pending.eventId, idx);
-    if (!result.resolved) return;
-    useGameStore.setState({ state: result.state });
-    logMsg(`事件 ${result.eventTitle}：选择「${result.optionText}」`);
-  }, [ev, logMsg, pending, pid]);
+    resolveEvent(pending.eventId, idx);
+  }, [ev, pending, resolveEvent]);
 
   useEffect(() => {
     if (pending && !ev) {

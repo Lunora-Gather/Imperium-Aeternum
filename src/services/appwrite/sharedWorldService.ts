@@ -1,5 +1,6 @@
 import { Channel, ExecutionMethod, Query, type Models } from 'appwrite';
 import type { NationControl, SharedWorldInstance, WorldTickPolicy } from '../../shared-world/types';
+import type { GameState } from '../../types/game';
 import { APPWRITE_CONFIG } from './config';
 import { getAppwriteServices } from './client';
 
@@ -86,12 +87,12 @@ export async function listNationControls(worldId: string): Promise<NationControl
   return (result.controls ?? []).map(toControl);
 }
 
-interface GatewayResult { ok: boolean; message?: string; control?: NationControlRow; controls?: NationControlRow[] }
+interface GatewayResult { ok: boolean; message?: string; control?: NationControlRow; controls?: NationControlRow[]; world?: SharedWorldRow; state?: GameState; ready?: boolean; readyCount?: number; requiredCount?: number; resolved?: { world: SharedWorldRow; state: GameState } | null }
 
-async function executeGateway(action: 'join_world' | 'list_controls' | 'claim_nation' | 'release_nation' | 'renew_control', worldId: string, nationId?: string): Promise<GatewayResult> {
+async function executeGateway(action: string, worldId: string, nationId?: string, data: Record<string, unknown> = {}): Promise<GatewayResult> {
   const execution = await getAppwriteServices().functions.createExecution({
     functionId: APPWRITE_CONFIG.worldGatewayFunctionId,
-    body: JSON.stringify({ action, worldId, nationId }),
+    body: JSON.stringify({ action, worldId, nationId, ...data }),
     async: false,
     xpath: '/',
     method: ExecutionMethod.POST,
@@ -105,6 +106,23 @@ export const joinSharedWorld = (worldId: string) => executeGateway('join_world',
 export const claimSharedNation = (worldId: string, nationId: string) => executeGateway('claim_nation', worldId, nationId);
 export const releaseSharedNation = (worldId: string, nationId: string) => executeGateway('release_nation', worldId, nationId);
 export const renewSharedNationControl = (worldId: string, nationId: string) => executeGateway('renew_control', worldId, nationId);
+
+export async function enterSharedWorld(worldId: string, nationId: string): Promise<{ world: SharedWorldInstance; state: GameState; controls: NationControl[] }> {
+  const result = await executeGateway('enter_world', worldId, nationId);
+  if (!result.world || !result.state) throw new Error('共享版图快照尚未准备完成');
+  return { world: toWorld(result.world), state: result.state, controls: (result.controls ?? []).map(toControl) };
+}
+
+export async function submitSharedWorldAction(worldId: string, nationId: string, baseRevision: number, commandType: string, action: string, args: unknown[]): Promise<{ world: SharedWorldInstance; state: GameState }> {
+  const result = await executeGateway('submit_command', worldId, nationId, { baseRevision, commandType, idempotencyKey: crypto.randomUUID(), payload: { action, args } });
+  if (!result.world || !result.state) throw new Error('共享行动没有返回最新世界状态');
+  return { world: toWorld(result.world), state: result.state };
+}
+
+export async function markSharedWorldReady(worldId: string, nationId: string, baseRevision: number): Promise<{ resolved: boolean; world?: SharedWorldInstance; state?: GameState; readyCount?: number; requiredCount?: number }> {
+  const result = await executeGateway('set_ready', worldId, nationId, { baseRevision, idempotencyKey: `ready:${worldId}:${nationId}:${crypto.randomUUID()}` });
+  return { resolved: !!result.resolved, world: result.resolved?.world ? toWorld(result.resolved.world) : undefined, state: result.resolved?.state, readyCount: result.readyCount, requiredCount: result.requiredCount };
+}
 
 export async function subscribeToWorldLobby(worldId: string, onChange: () => void): Promise<() => Promise<void>> {
   const { realtime } = getAppwriteServices();
