@@ -127,7 +127,14 @@ export { processAITurn };
 // 唯一正式回合入口：先隔离输入，再按固定顺序结算各子系统。
 // Pure 子引擎返回结构化差量；尚未迁移的复杂子系统只允许修改隔离后的 next。
 
-export function processTurn(state: GameState): { state: GameState; report: TurnReport } {
+export interface ProcessTurnOptions {
+  /** Nations controlled by people in a shared world. They receive passive settlement but no AI orders. */
+  humanNationIds?: readonly string[];
+  /** Shared worlds do not end because one ruler reaches a single-player failure condition. */
+  sharedWorld?: boolean;
+}
+
+export function processTurn(state: GameState, options: ProcessTurnOptions = {}): { state: GameState; report: TurnReport } {
   const rng = mulberry32(state.seed);
   const newSeed = Math.floor(rng() * 0xffffffff) >>> 0;
 
@@ -265,7 +272,7 @@ export function processTurn(state: GameState): { state: GameState; report: TurnR
     player.govTransitionTurns -= 1;
   }
 
-  runAITurnPhase(next, playerId, rng);
+  runAITurnPhase(next, playerId, rng, { humanNationIds: new Set(options.humanNationIds ?? []) });
 
   // triggeredEvents 上限 1000
   if (next.triggeredEvents.length > 1000) {
@@ -274,7 +281,7 @@ export function processTurn(state: GameState): { state: GameState; report: TurnR
 
   const worldEvents = collectWorldEvents(state, next, playerId, playerProvs);
   const report = buildReport(player, playerProvs, next, state, econ, pol, pop, cr, playerEventIds, worldEvents);
-  resolveFailuresAndRebellions(next, playerId);
+  if (!options.sharedWorld) resolveFailuresAndRebellions(next, playerId);
   // 判定与叛军衰减都可能改变归属，必须全部完成后再采集领土变化。
   decayRebelNations(next);
   report.provinceChanges = collectPlayerProvinceChanges(state, next, playerId);

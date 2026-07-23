@@ -1,6 +1,7 @@
 // Dashboard v40 — 帝国总参 + 路线图 + 胜利路线焦点 + 情境式提示 + 作战会议 + 史册摘要
 import { useMemo } from 'react';
 import { useGameStore } from '../store/gameStore';
+import { useSharedWorldSessionStore } from '../store/sharedWorldSessionStore';
 import { provincesOf } from '../engine/init';
 import { Panel, Btn, Tag } from '../components/ui';
 import DashboardStrategicHq from '../components/DashboardStrategicHq';
@@ -139,7 +140,8 @@ function ChronicleDigestPanel({ digest }: { digest: ChronicleDigest }) {
 }
 
 export default function Dashboard() {
-  const { state, nextTurn, save, load, hasSave, newGame, jumpToTab, setStrategyFocus } = useGameStore();
+  const { state, nextTurn, save, load, hasSave, newGame, backToMenu, jumpToTab, setStrategyFocus } = useGameStore();
+  const sharedSession = useSharedWorldSessionStore((current) => current.session);
   const pid = useGameStore((s) => s.state.playerNationId);
   const player = useGameStore((s) => s.state.nations[pid]);
   if (!player) return <Panel title="国政总览"><p className="dim">玩家国家缺失，请读档或开始新局。</p></Panel>;
@@ -195,6 +197,7 @@ export default function Dashboard() {
         <h2 className="ia-display">国政总览</h2>
         <p>{council.verdict}</p>
         <div className="ia-dash-hero-tags">
+          {sharedSession && <Tag text={`共享 · ${sharedSession.worldName}`} tone="good" />}
           <Tag text={council.title.replace('会议结论：', '')} tone={tagTone(council.tone)} />
           <Tag text={`体检 ${readiness.score}/100`} tone={tagTone(readiness.tone)} />
           <Tag text={turnPreview.canAdvance ? '本年可推进' : '先处理风险'} tone={turnPreview.canAdvance ? 'good' : 'danger'} />
@@ -202,10 +205,10 @@ export default function Dashboard() {
         </div>
       </div>
       <div className="ia-dash-command-actions">
-        <Btn label="新局" variant="ghost" onClick={newGame} />
-        <Btn label="读档" variant="ghost" onClick={() => load()} disabled={!hasSave()} />
-        <Btn label="存档" variant="ghost" onClick={() => save()} />
-        <Btn label="下一回合 →" variant="primary" onClick={() => nextTurn()} disabled={!!state.victory.type || hasPendingEventBlocker} title={hasPendingEventBlocker ? '先处理待决事件' : council.title} />
+        <Btn label={sharedSession ? '退出共享治理' : '新局'} variant="ghost" onClick={sharedSession ? backToMenu : newGame} />
+        {!sharedSession && <Btn label="读档" variant="ghost" onClick={() => load()} disabled={!hasSave()} />}
+        {!sharedSession && <Btn label="存档" variant="ghost" onClick={() => save()} />}
+        <Btn label={sharedSession ? '本年准备完毕 →' : '下一回合 →'} variant="primary" onClick={() => nextTurn()} disabled={!!state.victory.type || hasPendingEventBlocker} title={hasPendingEventBlocker ? '先处理待决事件' : sharedSession ? '提交后等待同版图统治者统一结算' : council.title} />
       </div>
     </section>
     <div className="ia-dash-overview-strip">

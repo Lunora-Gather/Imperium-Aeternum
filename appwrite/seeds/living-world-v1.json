@@ -16,7 +16,7 @@
     "maxNationsPerUser": 3
   },
   "openNations": [
-    {"nationId":"n_me_persia","nationName":"波斯帝国"},
+    {"nationId":"n_79","nationName":"波斯"},
     {"nationId":"n_ea_qin","nationName":"秦帝国"},
     {"nationId":"n_med_rome","nationName":"罗马"},
     {"nationId":"n_med_carthage","nationName":"迦太基"},

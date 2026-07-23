@@ -13,6 +13,8 @@ export interface AppwriteConfig {
   profileTableId: string;
   friendshipTableId: string;
   worldMessageTableId: string;
+  directMessageTableId: string;
+  worldChatMediaBucketId: string;
   socialGatewayFunctionId: string;
 }
 
@@ -31,6 +33,8 @@ export const APPWRITE_CONFIG: AppwriteConfig = {
   profileTableId: import.meta.env.VITE_APPWRITE_PROFILE_TABLE_ID || 'game_profiles',
   friendshipTableId: import.meta.env.VITE_APPWRITE_FRIENDSHIP_TABLE_ID || 'friendships',
   worldMessageTableId: import.meta.env.VITE_APPWRITE_WORLD_MESSAGE_TABLE_ID || 'world_messages',
+  directMessageTableId: import.meta.env.VITE_APPWRITE_DIRECT_MESSAGE_TABLE_ID || 'direct_messages',
+  worldChatMediaBucketId: import.meta.env.VITE_APPWRITE_WORLD_CHAT_MEDIA_BUCKET_ID || 'world_chat_media',
   socialGatewayFunctionId: import.meta.env.VITE_APPWRITE_SOCIAL_GATEWAY_FUNCTION_ID || 'social-gateway',
 };
 

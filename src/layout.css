@@ -197,12 +197,18 @@
 .ia-world-detail-head span { color: var(--text-dim); font-size: 10px; }
 .ia-world-rule-strip { display: flex; gap: 6px; flex-wrap: wrap; margin: 12px 0; }
 .ia-world-rule-strip span { padding: 5px 8px; border: 1px solid var(--border); border-radius: 999px; color: var(--text-mute); font-size: 10px; }
+.ia-world-start-card { display: grid; grid-template-columns: 1fr auto; gap: 12px; margin: 12px 0; padding: 13px; border: 1px solid var(--border); border-radius: 13px; background: var(--bg-inset); }
+.ia-world-start-card p { margin: 4px 0 0; color: var(--text-mute); font-size: 9.5px; }
+.ia-world-start-steps { grid-column: 1 / -1; display: flex; gap: 7px; color: var(--text-dim); font-size: 9px; }
+.ia-world-start-steps .is-current { color: var(--gold); }
+.ia-world-start-steps .is-done { color: var(--good); }
 .ia-world-nations { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 9px; }
 .ia-world-nation { padding: 12px; border: 1px solid var(--border); border-radius: 12px; background: color-mix(in srgb, var(--bg-inset) 86%, transparent); }
 .ia-world-nation.is-mine { border-color: var(--border-gold); }
 .ia-world-nation.is-open { border-color: color-mix(in srgb, var(--good) 45%, var(--border)); }
 .ia-world-nation > div { display: flex; justify-content: space-between; gap: 8px; align-items: center; }
 .ia-world-nation p { min-height: 35px; color: var(--text-mute); font-size: 10.5px; line-height: 1.55; }
+.ia-world-nation-actions { display: flex; gap: 7px; flex-wrap: wrap; }
 .ia-world-message { margin-top: 10px; padding: 8px 10px; border-radius: 8px; background: var(--bg-inset); color: var(--text-mute); font-size: 11px; }
 .ia-social-modal { width: min(620px, calc(100vw - 24px)); max-height: calc(100vh - 32px); overflow-y: auto; padding: 20px; border: 1px solid var(--border-gold); border-radius: 18px; background: linear-gradient(165deg, var(--bg-raised), var(--bg-panel)); box-shadow: 0 24px 80px rgba(0,0,0,.6); }
 .ia-social-modal > header { display: flex; justify-content: space-between; gap: 12px; align-items: flex-start; }
@@ -324,6 +330,10 @@ button:focus-visible, .ia-btn:focus-visible, .ia-tab-btn:focus-visible, .ia-icon
 .ia-social-overview > div { display: grid; gap: 4px; padding: 10px; border: 1px solid var(--border); border-radius: 10px; background: var(--bg-inset); }
 .ia-social-overview strong { color: var(--gold); font-family: var(--font-mono); }
 .ia-social-overview span { color: var(--text-dim); font-size: 9px; }
+.ia-direct-chat { display: grid; gap: 10px; margin-top: 14px; }
+.ia-direct-chat > header { display: flex; align-items: center; gap: 11px; padding: 10px; }
+.ia-direct-chat-log { height: 330px; border: 1px solid var(--border); }
+.ia-direct-chat-log article > div { max-width: 76%; }
 
 .ia-world-chat { margin: 12px 0; padding: 0; border: 1px solid color-mix(in srgb, var(--good) 32%, var(--border)); border-radius: 14px; overflow: hidden; background: color-mix(in srgb, var(--bg-inset) 92%, var(--good) 3%); }
 .ia-world-chat-entry { width: 100%; min-height: 66px; display: flex; align-items: center; gap: 12px; padding: 10px 13px; border: 0; background: linear-gradient(100deg, color-mix(in srgb, var(--good) 8%, transparent), transparent 55%); color: var(--text); text-align: left; cursor: pointer; transition: background .18s ease; }
@@ -353,6 +363,8 @@ button:focus-visible, .ia-btn:focus-visible, .ia-tab-btn:focus-visible, .ia-icon
 .ia-world-chat-log article.is-mine header { flex-direction: row-reverse; }
 .ia-world-chat-log article.is-mine header time { margin: 0 auto 0 0; }
 .ia-world-chat-log article.is-mine p { border-color: color-mix(in srgb, var(--gold) 35%, var(--border)); border-radius: 10px 3px 10px 10px; background: color-mix(in srgb, var(--gold) 8%, var(--bg-raised)); }
+.ia-chat-image { display: block; max-width: 290px; margin-top: 5px; overflow: hidden; border: 1px solid var(--border); border-radius: 10px; }
+.ia-chat-image img { width: 100%; max-height: 260px; display: block; object-fit: cover; }
 .ia-chat-empty { height: 100%; display: grid; place-content: center; justify-items: center; color: var(--text-dim); }
 .ia-chat-empty > span { color: var(--good); font-size: 22px; }
 .ia-chat-empty strong { margin-top: 6px; color: var(--text-mute); font-size: 11px; }
@@ -361,6 +373,11 @@ button:focus-visible, .ia-btn:focus-visible, .ia-tab-btn:focus-visible, .ia-icon
 .ia-world-chat-compose textarea { min-height: 54px; resize: vertical; line-height: 1.45; }
 .ia-world-chat-compose > div { display: grid; justify-items: end; gap: 4px; }
 .ia-world-chat-compose > div > span { color: var(--text-dim); font: 9px var(--font-mono); }
+.ia-chat-attachment { display: grid; grid-template-columns: 50px 1fr auto; align-items: center; gap: 9px; margin-bottom: 8px; padding: 7px; border: 1px solid var(--border); border-radius: 10px; }
+.ia-chat-attachment img { width: 50px; height: 42px; display: block; object-fit: cover; border-radius: 7px; }
+.ia-chat-attachment > div { min-width: 0; }
+.ia-chat-attachment span { display: block; color: var(--text-dim); font-size: 8.5px; }
+.ia-chat-attachment button, .ia-chat-attach-btn { padding: 6px 9px; border: 1px solid var(--border); border-radius: 8px; background: var(--bg-raised); color: var(--text-mute); cursor: pointer; }
 
 @media (max-width: 640px) {
   .ia-modal-backdrop { padding: 8px; }
@@ -379,6 +396,10 @@ button:focus-visible, .ia-btn:focus-visible, .ia-tab-btn:focus-visible, .ia-icon
   .ia-world-chat-log article > div { max-width: 86%; }
   .ia-world-chat-compose { flex-direction: column; align-items: stretch; }
   .ia-world-chat-compose > div { display: flex; align-items: center; justify-content: space-between; }
+  .ia-world-start-card { grid-template-columns: 1fr; align-items: stretch; }
+  .ia-world-start-card > button { width: 100%; }
+  .ia-world-start-steps { overflow-x: auto; }
+  .ia-direct-chat-log { height: 44dvh; }
 }
 
 @media (max-width: 1160px) { .ia-scenario-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } .ia-map-layout { grid-template-columns: 1fr; } .ia-map-info { display: grid; grid-template-columns: 260px 1fr; } .ia-map-legend { grid-column: 1 / -1; } }

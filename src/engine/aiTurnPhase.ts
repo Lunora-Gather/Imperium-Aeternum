@@ -16,8 +16,11 @@ function refreshActiveCharacters(nation: Nation): void {
   nation.activeCharacterBonuses = activated.filter((id) => id !== 'balanced' && NATIONAL_CHARACTERS[id]);
 }
 
-export function runAITurnPhase(state: GameState, playerId: string, rng: () => number): void {
-  processAITurn(state);
+export interface AITurnPhaseOptions { humanNationIds?: ReadonlySet<string> }
+
+export function runAITurnPhase(state: GameState, playerId: string, rng: () => number, options: AITurnPhaseOptions = {}): void {
+  const humanNationIds = options.humanNationIds ?? new Set<string>();
+  processAITurn(state, humanNationIds);
   const eventAvailability = createEventAvailabilityIndex(state);
 
   const provincesByOwner = new Map<string, Province[]>();
@@ -44,12 +47,16 @@ export function runAITurnPhase(state: GameState, playerId: string, rng: () => nu
     for (const eventId of rollEvents(nation, state, rng, 1, eventAvailability)) {
       const event = EVENT_BY_ID[eventId];
       if (!event) continue;
+      if (humanNationIds.has(nation.id)) {
+        if (!state.pendingEvents.some((pending) => pending.nationId === nation.id && pending.eventId === eventId)) state.pendingEvents.push({ nationId: nation.id, eventId });
+        continue;
+      }
       const optionIndex = aiChooseOption(event, rng);
       const option = event.options[optionIndex];
       if (option) applyEffect(nation, option.effects, state);
       recordEvent(state, nation.id, eventId, optionIndex);
     }
-    resolvePendingEventsForAI(nation, state, rng);
+    if (!humanNationIds.has(nation.id)) resolvePendingEventsForAI(nation, state, rng);
 
     if (state.turn % 10 === 0) {
       for (const key of Object.keys(nation.tendency) as (keyof typeof nation.tendency)[]) {

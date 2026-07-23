@@ -29,7 +29,7 @@
 | 控制权 | `NationControl` | 国家唯一控制者、租约、最后活动和版本 |
 | 命令 | `SharedWorldCommandEnvelope` | 用户意图、国家、基础修订、幂等键和载荷 |
 | 社交 | `GameProfile / Friendship` | 好友码、申请、接受和移除 |
-| 聊天 | `WorldChatMessage` | 仅版图成员可读写的纯文本消息 |
+| 聊天 | `WorldChatMessage / DirectMessage` | 版图频道与好友私聊，支持文字和受限图片 |
 
 当前纯领域代码位于 `src/shared-world/` 与 `src/social/`；Appwrite 适配位于 `src/services/appwrite/`；UI 位于对应的 `src/components/sharedWorld/` 和 `src/components/social/`。
 
@@ -41,7 +41,7 @@
 - `human_away`：控制权有效但玩家离线，由保守 AI 托管并自动准备。
 - `ai_autonomous`：无人控制或租约过期，完整 AI 自主决策并自动准备。
 
-版图为空且 `pauseWhenEmpty=true` 时停止计划结算。有人在线后，在线玩家控制的国家全部准备完成即可提前结算；否则在截止时间统一结算。任何国家不得拥有独立于版图的年份。
+版图为空且 `pauseWhenEmpty=true` 时停止计划结算。当前版本在所有受控国家提交“本年准备完毕”后结算；只有一个控制者时会立即进入统一结算。无人控制国家在结算中执行完整 AI 行动，受控国家执行被动年度结算但不会被 AI 擅自下达高风险命令。任何国家不得拥有独立于版图的年份。
 
 禁止以普通按钮点击触发 AI 时间脉冲，否则玩家可通过点击频率加速世界。国内设置可以即时登记，但经济、人口、战争、外交结果和事件必须在统一结算中产生。
 
@@ -60,6 +60,8 @@
 | `game_profiles` | 仅本人直接读取；好友码搜索经 Function | Social Gateway |
 | `friendships` | 双方读取 | Social Gateway |
 | `world_messages` | 成员读取 | Social Gateway |
+| `direct_messages` | 好友双方读取 | Social Gateway |
+| `world_chat_media` | 消息授权对象读取 | Social Gateway |
 | `world_snapshots` | 无客户端写权限 | 世界结算 Function |
 
 首版聊天室最多向 100 名成员配置行级读取权限；超过此规模前必须迁移为每版图 Appwrite Team 或专用聊天服务。
@@ -72,18 +74,20 @@
 - “无人在线暂停；有人在线时 AI/托管国自动准备”的纯逻辑与测试。
 - Appwrite 控制权网关、社交网关、数据表、快照桶和部署声明。
 - 标题页共享版图大厅、国家占用状态、认领/释放入口。
-- 好友码、好友申请处理与版图聊天室 UI/Realtime 适配。
+- 认领后的“初始化并进入治理”入口、多国切换入口、共享会话标识和“本年准备完毕”流程。
+- 权威快照初始化、带修订号和幂等键的行动日志、服务端行动重放及统一 AI 年度结算。
+- 单机失败条件与共享世界隔离；多人控制国不会在结算中被 AI 代下命令。
+- 好友码、好友申请、好友实时私聊与版图聊天室；两种频道均支持 2MB 内 JPG/PNG/WebP/GIF。
 - 强制邮箱验证码注册、统一交互反馈、好友通知徽标与可折叠版图频道已进入发布阶段。
 - 首张版图 seed；单机和原云存档路径保持不变。
 
-### 下一阶段（上线真正共享结算前必须完成）
+### 后续强化
 
-1. 从 `GameState.playerNationId` 提取共享会话的 `activeNationId`，逐页验证顾问、事件、年报和胜利路线。
-2. 将所有共享行动序列化为有版本和幂等键的 `world_commands`。
-3. 建立 World Resolver Function，加载快照、生成 AI/托管命令、调用确定性引擎并原子提交新修订。
-4. 把 `pendingEventOptions`、`lastReport/history` 与胜利结果按国家作用域存储。
-5. 增加在线心跳、准备状态、聊天举报/屏蔽、消息保留和管理员回收控制权。
-6. 完成两个账号并发认领、断线托管、重复结算、旧修订命令和聊天权限的端到端测试。
+1. 增加在线心跳、截止时间定时结算和离线受控国的保守托管命令；当前不会让 AI 擅自操作受控国。
+2. 把 `lastReport/history` 进一步改为按国家读取的报告视图，避免共享快照只保留一个焦点国报告。
+3. 增加聊天举报、屏蔽、删除策略、缩略图和媒体生命周期清理。
+4. 完成两个真实账号的并发认领、同时行动、断线、重复准备和权限越权端到端测试。
+5. 成员超过 100 前迁移到每版图 Appwrite Team，移除逐行枚举成员权限的规模上限。
 
 ## 8. 托管选择
 

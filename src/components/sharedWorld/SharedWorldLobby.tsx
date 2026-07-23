@@ -6,6 +6,7 @@ import { subscribeToWorldLobby } from '../../services/appwrite/sharedWorldServic
 import type { NationControl, SharedWorldInstance } from '../../shared-world/types';
 import { Btn, Tag } from '../ui';
 import { WorldChatPanel } from '../social/WorldChatPanel';
+import { useGameStore } from '../../store/gameStore';
 
 export function SharedWorldButton() {
   const [open, setOpen] = useState(false);
@@ -18,6 +19,7 @@ export function SharedWorldButton() {
 function SharedWorldLobby({ onClose }: { onClose: () => void }) {
   const user = useAccountStore((state) => state.user);
   const store = useSharedWorldStore();
+  const startSharedWorld = useGameStore((state) => state.startSharedWorld);
   const [selectedWorldId, setSelectedWorldId] = useState<string | null>(null);
   const selectedWorld = store.worlds.find((world) => world.id === selectedWorldId) ?? null;
   const controls = selectedWorldId ? store.controls[selectedWorldId] ?? [] : [];
@@ -48,7 +50,7 @@ function SharedWorldLobby({ onClose }: { onClose: () => void }) {
         <Btn label="关闭" variant="ghost" onClick={onClose} />
       </header>
 
-      {!user ? <div className="ia-world-empty"><strong>需要先登录账号</strong><p>共享版图涉及国家控制权和多人世界状态，游客仍可继续使用完整单机模式。</p></div> : !selectedWorld ? <WorldList worlds={store.worlds} loading={store.loading} onSelect={setSelectedWorldId} /> : <WorldDetail world={selectedWorld} controls={controls} userId={user.$id} mineCount={mine.length} busyNationId={store.busyNationId} onBack={() => setSelectedWorldId(null)} onClaim={(nationId) => void store.claim(selectedWorld.id, nationId)} onRelease={(nationId) => void store.release(selectedWorld.id, nationId)} />}
+      {!user ? <div className="ia-world-empty"><strong>需要先登录账号</strong><p>共享版图涉及国家控制权和多人世界状态，游客仍可继续使用完整单机模式。</p></div> : !selectedWorld ? <WorldList worlds={store.worlds} loading={store.loading} onSelect={setSelectedWorldId} /> : <WorldDetail world={selectedWorld} controls={controls} userId={user.$id} mineCount={mine.length} busyNationId={store.busyNationId} loading={store.loading} onBack={() => setSelectedWorldId(null)} onClaim={(nationId) => void store.claim(selectedWorld.id, nationId)} onRelease={(nationId) => void store.release(selectedWorld.id, nationId)} onEnter={(nationId) => void store.enter(selectedWorld.id, nationId).then((state) => { if (!state) return; startSharedWorld(state, nationId, selectedWorld.name); onClose(); })} />}
       {store.message && <div className="ia-world-message">{store.message}</div>}
     </section>
   </div>;
@@ -65,10 +67,17 @@ function WorldList({ worlds, loading, onSelect }: { worlds: SharedWorldInstance[
   </button>)}</div>;
 }
 
-function WorldDetail({ world, controls, userId, mineCount, busyNationId, onBack, onClaim, onRelease }: { world: SharedWorldInstance; controls: NationControl[]; userId: string; mineCount: number; busyNationId: string | null; onBack: () => void; onClaim: (nationId: string) => void; onRelease: (nationId: string) => void }) {
+function WorldDetail({ world, controls, userId, mineCount, busyNationId, loading, onBack, onClaim, onRelease, onEnter }: { world: SharedWorldInstance; controls: NationControl[]; userId: string; mineCount: number; busyNationId: string | null; loading: boolean; onBack: () => void; onClaim: (nationId: string) => void; onRelease: (nationId: string) => void; onEnter: (nationId: string) => void }) {
+  const mine = controls.filter((control) => control.controllerUserId === userId);
+  const canEnter = mine.length > 0 && world.status !== 'paused' && world.status !== 'archived';
   return <>
     <div className="ia-world-detail-head"><button className="ia-btn ia-btn--ghost" onClick={onBack}>← 版图列表</button><div><strong>{world.name}</strong><span>第 {world.turn + 1} 年 · 修订 {world.revision}</span></div><Tag text={`我控制 ${mineCount}/${world.tickPolicy.maxNationsPerUser}`} tone="info" /></div>
     <div className="ia-world-rule-strip"><span>有人在线才推进</span><span>离线国家保守托管</span><span>AI 国家持续发展</span><span>统一年度结算</span></div>
+    <section className={`ia-world-start-card ${canEnter ? 'is-ready' : ''}`} aria-live="polite">
+      <div className="ia-world-start-steps"><span className={mineCount > 0 ? 'is-done' : 'is-current'}><b>1</b>认领国家</span><i>→</i><span className={world.snapshotFileId ? 'is-done' : mineCount > 0 ? 'is-current' : ''}><b>2</b>版图初始化</span><i>→</i><span className={world.snapshotFileId && canEnter ? 'is-current' : ''}><b>3</b>进入治理</span></div>
+      <div><strong>{mineCount === 0 ? '先选择一个可认领国家' : world.snapshotFileId ? '共享纪元已经可以进入' : '国家已认领，可以创建首个权威世界快照'}</strong><p>{mineCount === 0 ? '认领后控制权会绑定账号；其他玩家不能重复选择。' : world.snapshotFileId ? '进入后行动会先由服务器校验，再写入统一世界状态。' : '首次进入会初始化整张版图；之后所有玩家读取同一个纪元，不会各玩各的。'}</p></div>
+      <Btn label={loading ? '载入纪元中…' : canEnter ? world.snapshotFileId ? '进入治理' : '初始化并进入治理' : mineCount > 0 ? '版图已暂停' : '请先认领国家'} variant={canEnter ? 'primary' : 'ghost'} disabled={!canEnter || loading} onClick={() => { if (mine[0]) onEnter(mine[0].nationId); }} />
+    </section>
     {controls.length > 0 && <WorldChatPanel worldId={world.id} nationId={controls.find((control) => control.controllerUserId === userId)?.nationId} />}
     <div className="ia-world-nations">{controls.map((control) => {
       const isMine = control.controllerUserId === userId;
@@ -76,7 +85,7 @@ function WorldDetail({ world, controls, userId, mineCount, busyNationId, onBack,
       return <article key={control.id} className={`ia-world-nation ${isMine ? 'is-mine' : available ? 'is-open' : 'is-taken'}`}>
         <div><strong>{control.nationName}</strong><Tag text={isMine ? '由我控制' : available ? '可认领' : '已有统治者'} tone={isMine ? 'gold' : available ? 'good' : 'info'} /></div>
         <p>{isMine ? '离线时由保守 AI 托管，不会停止发展。' : available ? '认领后可与账号下其他国家自由切换。' : '不可重复选择；对方释放或租约到期后重新开放。'}</p>
-        {isMine ? <Btn label={busyNationId === control.nationId ? '处理中…' : '释放控制'} warn disabled={busyNationId !== null} onClick={() => onRelease(control.nationId)} /> : available ? <Btn label={mineCount >= world.tickPolicy.maxNationsPerUser ? '已达本版图上限' : busyNationId === control.nationId ? '认领中…' : '认领国家'} variant="primary" disabled={busyNationId !== null || mineCount >= world.tickPolicy.maxNationsPerUser} onClick={() => onClaim(control.nationId)} /> : null}
+        {isMine ? <span className="ia-world-nation-actions"><Btn label="以此国进入" variant="primary" disabled={loading} onClick={() => onEnter(control.nationId)} /><Btn label={busyNationId === control.nationId ? '处理中…' : '释放控制'} warn disabled={busyNationId !== null || loading} onClick={() => onRelease(control.nationId)} /></span> : available ? <Btn label={mineCount >= world.tickPolicy.maxNationsPerUser ? '已达本版图上限' : busyNationId === control.nationId ? '认领中…' : '认领国家'} variant="primary" disabled={busyNationId !== null || mineCount >= world.tickPolicy.maxNationsPerUser} onClick={() => onClaim(control.nationId)} /> : null}
       </article>;
     })}</div>
   </>;
