@@ -40,7 +40,7 @@ export default function ScenarioSelect() {
 
   const applyTheme = (next: string) => { setTheme(next); document.documentElement.setAttribute('data-theme', next === 'night' ? '' : next); try { localStorage.setItem('ia-theme', next); } catch { /* ignore */ } };
   const refreshSaves = () => setPreviews(inspectAllSaveSlots());
-  const clearLocal = () => { if (!window.confirm('确认清理本浏览器里的全部 Imperium Aeternum 存档？')) return; clearAllSaves(); refreshSaves(); };
+  const clearLocal = () => { if (!window.confirm(t('确认清理本浏览器里的全部 Imperium Aeternum 存档？'))) return; clearAllSaves(); refreshSaves(); };
   const continueBest = () => { if (saveSummary.best) loadFromSlot(saveSummary.best.slot); };
   const featuredScenario = SCENARIOS.find((s) => s.id === 'classic') ?? SCENARIOS[0];
   const featuredHint = getScenarioProfile(featuredScenario.id);
@@ -61,11 +61,11 @@ export default function ScenarioSelect() {
     const challenge = buildScenarioChallengeGuide(scenario.id);
     return <div className="ia-menu ia-menu--compact">
       <div className="ia-menu-toolbar"><button className="ia-btn ia-btn--ghost" onClick={() => { setSelected(null); setPickedNation(null); }}>← {t('剧本大厅')}</button><div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}><LocaleSwitch /><ThemeSwitch theme={theme} applyTheme={applyTheme} /></div></div>
-      <header className="ia-menu-hero"><div className="ia-up ia-menu-kicker">Choose Nation</div><h1 className="ia-display">{scenario.name}</h1><p>{scenario.description}</p><div style={{ display: 'flex', gap: 6, justifyContent: 'center', flexWrap: 'wrap', marginTop: 8 }}><Tag text={hint.marketTag} tone={hint.tone} /><Tag text={`难度 ${hint.difficulty}`} tone={hint.tone} /><Tag text={challenge.label} tone={challenge.tone} /><Tag text={hint.audience} tone="info" /></div></header>
+      <header className="ia-menu-hero"><div className="ia-up ia-menu-kicker">{t('选择邦国')}</div><h1 className="ia-display">{t(scenario.name)}</h1><p>{t(scenario.description)}</p><div style={{ display: 'flex', gap: 6, justifyContent: 'center', flexWrap: 'wrap', marginTop: 8 }}><Tag text={t(hint.marketTag)} tone={hint.tone} /><Tag text={t('难度 {{level}}', { level: t(hint.difficulty) })} tone={hint.tone} /><Tag text={t(challenge.label)} tone={challenge.tone} /><Tag text={t(hint.audience)} tone="info" /></div></header>
       <ChallengePanel guide={challenge} />
-      <div className="ia-nation-advice">{hint.advice}</div>
-      <div className="ia-menu-section-title ia-up">选择你的邦国</div>
-      <div className="ia-nation-grid">{scenario.playableNations?.map((n) => <button key={n.id} className="ia-choice-card" onClick={() => setPickedNation(n.id)}><div className="ia-choice-head"><strong className="ia-display">{n.name}</strong><Tag text={n.tier} tone={n.tier === 'S' ? 'gold' : n.tier === 'A' ? 'info' : 'warn'} /></div><p>{n.desc}</p><div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginTop: 8 }}>{nationStyleTags(n.desc, n.tier).map((x) => <Tag key={x.text} text={x.text} tone={x.tone} />)}</div></button>)}</div>
+      <div className="ia-nation-advice">{t(hint.advice)}</div>
+      <div className="ia-menu-section-title ia-up">{t('选择你的邦国')}</div>
+      <div className="ia-nation-grid">{scenario.playableNations?.map((n) => <button key={n.id} className="ia-choice-card" onClick={() => setPickedNation(n.id)}><div className="ia-choice-head"><strong className="ia-display">{t(n.name)}</strong><Tag text={n.tier} tone={n.tier === 'S' ? 'gold' : n.tier === 'A' ? 'info' : 'warn'} /></div><p>{t(n.desc)}</p><div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginTop: 8 }}>{nationStyleTags(n.desc, n.tier).map((x) => <Tag key={x.text} text={t(x.text)} tone={x.tone} />)}</div></button>)}</div>
     </div>;
   }
 
@@ -75,12 +75,12 @@ export default function ScenarioSelect() {
     const challenge = buildScenarioChallengeGuide(scenario.id);
     return <div className="ia-menu ia-menu--confirm">
       <div className="ia-menu-toolbar"><button className="ia-btn ia-btn--ghost" onClick={() => setPickedNation(null)}>← {t('重选邦国')}</button><div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}><LocaleSwitch /><ThemeSwitch theme={theme} applyTheme={applyTheme} /></div></div>
-      <div className="ia-confirm-card"><p className="ia-up">即将开始</p><h1 className="ia-display">{scenario.name}</h1><p className="mute">{scenario.description}</p><div style={{ display: 'flex', gap: 6, justifyContent: 'center', flexWrap: 'wrap', marginBottom: 10 }}><Tag text={hint.marketTag} tone={hint.tone} /><Tag text={`难度 ${hint.difficulty}`} tone={hint.tone} /><Tag text={`${challenge.label} · 压力 ${challenge.pressure}`} tone={challenge.tone} /></div><div className="ia-confirm-nation"><span className="ia-up">你的邦国</span><h2 className="ia-display">{nation?.name}</h2><p>{nation?.desc}</p>{nation && <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', justifyContent: 'center' }}>{nationStyleTags(nation.desc, nation.tier).map((x) => <Tag key={x.text} text={x.text} tone={x.tone} />)}</div>}</div><ChallengePanel guide={challenge} compact /><div className="ia-confirm-actions"><Btn label="← 返回" variant="ghost" onClick={() => setPickedNation(null)} /><Btn label="开启纪元 →" variant="primary" onClick={() => startWithNation(pickedNation)} /></div></div>
+      <div className="ia-confirm-card"><p className="ia-up">{t('即将开始')}</p><h1 className="ia-display">{t(scenario.name)}</h1><p className="mute">{t(scenario.description)}</p><div style={{ display: 'flex', gap: 6, justifyContent: 'center', flexWrap: 'wrap', marginBottom: 10 }}><Tag text={t(hint.marketTag)} tone={hint.tone} /><Tag text={t('难度 {{level}}', { level: t(hint.difficulty) })} tone={hint.tone} /><Tag text={`${t(challenge.label)} · ${t('压力')} ${challenge.pressure}`} tone={challenge.tone} /></div><div className="ia-confirm-nation"><span className="ia-up">{t('你的邦国')}</span><h2 className="ia-display">{t(nation?.name ?? '')}</h2><p>{t(nation?.desc ?? '')}</p>{nation && <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', justifyContent: 'center' }}>{nationStyleTags(nation.desc, nation.tier).map((x) => <Tag key={x.text} text={t(x.text)} tone={x.tone} />)}</div>}</div><ChallengePanel guide={challenge} compact /><div className="ia-confirm-actions"><Btn label={t('← 返回')} variant="ghost" onClick={() => setPickedNation(null)} /><Btn label={t('开启纪元 →')} variant="primary" onClick={() => startWithNation(pickedNation)} /></div></div>
     </div>;
   }
 
   return <div className="ia-menu ia-menu--launch">
-    <div className="ia-menu-toolbar"><div className="ia-menu-version"><Tag text={BUILD_MARK} tone="gold" /><Tag text={`${t('存档')} v${SAVE_VERSION}`} tone="info" /><Tag text={saveSummary.headline} tone={saveSummary.tone} /></div><div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}><SocialButton /><AccountButton /><LocaleSwitch /><ThemeSwitch theme={theme} applyTheme={applyTheme} /></div></div>
+    <div className="ia-menu-toolbar"><div className="ia-menu-version"><Tag text={BUILD_MARK} tone="gold" /><Tag text={`${t('存档')} v${SAVE_VERSION}`} tone="info" /><Tag text={t(saveSummary.headline)} tone={saveSummary.tone} /></div><div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}><SocialButton /><AccountButton /><LocaleSwitch /><ThemeSwitch theme={theme} applyTheme={applyTheme} /></div></div>
     <header className="ia-launch-hero">
       <div className="ia-launch-copy">
         <div className="ia-up ia-menu-kicker">Grand Strategy Chronicle</div>
@@ -117,7 +117,7 @@ export default function ScenarioSelect() {
     <div className="ia-launch-guide-grid"><Guide title={t('第一次玩')} body={t('选地中海黎明，最快理解财政、省份、战争和事件。')} tone="good" /><Guide title={t('喜欢经营')} body={t('选印度洋贸易，经济和海贸路线更清晰。')} tone="info" /><Guide title={t('喜欢冲突')} body={t('选地中海争霸，战争、贸易和外交都很密集。')} tone="warn" /><Guide title={t('追求旗舰长局')} body={t('选万邦纪元，但建议熟悉系统后再玩。')} tone="danger" /></div>
     <div id="scenario-library" className="ia-scenario-library-head"><div><span className="ia-up">Campaign Library</span><h2 className="ia-display">{t('选择剧本')}</h2></div><p>{t('按压力和玩法定位选择，不同剧本对应不同学习曲线。')}</p></div>
     <div className="ia-scenario-grid">{SCENARIOS.map((s) => { const hint = getScenarioProfile(s.id); const challenge = buildScenarioChallengeGuide(s.id); const isRecommended = recommended.has(s.id); return <button key={s.id} className={`ia-scenario-card ${isRecommended ? 'is-recommended' : ''}`} onClick={() => startPickedScenario(s.id)} style={{ borderColor: isRecommended ? `var(--${toneVar(hint.tone)})` : undefined }}><div className="ia-scenario-card__top"><h3 className="ia-display">{t(s.name)}</h3><Tag text={t(s.nationCount)} tone="gold" /></div><div className="ia-scenario-sub">{t(s.subtitle)}</div><p>{t(s.description)}</p><div className="ia-scenario-tags"><Tag text={t(hint.marketTag)} tone={hint.tone} /><Tag text={t(challenge.label)} tone={challenge.tone} /><Tag text={`${t('压力')} ${challenge.pressure}`} tone={challenge.tone} />{isRecommended && <Tag text={t('推荐')} tone="gold" />}</div><div className="ia-scenario-advice">{t(challenge.headline)} · {t(challenge.recommendedAfter)}</div><div className="ia-scenario-foot">{t(s.needsNationPick ? '选择邦国' : '开始剧本')}<span>→</span></div></button>; })}</div>
-    <div className="ia-menu-actions">{saveExists && <Btn label="读取自动存档" variant="ghost" onClick={() => loadFromSlot(0)} />}{saveSummary.best && <Btn label={`继续槽位 ${saveSummary.best.slot}`} variant="primary" onClick={continueBest} />}{previews.some((p) => p.status !== 'empty') && <Btn label="刷新存档体检" variant="ghost" onClick={refreshSaves} />}{previews.some((p) => p.status !== 'empty') && <Btn label="清理本地存档" warn onClick={clearLocal} />}</div>
+    <div className="ia-menu-actions">{saveExists && <Btn label={t('读取自动存档')} variant="ghost" onClick={() => loadFromSlot(0)} />}{saveSummary.best && <Btn label={t('继续槽位 {{slot}}', { slot: saveSummary.best.slot })} variant="primary" onClick={continueBest} />}{previews.some((p) => p.status !== 'empty') && <Btn label={t('刷新存档体检')} variant="ghost" onClick={refreshSaves} />}{previews.some((p) => p.status !== 'empty') && <Btn label={t('清理本地存档')} warn onClick={clearLocal} />}</div>
     {log.length > 0 && <p className="dim ia-menu-log">{log[log.length - 1]}</p>}
   </div>;
 }
@@ -189,15 +189,15 @@ function ContinuePanel({ summary, onContinue, onStartRecommended, onRefresh }: {
     <div className="ia-continue-copy">
       <div className="ia-continue-tags">
         <Tag text={t('继续游戏')} tone={summary.tone} />
-        <Tag text={`可读 ${summary.playable}/${summary.total}`} tone="info" />
-        {summary.repairable > 0 && <Tag text={`可修复 ${summary.repairable}`} tone="warn" />}
-        {summary.broken > 0 && <Tag text={`损坏 ${summary.broken}`} tone="danger" />}
+        <Tag text={t('可读 {{playable}}/{{total}}', { playable: summary.playable, total: summary.total })} tone="info" />
+        {summary.repairable > 0 && <Tag text={t('可修复 {{count}}', { count: summary.repairable })} tone="warn" />}
+        {summary.broken > 0 && <Tag text={t('损坏 {{count}}', { count: summary.broken })} tone="danger" />}
       </div>
       <strong>{best ? t('推荐继续：槽位 {{slot}} · {{nation}} · 第 {{year}} 年', { slot: best.slot, nation: best.nationName ?? t('未知国家'), year: (best.turn ?? 0) + 1 }) : t(summary.headline)}</strong>
-      <p>{best ? `${best.label} · 体检 ${best.score ?? 0}/100${best.repairs.length ? ` · 将自动：${best.repairs.slice(0, 2).join('、')}` : ''}` : summary.advice}</p>
+      <p>{best ? t('{{label}} · 体检 {{score}}/100{{repairs}}', { label: t(best.label), score: best.score ?? 0, repairs: best.repairs.length ? t(' · 将自动：{{items}}', { items: best.repairs.slice(0, 2).map((item) => t(item)).join(t('、')) }) : '' }) : t(summary.advice)}</p>
     </div>
     <div className="ia-continue-actions">
-      {best && <Btn label={best.status === 'repairable' ? '修复并继续' : '继续最佳存档'} variant="primary" onClick={onContinue} />}
+      {best && <Btn label={t(best.status === 'repairable' ? '修复并继续' : '继续最佳存档')} variant="primary" onClick={onContinue} />}
       {!best && <Btn label={t('开始推荐剧本')} variant="primary" onClick={onStartRecommended} />}
       <Btn label={t('刷新体检')} variant="ghost" onClick={onRefresh} />
     </div>

@@ -1,5 +1,6 @@
-import { AppwriteException, ID, type Models } from 'appwrite';
+import { AppwriteException, ExecutionMethod, ID, type Models } from 'appwrite';
 import { getAppwriteServices } from './client';
+import { APPWRITE_CONFIG } from './config';
 
 export type AuthUser = Models.User<Models.Preferences>;
 
@@ -53,12 +54,20 @@ export async function completeVerifiedRegistration(userId: string, secret: strin
 }
 
 export async function completePasswordRecovery(userId: string, secret: string, password: string): Promise<AuthUser> {
-  const { account } = getAppwriteServices();
+  const { account, functions } = getAppwriteServices();
   await account.createSession({ userId, secret });
   try {
     const user = await requireVerifiedUser(await account.get());
     if (!user.passwordUpdate) throw new Error('该邮箱没有可找回的密码账号，请注册新账号');
-    await account.updatePassword({ password });
+    const execution = await functions.createExecution({
+      functionId: APPWRITE_CONFIG.accountGatewayFunctionId,
+      body: JSON.stringify({ action: 'complete_otp_recovery', password }),
+      async: false,
+      xpath: '/',
+      method: ExecutionMethod.POST,
+    });
+    const result = JSON.parse(execution.responseBody || '{}') as { ok?: boolean; message?: string };
+    if (!result.ok) throw new Error(result.message || '密码找回失败');
     return await requireVerifiedUser(await account.get());
   } catch (error) {
     await account.deleteSession({ sessionId: 'current' }).catch(() => undefined);

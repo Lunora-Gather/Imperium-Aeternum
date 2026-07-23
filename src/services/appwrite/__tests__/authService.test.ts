@@ -6,10 +6,11 @@ const mocks = vi.hoisted(() => ({
   deleteSession: vi.fn(),
   updateName: vi.fn(),
   updatePassword: vi.fn(),
+  createExecution: vi.fn(),
   get: vi.fn(),
 }));
 
-vi.mock('../client', () => ({ getAppwriteServices: () => ({ account: mocks }) }));
+vi.mock('../client', () => ({ getAppwriteServices: () => ({ account: mocks, functions: { createExecution: mocks.createExecution } }) }));
 
 import { completePasswordRecovery, completeVerifiedRegistration, loginWithPassword } from '../authService';
 
@@ -21,6 +22,7 @@ describe('verified Appwrite account flow', () => {
     mocks.deleteSession.mockResolvedValue({});
     mocks.updateName.mockResolvedValue({});
     mocks.updatePassword.mockResolvedValue({});
+    mocks.createExecution.mockResolvedValue({ responseBody: '{"ok":true}' });
   });
 
   it('rejects a password session whose email is not verified', async () => {
@@ -48,14 +50,14 @@ describe('verified Appwrite account flow', () => {
     mocks.get.mockResolvedValue({ $id: 'u4', emailVerification: true, passwordUpdate: '2026-07-22T00:00:00.000Z' });
     await completePasswordRecovery('u4', '654321', 'NewImperium42');
     expect(mocks.createSession).toHaveBeenCalledWith({ userId: 'u4', secret: '654321' });
-    expect(mocks.updatePassword).toHaveBeenCalledWith({ password: 'NewImperium42' });
-    expect(mocks.createSession.mock.invocationCallOrder[0]).toBeLessThan(mocks.updatePassword.mock.invocationCallOrder[0]);
+    expect(mocks.createExecution).toHaveBeenCalledWith(expect.objectContaining({ functionId: 'account-gateway', body: JSON.stringify({ action: 'complete_otp_recovery', password: 'NewImperium42' }) }));
+    expect(mocks.createSession.mock.invocationCallOrder[0]).toBeLessThan(mocks.createExecution.mock.invocationCallOrder[0]);
   });
 
   it('does not turn an unknown OTP-only account into a recovered password account', async () => {
     mocks.get.mockResolvedValue({ $id: 'u5', emailVerification: true, passwordUpdate: '' });
     await expect(completePasswordRecovery('u5', '654321', 'NewImperium42')).rejects.toThrow('没有可找回');
-    expect(mocks.updatePassword).not.toHaveBeenCalled();
+    expect(mocks.createExecution).not.toHaveBeenCalled();
     expect(mocks.deleteSession).toHaveBeenCalledWith({ sessionId: 'current' });
   });
 });
