@@ -73,6 +73,46 @@ const en: Record<string, string> = {
   '5 国': '5 nations', '205 国': '205 nations', '东亚': 'East Asia', '挑战': 'Challenge',
 };
 
+// Dynamic launch/gameplay copy lives with the pure domain helpers. Keep its UI
+// translations here so changing locale never exposes a half-translated lobby.
+const enLaunch: Record<string, string> = {
+  '暂无可继续存档': 'No playable save found',
+  '推荐从“地中海黎明”开始，先建立一套稳定玩法循环。': 'Start with Mediterranean Dawn and build a stable play loop first.',
+  '可读 {{playable}}/{{total}}': 'Playable {{playable}}/{{total}}',
+  '可修复 {{count}}': '{{count}} repairable',
+  '损坏 {{count}}': '{{count}} damaged',
+  '新手首选': 'Best for beginners', '旗舰长局': 'Epic campaign', '东方入门': 'Eastern introduction', '东方长线': 'Eastern long campaign',
+  '战争贸易': 'War and trade', '文明成长': 'Civilization growth', '重开乐趣': 'Replay challenge', '外交战争': 'Diplomacy and war', '贸易推荐': 'Trade focus',
+  '困难长线': 'Hard long campaign', '标准成长': 'Standard growth', '随机挑战': 'Random challenge', '困难外交': 'Hard diplomacy',
+  '5 国 · 50 省': '5 nations · 50 provinces', '205 国 · 577 省': '205 nations · 577 provinces', '东亚剧本': 'East Asia campaign',
+  'W3 · 东亚 3 洲': 'W3 · 3 Asian regions', 'W5 · 地中海 4 洲': 'W5 · 4 Mediterranean regions', 'W6 · 美洲 1 洲': 'W6 · Americas',
+  'W7 · 随机洲': 'W7 · Random region', 'W4 · 欧洲 4 洲': 'W4 · 4 European regions', 'W8 · 印度洋 3 洲': 'W8 · 3 Indian Ocean regions',
+  '挑战 · 高压生存': 'Challenge · High-pressure survival', '~50 国': '~50 nations', '~70 国': '~70 nations', '~20 国': '~20 nations', '~20-40 国': '~20–40 nations', '~60 国': '~60 nations', '~55 国': '~55 nations',
+  '完整世界沙盘，信息密度最高': 'The complete world sandbox with the highest information density',
+  '建议先完成至少一局标准或困难区域剧本。': 'Complete at least one standard or hard regional campaign first.',
+  '区域扩张和内政稳定并重': 'Balance regional expansion with domestic stability', '至少熟悉行动中心和省份页。': 'Learn the action center and provinces screen first.',
+  '东方大区长期博弈': 'A long strategic contest across eastern regions', '熟悉路线图、作战会议、年报复盘。': 'Learn the roadmap, war council, and annual review.',
+  '战争、贸易和外交都很密集': 'War, trade, and diplomacy are all intense', '至少能稳定处理战争、补给、外交情报。': 'Be able to manage war, supply, and diplomatic intelligence.',
+  '较少外部干扰的文明成长线': 'Civilization growth with less outside interference', '适合第二局或喜欢独立发展线的玩家。': 'Ideal for a second campaign or independent growth.',
+  '每局压力不同，考验适应能力': 'Every campaign differs and tests adaptability', '至少完成一局标准或困难剧本。': 'Complete at least one standard or hard campaign first.',
+  '联盟、边境和多国关系压力高': 'High pressure from alliances, borders, and many relationships', '熟悉外交情报和作战会议。': 'Learn diplomatic intelligence and the war council.',
+  '适合经营玩家的贸易成长线': 'A trade-led growth path for economic players', '完成一局地中海黎明，理解财政和省份。': 'Complete Mediterranean Dawn and understand finance and provinces.',
+  '资源少、叛乱高、外交孤立': 'Scarce resources, frequent rebellion, and diplomatic isolation', '熟悉存档体检、作战会议、下一回合预演后再挑战。': 'Learn save checks, the war council, and turn forecasts before attempting this.',
+  '确认清理本浏览器里的全部 Imperium Aeternum 存档？': 'Delete every Imperium Aeternum save in this browser?',
+  '难度 {{level}}': 'Difficulty {{level}}', '低': 'Low', '中': 'Medium', '中高': 'Medium–high', '高': 'High', '极高': 'Extreme', '未知': 'Unknown',
+  '第一次玩 / 快速理解系统': 'First campaign / learn quickly', '熟悉系统后的长期玩家': 'Long-term players familiar with the systems',
+  '喜欢秦汉、草原和南亚互动': 'Players interested in Qin–Han, steppe, and South Asian interaction', '喜欢东方大区长期博弈': 'Players who enjoy long eastern campaigns',
+  '喜欢罗马、迦太基、波斯冲突': 'Players who enjoy Roman, Carthaginian, and Persian conflict', '喜欢较少外交干扰的成长线': 'Players who prefer growth with less diplomatic pressure',
+  '老手 / 每局想要不同开局': 'Veterans seeking a different opening each time', '喜欢联盟、边境和多国关系': 'Players who enjoy alliances, borders, and many-state relations',
+  '喜欢贸易和港口路线': 'Players who enjoy trade and port networks', '硬核玩家 / 失败也能接受': 'Hardcore players comfortable with failure',
+  '选择你的邦国': 'Choose your nation', '即将开始': 'Campaign ready', '你的邦国': 'Your nation', '← 返回': '← Back', '开启纪元 →': 'Begin era →',
+  '读取自动存档': 'Load autosave', '刷新存档体检': 'Refresh save check', '清理本地存档': 'Delete local saves', '修复并继续': 'Repair and continue', '继续最佳存档': 'Continue best save',
+  '{{label}} · 体检 {{score}}/100{{repairs}}': '{{label}} · Check {{score}}/100{{repairs}}', ' · 将自动：{{items}}': ' · Automatic: {{items}}', '、': ', ',
+  '挑战': 'Challenge', '贸易': 'Trade', '军事': 'Military', '行政': 'Administration', '民生': 'Welfare', '强国': 'Great power', '稳健': 'Balanced',
+  '波斯帝国': 'Persian Empire', '秦帝国': 'Qin Empire', '罗马': 'Rome', '迦太基': 'Carthage', '汉': 'Han', '孔雀帝国': 'Maurya Empire', '印加': 'Inca', '法兰克': 'Franks',
+  '匈奴汗国': 'Xiongnu Khanate', '努米底亚': 'Numidia', '阿兹特克': 'Aztec', '玛雅': 'Maya', '基辅罗斯': 'Kievan Rus’', '室利佛逝': 'Srivijaya', '埃及王国': 'Kingdom of Egypt',
+};
+
 let currentLocale: Locale = detectLocale();
 const listeners = new Set<() => void>();
 
@@ -103,8 +143,16 @@ export function setLocale(locale: Locale): void {
 
 export function getLocale(): Locale { return currentLocale; }
 
+export function hasExplicitTranslation(source: string, locale: Exclude<Locale, 'zh-CN'>): boolean {
+  return locale === 'zh-TW' ? source in zhTW : source in en || source in enLaunch;
+}
+
 export function translate(source: string, values: Record<string, string | number> = {}, locale = currentLocale): string {
-  const template = locale === 'zh-CN' ? source : (locale === 'zh-TW' ? zhTW[source] : en[source]) ?? source;
+  const template = locale === 'zh-CN'
+    ? source
+    : locale === 'zh-TW'
+      ? zhTW[source] ?? source
+      : en[source] ?? enLaunch[source] ?? source;
   return template.replace(/\{\{(\w+)\}\}/g, (_, key: string) => String(values[key] ?? `{{${key}}}`));
 }
 

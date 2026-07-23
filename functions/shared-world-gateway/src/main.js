@@ -1,6 +1,7 @@
 import { Client, ID, Permission, Query, Role, Storage, TablesDB } from 'node-appwrite';
 import { InputFile } from 'node-appwrite/file';
 import { advanceSharedWorld, applySharedWorldCommand, createSharedWorldSnapshot } from './engine-bundle.js';
+import { assertCommandOwnership, isControlActive, isWorldDue, wasWorldActiveDuringWindow } from './policy.js';
 
 const DATABASE_ID = 'imperium_game';
 const WORLD_TABLE = 'shared_worlds';
@@ -41,7 +42,55 @@ async function ensureMembership(db, worldId, userId, now) {
 }
 
 async function listControls(db, worldId) {
-  return (await db.listRows({ databaseId: DATABASE_ID, tableId: CONTROL_TABLE, queries: [Query.equal('worldId', worldId), Query.orderAsc('nationName'), Query.limit(100)], total: false })).rows;
+  const rows = [];
+  let cursor;
+  do {
+    const queries = [Query.equal('worldId', worldId), Query.orderAsc('nationName'), Query.limit(100)];
+    if (cursor) queries.push(Query.cursorAfter(cursor));
+    const page = await db.listRows({ databaseId: DATABASE_ID, tableId: CONTROL_TABLE, queries, total: false });
+    rows.push(...page.rows);
+    cursor = page.rows.length === 100 ? page.rows.at(-1)?.$id : undefined;
+  } while (cursor && rows.length < 1000);
+  return rows;
+}
+
+async function listMemberships(db, worldId) {
+  const rows = [];
+  let cursor;
+  do {
+    const queries = [Query.equal('worldId', worldId), Query.orderAsc('$id'), Query.limit(100)];
+    if (cursor) queries.push(Query.cursorAfter(cursor));
+    const page = await db.listRows({ databaseId: DATABASE_ID, tableId: MEMBERSHIP_TABLE, queries, total: false });
+    rows.push(...page.rows);
+    cursor = page.rows.length === 100 ? page.rows.at(-1)?.$id : undefined;
+  } while (cursor && rows.length < 1000);
+  return rows;
+}
+
+async function listActiveWorlds(db) {
+  const rows = [];
+  let cursor;
+  do {
+    const queries = [Query.equal('status', 'active'), Query.orderAsc('$id'), Query.limit(100)];
+    if (cursor) queries.push(Query.cursorAfter(cursor));
+    const page = await db.listRows({ databaseId: DATABASE_ID, tableId: WORLD_TABLE, queries, total: false });
+    rows.push(...page.rows);
+    cursor = page.rows.length === 100 ? page.rows.at(-1)?.$id : undefined;
+  } while (cursor && rows.length < 1000);
+  return rows;
+}
+
+async function listTurnCommands(db, worldId, turn, extraQueries = []) {
+  const rows = [];
+  let cursor;
+  do {
+    const queries = [Query.equal('worldId', worldId), Query.equal('turn', turn), ...extraQueries, Query.orderAsc('$id'), Query.limit(100)];
+    if (cursor) queries.push(Query.cursorAfter(cursor));
+    const page = await db.listRows({ databaseId: DATABASE_ID, tableId: COMMAND_TABLE, queries, total: false });
+    rows.push(...page.rows);
+    cursor = page.rows.length === 100 ? page.rows.at(-1)?.$id : undefined;
+  } while (cursor && rows.length < 1000);
+  return rows;
 }
 
 async function requireControl(db, worldId, nationId, userId) {
@@ -145,6 +194,7 @@ async function submitCommand(db, storage, worldId, nationId, userId, body) {
   if (serializedPayload.length > 8192) throw new Error('共享行动参数过大');
   try {
     const existing = await db.getRow({ databaseId: DATABASE_ID, tableId: COMMAND_TABLE, rowId: commandId(key) });
+    assertCommandOwnership(existing, { idempotencyKey: key, worldId, nationId, userId });
     const state = await readSnapshot(storage, world.snapshotFileId);
     return { command: existing, world, state };
   } catch (error) { if (error?.code !== 404) throw error; }
@@ -161,17 +211,53 @@ async function submitCommand(db, storage, worldId, nationId, userId, body) {
   }
 }
 
-async function resolveWorld(db, storage, worldId) {
+async function releaseExpiredControls(db, worldId, controls, nowMs) {
+  const expired = controls.filter((control) => control.controllerUserId && !isControlActive(control, nowMs));
+  await Promise.all(expired.map(async (control) => {
+    const tx = await db.createTransaction();
+    try {
+      const current = await db.getRow({ databaseId: DATABASE_ID, tableId: CONTROL_TABLE, rowId: control.$id, transactionId: tx.$id });
+      if (!current.controllerUserId || isControlActive(current, nowMs)) {
+        await db.updateTransaction({ transactionId: tx.$id, rollback: true });
+        return;
+      }
+      await db.updateRow({ databaseId: DATABASE_ID, tableId: CONTROL_TABLE, rowId: current.$id, transactionId: tx.$id, data: { controllerUserId: null, status: 'available', releasedAt: new Date(nowMs).toISOString(), leaseExpiresAt: null, lastActiveAt: null, version: current.version + 1 } });
+      await db.updateTransaction({ transactionId: tx.$id, commit: true });
+    } catch (error) {
+      await db.updateTransaction({ transactionId: tx.$id, rollback: true }).catch(() => undefined);
+      throw error;
+    }
+  }));
+  return (await listControls(db, worldId)).filter((control) => isControlActive(control, nowMs));
+}
+
+async function resolveWorld(db, storage, worldId, options = {}) {
   let world = await db.getRow({ databaseId: DATABASE_ID, tableId: WORLD_TABLE, rowId: worldId });
   if (world.status !== 'active' || world.phase !== 'planning' || !world.snapshotFileId) return null;
-  const controls = (await listControls(db, worldId)).filter((row) => row.controllerUserId && row.status === 'controlled');
+  const nowMs = options.nowMs ?? Date.now();
+  const controls = await releaseExpiredControls(db, worldId, await listControls(db, worldId), nowMs);
+  if (options.requireActivity && !wasWorldActiveDuringWindow(world, await listMemberships(db, worldId))) return null;
   if (!controls.length && world.pauseWhenEmpty) return null;
   const snapshot = await readSnapshot(storage, world.snapshotFileId);
   const state = advanceSharedWorld(snapshot, controls.map((row) => row.nationId));
   const updated = await replaceSnapshot(db, storage, world, state, 1, 1);
-  const pending = await db.listRows({ databaseId: DATABASE_ID, tableId: COMMAND_TABLE, queries: [Query.equal('worldId', worldId), Query.equal('turn', world.turn), Query.equal('status', 'pending'), Query.limit(100)], total: false });
-  await Promise.all(pending.rows.map((row) => db.updateRow({ databaseId: DATABASE_ID, tableId: COMMAND_TABLE, rowId: row.$id, data: { status: 'resolved' } })));
+  const pending = await listTurnCommands(db, worldId, world.turn, [Query.equal('status', 'pending')]);
+  await Promise.all(pending.map((row) => db.updateRow({ databaseId: DATABASE_ID, tableId: COMMAND_TABLE, rowId: row.$id, data: { status: 'resolved' } })));
   return { world: updated, state };
+}
+
+async function resolveDueWorlds(db, storage, nowMs = Date.now()) {
+  const due = (await listActiveWorlds(db)).filter((world) => isWorldDue(world, nowMs));
+  const results = [];
+  for (const world of due) {
+    try {
+      const resolved = await resolveWorld(db, storage, world.$id, { requireActivity: true, nowMs });
+      results.push({ worldId: world.$id, resolved: !!resolved });
+    } catch (cause) {
+      results.push({ worldId: world.$id, resolved: false, error: cause instanceof Error ? cause.message : String(cause) });
+    }
+  }
+  return results;
 }
 
 async function setReady(db, storage, worldId, nationId, userId, body) {
@@ -183,20 +269,24 @@ async function setReady(db, storage, worldId, nationId, userId, body) {
     await db.createRow({ databaseId: DATABASE_ID, tableId: COMMAND_TABLE, rowId: commandId(key), data: { worldId, nationId, userId, turn: world.turn, baseRevision: world.revision, commandType: 'set_ready', idempotencyKey: key, payload: '{}', status: 'pending', createdAt: new Date().toISOString() }, permissions: userPermissions(userId) });
   } catch (error) { if (error?.code !== 409) throw error; }
   const controls = (await listControls(db, worldId)).filter((row) => row.controllerUserId && row.status === 'controlled');
-  const ready = await db.listRows({ databaseId: DATABASE_ID, tableId: COMMAND_TABLE, queries: [Query.equal('worldId', worldId), Query.equal('turn', world.turn), Query.equal('commandType', 'set_ready'), Query.equal('status', 'pending'), Query.limit(100)], total: false });
-  const readyNations = new Set(ready.rows.map((row) => row.nationId));
+  const ready = await listTurnCommands(db, worldId, world.turn, [Query.equal('commandType', 'set_ready'), Query.equal('status', 'pending')]);
+  const readyNations = new Set(ready.map((row) => row.nationId));
   if (controls.every((control) => readyNations.has(control.nationId))) return { ready: true, resolved: await resolveWorld(db, storage, worldId) };
   return { ready: true, readyCount: readyNations.size, requiredCount: controls.length };
 }
 
 export default async ({ req, res, error }) => {
   try {
+    const { db, storage } = services(req);
+    if (req.headers['x-appwrite-trigger'] === 'schedule') {
+      const results = await resolveDueWorlds(db, storage);
+      return res.json({ ok: true, checked: results.length, results });
+    }
     const userId = req.headers['x-appwrite-user-id'];
     if (!userId) return res.json({ ok: false, message: '需要登录后操作共享版图' }, 401);
     const body = req.bodyJson ?? {};
     const { action, worldId, nationId } = body;
     if (!worldId || typeof worldId !== 'string') return res.json({ ok: false, message: '缺少版图标识' }, 400);
-    const { db, storage } = services(req);
     const now = new Date();
     await ensureMembership(db, worldId, userId, now);
     if (action === 'join_world') return res.json({ ok: true });

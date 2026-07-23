@@ -16,6 +16,7 @@ export interface AppwriteConfig {
   directMessageTableId: string;
   worldChatMediaBucketId: string;
   socialGatewayFunctionId: string;
+  accountGatewayFunctionId: string;
 }
 
 export const APPWRITE_CONFIG: AppwriteConfig = {
@@ -36,6 +37,7 @@ export const APPWRITE_CONFIG: AppwriteConfig = {
   directMessageTableId: import.meta.env.VITE_APPWRITE_DIRECT_MESSAGE_TABLE_ID || 'direct_messages',
   worldChatMediaBucketId: import.meta.env.VITE_APPWRITE_WORLD_CHAT_MEDIA_BUCKET_ID || 'world_chat_media',
   socialGatewayFunctionId: import.meta.env.VITE_APPWRITE_SOCIAL_GATEWAY_FUNCTION_ID || 'social-gateway',
+  accountGatewayFunctionId: import.meta.env.VITE_APPWRITE_ACCOUNT_GATEWAY_FUNCTION_ID || 'account-gateway',
 };
 
 export const isAppwriteConfigured = Object.values(APPWRITE_CONFIG).every((value) => value.trim().length > 0);

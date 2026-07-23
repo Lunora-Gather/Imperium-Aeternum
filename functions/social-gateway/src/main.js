@@ -1,5 +1,6 @@
 import { Client, ID, Permission, Query, Role, Storage, TablesDB, Users } from 'node-appwrite';
 import { InputFile } from 'node-appwrite/file';
+import { verifiedNationIdentity } from './policy.js';
 
 const DATABASE_ID = 'imperium_game';
 const PROFILE_TABLE = 'game_profiles';
@@ -45,6 +46,12 @@ async function ensureProfile(db, users, userId) {
 async function requireMembership(db, worldId, userId) {
   try { return await db.getRow({ databaseId: DATABASE_ID, tableId: MEMBERSHIP_TABLE, rowId: membershipId(worldId, userId) }); }
   catch (error) { if (error?.code === 404) throw new Error('只有该版图成员可以使用聊天室'); throw error; }
+}
+
+async function requireNationIdentity(db, worldId, userId, requestedNationId) {
+  if (!requestedNationId) return null;
+  const result = await db.listRows({ databaseId: DATABASE_ID, tableId: 'nation_controls', queries: [Query.equal('worldId', worldId), Query.equal('nationId', requestedNationId), Query.limit(1)], total: false });
+  return verifiedNationIdentity(result.rows[0], userId, requestedNationId);
 }
 
 async function worldMembers(db, worldId) {
@@ -155,10 +162,11 @@ export default async ({ req, res, error }) => {
       const worldId = String(body.worldId ?? '');
       const text = String(body.body ?? '').trim();
       await requireMembership(db, worldId, userId);
+      const nationId = await requireNationIdentity(db, worldId, userId, body.nationId ? String(body.nationId) : null);
       if (!text || text.length > 500) throw new Error('消息需要在 1–500 字之间');
       await enforceMessageRate(db, worldId, userId);
       const members = await worldMembers(db, worldId);
-      const message = await createWorldMessage(db, members, { worldId, userId, displayName: self.displayName, nationId: body.nationId ? String(body.nationId) : null, body: text, kind: 'text', mediaFileId: null, mediaMime: null, createdAt: new Date().toISOString() });
+      const message = await createWorldMessage(db, members, { worldId, userId, displayName: self.displayName, nationId, body: text, kind: 'text', mediaFileId: null, mediaMime: null, createdAt: new Date().toISOString() });
       return res.json({ ok: true, message });
     }
     if (action === 'send_world_image') {
@@ -166,6 +174,7 @@ export default async ({ req, res, error }) => {
       const caption = String(body.caption ?? '').trim().slice(0, 300);
       const mime = String(body.mime ?? '').toLowerCase();
       await requireMembership(db, worldId, userId);
+      const nationId = await requireNationIdentity(db, worldId, userId, body.nationId ? String(body.nationId) : null);
       await enforceMessageRate(db, worldId, userId);
       if (!ALLOWED_IMAGE_TYPES.has(mime)) throw new Error('仅支持 JPG、PNG、WebP 或 GIF 图片');
       const buffer = Buffer.from(String(body.base64 ?? ''), 'base64');
@@ -176,7 +185,7 @@ export default async ({ req, res, error }) => {
       const safeName = safeImageName(body.fileName, mime, 'world-image');
       await storage.createFile({ bucketId: MEDIA_BUCKET, fileId, file: InputFile.fromBuffer(buffer, safeName), permissions: readForUsers(members) });
       try {
-        const message = await createWorldMessage(db, members, { worldId, userId, displayName: self.displayName, nationId: body.nationId ? String(body.nationId) : null, body: caption || '图片', kind: 'image', mediaFileId: fileId, mediaMime: mime, createdAt: new Date().toISOString() });
+        const message = await createWorldMessage(db, members, { worldId, userId, displayName: self.displayName, nationId, body: caption || '图片', kind: 'image', mediaFileId: fileId, mediaMime: mime, createdAt: new Date().toISOString() });
         return res.json({ ok: true, message });
       } catch (messageError) {
         await storage.deleteFile({ bucketId: MEDIA_BUCKET, fileId }).catch(() => undefined);
