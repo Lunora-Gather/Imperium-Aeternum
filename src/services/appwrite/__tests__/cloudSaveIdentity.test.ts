@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { buildCloudSaveRowId } from '../cloudSaveService';
-import { buildCloudSaveRowId as buildServerCloudSaveRowId } from '../../../../functions/cloud-save-gateway/src/main.js';
+import { buildCloudSaveRowId as buildServerCloudSaveRowId } from '../../../../functions/cloud-save-gateway/src/identity.js';
 
 describe('cloud save identity', () => {
   it('is stable per user and slot without exposing the full user id', () => {

@@ -1,26 +1,14 @@
 import { createHash } from 'node:crypto';
 import { Client, ID, Permission, Role, Storage, TablesDB } from 'node-appwrite';
 import { InputFile } from 'node-appwrite/file';
+import { buildCloudSaveRowId } from './identity.js';
+
+export { buildCloudSaveRowId } from './identity.js';
 
 const DATABASE_ID = 'imperium_game';
 const SAVE_TABLE = 'cloud_saves';
 const SAVE_BUCKET = 'cloud_saves';
 const MAX_SAVE_BYTES = 5 * 1024 * 1024;
-
-function shortHash(value) {
-  let a = 0x811c9dc5;
-  let b = 0x9e3779b9;
-  for (let index = 0; index < value.length; index += 1) {
-    a = Math.imul(a ^ value.charCodeAt(index), 0x01000193);
-    b = Math.imul(b ^ value.charCodeAt(index), 0x85ebca6b);
-  }
-  return `${(a >>> 0).toString(16).padStart(8, '0')}${(b >>> 0).toString(16).padStart(8, '0')}`;
-}
-
-export function buildCloudSaveRowId(userId, slot) {
-  const safe = userId.replace(/[^a-zA-Z0-9_-]/g, '').slice(0, 14) || 'user';
-  return `save_${safe}_${shortHash(userId).slice(0, 12)}_${slot}`;
-}
 
 function services(req) {
   const client = new Client().setEndpoint(process.env.APPWRITE_FUNCTION_API_ENDPOINT).setProject(process.env.APPWRITE_FUNCTION_PROJECT_ID).setKey(req.headers['x-appwrite-key']);
