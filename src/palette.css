@@ -524,8 +524,8 @@ body > div[style*="position:fixed"][style*="right:8px"] {
   }
 
   .ia-icon-btn {
-    width: 26px !important;
-    height: 26px !important;
+    width: 38px !important;
+    height: 38px !important;
   }
 
   .ia-ruler-title {
@@ -602,7 +602,7 @@ body > div[style*="position:fixed"][style*="right:8px"] {
    ============================================================ */
 
 .ia-btn {
-  min-height: 34px !important;
+  min-height: 38px !important;
   border-radius: 7px !important;
   padding: 7px 14px !important;
   font-weight: 650 !important;

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { buildCloudSaveRowId } from '../cloudSaveService';
+import { buildCloudSaveRowId as buildServerCloudSaveRowId } from '../../../../functions/cloud-save-gateway/src/main.js';
 
 describe('cloud save identity', () => {
   it('is stable per user and slot without exposing the full user id', () => {
@@ -15,5 +16,9 @@ describe('cloud save identity', () => {
   it('separates users and slots deterministically', () => {
     expect(buildCloudSaveRowId('alpha', 1)).not.toBe(buildCloudSaveRowId('alpha', 2));
     expect(buildCloudSaveRowId('alpha', 1)).not.toBe(buildCloudSaveRowId('beta', 1));
+  });
+
+  it('uses the identical row identity on the trusted gateway', () => {
+    expect(buildServerCloudSaveRowId('user-a', 4)).toBe(buildCloudSaveRowId('user-a', 4));
   });
 });

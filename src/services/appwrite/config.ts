@@ -4,6 +4,7 @@ export interface AppwriteConfig {
   databaseId: string;
   saveTableId: string;
   saveBucketId: string;
+  cloudSaveGatewayFunctionId: string;
   worldTableId: string;
   worldMembershipTableId: string;
   nationControlTableId: string;
@@ -26,6 +27,7 @@ export const APPWRITE_CONFIG: AppwriteConfig = {
   databaseId: import.meta.env.VITE_APPWRITE_DATABASE_ID || 'imperium_game',
   saveTableId: import.meta.env.VITE_APPWRITE_SAVE_TABLE_ID || 'cloud_saves',
   saveBucketId: import.meta.env.VITE_APPWRITE_SAVE_BUCKET_ID || 'cloud_saves',
+  cloudSaveGatewayFunctionId: import.meta.env.VITE_APPWRITE_CLOUD_SAVE_GATEWAY_FUNCTION_ID || 'cloud-save-gateway',
   worldTableId: import.meta.env.VITE_APPWRITE_WORLD_TABLE_ID || 'shared_worlds',
   worldMembershipTableId: import.meta.env.VITE_APPWRITE_WORLD_MEMBERSHIP_TABLE_ID || 'world_memberships',
   nationControlTableId: import.meta.env.VITE_APPWRITE_NATION_CONTROL_TABLE_ID || 'nation_controls',

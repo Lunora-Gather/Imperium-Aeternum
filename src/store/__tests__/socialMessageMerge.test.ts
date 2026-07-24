@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { mergeChatMessages } from '../socialStore';
+import { mergeChatMessages, reconcileSentMessage } from '../socialStore';
 
 const entry = (id: string, createdAt: string, body = id) => ({ id, createdAt, body });
 
@@ -16,6 +16,20 @@ describe('social message reconciliation', () => {
     const echo = entry('same-row', '2026-07-24T10:00:00.000Z', 'realtime echo');
 
     expect(mergeChatMessages([sent], [echo])).toEqual([echo]);
+  });
+
+  it('keeps an optimistic message while history refreshes', () => {
+    const pending = entry('local:pending', '2026-07-24T10:00:02.000Z', 'sending');
+    const history = [entry('old', '2026-07-24T10:00:00.000Z')];
+
+    expect(mergeChatMessages([pending], history).map((item) => item.id)).toEqual(['old', 'local:pending']);
+  });
+
+  it('replaces an optimistic message with its authoritative row', () => {
+    const pending = entry('local:pending', '2026-07-24T10:00:00.000Z', 'sending');
+    const sent = entry('server-row', '2026-07-24T10:00:01.000Z', 'sent');
+
+    expect(reconcileSentMessage([pending], pending.id, sent)).toEqual([sent]);
   });
 
   it('sorts out-of-order events deterministically and retains only the newest 50', () => {

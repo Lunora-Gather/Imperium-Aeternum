@@ -1,6 +1,6 @@
 import { Client, ID, Permission, Query, Role, Storage, TablesDB, Users } from 'node-appwrite';
 import { InputFile } from 'node-appwrite/file';
-import { verifiedNationIdentity } from './policy.js';
+import { messageRateRowId, verifiedNationIdentity } from './policy.js';
 
 const DATABASE_ID = 'imperium_game';
 const PROFILE_TABLE = 'game_profiles';
@@ -10,6 +10,9 @@ const MESSAGE_TABLE = 'world_messages';
 const DIRECT_MESSAGE_TABLE = 'direct_messages';
 const MEDIA_BUCKET = 'world_chat_media';
 const MAX_IMAGE_BYTES = 2 * 1024 * 1024;
+const MAX_WORLD_MEMBERS = 100;
+const WORLD_MESSAGE_WINDOW_MS = 1800;
+const DIRECT_MESSAGE_WINDOW_MS = 1200;
 const ALLOWED_IMAGE_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/gif']);
 
 function hash(value) {
@@ -33,13 +36,21 @@ async function ensureProfile(db, users, userId) {
   const now = new Date().toISOString();
   try {
     const current = await db.getRow({ databaseId: DATABASE_ID, tableId: PROFILE_TABLE, rowId: id });
+    if (current.userId !== userId) throw new Error('玩家资料标识冲突');
     return db.updateRow({ databaseId: DATABASE_ID, tableId: PROFILE_TABLE, rowId: id, data: { lastSeenAt: now } });
   } catch (error) {
     if (error?.code !== 404) throw error;
     const user = await users.get({ userId });
     const displayName = (user.name || `统治者-${hash(userId).slice(0, 4)}`).slice(0, 64);
     const friendCode = `IA${hash(userId).toUpperCase()}`.slice(0, 10);
-    return db.createRow({ databaseId: DATABASE_ID, tableId: PROFILE_TABLE, rowId: id, data: { userId, displayName, friendCode, createdAt: now, lastSeenAt: now }, permissions: readForUsers([userId]) });
+    try {
+      return await db.createRow({ databaseId: DATABASE_ID, tableId: PROFILE_TABLE, rowId: id, data: { userId, displayName, friendCode, createdAt: now, lastSeenAt: now }, permissions: readForUsers([userId]) });
+    } catch (createError) {
+      if (createError?.code !== 409) throw createError;
+      const current = await db.getRow({ databaseId: DATABASE_ID, tableId: PROFILE_TABLE, rowId: id });
+      if (current.userId !== userId) throw new Error('玩家资料标识冲突');
+      return current;
+    }
   }
 }
 
@@ -55,7 +66,8 @@ async function requireNationIdentity(db, worldId, userId, requestedNationId) {
 }
 
 async function worldMembers(db, worldId) {
-  const result = await db.listRows({ databaseId: DATABASE_ID, tableId: MEMBERSHIP_TABLE, queries: [Query.equal('worldId', worldId), Query.limit(100)], total: false });
+  const result = await db.listRows({ databaseId: DATABASE_ID, tableId: MEMBERSHIP_TABLE, queries: [Query.equal('worldId', worldId), Query.limit(MAX_WORLD_MEMBERS)], total: true });
+  if (Number(result.total ?? result.rows.length) > MAX_WORLD_MEMBERS) throw new Error(`当前版图超过 ${MAX_WORLD_MEMBERS} 人，聊天权限需要迁移后才能继续发送`);
   return result.rows.map((row) => row.userId);
 }
 
@@ -92,11 +104,22 @@ async function enforceDirectRate(db, key, userId) {
 }
 
 async function createDirectMessage(db, userId, friendUserId, senderName, data) {
-  return db.createRow({ databaseId: DATABASE_ID, tableId: DIRECT_MESSAGE_TABLE, rowId: ID.unique(), data: { conversationKey: pairKey(userId, friendUserId), senderId: userId, recipientId: friendUserId, senderName, createdAt: new Date().toISOString(), ...data }, permissions: readForUsers([userId, friendUserId]) });
+  const key = pairKey(userId, friendUserId);
+  try {
+    return await db.createRow({ databaseId: DATABASE_ID, tableId: DIRECT_MESSAGE_TABLE, rowId: messageRateRowId('direct', key, userId, Date.now(), DIRECT_MESSAGE_WINDOW_MS), data: { conversationKey: key, senderId: userId, recipientId: friendUserId, senderName, createdAt: new Date().toISOString(), ...data }, permissions: readForUsers([userId, friendUserId]) });
+  } catch (error) {
+    if (error?.code === 409) throw new Error('发送太快，请稍后再试');
+    throw error;
+  }
 }
 
 async function createWorldMessage(db, members, data) {
-  return db.createRow({ databaseId: DATABASE_ID, tableId: MESSAGE_TABLE, rowId: ID.unique(), data, permissions: readForUsers(members) });
+  try {
+    return await db.createRow({ databaseId: DATABASE_ID, tableId: MESSAGE_TABLE, rowId: messageRateRowId('world', data.worldId, data.userId, Date.now(), WORLD_MESSAGE_WINDOW_MS), data, permissions: readForUsers(members) });
+  } catch (error) {
+    if (error?.code === 409) throw new Error('发送太快，请稍后再试');
+    throw error;
+  }
 }
 
 export default async ({ req, res, error }) => {

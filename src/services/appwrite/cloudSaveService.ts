@@ -1,4 +1,4 @@
-import { AppwriteException, ID, Permission, Query, Role, type Models } from 'appwrite';
+import { AppwriteException, ExecutionMethod, Query, type Models } from 'appwrite';
 import { APPWRITE_CONFIG } from './config';
 import { getAppwriteServices } from './client';
 import {
@@ -65,12 +65,6 @@ async function contentHash(raw: string): Promise<string> {
   return shortHash(raw);
 }
 
-const privatePermissions = (userId: string) => [
-  Permission.read(Role.user(userId)),
-  Permission.update(Role.user(userId)),
-  Permission.delete(Role.user(userId)),
-];
-
 async function getCloudRow(userId: string, slot: number): Promise<CloudSaveRow | null> {
   try {
     return await getAppwriteServices().tablesDB.getRow<CloudSaveRow>({
@@ -114,42 +108,19 @@ export async function uploadLocalSave(userId: string, slot: number, force = fals
   }
   if (previous?.contentHash === hash) return previous;
 
-  const { storage, tablesDB } = getAppwriteServices();
-  const permissions = privatePermissions(userId);
-  const file = new File([local.raw], `imperium-slot-${slot}.json`, { type: 'application/json' });
-  const uploaded = await storage.createFile({
-    bucketId: APPWRITE_CONFIG.saveBucketId,
-    fileId: ID.unique(),
-    file,
-    permissions,
+  const execution = await getAppwriteServices().functions.createExecution({
+    functionId: APPWRITE_CONFIG.cloudSaveGatewayFunctionId,
+    body: JSON.stringify({ action: 'upload_save', slot, raw: local.raw, saveVersion: localMeta.version, turn: localMeta.turn, nationName: localMeta.nationName ?? '未知国家', deviceId: getDeviceId(), clientUpdatedAt: localMeta.createdAt, force }),
+    async: false,
+    xpath: '/',
+    method: ExecutionMethod.POST,
   });
-
-  try {
-    const row = await tablesDB.upsertRow<CloudSaveRow>({
-      databaseId: APPWRITE_CONFIG.databaseId,
-      tableId: APPWRITE_CONFIG.saveTableId,
-      rowId: buildCloudSaveRowId(userId, slot),
-      data: {
-        userId,
-        slot,
-        fileId: uploaded.$id,
-        saveVersion: localMeta.version,
-        turn: localMeta.turn,
-        nationName: localMeta.nationName ?? '未知国家',
-        deviceId: getDeviceId(),
-        contentHash: hash,
-        clientUpdatedAt: localMeta.createdAt,
-      },
-      permissions,
-    });
-    if (previous?.fileId && previous.fileId !== uploaded.$id) {
-      void storage.deleteFile({ bucketId: APPWRITE_CONFIG.saveBucketId, fileId: previous.fileId }).catch(() => undefined);
-    }
-    return row;
-  } catch (error) {
-    void storage.deleteFile({ bucketId: APPWRITE_CONFIG.saveBucketId, fileId: uploaded.$id }).catch(() => undefined);
-    throw error;
+  const result = JSON.parse(execution.responseBody || '{}') as { ok?: boolean; row?: CloudSaveRow; message?: string };
+  if (!result.ok || !result.row) {
+    if (execution.responseStatusCode === 409) throw new CloudSaveConflictError(slot, result.message || '云存档存在更新冲突');
+    throw new Error(result.message || '云存档上传失败');
   }
+  return result.row;
 }
 
 export async function downloadCloudSave(userId: string, slot: number, force = false): Promise<void> {

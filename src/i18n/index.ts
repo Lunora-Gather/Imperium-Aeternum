@@ -7,6 +7,7 @@ const STORAGE_KEY = 'ia-locale';
 const SUPPORTED: readonly Locale[] = ['zh-CN', 'zh-TW', 'en'];
 
 const zhTW: Record<string, string> = {
+  '发送中…': '傳送中…',
   '语言': '語言', '简体中文': '簡體中文', '繁體中文': '繁體中文', 'English': 'English',
   '剧本大厅': '劇本大廳', '重选邦国': '重選邦國', '治理一个国家数百年。扩张越快，崩溃越早。真正的胜利是建立一个能长期运转的国家机器。': '治理一個國家數百年。擴張越快，崩潰越早。真正的勝利是建立一部能長期運轉的國家機器。', '继续槽位 {{slot}}': '繼續欄位 {{slot}}', '开始推荐剧本': '開始推薦劇本', '查看全部剧本': '查看全部劇本', '选择剧本': '選擇劇本', '按压力和玩法定位选择，不同剧本对应不同学习曲线。': '依壓力和玩法定位選擇，不同劇本對應不同學習曲線。', '压力': '壓力', '推荐': '推薦', '选择邦国': '選擇邦國', '开始剧本': '開始劇本',
   '注册进度': '註冊進度', '验证邮箱并完成注册': '驗證信箱並完成註冊', '填写账号资料': '填寫帳號資料', '显示名称': '顯示名稱', '邮箱': '信箱', '设置密码': '設定密碼', '确认密码': '確認密碼', '两次密码不一致': '兩次密碼不一致', '再次输入同一密码': '再次輸入相同密碼', '注册必须验证邮箱': '註冊必須驗證信箱', '密码不会在验证前生效；验证码由 Appwrite 发送，15 分钟内有效。': '密碼不會在驗證前生效；驗證碼由 Appwrite 傳送，15 分鐘內有效。', '发送验证码，继续注册': '傳送驗證碼，繼續註冊', '验证码已发送': '驗證碼已傳送', '修改资料': '修改資料', '6 位邮箱验证码': '6 位信箱驗證碼', '请检查收件箱与垃圾邮件目录': '請檢查收件匣與垃圾郵件資料夾', '验证邮箱并创建账号': '驗證信箱並建立帳號', '{{seconds}} 秒后可重新发送': '{{seconds}} 秒後可重新傳送', '没有收到？重新发送验证码': '沒有收到？重新傳送驗證碼',
@@ -39,6 +40,7 @@ const zhTW: Record<string, string> = {
 };
 
 const en: Record<string, string> = {
+  '发送中…': 'Sending…',
   '语言': 'Language', '简体中文': '简体中文', '繁體中文': '繁體中文', 'English': 'English',
   '剧本大厅': 'Campaign lobby', '重选邦国': 'Choose another nation', '治理一个国家数百年。扩张越快，崩溃越早。真正的胜利是建立一个能长期运转的国家机器。': 'Govern a nation across centuries. Rapid expansion invites collapse; true victory is a state built to endure.', '继续槽位 {{slot}}': 'Continue slot {{slot}}', '开始推荐剧本': 'Start recommended campaign', '查看全部剧本': 'View all campaigns', '选择剧本': 'Choose a Campaign', '按压力和玩法定位选择，不同剧本对应不同学习曲线。': 'Choose by pressure and play style. Each campaign has a different learning curve.', '压力': 'Pressure', '推荐': 'Recommended', '选择邦国': 'Choose nation', '开始剧本': 'Start campaign',
   '注册进度': 'Registration progress', '验证邮箱并完成注册': 'Verify email and finish registration', '填写账号资料': 'Enter account details', '显示名称': 'Display name', '邮箱': 'Email', '设置密码': 'Set password', '确认密码': 'Confirm password', '两次密码不一致': 'Passwords do not match', '再次输入同一密码': 'Enter the same password again', '注册必须验证邮箱': 'Email verification is required', '密码不会在验证前生效；验证码由 Appwrite 发送，15 分钟内有效。': 'Your password is not activated until verification. Appwrite sends a code valid for 15 minutes.', '发送验证码，继续注册': 'Send code and continue', '验证码已发送': 'Verification code sent', '修改资料': 'Edit details', '6 位邮箱验证码': '6-digit email code', '请检查收件箱与垃圾邮件目录': 'Check your inbox and spam folder', '验证邮箱并创建账号': 'Verify email and create account', '{{seconds}} 秒后可重新发送': 'Resend in {{seconds}}s', '没有收到？重新发送验证码': 'Did not receive it? Resend code',

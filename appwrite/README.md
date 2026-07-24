@@ -4,6 +4,8 @@
 
 - `../functions/shared-world-gateway/`：加入版图、控制权、权威快照、共享行动和统一年度结算。
 - `../functions/social-gateway/`：玩家资料、好友申请、好友私聊、版图频道和图片媒体。
+- `../functions/cloud-save-gateway/`：以登录会话确定存档所有者，负责私有存档文件与元数据的原子替换。
+- `../functions/account-gateway/`：邮箱 OTP 验证后的受限密码找回。
 - `../functions/ai-diplomacy-gateway/`：受限的 Hugging Face 元首会谈简报；只解释规则事实，不参与结算。
 - `seeds/living-world-v1.json`：首张共享版图及首批开放国家的初始化数据。
 
@@ -16,4 +18,4 @@
 
 AI Function 的 `HF_TOKEN` 必须保存为远端 Function 变量。部署普通代码时不要使用 `--with-variables`，详细边界见 [`../docs/maintenance/AI-INFERENCE.md`](../docs/maintenance/AI-INFERENCE.md)。
 
-浏览器只读取大厅数据并调用 Functions。`nation_controls`、`world_memberships`、`world_commands`、`friendships`、`world_messages`、`direct_messages` 和媒体桶不允许客户端直接写入。
+浏览器只读取获授权的数据并调用 Functions。`cloud_saves`、`nation_controls`、`world_memberships`、`world_commands`、`friendships`、`world_messages`、`direct_messages` 及对应文件桶不允许客户端直接写入。

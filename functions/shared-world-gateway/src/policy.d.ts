@@ -24,3 +24,4 @@ export function isControlActive(control: ControlPolicyRow | null | undefined, no
 export function assertCommandOwnership<T extends CommandPolicyRow>(command: T, expected: CommandPolicyRow): T;
 export function wasWorldActiveDuringWindow(world: WorldSchedulePolicyRow, memberships: { lastSeenAt: string }[]): boolean;
 export function isWorldDue(world: WorldSchedulePolicyRow | null | undefined, nowMs?: number): boolean;
+export function readyCommandKey(worldId: string, turn: number, nationId: string): string;

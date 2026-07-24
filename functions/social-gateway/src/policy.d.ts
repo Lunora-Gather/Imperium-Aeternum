@@ -11,4 +11,5 @@ export function verifiedNationIdentity(
   requestedNationId: string | null | undefined,
   nowMs?: number,
 ): string | null;
+export function messageRateRowId(kind: 'world' | 'direct', channelId: string, userId: string, nowMs: number, windowMs: number): string;
 

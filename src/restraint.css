@@ -132,9 +132,9 @@
   background: color-mix(in srgb, var(--bg-panel) 92%, transparent) !important;
 }
 .ia-theme-switch button {
-  height: 28px !important;
+  height: 38px !important;
   border-radius: 8px !important;
-  padding: 0 9px !important;
+  padding: 0 15px !important;
 }
 .ia-menu-hero {
   padding: 20px 16px 16px !important;

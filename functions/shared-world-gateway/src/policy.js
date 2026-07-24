@@ -29,3 +29,7 @@ export function isWorldDue(world, nowMs = Date.now()) {
     && Date.parse(world.planningDeadlineAt) <= nowMs;
 }
 
+export function readyCommandKey(worldId, turn, nationId) {
+  return `ready:${worldId}:${turn}:${nationId}`;
+}
+
