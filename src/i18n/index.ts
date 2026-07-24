@@ -178,7 +178,20 @@ let currentLocale: Locale = detectLocale();
 const listeners = new Set<() => void>();
 const registeredEn: Record<string, string> = {};
 type EnglishReplacement = string | ((substring: string, ...args: string[]) => string);
-const registeredEnPatterns: Array<{ pattern: RegExp; replacement: EnglishReplacement }> = [];
+const registeredEnPatterns: Array<{ pattern: RegExp; replacement: EnglishReplacement }> = [
+  {
+    pattern: /^新游戏开始：(.+) · 你执掌 (.+) · 第 (\d+) 年$/,
+    replacement: (_all, scenario, nation, year) => `New campaign: ${en[scenario] ?? enLaunch[scenario] ?? scenario} · You govern ${en[nation] ?? enLaunch[nation] ?? nation} · Year ${year}`,
+  },
+  {
+    pattern: /^新游戏开始：(.+) · 第 (\d+) 年$/,
+    replacement: (_all, scenario, year) => `New campaign: ${en[scenario] ?? enLaunch[scenario] ?? scenario} · Year ${year}`,
+  },
+  {
+    pattern: /^已选剧本：(.+)，请选择你的邦国$/,
+    replacement: (_all, scenario) => `Campaign selected: ${en[scenario] ?? enLaunch[scenario] ?? scenario}. Choose your nation.`,
+  },
+];
 
 function detectLocale(): Locale {
   try {
