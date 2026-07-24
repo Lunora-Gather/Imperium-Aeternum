@@ -1,10 +1,12 @@
 // LogToast v3 — 轻量操作反馈（不再用厚重黑色浮窗）
 import { useEffect, useState } from 'react';
+import { useI18n } from '../i18n';
 import { useGameStore } from '../store/gameStore';
 
 interface ToastItem { id: number; text: string; tone: 'ok' | 'fail'; }
 
 export default function LogToast() {
+  const { t } = useI18n();
   const log = useGameStore((s) => s.log);
   const [queue, setQueue] = useState<ToastItem[]>([]);
   const [seenIdx, setSeenIdx] = useState(0);
@@ -38,7 +40,7 @@ export default function LogToast() {
         return (
           <div key={item.id} className={`ia-toast ${isFail ? 'is-fail' : 'is-ok'}`}>
             <span>{isFail ? '!' : '·'}</span>
-            <p>{item.text}</p>
+            <p>{t(item.text)}</p>
           </div>
         );
       })}
