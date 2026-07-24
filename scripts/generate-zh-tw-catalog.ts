@@ -24,8 +24,15 @@ function collect(file: string): void {
   const text = readFileSync(file, 'utf8');
   const source = ts.createSourceFile(file, text, ts.ScriptTarget.Latest, true, file.endsWith('x') ? ts.ScriptKind.TSX : ts.ScriptKind.TS);
   function visit(node: ts.Node): void {
-    if ((ts.isStringLiteralLike(node) || ts.isNoSubstitutionTemplateLiteral(node)) && /[\u3400-\u9fff]/.test(node.text)) {
-      for (const character of node.text) if (/[\u3400-\u9fff]/.test(character)) sourceCharacters.add(character);
+    const literal = ts.isStringLiteralLike(node)
+      || ts.isNoSubstitutionTemplateLiteral(node)
+      || ts.isTemplateHead(node)
+      || ts.isTemplateMiddle(node)
+      || ts.isTemplateTail(node)
+      ? node.text
+      : '';
+    if (/[\u3400-\u9fff]/.test(literal)) {
+      for (const character of literal) if (/[\u3400-\u9fff]/.test(character)) sourceCharacters.add(character);
     }
     ts.forEachChild(node, visit);
   }
