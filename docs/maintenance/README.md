@@ -1,5 +1,7 @@
 # 维护手册
 
+Hugging Face 推理的服务端密钥、使用边界和降级策略见 [`AI-INFERENCE.md`](AI-INFERENCE.md)。
+
 ## 1. 当前架构基线
 
 核心状态只有一个事实源：`GameState`。完整回合必须经过：

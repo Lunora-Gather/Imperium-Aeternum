@@ -8,12 +8,15 @@ const budgets = {
   // Full feature inventory includes the lazy Appwrite web SDK; initial-route budgets stay unchanged.
   // Three locale catalogs add bounded copy weight. Governance copy stays lazy;
   // the 64 KiB allowance is raw (about 12 KiB gzip) and does not relax entry/App limits.
-  totalJavaScript: 1096 * KIB,
+  // The authenticated HF summit secretary adds 8 KiB of lazy diplomacy code;
+  // entry/App/CSS limits remain unchanged and the diplomacy chunk gets its own cap.
+  totalJavaScript: 1104 * KIB,
   // Verified auth and responsive social/chat surfaces add intentional UI states; retain bounded headroom.
   totalCss: 92 * KIB,
   entryJavaScript: 180 * KIB,
   appJavaScript: 25 * KIB,
   accountJavaScript: 140 * KIB,
+  diplomacyJavaScript: 34 * KIB,
 };
 
 interface AssetInfo {
@@ -45,6 +48,7 @@ const totalCss = css.reduce((sum, asset) => sum + asset.bytes, 0);
 const entryJs = matchingSize(js, 'index-');
 const appJs = matchingSize(js, 'App-');
 const accountJs = matchingSize(js, 'accountStore-');
+const diplomacyJs = matchingSize(js, 'DiplomacyScreen-');
 const failures: string[] = [];
 
 if (largest.bytes > budgets.largestJavaScript) failures.push(`最大 JS ${largest.name} 为 ${kib(largest.bytes)}KiB，预算 ${kib(budgets.largestJavaScript)}KiB`);
@@ -53,6 +57,7 @@ if (totalCss > budgets.totalCss) failures.push(`CSS 总量 ${kib(totalCss)}KiB�
 if (entryJs === 0 || entryJs > budgets.entryJavaScript) failures.push(`入口 JS ${kib(entryJs)}KiB，预算 1–${kib(budgets.entryJavaScript)}KiB`);
 if (appJs === 0 || appJs > budgets.appJavaScript) failures.push(`App 块 ${kib(appJs)}KiB，预算 1–${kib(budgets.appJavaScript)}KiB`);
 if (accountJs === 0 || accountJs > budgets.accountJavaScript) failures.push(`懒加载账号块 ${kib(accountJs)}KiB，预算 1–${kib(budgets.accountJavaScript)}KiB`);
+if (diplomacyJs === 0 || diplomacyJs > budgets.diplomacyJavaScript) failures.push(`懒加载外交块 ${kib(diplomacyJs)}KiB，预算 1–${kib(budgets.diplomacyJavaScript)}KiB`);
 
 const summary = {
   jsFiles: js.length,
@@ -61,6 +66,7 @@ const summary = {
   entryJsKiB: kib(entryJs),
   appJsKiB: kib(appJs),
   lazyAccountJsKiB: kib(accountJs),
+  lazyDiplomacyJsKiB: kib(diplomacyJs),
   totalCssKiB: kib(totalCss),
 };
 

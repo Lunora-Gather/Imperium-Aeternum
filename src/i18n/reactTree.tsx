@@ -17,7 +17,12 @@ function localizeString(source: string): string {
  * inputs, and it preserves non-text props and event handlers verbatim. */
 export function localizeReactTree(node: ReactNode): ReactNode {
   if (typeof node === 'string') return localizeString(node);
-  if (Array.isArray(node)) return node.map(localizeReactTree);
+  if (Array.isArray(node)) return node.map((child, index) => {
+    const localized = localizeReactTree(child);
+    return isValidElement(localized) && localized.key == null
+      ? cloneElement(localized, { key: `i18n-${index}` })
+      : localized;
+  });
   if (!isValidElement(node)) return node;
 
   const element = node as ReactElement<Record<string, unknown>>;

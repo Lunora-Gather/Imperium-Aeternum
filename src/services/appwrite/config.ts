@@ -17,6 +17,7 @@ export interface AppwriteConfig {
   worldChatMediaBucketId: string;
   socialGatewayFunctionId: string;
   accountGatewayFunctionId: string;
+  aiDiplomacyFunctionId: string;
 }
 
 export const APPWRITE_CONFIG: AppwriteConfig = {
@@ -38,6 +39,7 @@ export const APPWRITE_CONFIG: AppwriteConfig = {
   worldChatMediaBucketId: import.meta.env.VITE_APPWRITE_WORLD_CHAT_MEDIA_BUCKET_ID || 'world_chat_media',
   socialGatewayFunctionId: import.meta.env.VITE_APPWRITE_SOCIAL_GATEWAY_FUNCTION_ID || 'social-gateway',
   accountGatewayFunctionId: import.meta.env.VITE_APPWRITE_ACCOUNT_GATEWAY_FUNCTION_ID || 'account-gateway',
+  aiDiplomacyFunctionId: import.meta.env.VITE_APPWRITE_AI_DIPLOMACY_FUNCTION_ID || 'ai-diplomacy-gateway',
 };
 
 export const isAppwriteConfigured = Object.values(APPWRITE_CONFIG).every((value) => value.trim().length > 0);
