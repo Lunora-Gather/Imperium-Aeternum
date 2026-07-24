@@ -14,12 +14,16 @@ import { buildDashboardCommandGroups } from '../gameplay/dashboardCommandGroups'
 import { buildStrategicHqPlan } from '../gameplay/strategicHq';
 import type { GameState } from '../types/game';
 import type { CommandCenterAction } from '../gameplay/commandCenterActions';
+import { createScopedTranslator, localizeDeep } from '../i18n/scoped';
+import { dashboardCatalog } from '../i18n/catalogs/dashboard';
+
+const t = createScopedTranslator(dashboardCatalog);
 
 type JumpToTab = (tab: string) => void;
 
 export default function DashboardStrategicHq({ state, commandActions, jumpToTab }: { state: GameState; commandActions: CommandCenterAction[]; jumpToTab: JumpToTab }) {
-  const plan = useMemo(() => buildStrategicHqPlan(state, commandActions), [state, commandActions]);
-  const groups = useMemo(() => buildDashboardCommandGroups(state, state.playerNationId), [state]);
+  const plan = localizeDeep(useMemo(() => buildStrategicHqPlan(state, commandActions), [state, commandActions]), t);
+  const groups = localizeDeep(useMemo(() => buildDashboardCommandGroups(state, state.playerNationId), [state]), t);
 
   const renderItem = (id: string) => {
     if (id === 'release') return <DashboardReleaseReadiness state={state} commandActions={commandActions} />;

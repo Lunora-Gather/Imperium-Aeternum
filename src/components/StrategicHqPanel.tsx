@@ -3,6 +3,9 @@
 
 import { Tag } from './ui';
 import type { StrategicHqPlan } from '../gameplay/strategicHq';
+import { createScopedTranslator } from '../i18n/scoped';
+import { dashboardCatalog } from '../i18n/catalogs/dashboard';
+const t = createScopedTranslator(dashboardCatalog);
 
 function tagTone(tone: string): 'danger' | 'warn' | 'good' | 'info' | 'gold' {
   return tone === 'danger' ? 'danger' : tone === 'warn' ? 'warn' : tone === 'good' ? 'good' : tone === 'gold' ? 'gold' : 'info';
@@ -15,10 +18,10 @@ function toneBorder(tone: string): string {
 export default function StrategicHqPanel({ plan, jumpToPrimary }: { plan: StrategicHqPlan; jumpToPrimary?: () => void }) {
   return <section className="ia-dash-section" style={{ borderColor: toneBorder(plan.risk) }}>
     <header>
-      <div><small>Strategic HQ</small><h3>帝国总参</h3></div>
+      <div><small>Strategic HQ</small><h3>{t('帝国总参')}</h3></div>
       <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
         <Tag text={plan.riskLabel} tone={tagTone(plan.risk)} />
-        <Tag text={`把握 ${plan.confidence}`} tone={plan.confidence >= 75 ? 'good' : plan.confidence >= 55 ? 'warn' : 'danger'} />
+        <Tag text={t(`把握 ${plan.confidence}`)} tone={plan.confidence >= 75 ? 'good' : plan.confidence >= 55 ? 'warn' : 'danger'} />
       </div>
     </header>
 
@@ -42,13 +45,13 @@ export default function StrategicHqPanel({ plan, jumpToPrimary }: { plan: Strate
 
     <div className="ia-action-list" style={{ marginBottom: 8 }}>
       {plan.summaryView.lines.slice(0, 3).map((line, i) => <button key={line.id} className={`tone-${line.tone === 'danger' ? 'danger' : line.tone === 'warn' ? 'warn' : 'normal'}`} onClick={i === 0 ? jumpToPrimary : undefined} disabled={i !== 0 || !jumpToPrimary}>
-        <b>{i === 0 ? `首要：${line.title}` : line.title}</b>
+        <b>{i === 0 ? t(`首要：${line.title}`) : line.title}</b>
         <span>{line.body}{line.actionLabel ? ` · ${line.actionLabel}` : ''}</span>
       </button>)}
     </div>
 
     <div className="ia-dash-note">
-      为什么：{plan.why.slice(0, 2).join(' / ')}
+      {t('为什么：')}{plan.why.slice(0, 2).join(' / ')}
     </div>
   </section>;
 }

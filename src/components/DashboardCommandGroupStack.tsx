@@ -3,6 +3,10 @@
 import { useMemo, useState, type ReactNode } from 'react';
 import { Tag } from './ui';
 import type { DashboardCommandGroup, DashboardGroupTone } from '../gameplay/dashboardCommandGroups';
+import { createScopedTranslator } from '../i18n/scoped';
+import { dashboardCatalog } from '../i18n/catalogs/dashboard';
+
+const t = createScopedTranslator(dashboardCatalog);
 
 function tagTone(tone: DashboardGroupTone): 'danger' | 'warn' | 'good' | 'info' | 'gold' {
   return tone === 'danger' ? 'danger' : tone === 'warn' ? 'warn' : 'good';
@@ -23,10 +27,10 @@ export default function DashboardCommandGroupStack({ groups, renderItem }: { gro
         <header style={{ marginBottom: expanded ? 8 : 0 }}>
           <button onClick={() => setOpen((x) => ({ ...x, [g.id]: !expanded }))} style={{ flex: 1, textAlign: 'left', background: 'transparent', color: 'inherit', border: 0, padding: 0, cursor: 'pointer' }}>
             <small>{expanded ? '▼' : '▶'} Command Group</small>
-            <h3>{g.title}</h3>
-            <div style={{ fontSize: 11, color: 'var(--text-dim)', lineHeight: 1.45 }}>{g.subtitle}</div>
+            <h3>{t(g.title)}</h3>
+            <div style={{ fontSize: 11, color: 'var(--text-dim)', lineHeight: 1.45 }}>{t(g.subtitle)}</div>
           </button>
-          <Tag text={g.tone === 'danger' ? '紧急' : g.tone === 'warn' ? '注意' : '良好'} tone={tagTone(g.tone)} />
+          <Tag text={t(g.tone === 'danger' ? '紧急' : g.tone === 'warn' ? '注意' : '良好')} tone={tagTone(g.tone)} />
         </header>
         {expanded && <div className="ia-command-stack-items">
           {g.itemIds.map((id) => <div key={id}>{renderItem(id)}</div>)}

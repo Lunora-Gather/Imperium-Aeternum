@@ -1,3 +1,6 @@
+import { registerGovernanceTranslations } from '../i18n/catalogs/governance';
+import { localizeReactTree } from '../i18n/reactTree';
+registerGovernanceTranslations();
 // Stats v2 — 大局诊断 + 趋势图表
 import { useGameStore } from '../store/gameStore';
 import { Panel, Tag } from '../components/ui';
@@ -25,7 +28,7 @@ export default function StatsScreen() {
   const pid = useGameStore((s) => s.state.playerNationId);
   const player = useGameStore((s) => s.state.nations[pid]);
   const history = state.history.filter((r) => r.nationId === pid);
-  if (history.length === 0) return <Panel title="统计图表"><p className="dim" style={{ padding: 16 }}>尚无回合数据，推进一步后可见趋势。</p></Panel>;
+  if (history.length === 0) return localizeReactTree(<Panel title="统计图表"><p className="dim" style={{ padding: 16 }}>尚无回合数据，推进一步后可见趋势。</p></Panel>);
 
   const goldData = history.map((r) => ({ x: r.turn, y: r.income.tax + r.income.trade + r.income.building - r.expense.military - r.expense.corruption }));
   const foodData = history.map((r) => ({ x: r.turn, y: r.foodDelta }));
@@ -60,7 +63,7 @@ export default function StatsScreen() {
   const radarPath = factionPts.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x.toFixed(1)} ${p.y.toFixed(1)}`).join(' ') + ' Z';
   const maxArmy = Math.max(playerArmy, topArmy || 1, 1);
 
-  return <div>
+  return localizeReactTree(<div>
     <Panel title="大局诊断" accent>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))', gap: 8 }}>
         {advice.slice(0, 4).map((a) => <Guide key={a.title} {...a} />)}
@@ -80,7 +83,7 @@ export default function StatsScreen() {
       <Panel title="军力对比"><div style={{ display: 'flex', flexDirection: 'column', gap: 6, padding: 8 }}><ArmyRow name={player.name} value={playerArmy} max={maxArmy} color="var(--gold)" />{topAi.map((n) => <ArmyRow key={n.id} name={n.name} value={n.army.reduce((s, a) => s + a.size, 0)} max={maxArmy} color="var(--war)" />)}</div></Panel>
       <Panel title="科技进度"><div style={{ display: 'flex', flexDirection: 'column', gap: 6, padding: 8 }}>{(['agri', 'mil', 'admin', 'culture'] as const).map((branch) => { const lv = player.tech[branch] || 0; const pct = (lv / 8) * 100; const colors: Record<string, string> = { agri: 'var(--food)', mil: 'var(--war)', admin: 'var(--accent)', culture: 'var(--faith)' }; return <div key={branch} style={{ display: 'flex', alignItems: 'center', gap: 8 }}><span style={{ width: 50, fontSize: 11, color: colors[branch] }}>{labels[branch]}</span><div style={{ flex: 1, height: 12, background: 'var(--bg-inset)', borderRadius: 3, overflow: 'hidden', position: 'relative' }}><div style={{ width: `${pct}%`, height: '100%', background: colors[branch] }} /><span style={{ position: 'absolute', right: 4, top: -1, fontSize: 10, color: 'var(--text-soft)' }}>Lv {lv}/8</span></div></div>; })}</div></Panel>
     </div>
-  </div>;
+  </div>);
 }
 
 function Guide({ title, body, tone }: { title: string; body: string; tone: 'danger' | 'warn' | 'good' | 'info' }) {

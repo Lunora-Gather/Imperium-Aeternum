@@ -2,6 +2,9 @@
 
 import { Tag } from './ui';
 import type { DiplomacyAdvisorPlan, DiplomacyAdvisorTone } from '../gameplay/diplomacyAdvisor';
+import { createScopedTranslator } from '../i18n/scoped';
+import { dashboardCatalog } from '../i18n/catalogs/dashboard';
+const t = createScopedTranslator(dashboardCatalog);
 
 function tagTone(tone: DiplomacyAdvisorTone): 'danger' | 'warn' | 'good' | 'info' | 'gold' {
   return tone === 'danger' ? 'danger' : tone === 'warn' ? 'warn' : 'good';
@@ -14,10 +17,10 @@ function toneBorder(tone: DiplomacyAdvisorTone): string {
 export default function DiplomacyAdvisorPanel({ plan, jumpToTab }: { plan: DiplomacyAdvisorPlan; jumpToTab?: (tab: string) => void }) {
   return <section className="ia-dash-section" style={{ borderColor: toneBorder(plan.tone) }}>
     <header>
-      <div><small>Diplomacy</small><h3>外交顾问</h3></div>
+      <div><small>Diplomacy</small><h3>{t('外交顾问')}</h3></div>
       <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
-        <Tag text={plan.tone === 'danger' ? '解除孤立' : plan.tone === 'warn' ? '修补关系' : '主动布局'} tone={tagTone(plan.tone)} />
-        <Tag text={`态势 ${plan.posture}`} tone={tagTone(plan.tone)} />
+        <Tag text={t(plan.tone === 'danger' ? '解除孤立' : plan.tone === 'warn' ? '修补关系' : '主动布局')} tone={tagTone(plan.tone)} />
+        <Tag text={t(`态势 ${plan.posture}`)} tone={tagTone(plan.tone)} />
       </div>
     </header>
 
@@ -34,8 +37,8 @@ export default function DiplomacyAdvisorPanel({ plan, jumpToTab }: { plan: Diplo
     </div>
 
     <div className="ia-action-list">
-      {plan.candidates.length === 0 ? <div className="ia-risk-empty">暂无迫切外交动作，可以积累影响力。</div> : plan.candidates.slice(0, 4).map((c, i) => <button key={c.id} className={`tone-${c.tone === 'danger' ? 'danger' : c.tone === 'warn' ? 'warn' : 'normal'}`} onClick={() => jumpToTab?.(c.tab)} disabled={!jumpToTab}>
-        <b>{i === 0 ? `优先：${c.title}` : c.title}</b>
+      {plan.candidates.length === 0 ? <div className="ia-risk-empty">{t('暂无迫切外交动作，可以积累影响力。')}</div> : plan.candidates.slice(0, 4).map((c, i) => <button key={c.id} className={`tone-${c.tone === 'danger' ? 'danger' : c.tone === 'warn' ? 'warn' : 'normal'}`} onClick={() => jumpToTab?.(c.tab)} disabled={!jumpToTab}>
+        <b>{i === 0 ? t(`优先：${c.title}`) : c.title}</b>
         <span>{c.body}</span>
       </button>)}
     </div>

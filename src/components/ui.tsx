@@ -1,5 +1,6 @@
 // Imperium Aeternum — UI 组件 v4（青铜铭文设计语言）
 import type { CSSProperties, ReactNode } from 'react';
+import { translate } from '../i18n';
 
 // ── Panel：分区面板，display 字体标题，金色顶饰 ──
 export function Panel({ title, children, actions, accent, icon }: {
@@ -33,7 +34,7 @@ export function Panel({ title, children, actions, accent, icon }: {
           display: 'flex', alignItems: 'center', gap: 'var(--space-2)',
         }}>
           {icon && <span style={{ fontSize: 16, opacity: 0.8 }}>{icon}</span>}
-          {title}
+          {translate(title)}
         </h3>
         {actions && <div style={{ display: 'flex', gap: 'var(--space-2)' }}>{actions}</div>}
       </header>
@@ -83,7 +84,7 @@ export function StatRow({ label, value, max = 100, color, kind, warn }: {
 }) {
   return (
     <div style={{ display: 'grid', gridTemplateColumns: '84px 1fr 54px', gap: 'var(--space-3)', alignItems: 'center', marginBottom: 'var(--space-2)' }}>
-      <span style={{ color: 'var(--text-mute)', fontSize: 11.5 }}>{label}</span>
+      <span style={{ color: 'var(--text-mute)', fontSize: 11.5 }}>{translate(label)}</span>
       <Bar value={value} max={max} color={color} kind={kind} />
       <span className="ia-num" style={{
         fontSize: 13, color: warn ? 'var(--warn)' : 'var(--text)', textAlign: 'right', fontWeight: 600,
@@ -107,7 +108,7 @@ export function Stat({ label, value, warn, kind = 'minor', accent, icon }: {
         {accent && <div style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: 2, background: accent, boxShadow: `0 0 12px ${accent}` }} />}
         <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', color: 'var(--text-mute)' }}>
           {icon && <span style={{ fontSize: 13, opacity: 0.7 }}>{icon}</span>}
-          <span className="ia-up" style={{ fontSize: 10 }}>{label}</span>
+          <span className="ia-up" style={{ fontSize: 10 }}>{translate(label)}</span>
         </div>
         <div className="ia-num" style={{
           fontSize: 26, fontWeight: 700, lineHeight: 1, color: warn ? 'var(--war)' : 'var(--text)',
@@ -117,7 +118,7 @@ export function Stat({ label, value, warn, kind = 'minor', accent, icon }: {
   }
   return (
     <div style={{ padding: 'var(--space-2) 0' }}>
-      <div style={{ color: 'var(--text-mute)', fontSize: 10.5, marginBottom: 3, textTransform: 'uppercase', letterSpacing: '0.05em' }}>{label}</div>
+      <div style={{ color: 'var(--text-mute)', fontSize: 10.5, marginBottom: 3, textTransform: 'uppercase', letterSpacing: '0.05em' }}>{translate(label)}</div>
       <div className="ia-num" style={{ fontSize: 16, color: warn ? 'var(--warn)' : 'var(--text)', fontWeight: 600 }}>{v}</div>
     </div>
   );
@@ -136,7 +137,7 @@ export function Btn({ label, onClick, disabled, busy, warn, variant, title, icon
     : 'ia-btn';
   return (
     <button type={type} className={cls} onClick={onClick} disabled={disabled || busy} title={title} aria-busy={busy || undefined}>
-      {busy ? <span className="ia-btn-spinner" aria-hidden="true" /> : icon && <span style={{ marginRight: 6, opacity: 0.8 }}>{icon}</span>}{label}
+      {busy ? <span className="ia-btn-spinner" aria-hidden="true" /> : icon && <span style={{ marginRight: 6, opacity: 0.8 }}>{icon}</span>}{translate(label)}
     </button>
   );
 }
@@ -155,7 +156,7 @@ export function Tag({ text, color, tone }: { text: string; color?: string; tone?
     : tone === 'info' ? 'var(--stable)'
     : tone === 'gold' ? 'var(--gold)'
     : 'var(--text-mute)';
-  return <span className="ia-tag" style={{ background: bg, borderColor: fg, color: fg }}>{text}</span>;
+  return <span className="ia-tag" style={{ background: bg, borderColor: fg, color: fg }}>{translate(text)}</span>;
 }
 
 // ── Divider：金色细线分隔 ──
@@ -164,7 +165,7 @@ export function Divider({ label }: { label?: string }) {
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)', margin: 'var(--space-4) 0', color: 'var(--text-dim)' }}>
       <div style={{ flex: 1, height: 1, background: 'linear-gradient(90deg, transparent, var(--border))' }} />
-      <span className="ia-up" style={{ fontSize: 10 }}>{label}</span>
+      <span className="ia-up" style={{ fontSize: 10 }}>{translate(label)}</span>
       <div style={{ flex: 1, height: 1, background: 'linear-gradient(90deg, var(--border), transparent)' }} />
     </div>
   );
@@ -184,7 +185,7 @@ export function ResourceStrip({ items }: { items: { label: string; value: number
         <div key={it.label} style={{ display: 'flex', flexDirection: 'column', lineHeight: 1.1, alignItems: 'flex-start' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 4, color: 'var(--text-dim)' }}>
             {it.icon && <span style={{ fontSize: 10, opacity: 0.7 }}>{it.icon}</span>}
-            <span className="ia-up" style={{ fontSize: 9 }}>{it.label}</span>
+            <span className="ia-up" style={{ fontSize: 9 }}>{translate(it.label)}</span>
           </div>
           <span className="ia-num" style={{
             fontSize: 18, fontWeight: 700,

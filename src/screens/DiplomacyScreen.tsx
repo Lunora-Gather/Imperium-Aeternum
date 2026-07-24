@@ -1,3 +1,6 @@
+import { registerGovernanceTranslations } from '../i18n/catalogs/governance';
+import { localizeReactTree } from '../i18n/reactTree';
+registerGovernanceTranslations();
 // Diplomacy v31 — 国家风格画像 + AI 意图透明化
 import { useEffect, useState } from 'react';
 import { useGameStore } from '../store/gameStore';
@@ -100,7 +103,7 @@ export default function DiplomacyScreen() {
   const strategicAdvice = intelBoard[0]?.intel.explanation ?? '当前外交格局较平稳，可积累影响力等待机会。';
   const pick = (id: string) => { setView('list'); setFocusNation(id); };
 
-  return <div>
+  return localizeReactTree(<div>
     <Panel title="外交判断" accent>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))', gap: 8, marginBottom: 10 }}>
         <div className="ia-card" style={{ padding: 10, borderLeft: `3px solid ${toneBorder(intelBoard[0]?.intel.tone ?? 'info')}` }}><Tag text="建议" tone={intelBoard[0]?.intel.tone ?? 'info'} /><div style={{ fontSize: 12, lineHeight: 1.55, marginTop: 6 }}>{strategicAdvice}</div></div>
@@ -135,7 +138,7 @@ export default function DiplomacyScreen() {
         {intelTarget === n.id && <div className="ia-fade-in" style={{ marginTop: 8, padding: 8, background: 'var(--bg-inset)', borderRadius: 6, border: '1px solid var(--warn)' }}><div style={{ fontSize: 11, color: 'var(--warn)', fontWeight: 700, marginBottom: 6 }}>情报行动 · 会影响双方信任</div><div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}><Btn label="科技情报" variant="ghost" onClick={() => { espionage(n.id, 'steal_tech'); setIntelTarget(null); }} /><Btn label="地方扰动" variant="ghost" onClick={() => { espionage(n.id, 'foment_rebellion'); setIntelTarget(null); }} /><Btn label="军情观察" variant="ghost" onClick={() => { espionage(n.id, 'spy_military'); setIntelTarget(null); }} /></div></div>}
       </div>;
     })}</div></Panel>}
-  </div>;
+  </div>);
 }
 
 function MiniList({ title, rows, empty, tone, onPick }: { title: string; rows: Row[]; empty: string; tone: 'danger' | 'warn' | 'good' | 'info'; onPick: (id: string) => void }) {

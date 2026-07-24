@@ -5,7 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc -b && vite build",
+    "generate:i18n": "tsx scripts/generate-zh-tw-catalog.ts",
+    "build": "npm run generate:i18n && tsc -b && vite build",
     "pages:build": "vite build",
     "check:bundle": "tsx scripts/check-build-size.ts",
     "preview": "vite preview",
@@ -35,6 +36,7 @@
     "@types/react-dom": "^18.3.0",
     "@vitejs/plugin-react": "^6.0.3",
     "esbuild": "^0.28.1",
+    "opencc-js": "^1.4.1",
     "tsx": "^4.16.2",
     "typescript": "^5.5.3",
     "vite": "^8.1.0",

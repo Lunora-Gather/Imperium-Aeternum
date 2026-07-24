@@ -1,3 +1,6 @@
+import { registerGovernanceTranslations } from '../i18n/catalogs/governance';
+import { localizeReactTree } from '../i18n/reactTree';
+registerGovernanceTranslations();
 // Population v3 — 人口判断 + 阶层风险 + 派系优先级
 import { useGameStore } from '../store/gameStore';
 import { provincesOf } from '../engine/init';
@@ -41,7 +44,7 @@ export default function PopulationScreen() {
   if (avgLoyalty < 45) advice.push({ title: '忠诚不足', body: '地方忠诚偏低，扩张或高税会放大不稳定。', tone: 'warn' });
   if (advice.length === 0) advice.push({ title: '社会尚稳', body: '人口和派系状态可支撑继续发展，适合转向经济、科技或外交目标。', tone: 'good' });
 
-  return (
+  return localizeReactTree(
     <div>
       <Panel title="人口判断" accent>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 8 }}>

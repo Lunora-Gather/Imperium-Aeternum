@@ -3,6 +3,9 @@
 import { Tag } from './ui';
 import type { ReleaseReadinessPlan } from '../gameplay/releaseReadiness';
 import type { TurnRiskTone } from '../gameplay/turnRiskCenter';
+import { createScopedTranslator } from '../i18n/scoped';
+import { dashboardCatalog } from '../i18n/catalogs/dashboard';
+const t = createScopedTranslator(dashboardCatalog);
 
 function tagTone(tone: TurnRiskTone): 'danger' | 'warn' | 'good' | 'info' | 'gold' {
   return tone === 'danger' ? 'danger' : tone === 'warn' ? 'warn' : 'good';
@@ -15,9 +18,9 @@ function border(tone: TurnRiskTone): string {
 export default function ReleaseReadinessPanel({ plan }: { plan: ReleaseReadinessPlan }) {
   return <section className="ia-dash-section" style={{ borderColor: border(plan.tone) }}>
     <header>
-      <div><small>Release</small><h3>发布准备中心</h3></div>
+      <div><small>Release</small><h3>{t('发布准备中心')}</h3></div>
       <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
-        <Tag text={`评分 ${plan.score}`} tone={tagTone(plan.tone)} />
+        <Tag text={t(`评分 ${plan.score}`)} tone={tagTone(plan.tone)} />
         <Tag text={plan.buildMark} tone={tagTone(plan.tone)} />
       </div>
     </header>
@@ -31,7 +34,7 @@ export default function ReleaseReadinessPanel({ plan }: { plan: ReleaseReadiness
       {plan.items.map((item) => <div key={item.id} className={`ia-card tone-${item.tone === 'danger' ? 'danger' : item.tone === 'warn' ? 'warn' : 'normal'}`} style={{ padding: 9 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', gap: 5, marginBottom: 4 }}>
           <strong style={{ fontSize: 12 }}>{item.title}</strong>
-          <Tag text={item.tone === 'danger' ? '修复' : item.tone === 'warn' ? '注意' : '通过'} tone={tagTone(item.tone)} />
+          <Tag text={t(item.tone === 'danger' ? '修复' : item.tone === 'warn' ? '注意' : '通过')} tone={tagTone(item.tone)} />
         </div>
         <div style={{ fontSize: 11, color: 'var(--text-dim)', lineHeight: 1.45 }}>{item.body}</div>
       </div>)}

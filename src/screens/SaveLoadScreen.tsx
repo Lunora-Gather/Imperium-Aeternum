@@ -1,3 +1,6 @@
+import { registerGovernanceTranslations } from '../i18n/catalogs/governance';
+import { localizeReactTree } from '../i18n/reactTree';
+registerGovernanceTranslations();
 // SaveLoad v16 — 存档恢复预检 + 多槽位管理 + 自动修复可视化
 import { useState, useEffect } from 'react';
 import { useGameStore } from '../store/gameStore';
@@ -64,7 +67,7 @@ export default function SaveLoadScreen() {
               : { text: '槽位已满，覆盖前先确认年份和国家。', tone: 'info' as const };
   const cloudBySlot = new Map(account.cloudSaves.map((save) => [save.slot, save]));
 
-  return <div>
+  return localizeReactTree(<div>
     <Panel title="存档恢复体检" accent>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 8, marginBottom: 10 }}>
         <Health label="已用槽位" value={filled} tone="info" />
@@ -91,6 +94,6 @@ export default function SaveLoadScreen() {
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(250px, 1fr))', gap: 10, marginBottom: 12 }}>{slots.map((s) => { const isAuto = s.slot === 0; const meta = s.meta as SlotMeta | null; const preview = previewBySlot.get(s.slot); const isOld = !!meta && meta.version < SAVE_VERSION; const isCurrentNation = !!meta && meta.nationName === player?.name; const isBroken = preview?.status === 'broken'; const canLoad = !!meta && !isBroken; return <div key={s.slot} className="ia-card" style={{ padding: 10, borderColor: isBroken ? 'var(--war)' : isOld || preview?.status === 'repairable' ? 'var(--warn)' : isAuto ? 'var(--border-gold)' : isCurrentNation ? 'var(--good)' : 'var(--border)' }}><div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}><strong style={{ fontSize: 13 }}>{isAuto ? '槽位 0（自动）' : `槽位 ${s.slot}`}</strong>{meta ? <Tag text={isOld ? `旧档 v${meta.version}→v${SAVE_VERSION}` : `v${meta.version}`} tone={isOld ? 'warn' : 'info'} /> : <Tag text="空" tone="info" />}</div>{meta ? <><div style={{ fontSize: 12, color: 'var(--text-mute)', marginBottom: 4 }}>{meta.nationName ?? preview?.nationName ?? '未知'} · 第 {(preview?.turn ?? meta.turn) + 1} 年</div><div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginBottom: 6 }}><Tag text={fmtTime(meta.createdAt)} tone="info" />{isAuto && <Tag text="自动" tone="gold" />}{isCurrentNation && <Tag text="当前国家" tone="good" />}{isOld && <Tag text="读档迁移" tone="warn" />}</div><RecoveryMini preview={preview} /><div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>{!isAuto && <Btn label={pickSlot === s.slot ? '确认覆盖' : '存档'} variant={pickSlot === s.slot ? 'warn' : 'ghost'} onClick={() => { if (pickSlot !== s.slot) { setPickSlot(s.slot); return; } saveToSlot(s.slot); setPickSlot(null); refresh(); }} />}<Btn label={preview?.status === 'repairable' || isOld ? '修复并读档' : '读档'} variant="ghost" disabled={!canLoad} onClick={() => { loadFromSlot(s.slot); refresh(); }} />{!isAuto && <Btn label="删除" warn onClick={() => { if (window.confirm(`删除槽位 ${s.slot}？`)) { deleteSlotSave(s.slot); refresh(); } }} />}</div></> : <><div style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 8 }}>空槽位，可保存当前路线。</div>{!isAuto && <Btn label="存档到此" variant="ghost" onClick={() => { saveToSlot(s.slot); refresh(); }} />}</>}</div>; })}</div>
       <div className="ia-card" style={{ background: 'rgba(245,166,35,0.06)', borderColor: 'var(--warn)' }}><p className="dim" style={{ fontSize: 11, margin: 0, lineHeight: 1.6 }}>ℹ 槽位体检是只读预检，不会提前改写 localStorage。点击“修复并读档”后才会迁移、净化并写回存档。关键节点建议手动存档到槽位 1-4。</p></div>
     </Panel>
-  </div>;
+  </div>);
 }
 function Health({ label, value, tone }: { label: string; value: number; tone: 'danger' | 'warn' | 'good' | 'info' }) { return <div className="ia-card" style={{ padding: 10 }}><Tag text={label} tone={tone} /><div style={{ fontSize: 22, marginTop: 6, fontWeight: 700 }}>{value}</div></div>; }

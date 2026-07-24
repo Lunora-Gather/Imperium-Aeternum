@@ -1,4 +1,5 @@
 import { useSyncExternalStore } from 'react';
+import generatedZhTWCharacters from './generated/zh-TW.json';
 
 export type Locale = 'zh-CN' | 'zh-TW' | 'en';
 
@@ -111,10 +112,43 @@ const enLaunch: Record<string, string> = {
   '挑战': 'Challenge', '贸易': 'Trade', '军事': 'Military', '行政': 'Administration', '民生': 'Welfare', '强国': 'Great power', '稳健': 'Balanced',
   '波斯帝国': 'Persian Empire', '秦帝国': 'Qin Empire', '罗马': 'Rome', '迦太基': 'Carthage', '汉': 'Han', '孔雀帝国': 'Maurya Empire', '印加': 'Inca', '法兰克': 'Franks',
   '匈奴汗国': 'Xiongnu Khanate', '努米底亚': 'Numidia', '阿兹特克': 'Aztec', '玛雅': 'Maya', '基辅罗斯': 'Kievan Rus’', '室利佛逝': 'Srivijaya', '埃及王国': 'Kingdom of Egypt',
+  '执政官布鲁图': 'Consul Brutus',
+  '治国路线说明': 'Governance route guide', '✦ 治国路线 · 第 {{current}} / {{total}} 步': '✦ Governance Route · Step {{current}} / {{total}}',
+  '推荐页面：{{page}}': 'Recommended screen: {{page}}', ' · 快捷键 {{shortcut}}': ' · Shortcut {{shortcut}}',
+  '不再提示': 'Do not show again', '上一步': 'Previous', '下一步': 'Next', '开始实战引导': 'Start interactive guide',
+  '① 先看总览': '① Read the overview first',
+  '总览页现在是总参谋部。先看“下一回合前检查”，红色是推进前必须处理，黄色是最好先关注。': 'The overview is your headquarters. Check the pre-turn review first: red items must be resolved, while yellow items deserve attention.',
+  '打开总览': 'Open overview', '② 对齐国运目标': '② Choose a national objective',
+  '右侧“国运目标”会按剧本规模给出征服、富国、合纵、永恒四条路线。先选一个主线，不要每回合乱点。': 'National objectives offer conquest, prosperity, diplomacy, and endurance routes based on campaign scale. Choose one primary route and stay focused.',
+  '查看国运目标': 'View national objectives', '③ 修红黄项': '③ Resolve red and yellow items',
+  '回合前检查项可以跳转到对应页面。国库、粮储、安定、待决事件最优先；战时再看军队补给和士气。': 'Pre-turn checks link to the relevant screens. Prioritize treasury, food, stability, and pending events; during war, also review supply and morale.',
+  '查看体检项': 'View checks', '④ 做一件关键事': '④ Take one decisive action',
+  '每回合先做一件最能解决当前风险的事：缺钱看经济，地方乱看省份/政治，战时看军事，合纵看外交。': 'Each year, take the action that best addresses the current risk: economy for deficits, provinces or politics for unrest, military in wartime, and diplomacy for coalitions.',
+  '去处理内政': 'Manage domestic affairs', '⑤ 推进并读年报': '⑤ Advance and read the report',
+  '确认没有待决事件后，点“下一回合”或按空格。结算后先看年报，再回总览看趋势是否好转。': 'Once no events remain, choose Next Year or press Space. Read the annual report after settlement, then return to the overview to check the trend.',
+  '理解年报': 'Understand the annual report', '⑥ 关键点手动存档': '⑥ Save manually at key moments',
+  '开战、改革、读旧档、连续胜利前都去存档页。槽位体检会告诉你存档是否健康、是否会自动修复。': 'Visit the save screen before wars, reforms, loading old saves, or victory streaks. Slot checks show save health and automatic repairs.',
+  '打开存档体检': 'Open save checks',
 };
+
+Object.assign(zhTW, {
+  '治国路线说明': '治國路線說明', '✦ 治国路线 · 第 {{current}} / {{total}} 步': '✦ 治國路線 · 第 {{current}} / {{total}} 步',
+  '推荐页面：{{page}}': '推薦頁面：{{page}}', ' · 快捷键 {{shortcut}}': ' · 快捷鍵 {{shortcut}}', '不再提示': '不再提示',
+  '上一步': '上一步', '下一步': '下一步', '开始实战引导': '開始實戰引導',
+  '① 先看总览': '① 先看總覽', '总览页现在是总参谋部。先看“下一回合前检查”，红色是推进前必须处理，黄色是最好先关注。': '總覽頁現在是總參謀部。先看「下一回合前檢查」，紅色是推進前必須處理，黃色是最好先關注。',
+  '打开总览': '打開總覽', '② 对齐国运目标': '② 對齊國運目標', '右侧“国运目标”会按剧本规模给出征服、富国、合纵、永恒四条路线。先选一个主线，不要每回合乱点。': '右側「國運目標」會按劇本規模給出征服、富國、合縱、永恆四條路線。先選一個主線，不要每回合亂點。',
+  '查看国运目标': '查看國運目標', '③ 修红黄项': '③ 修紅黃項', '回合前检查项可以跳转到对应页面。国库、粮储、安定、待决事件最优先；战时再看军队补给和士气。': '回合前檢查項可以跳轉到對應頁面。國庫、糧儲、安定、待決事件最優先；戰時再看軍隊補給和士氣。',
+  '查看体检项': '查看體檢項', '④ 做一件关键事': '④ 做一件關鍵事', '每回合先做一件最能解决当前风险的事：缺钱看经济，地方乱看省份/政治，战时看军事，合纵看外交。': '每回合先做一件最能解決當前風險的事：缺錢看經濟，地方亂看省份／政治，戰時看軍事，合縱看外交。',
+  '去处理内政': '去處理內政', '⑤ 推进并读年报': '⑤ 推進並讀年報', '确认没有待决事件后，点“下一回合”或按空格。结算后先看年报，再回总览看趋势是否好转。': '確認沒有待決事件後，點「下一回合」或按空白鍵。結算後先看年報，再回總覽看趨勢是否好轉。',
+  '理解年报': '理解年報', '⑥ 关键点手动存档': '⑥ 關鍵點手動存檔', '开战、改革、读旧档、连续胜利前都去存档页。槽位体检会告诉你存档是否健康、是否会自动修复。': '開戰、改革、讀舊檔、連續勝利前都去存檔頁。欄位體檢會告訴你存檔是否健康、是否會自動修復。',
+  '打开存档体检': '打開存檔體檢',
+});
 
 let currentLocale: Locale = detectLocale();
 const listeners = new Set<() => void>();
+const registeredEn: Record<string, string> = {};
+type EnglishReplacement = string | ((substring: string, ...args: string[]) => string);
+const registeredEnPatterns: Array<{ pattern: RegExp; replacement: EnglishReplacement }> = [];
 
 function detectLocale(): Locale {
   try {
@@ -144,15 +178,33 @@ export function setLocale(locale: Locale): void {
 export function getLocale(): Locale { return currentLocale; }
 
 export function hasExplicitTranslation(source: string, locale: Exclude<Locale, 'zh-CN'>): boolean {
-  return locale === 'zh-TW' ? source in zhTW : source in en || source in enLaunch;
+  return locale === 'zh-TW' ? source in zhTW : source in en || source in enLaunch || source in registeredEn;
+}
+
+/** Register copy owned by a lazy screen. Keeping these catalogs beside lazy
+ * routes prevents the complete governance vocabulary inflating first load. */
+export function registerEnglishTranslations(catalog: Readonly<Record<string, string>>): void {
+  Object.assign(registeredEn, catalog);
+}
+
+export function registerEnglishPatterns(patterns: ReadonlyArray<{ pattern: RegExp; replacement: EnglishReplacement }>): void {
+  registeredEnPatterns.push(...patterns);
+}
+
+function toTraditional(source: string): string {
+  return [...source].map((character) => generatedZhTWCharacters[character as keyof typeof generatedZhTWCharacters] ?? character).join('');
 }
 
 export function translate(source: string, values: Record<string, string | number> = {}, locale = currentLocale): string {
-  const template = locale === 'zh-CN'
+  let template = locale === 'zh-CN'
     ? source
     : locale === 'zh-TW'
-      ? zhTW[source] ?? source
-      : en[source] ?? enLaunch[source] ?? source;
+      ? zhTW[source] ?? toTraditional(source)
+      : en[source] ?? enLaunch[source] ?? registeredEn[source] ?? source;
+  if (locale === 'en' && template === source) {
+    const rule = registeredEnPatterns.find(({ pattern }) => { pattern.lastIndex = 0; return pattern.test(source); });
+    if (rule) { rule.pattern.lastIndex = 0; template = source.replace(rule.pattern, rule.replacement as never); }
+  }
   return template.replace(/\{\{(\w+)\}\}/g, (_, key: string) => String(values[key] ?? `{{${key}}}`));
 }
 

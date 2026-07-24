@@ -2,6 +2,9 @@
 
 import { Tag } from './ui';
 import type { EconomyAdvisorPlan, EconomyAdvisorTone } from '../gameplay/economyAdvisor';
+import { createScopedTranslator } from '../i18n/scoped';
+import { dashboardCatalog } from '../i18n/catalogs/dashboard';
+const t = createScopedTranslator(dashboardCatalog);
 
 function tagTone(tone: EconomyAdvisorTone): 'danger' | 'warn' | 'good' | 'info' | 'gold' {
   return tone === 'danger' ? 'danger' : tone === 'warn' ? 'warn' : 'good';
@@ -14,10 +17,10 @@ function toneBorder(tone: EconomyAdvisorTone): string {
 export default function EconomyAdvisorPanel({ plan, jumpToTab }: { plan: EconomyAdvisorPlan; jumpToTab?: (tab: string) => void }) {
   return <section className="ia-dash-section" style={{ borderColor: toneBorder(plan.tone) }}>
     <header>
-      <div><small>Economy</small><h3>经济内政顾问</h3></div>
+      <div><small>Economy</small><h3>{t('经济内政顾问')}</h3></div>
       <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
-        <Tag text={plan.tone === 'danger' ? '先止血' : plan.tone === 'warn' ? '需修正' : '可发展'} tone={tagTone(plan.tone)} />
-        <Tag text={`健康 ${plan.health}`} tone={tagTone(plan.tone)} />
+        <Tag text={t(plan.tone === 'danger' ? '先止血' : plan.tone === 'warn' ? '需修正' : '可发展')} tone={tagTone(plan.tone)} />
+        <Tag text={t(`健康 ${plan.health}`)} tone={tagTone(plan.tone)} />
       </div>
     </header>
 
@@ -35,7 +38,7 @@ export default function EconomyAdvisorPanel({ plan, jumpToTab }: { plan: Economy
 
     <div className="ia-action-list">
       {plan.recommendations.map((r, i) => <button key={`${r.id}-${i}`} className={`tone-${r.tone === 'danger' ? 'danger' : r.tone === 'warn' ? 'warn' : 'normal'}`} onClick={() => jumpToTab?.(r.tab)} disabled={!jumpToTab}>
-        <b>{i === 0 ? `优先：${r.title}` : r.title}</b>
+        <b>{i === 0 ? t(`优先：${r.title}`) : r.title}</b>
         <span>{r.body}</span>
       </button>)}
     </div>

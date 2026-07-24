@@ -17,6 +17,10 @@ import { buildPreTurnCouncil, type PreTurnCouncil } from '../gameplay/preTurnCou
 import { buildChronicleDigest, type ChronicleDigest, type ChronicleHighlight } from '../gameplay/chronicleDigest';
 import { buildContextualGuidance, type ContextualGuidance } from '../gameplay/contextualGuidance';
 import { buildVictoryRouteFocus, type VictoryRouteFocus } from '../gameplay/victoryRoutes';
+import { createScopedTranslator, localizeDeep } from '../i18n/scoped';
+import { dashboardCatalog } from '../i18n/catalogs/dashboard';
+
+const t = createScopedTranslator(dashboardCatalog);
 
 const FOCUSES: { id: StrategyFocusId; label: string; short: string; desc: string; effect: string }[] = [
   { id: 'balance', label: '均衡', short: '守中', desc: '保留行政弹性，应对不确定局势。', effect: '行政点 +1' },
@@ -30,7 +34,7 @@ const FOCUSES: { id: StrategyFocusId; label: string; short: string; desc: string
 function n(v: number) { return Math.round(v); }
 function clamp(v: number, min = 0, max = 100) { return Math.max(min, Math.min(max, v)); }
 function tagTone(t: string): 'danger' | 'warn' | 'good' | 'info' | 'gold' { return t === 'danger' ? 'danger' : t === 'warn' ? 'warn' : t === 'good' ? 'good' : t === 'gold' ? 'gold' : 'info'; }
-function actionSourceLabel(source: CommandCenterAction['source']) { return source === 'readiness' ? '体检' : source === 'report' ? '年报' : source === 'strategy' ? '参谋' : '规划'; }
+function actionSourceLabel(source: CommandCenterAction['source']) { return t(source === 'readiness' ? '体检' : source === 'report' ? '年报' : source === 'strategy' ? '参谋' : '规划'); }
 function toneBorder(tone: string) { return tone === 'danger' ? 'var(--war)' : tone === 'warn' ? 'var(--warn)' : tone === 'gold' ? 'var(--gold)' : tone === 'good' ? 'var(--good)' : 'var(--border)'; }
 
 function Metric({ label, value, tone = 'normal', hint }: { label: string; value: string | number; tone?: 'normal' | 'good' | 'warn' | 'danger' | 'gold'; hint?: string }) {
@@ -45,98 +49,98 @@ function Meter({ label, value, lowBad = false }: { label: string; value: number;
 }
 
 function VictoryRoutePanel({ focus, jumpToTab }: { focus: VictoryRouteFocus; jumpToTab: (tab: string) => void }) {
-  return <section className="ia-dash-section ia-ambitions" style={{ borderColor: toneBorder(focus.tone) }}><header><div><small>Victory</small><h3>胜利路线</h3></div><div style={{ display: 'flex', gap: 5, flexWrap: 'wrap', justifyContent: 'flex-end' }}><Tag text={focus.actionLabel} tone={tagTone(focus.tone)} /><Tag text={`${focus.primary.progress}%`} tone={tagTone(focus.tone)} /></div></header><div className="ia-card" style={{ padding: 10, marginBottom: 8, borderLeft: `3px solid ${toneBorder(focus.tone)}` }}><strong style={{ fontSize: 13 }}>{focus.headline}</strong><div style={{ fontSize: 11, color: 'var(--text-dim)', lineHeight: 1.55, marginTop: 5 }}>{focus.summary}</div></div><div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 6, marginBottom: 8 }}>{focus.routes.map((route) => <button key={route.id} className="ia-card" onClick={() => jumpToTab(route.tab)} style={{ padding: 8, textAlign: 'left', cursor: 'pointer', border: `1px solid ${toneBorder(route.tone)}` }}><div style={{ display: 'flex', justifyContent: 'space-between', gap: 5, marginBottom: 4 }}><strong style={{ fontSize: 12 }}>{route.label.replace('路线', '')}</strong><Tag text={`${route.progress}%`} tone={tagTone(route.tone)} /></div><div className="ia-goal-line" style={{ marginBottom: 4 }}><i><b style={{ width: `${route.done ? 100 : route.progress}%` }} /></i></div><div style={{ fontSize: 10, color: 'var(--text-dim)', lineHeight: 1.35 }}>{route.warning ?? route.next}</div></button>)}</div><div className="ia-dash-note">路线对比：{focus.routeLine}</div></section>;
+  return <section className="ia-dash-section ia-ambitions" style={{ borderColor: toneBorder(focus.tone) }}><header><div><small>Victory</small><h3>{t('胜利路线')}</h3></div><div style={{ display: 'flex', gap: 5, flexWrap: 'wrap', justifyContent: 'flex-end' }}><Tag text={t(focus.actionLabel)} tone={tagTone(focus.tone)} /><Tag text={`${focus.primary.progress}%`} tone={tagTone(focus.tone)} /></div></header><div className="ia-card" style={{ padding: 10, marginBottom: 8, borderLeft: `3px solid ${toneBorder(focus.tone)}` }}><strong style={{ fontSize: 13 }}>{t(focus.headline)}</strong><div style={{ fontSize: 11, color: 'var(--text-dim)', lineHeight: 1.55, marginTop: 5 }}>{t(focus.summary)}</div></div><div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 6, marginBottom: 8 }}>{focus.routes.map((route) => <button key={route.id} className="ia-card" onClick={() => jumpToTab(route.tab)} style={{ padding: 8, textAlign: 'left', cursor: 'pointer', border: `1px solid ${toneBorder(route.tone)}` }}><div style={{ display: 'flex', justifyContent: 'space-between', gap: 5, marginBottom: 4 }}><strong style={{ fontSize: 12 }}>{t(route.label).replace(t('路线'), '')}</strong><Tag text={`${route.progress}%`} tone={tagTone(route.tone)} /></div><div className="ia-goal-line" style={{ marginBottom: 4 }}><i><b style={{ width: `${route.done ? 100 : route.progress}%` }} /></i></div><div style={{ fontSize: 10, color: 'var(--text-dim)', lineHeight: 1.35 }}>{t(route.warning ?? route.next)}</div></button>)}</div><div className="ia-dash-note">{t('路线对比：')}{t(focus.routeLine)}</div></section>;
 }
 
 function Sparkline({ data, label }: { data: number[]; label: string }) {
-  if (data.length < 2) return <span className="ia-mini-empty">{label}：暂无趋势</span>;
+  if (data.length < 2) return <span className="ia-mini-empty">{t(label)}: {t('暂无趋势')}</span>;
   const min = Math.min(...data), max = Math.max(...data), range = max - min || 1;
   const points = data.map((v, i) => `${(i / (data.length - 1)) * 92},${24 - ((v - min) / range) * 22}`).join(' ');
   const last = data[data.length - 1], first = data[0];
-  return <div className="ia-dash-spark"><span>{label}</span><svg viewBox="0 0 92 24" preserveAspectRatio="none"><polyline points={points} /></svg><strong className={last >= first ? 'good' : 'danger'}>{last >= first ? '↑' : '↓'}{n(last)}</strong></div>;
+  return <div className="ia-dash-spark"><span>{t(label)}</span><svg viewBox="0 0 92 24" preserveAspectRatio="none"><polyline points={points} /></svg><strong className={last >= first ? 'good' : 'danger'}>{last >= first ? '↑' : '↓'}{n(last)}</strong></div>;
 }
 
 function FocusPanel({ focus, onChange }: { focus: StrategyFocusId; onChange: (id: StrategyFocusId) => void }) {
   const current = FOCUSES.find((f) => f.id === focus) ?? FOCUSES[0];
-  return <section className="ia-dash-section"><header><div><small>Strategy</small><h3>国策焦点</h3></div><Tag text={current.label} tone="gold" /></header><p className="ia-dash-muted">{current.desc}</p><div className="ia-focus-inline">{FOCUSES.map((f) => <button key={f.id} className={f.id === focus ? 'is-active' : ''} onClick={() => onChange(f.id)} title={`${f.desc}\n${f.effect}`}><span>{f.short}</span><em>{f.label}</em></button>)}</div><div className="ia-dash-note">本回合倾向：{current.effect}</div></section>;
+  return <section className="ia-dash-section"><header><div><small>Strategy</small><h3>{t('国策焦点')}</h3></div><Tag text={t(current.label)} tone="gold" /></header><p className="ia-dash-muted">{t(current.desc)}</p><div className="ia-focus-inline">{FOCUSES.map((f) => <button key={f.id} className={f.id === focus ? 'is-active' : ''} onClick={() => onChange(f.id)} title={`${t(f.desc)}\n${t(f.effect)}`}><span>{t(f.short)}</span><em>{t(f.label)}</em></button>)}</div><div className="ia-dash-note">{t('本回合倾向：')}{t(current.effect)}</div></section>;
 }
 
 function RoadmapPanel({ roadmap, jumpToTab }: { roadmap: EmpireRoadmap; jumpToTab: (tab: string) => void }) {
   return <section className="ia-dash-section" style={{ borderColor: toneBorder(roadmap.tone) }}>
-    <header><div><small>Roadmap</small><h3>帝国路线图</h3></div><div style={{ display: 'flex', gap: 5, flexWrap: 'wrap', justifyContent: 'flex-end' }}><Tag text={roadmap.headline} tone={tagTone(roadmap.tone)} /><Tag text={`国势 ${roadmap.score}`} tone={tagTone(roadmap.tone)} /></div></header>
-    <div className="ia-card" style={{ padding: 10, marginBottom: 8, borderLeft: `3px solid ${toneBorder(roadmap.tone)}` }}><strong style={{ fontSize: 13 }}>{roadmap.summary}</strong><div style={{ fontSize: 11, color: 'var(--text-dim)', marginTop: 5, lineHeight: 1.55 }}>胜利主线：{roadmap.route.label} · {roadmap.route.hint} · 约 {roadmap.route.progress}%</div></div>
-    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(175px, 1fr))', gap: 8, marginBottom: 8 }}>{roadmap.steps.map((s) => <button key={s.id} className={`ia-card tone-${s.tone === 'danger' ? 'danger' : s.tone === 'warn' ? 'warn' : 'normal'}`} onClick={() => jumpToTab(s.tab)} style={{ padding: 10, textAlign: 'left', cursor: 'pointer', border: `1px solid ${toneBorder(s.tone)}` }}><div style={{ display: 'flex', justifyContent: 'space-between', gap: 6, marginBottom: 4 }}><strong style={{ fontSize: 13 }}>{s.title}</strong><Tag text={s.horizon} tone={tagTone(s.tone)} /></div><div style={{ fontSize: 11, color: 'var(--text-dim)', lineHeight: 1.5 }}>{s.body}</div></button>)}</div>
-    <div className="ia-dash-note"><span className={roadmap.tone === 'danger' ? 'danger' : roadmap.tone === 'warn' ? 'warn' : 'good'}>风险：{roadmap.riskLine}</span> · 机会：{roadmap.opportunityLine}</div>
+    <header><div><small>Roadmap</small><h3>{t('帝国路线图')}</h3></div><div style={{ display: 'flex', gap: 5, flexWrap: 'wrap', justifyContent: 'flex-end' }}><Tag text={t(roadmap.headline)} tone={tagTone(roadmap.tone)} /><Tag text={t(`国势 ${roadmap.score}`)} tone={tagTone(roadmap.tone)} /></div></header>
+    <div className="ia-card" style={{ padding: 10, marginBottom: 8, borderLeft: `3px solid ${toneBorder(roadmap.tone)}` }}><strong style={{ fontSize: 13 }}>{t(roadmap.summary)}</strong><div style={{ fontSize: 11, color: 'var(--text-dim)', marginTop: 5, lineHeight: 1.55 }}>{t('胜利主线：')}{t(roadmap.route.label)} · {t(roadmap.route.hint)} · {roadmap.route.progress}%</div></div>
+    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(175px, 1fr))', gap: 8, marginBottom: 8 }}>{roadmap.steps.map((s) => <button key={s.id} className={`ia-card tone-${s.tone === 'danger' ? 'danger' : s.tone === 'warn' ? 'warn' : 'normal'}`} onClick={() => jumpToTab(s.tab)} style={{ padding: 10, textAlign: 'left', cursor: 'pointer', border: `1px solid ${toneBorder(s.tone)}` }}><div style={{ display: 'flex', justifyContent: 'space-between', gap: 6, marginBottom: 4 }}><strong style={{ fontSize: 13 }}>{t(s.title)}</strong><Tag text={t(s.horizon)} tone={tagTone(s.tone)} /></div><div style={{ fontSize: 11, color: 'var(--text-dim)', lineHeight: 1.5 }}>{t(s.body)}</div></button>)}</div>
+    <div className="ia-dash-note"><span className={roadmap.tone === 'danger' ? 'danger' : roadmap.tone === 'warn' ? 'warn' : 'good'}>{t('风险：')}{t(roadmap.riskLine)}</span> · {t('机会：')}{t(roadmap.opportunityLine)}</div>
   </section>;
 }
 
 function GuidancePanel({ guidance, jumpToTab }: { guidance: ContextualGuidance; jumpToTab: (tab: string) => void }) {
-  return <section className="ia-dash-section" style={{ borderColor: toneBorder(guidance.tone) }}><header><div><small>Guide</small><h3>情境式提示</h3></div><Tag text={guidance.title} tone={tagTone(guidance.tone)} /></header><div className="ia-card" style={{ padding: 10, marginBottom: 8, borderLeft: `3px solid ${toneBorder(guidance.tone)}` }}><strong style={{ fontSize: 13 }}>{guidance.primary.title}</strong><div style={{ fontSize: 11, color: 'var(--text-dim)', lineHeight: 1.55, marginTop: 5 }}>{guidance.primary.body}</div></div><div className="ia-action-list">{guidance.tips.slice(0, 3).map((tip) => <button key={tip.id} className={`tone-${tip.tone === 'danger' ? 'danger' : tip.tone === 'warn' ? 'warn' : 'normal'}`} onClick={() => jumpToTab(tip.tab)}><b>{tip.action}</b><span>{tip.title} · {tip.body}</span></button>)}</div></section>;
+  return <section className="ia-dash-section" style={{ borderColor: toneBorder(guidance.tone) }}><header><div><small>Guide</small><h3>{t('情境式提示')}</h3></div><Tag text={t(guidance.title)} tone={tagTone(guidance.tone)} /></header><div className="ia-card" style={{ padding: 10, marginBottom: 8, borderLeft: `3px solid ${toneBorder(guidance.tone)}` }}><strong style={{ fontSize: 13 }}>{t(guidance.primary.title)}</strong><div style={{ fontSize: 11, color: 'var(--text-dim)', lineHeight: 1.55, marginTop: 5 }}>{t(guidance.primary.body)}</div></div><div className="ia-action-list">{guidance.tips.slice(0, 3).map((tip) => <button key={tip.id} className={`tone-${tip.tone === 'danger' ? 'danger' : tip.tone === 'warn' ? 'warn' : 'normal'}`} onClick={() => jumpToTab(tip.tab)}><b>{t(tip.action)}</b><span>{t(tip.title)} · {t(tip.body)}</span></button>)}</div></section>;
 }
 
 function CouncilPanel({ council, jumpToTab }: { council: PreTurnCouncil; jumpToTab: (tab: string) => void }) {
   const visible = council.blockers.length > 0 ? council.blockers : council.recommendations;
   return <section className="ia-dash-section" style={{ borderColor: toneBorder(council.tone) }}>
-    <header><div><small>Council</small><h3>回合前作战会议</h3></div><div style={{ display: 'flex', gap: 5, flexWrap: 'wrap', justifyContent: 'flex-end' }}><Tag text={council.title.replace('会议结论：', '')} tone={tagTone(council.tone)} /><Tag text={`把握 ${council.confidence}`} tone={tagTone(council.tone)} /></div></header>
-    <div className="ia-goal-line" style={{ marginBottom: 8 }}><div><span>{council.title}</span><strong>{council.progress}/100</strong></div><i><b style={{ width: `${council.progress}%` }} /></i><em>{council.verdict}</em></div>
-    <div className="ia-action-list">{visible.length === 0 ? <div className="ia-risk-empty">会议无额外事项，可以按预演推进。</div> : visible.slice(0, 3).map((item) => <button key={item.id} className={`tone-${item.tone === 'danger' ? 'danger' : item.tone === 'warn' ? 'warn' : 'normal'}`} onClick={() => jumpToTab(item.tab)}><b>{item.priority === 'must' ? `必须：${item.title}` : item.priority === 'should' ? `建议：${item.title}` : item.title}</b><span>{item.body}</span></button>)}</div>
-    <div className="ia-dash-note" style={{ marginTop: 8 }}>{council.footer}</div>
+    <header><div><small>Council</small><h3>{t('回合前作战会议')}</h3></div><div style={{ display: 'flex', gap: 5, flexWrap: 'wrap', justifyContent: 'flex-end' }}><Tag text={t(council.title)} tone={tagTone(council.tone)} /><Tag text={t(`把握 ${council.confidence}`)} tone={tagTone(council.tone)} /></div></header>
+    <div className="ia-goal-line" style={{ marginBottom: 8 }}><div><span>{t(council.title)}</span><strong>{council.progress}/100</strong></div><i><b style={{ width: `${council.progress}%` }} /></i><em>{t(council.verdict)}</em></div>
+    <div className="ia-action-list">{visible.length === 0 ? <div className="ia-risk-empty">{t('会议无额外事项，可以按预演推进。')}</div> : visible.slice(0, 3).map((item) => <button key={item.id} className={`tone-${item.tone === 'danger' ? 'danger' : item.tone === 'warn' ? 'warn' : 'normal'}`} onClick={() => jumpToTab(item.tab)}><b>{t(item.priority === 'must' ? `必须：${item.title}` : item.priority === 'should' ? `建议：${item.title}` : item.title)}</b><span>{t(item.body)}</span></button>)}</div>
+    <div className="ia-dash-note" style={{ marginTop: 8 }}>{t(council.footer)}</div>
   </section>;
 }
 
 function TurnPreviewPanel({ preview, jumpToTab }: { preview: TurnPreview; jumpToTab: (tab: string) => void }) {
   return <section className="ia-dash-section" style={{ borderColor: toneBorder(preview.tone) }}>
-    <header><div><small>Forecast</small><h3>下一回合预演</h3></div><div style={{ display: 'flex', gap: 5, flexWrap: 'wrap', justifyContent: 'flex-end' }}><Tag text={preview.title} tone={tagTone(preview.tone)} /><Tag text={preview.canAdvance ? '可推进' : '先处理'} tone={preview.canAdvance ? 'good' : 'danger'} /></div></header>
-    <div className="ia-card" style={{ padding: 10, marginBottom: 8, borderLeft: `3px solid ${toneBorder(preview.tone)}` }}><strong style={{ fontSize: 13 }}>{preview.summary}</strong><div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginTop: 8 }}>{preview.signals.map((s) => <Tag key={s.id} text={`${s.label} ${s.value}`} tone={tagTone(s.tone)} />)}</div></div>
-    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 8, marginBottom: 8 }}>{preview.likelyChanges.slice(0, 3).map((x) => <button key={x.id} className="ia-card" onClick={() => jumpToTab(x.tab)} style={{ padding: 10, textAlign: 'left', cursor: 'pointer', border: `1px solid ${toneBorder(x.tone)}` }}><div style={{ display: 'flex', justifyContent: 'space-between', gap: 6, marginBottom: 4 }}><strong style={{ fontSize: 13 }}>{x.title}</strong><Tag text="可能" tone={tagTone(x.tone)} /></div><div style={{ fontSize: 11, color: 'var(--text-dim)', lineHeight: 1.5 }}>{x.body}</div></button>)}</div>
-    <div className="ia-dash-note"><span className={preview.saveAdvice.tone === 'danger' ? 'danger' : preview.saveAdvice.tone === 'warn' ? 'warn' : 'good'}>{preview.saveAdvice.title}</span> · {preview.saveAdvice.body}</div>
+    <header><div><small>Forecast</small><h3>{t('下一回合预演')}</h3></div><div style={{ display: 'flex', gap: 5, flexWrap: 'wrap', justifyContent: 'flex-end' }}><Tag text={t(preview.title)} tone={tagTone(preview.tone)} /><Tag text={t(preview.canAdvance ? '可推进' : '先处理')} tone={preview.canAdvance ? 'good' : 'danger'} /></div></header>
+    <div className="ia-card" style={{ padding: 10, marginBottom: 8, borderLeft: `3px solid ${toneBorder(preview.tone)}` }}><strong style={{ fontSize: 13 }}>{t(preview.summary)}</strong><div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginTop: 8 }}>{preview.signals.map((s) => <Tag key={s.id} text={`${t(s.label)} ${t(s.value)}`} tone={tagTone(s.tone)} />)}</div></div>
+    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 8, marginBottom: 8 }}>{preview.likelyChanges.slice(0, 3).map((x) => <button key={x.id} className="ia-card" onClick={() => jumpToTab(x.tab)} style={{ padding: 10, textAlign: 'left', cursor: 'pointer', border: `1px solid ${toneBorder(x.tone)}` }}><div style={{ display: 'flex', justifyContent: 'space-between', gap: 6, marginBottom: 4 }}><strong style={{ fontSize: 13 }}>{t(x.title)}</strong><Tag text={t('可能')} tone={tagTone(x.tone)} /></div><div style={{ fontSize: 11, color: 'var(--text-dim)', lineHeight: 1.5 }}>{t(x.body)}</div></button>)}</div>
+    <div className="ia-dash-note"><span className={preview.saveAdvice.tone === 'danger' ? 'danger' : preview.saveAdvice.tone === 'warn' ? 'warn' : 'good'}>{t(preview.saveAdvice.title)}</span> · {t(preview.saveAdvice.body)}</div>
   </section>;
 }
 
 function CommandCenterPanel({ items, jumpToTab }: { items: CommandCenterAction[]; jumpToTab: (tab: string) => void }) {
   const primary = items[0];
-  return <section className="ia-dash-section ia-dash-actions" style={{ borderColor: primary?.tone === 'danger' ? 'var(--war)' : primary?.tone === 'warn' ? 'var(--warn)' : 'var(--border)' }}><header><div><small>Command</small><h3>行动中心</h3></div>{primary && <Tag text={actionSourceLabel(primary.source)} tone={primary.tone === 'danger' ? 'danger' : primary.tone === 'warn' ? 'warn' : 'info'} />}</header><div className="ia-action-list">{items.slice(0, 3).map((a, i) => <button key={`${a.id}-${i}`} className={`tone-${a.tone}`} onClick={() => jumpToTab(a.tab)}><b>{i === 0 ? `优先：${a.label}` : a.label}</b><span>{a.desc}</span></button>)}</div></section>;
+  return <section className="ia-dash-section ia-dash-actions" style={{ borderColor: primary?.tone === 'danger' ? 'var(--war)' : primary?.tone === 'warn' ? 'var(--warn)' : 'var(--border)' }}><header><div><small>Command</small><h3>{t('行动中心')}</h3></div>{primary && <Tag text={actionSourceLabel(primary.source)} tone={primary.tone === 'danger' ? 'danger' : primary.tone === 'warn' ? 'warn' : 'info'} />}</header><div className="ia-action-list">{items.slice(0, 3).map((a, i) => <button key={`${a.id}-${i}`} className={`tone-${a.tone}`} onClick={() => jumpToTab(a.tab)}><b>{t(i === 0 ? `优先：${a.label}` : a.label)}</b><span>{t(a.desc)}</span></button>)}</div></section>;
 }
 
 function RiskPanel({ risks }: { risks: { label: string; value: string; tone: 'warn' | 'danger' | 'good' }[] }) {
-  return <section className="ia-dash-section"><header><div><small>Risk</small><h3>风险状态</h3></div></header><div className="ia-risk-list">{risks.length === 0 ? <div className="ia-risk-empty">暂无迫切风险</div> : risks.map((r) => <div key={r.label} className={`tone-${r.tone}`}><span>{r.label}</span><strong>{r.value}</strong></div>)}</div></section>;
+  return <section className="ia-dash-section"><header><div><small>Risk</small><h3>{t('风险状态')}</h3></div></header><div className="ia-risk-list">{risks.length === 0 ? <div className="ia-risk-empty">{t('暂无迫切风险')}</div> : risks.map((r) => <div key={r.label} className={`tone-${r.tone}`}><span>{t(r.label)}</span><strong>{t(r.value)}</strong></div>)}</div></section>;
 }
 
 function ReadinessButton({ item, jumpToTab }: { item: ReadinessItem; jumpToTab: (tab: string) => void }) {
-  return <button className={`tone-${item.tone === 'danger' ? 'danger' : item.tone === 'warn' ? 'warn' : 'normal'}`} onClick={() => item.tab && jumpToTab(item.tab)} disabled={!item.tab}><b>{item.title}</b><span>{item.detail}</span></button>;
+  return <button className={`tone-${item.tone === 'danger' ? 'danger' : item.tone === 'warn' ? 'warn' : 'normal'}`} onClick={() => item.tab && jumpToTab(item.tab)} disabled={!item.tab}><b>{t(item.title)}</b><span>{t(item.detail)}</span></button>;
 }
 
 function ReadinessPanel({ report, jumpToTab }: { report: ReadinessReport; jumpToTab: (tab: string) => void }) {
   const visible = report.advice.length > 0 ? report.advice.slice(0, 4) : [];
   const devWarn = report.devChecks.length;
   return <section className="ia-dash-section" style={{ borderColor: report.tone === 'danger' ? 'var(--war)' : report.tone === 'warn' ? 'var(--warn)' : 'var(--border)' }}>
-    <header><div><small>Pre-turn</small><h3>下一回合前检查</h3></div><Tag text={`${report.label} ${report.score}`} tone={tagTone(report.tone)} /></header>
-    <div className="ia-goal-line" style={{ marginBottom: 8 }}><div><span>综合健康度</span><strong>{report.score}/100</strong></div><i><b style={{ width: `${report.score}%` }} /></i><em>{report.canAdvance ? '没有硬性阻断，仍建议先处理红黄项' : '存在高危项，推进前请先处理'}</em></div>
-    <div className="ia-action-list">{visible.length === 0 ? <div className="ia-risk-empty">暂无阻断项，可以稳步推进。</div> : visible.map((item) => <ReadinessButton key={item.id} item={item} jumpToTab={jumpToTab} />)}</div>
-    {devWarn > 0 && <div className="ia-dash-note" style={{ marginTop: 8 }}><span className={report.devChecks.some((x) => x.tone === 'danger') ? 'danger' : 'warn'}>开发体检：{devWarn} 项</span> · {report.devChecks.slice(0, 2).map((x) => x.title).join(' / ')}</div>}
+    <header><div><small>Pre-turn</small><h3>{t('下一回合前检查')}</h3></div><Tag text={`${t(report.label)} ${report.score}`} tone={tagTone(report.tone)} /></header>
+    <div className="ia-goal-line" style={{ marginBottom: 8 }}><div><span>{t('综合健康度')}</span><strong>{report.score}/100</strong></div><i><b style={{ width: `${report.score}%` }} /></i><em>{t(report.canAdvance ? '没有硬性阻断，仍建议先处理红黄项' : '存在高危项，推进前请先处理')}</em></div>
+    <div className="ia-action-list">{visible.length === 0 ? <div className="ia-risk-empty">{t('暂无阻断项，可以稳步推进。')}</div> : visible.map((item) => <ReadinessButton key={item.id} item={item} jumpToTab={jumpToTab} />)}</div>
+    {devWarn > 0 && <div className="ia-dash-note" style={{ marginTop: 8 }}><span className={report.devChecks.some((x) => x.tone === 'danger') ? 'danger' : 'warn'}>{t('开发体检：')}{t(`${devWarn} 项`)}</span> · {report.devChecks.slice(0, 2).map((x) => t(x.title)).join(' / ')}</div>}
   </section>;
 }
 
 function StrategicDirectorPanel({ brief, jumpToTab }: { brief: StrategicBrief; jumpToTab: (tab: string) => void }) {
   const top = brief.urgent[0] ?? brief.opportunities[0];
   return <section className="ia-dash-section" style={{ borderColor: brief.score < 40 ? 'var(--war)' : brief.score < 60 ? 'var(--warn)' : 'var(--border)' }}>
-    <header><div><small>Grand Strategy</small><h3>帝国总参谋部</h3></div><div style={{ display: 'flex', gap: 5, flexWrap: 'wrap', justifyContent: 'flex-end' }}><Tag text={brief.phase} tone={brief.score < 40 ? 'danger' : brief.score < 60 ? 'warn' : 'gold'} /><Tag text={`${brief.scoreLabel} ${Math.round(brief.score)}`} tone={brief.score < 40 ? 'danger' : brief.score < 60 ? 'warn' : 'good'} /></div></header>
-    <div className="ia-card" style={{ padding: 10, marginBottom: 8 }}><strong style={{ fontSize: 13 }}>{brief.doctrine}</strong><div style={{ fontSize: 11, color: 'var(--text-dim)', marginTop: 4, lineHeight: 1.55 }}>{brief.doctrineBody}</div></div>
-    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', gap: 6, marginBottom: 8 }}>{brief.horizon.map((x, i) => <div key={i} className="ia-card" style={{ padding: 8 }}><Tag text={i === 0 ? '今年' : i === 1 ? '三年' : '长期'} tone={i === 0 && brief.score < 45 ? 'warn' : 'info'} /><div style={{ fontSize: 11, color: 'var(--text-mute)', marginTop: 5 }}>{x}</div></div>)}</div>
-    {top && <button className="ia-card" onClick={() => jumpToTab(top.tab)} style={{ width: '100%', padding: 10, textAlign: 'left', cursor: 'pointer', border: `1px solid var(--${top.tone === 'danger' ? 'war' : top.tone === 'warn' ? 'warn' : 'border'})` }}><div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, marginBottom: 4 }}><strong style={{ fontSize: 13 }}>{top.title}</strong><Tag text={top.tone === 'danger' ? '最高优先' : top.tone === 'warn' ? '需处理' : '可推进'} tone={tagTone(top.tone)} /></div><div style={{ fontSize: 11, color: 'var(--text-dim)', lineHeight: 1.5 }}>{top.body}</div></button>}
+    <header><div><small>Grand Strategy</small><h3>{t('帝国总参谋部')}</h3></div><div style={{ display: 'flex', gap: 5, flexWrap: 'wrap', justifyContent: 'flex-end' }}><Tag text={t(brief.phase)} tone={brief.score < 40 ? 'danger' : brief.score < 60 ? 'warn' : 'gold'} /><Tag text={`${t(brief.scoreLabel)} ${Math.round(brief.score)}`} tone={brief.score < 40 ? 'danger' : brief.score < 60 ? 'warn' : 'good'} /></div></header>
+    <div className="ia-card" style={{ padding: 10, marginBottom: 8 }}><strong style={{ fontSize: 13 }}>{t(brief.doctrine)}</strong><div style={{ fontSize: 11, color: 'var(--text-dim)', marginTop: 4, lineHeight: 1.55 }}>{t(brief.doctrineBody)}</div></div>
+    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', gap: 6, marginBottom: 8 }}>{brief.horizon.map((x, i) => <div key={i} className="ia-card" style={{ padding: 8 }}><Tag text={t(i === 0 ? '今年' : i === 1 ? '三年' : '长期')} tone={i === 0 && brief.score < 45 ? 'warn' : 'info'} /><div style={{ fontSize: 11, color: 'var(--text-mute)', marginTop: 5 }}>{t(x)}</div></div>)}</div>
+    {top && <button className="ia-card" onClick={() => jumpToTab(top.tab)} style={{ width: '100%', padding: 10, textAlign: 'left', cursor: 'pointer', border: `1px solid var(--${top.tone === 'danger' ? 'war' : top.tone === 'warn' ? 'warn' : 'border'})` }}><div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, marginBottom: 4 }}><strong style={{ fontSize: 13 }}>{t(top.title)}</strong><Tag text={t(top.tone === 'danger' ? '最高优先' : top.tone === 'warn' ? '需处理' : '可推进')} tone={tagTone(top.tone)} /></div><div style={{ fontSize: 11, color: 'var(--text-dim)', lineHeight: 1.5 }}>{t(top.body)}</div></button>}
   </section>;
 }
 
 function AdvisorList({ title, items, empty, jumpToTab }: { title: string; items: StrategicItem[]; empty: string; jumpToTab: (tab: string) => void }) {
-  return <section className="ia-dash-section"><header><div><small>Advisor</small><h3>{title}</h3></div></header><div className="ia-action-list">{items.length === 0 ? <div className="ia-risk-empty">{empty}</div> : items.slice(0, 4).map((x, i) => <button key={`${x.title}-${i}`} className={`tone-${x.tone === 'danger' ? 'danger' : x.tone === 'warn' ? 'warn' : 'normal'}`} onClick={() => jumpToTab(x.tab)}><b>{x.title}</b><span>{x.body}</span></button>)}</div></section>;
+  return <section className="ia-dash-section"><header><div><small>Advisor</small><h3>{t(title)}</h3></div></header><div className="ia-action-list">{items.length === 0 ? <div className="ia-risk-empty">{t(empty)}</div> : items.slice(0, 4).map((x, i) => <button key={`${x.title}-${i}`} className={`tone-${x.tone === 'danger' ? 'danger' : x.tone === 'warn' ? 'warn' : 'normal'}`} onClick={() => jumpToTab(x.tab)}><b>{t(x.title)}</b><span>{t(x.body)}</span></button>)}</div></section>;
 }
 
 function ChronicleLine({ item }: { item: ChronicleHighlight }) {
-  return <div className="ia-card" style={{ padding: 8, borderLeft: `3px solid ${toneBorder(item.tone)}` }}><div style={{ display: 'flex', justifyContent: 'space-between', gap: 6, marginBottom: 4 }}><strong style={{ fontSize: 12 }}>{item.icon} {item.title}</strong><Tag text={`第${item.turn}年`} tone={tagTone(item.tone)} /></div><div style={{ fontSize: 11, color: 'var(--text-dim)', lineHeight: 1.45 }}>{item.body}</div></div>;
+  return <div className="ia-card" style={{ padding: 8, borderLeft: `3px solid ${toneBorder(item.tone)}` }}><div style={{ display: 'flex', justifyContent: 'space-between', gap: 6, marginBottom: 4 }}><strong style={{ fontSize: 12 }}>{item.icon} {t(item.title)}</strong><Tag text={t(`第${item.turn}年`)} tone={tagTone(item.tone)} /></div><div style={{ fontSize: 11, color: 'var(--text-dim)', lineHeight: 1.45 }}>{t(item.body)}</div></div>;
 }
 
 function ChronicleDigestPanel({ digest }: { digest: ChronicleDigest }) {
-  return <section className="ia-dash-section" style={{ borderColor: toneBorder(digest.tone) }}><header><div><small>Chronicle</small><h3>帝国史册</h3></div><div style={{ display: 'flex', gap: 5, flexWrap: 'wrap', justifyContent: 'flex-end' }}><Tag text={digest.era} tone="gold" /><Tag text={`${digest.total} 条`} tone={tagTone(digest.tone)} /></div></header><div className="ia-card" style={{ padding: 10, marginBottom: 8, borderLeft: `3px solid ${toneBorder(digest.tone)}` }}><strong style={{ fontSize: 13 }}>{digest.chapterTitle}</strong><div style={{ fontSize: 11, color: 'var(--text-dim)', lineHeight: 1.55, marginTop: 5 }}>{digest.summary}</div></div><div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 6, marginBottom: 8 }}><Metric label="荣光" value={digest.glory} tone="gold" /><Metric label="危机" value={digest.crisis} tone={digest.crisis > 0 ? 'warn' : 'normal'} /><Metric label="统绪" value={digest.reform} /><Metric label="外交" value={digest.diplomacy} tone="good" /></div><div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>{digest.empty ? <div className="ia-risk-empty">尚无入史事件。推进回合后，开国、扩张、危机、继位和胜利会被写入史册。</div> : digest.recent.slice(0, 3).map((item) => <ChronicleLine key={item.id} item={item} />)}</div>{digest.highlights.length > 0 && <div className="ia-dash-note" style={{ marginTop: 8 }}>史册主轴：{digest.highlights.slice(0, 2).map((x) => x.title).join(' / ')}</div>}</section>;
+  return <section className="ia-dash-section" style={{ borderColor: toneBorder(digest.tone) }}><header><div><small>Chronicle</small><h3>{t('帝国史册')}</h3></div><div style={{ display: 'flex', gap: 5, flexWrap: 'wrap', justifyContent: 'flex-end' }}><Tag text={t(digest.era)} tone="gold" /><Tag text={t(`${digest.total} 条`)} tone={tagTone(digest.tone)} /></div></header><div className="ia-card" style={{ padding: 10, marginBottom: 8, borderLeft: `3px solid ${toneBorder(digest.tone)}` }}><strong style={{ fontSize: 13 }}>{t(digest.chapterTitle)}</strong><div style={{ fontSize: 11, color: 'var(--text-dim)', lineHeight: 1.55, marginTop: 5 }}>{t(digest.summary)}</div></div><div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 6, marginBottom: 8 }}><Metric label={t('荣光')} value={digest.glory} tone="gold" /><Metric label={t('危机')} value={digest.crisis} tone={digest.crisis > 0 ? 'warn' : 'normal'} /><Metric label={t('统绪')} value={digest.reform} /><Metric label={t('外交')} value={digest.diplomacy} tone="good" /></div><div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>{digest.empty ? <div className="ia-risk-empty">{t('尚无入史事件。推进回合后，开国、扩张、危机、继位和胜利会被写入史册。')}</div> : digest.recent.slice(0, 3).map((item) => <ChronicleLine key={item.id} item={item} />)}</div>{digest.highlights.length > 0 && <div className="ia-dash-note" style={{ marginTop: 8 }}>{t('史册主轴：')}{digest.highlights.slice(0, 2).map((x) => t(x.title)).join(' / ')}</div>}</section>;
 }
 
 export default function Dashboard() {
@@ -144,7 +148,7 @@ export default function Dashboard() {
   const sharedSession = useSharedWorldSessionStore((current) => current.session);
   const pid = useGameStore((s) => s.state.playerNationId);
   const player = useGameStore((s) => s.state.nations[pid]);
-  if (!player) return <Panel title="国政总览"><p className="dim">玩家国家缺失，请读档或开始新局。</p></Panel>;
+  if (!player) return <Panel title={t('国政总览')}><p className="dim">{t('玩家国家缺失，请读档或开始新局。')}</p></Panel>;
 
   const provs = provincesOf(pid, state.provinces);
   const totalPop = provs.reduce((s, p) => s + p.population, 0);
@@ -153,16 +157,22 @@ export default function Dashboard() {
   const hist = state.history;
   const g = player.government;
   const focus: StrategyFocusId = state.strategyFocus ?? 'balance';
-  const brief = useMemo(() => buildStrategicBrief(state), [state]);
-  const readiness = useMemo(() => buildReadinessReport(state), [state]);
-  const reportActions = useMemo(() => buildTurnReportActions(state, { brief }), [state, brief]);
-  const commandActions = useMemo(() => buildCommandCenterActions(state, 5, { brief, readiness, reportActions }), [state, brief, readiness, reportActions]);
-  const roadmap = useMemo(() => buildEmpireRoadmap(state, { brief, readiness, reportActions, commandActions }), [state, brief, readiness, reportActions, commandActions]);
-  const turnPreview = useMemo(() => buildTurnPreview(state, { readiness, roadmap, commandActions }), [state, readiness, roadmap, commandActions]);
-  const council = useMemo(() => buildPreTurnCouncil(state, { readiness, roadmap, preview: turnPreview, commandActions }), [state, readiness, roadmap, turnPreview, commandActions]);
-  const chronicle = useMemo(() => buildChronicleDigest(state), [state]);
-  const guidance = useMemo(() => buildContextualGuidance(state), [state]);
-  const victoryFocus = useMemo(() => buildVictoryRouteFocus(state), [state]);
+  const briefRaw = useMemo(() => buildStrategicBrief(state), [state]);
+  const readinessRaw = useMemo(() => buildReadinessReport(state), [state]);
+  const reportActions = useMemo(() => buildTurnReportActions(state, { brief: briefRaw }), [state, briefRaw]);
+  const commandActionsRaw = useMemo(() => buildCommandCenterActions(state, 5, { brief: briefRaw, readiness: readinessRaw, reportActions }), [state, briefRaw, readinessRaw, reportActions]);
+  const roadmapRaw = useMemo(() => buildEmpireRoadmap(state, { brief: briefRaw, readiness: readinessRaw, reportActions, commandActions: commandActionsRaw }), [state, briefRaw, readinessRaw, reportActions, commandActionsRaw]);
+  const turnPreviewRaw = useMemo(() => buildTurnPreview(state, { readiness: readinessRaw, roadmap: roadmapRaw, commandActions: commandActionsRaw }), [state, readinessRaw, roadmapRaw, commandActionsRaw]);
+  const councilRaw = useMemo(() => buildPreTurnCouncil(state, { readiness: readinessRaw, roadmap: roadmapRaw, preview: turnPreviewRaw, commandActions: commandActionsRaw }), [state, readinessRaw, roadmapRaw, turnPreviewRaw, commandActionsRaw]);
+  const brief = localizeDeep(briefRaw, t);
+  const readiness = localizeDeep(readinessRaw, t);
+  const commandActions = localizeDeep(commandActionsRaw, t);
+  const roadmap = localizeDeep(roadmapRaw, t);
+  const turnPreview = localizeDeep(turnPreviewRaw, t);
+  const council = localizeDeep(councilRaw, t);
+  const chronicle = localizeDeep(useMemo(() => buildChronicleDigest(state), [state]), t);
+  const guidance = localizeDeep(useMemo(() => buildContextualGuidance(state), [state]), t);
+  const victoryFocus = localizeDeep(useMemo(() => buildVictoryRouteFocus(state), [state]), t);
 
   const lastNet = state.lastReport ? state.lastReport.income.tax + state.lastReport.income.trade + state.lastReport.income.building - state.lastReport.expense.military - state.lastReport.expense.corruption : 0;
   const unrest = provs.filter((p) => p.rebellionRisk > 70 || p.unrest > 50);
@@ -194,39 +204,39 @@ export default function Dashboard() {
     <section className="ia-dash-hero" style={{ borderColor: toneBorder(council.tone) }}>
       <div className="ia-dash-hero-main">
         <small>Overview</small>
-        <h2 className="ia-display">国政总览</h2>
-        <p>{council.verdict}</p>
+        <h2 className="ia-display">{t('国政总览')}</h2>
+        <p>{t(council.verdict)}</p>
         <div className="ia-dash-hero-tags">
-          {sharedSession && <Tag text={`共享 · ${sharedSession.worldName}`} tone="good" />}
-          <Tag text={council.title.replace('会议结论：', '')} tone={tagTone(council.tone)} />
-          <Tag text={`体检 ${readiness.score}/100`} tone={tagTone(readiness.tone)} />
-          <Tag text={turnPreview.canAdvance ? '本年可推进' : '先处理风险'} tone={turnPreview.canAdvance ? 'good' : 'danger'} />
-          <Tag text={`${victoryFocus.primary.label} ${victoryFocus.primary.progress}%`} tone={tagTone(victoryFocus.tone)} />
+          {sharedSession && <Tag text={t(`共享 · ${sharedSession.worldName}`)} tone="good" />}
+          <Tag text={t(council.title)} tone={tagTone(council.tone)} />
+          <Tag text={t(`体检 ${readiness.score}/100`)} tone={tagTone(readiness.tone)} />
+          <Tag text={t(turnPreview.canAdvance ? '本年可推进' : '先处理风险')} tone={turnPreview.canAdvance ? 'good' : 'danger'} />
+          <Tag text={`${t(victoryFocus.primary.label)} ${victoryFocus.primary.progress}%`} tone={tagTone(victoryFocus.tone)} />
         </div>
       </div>
       <div className="ia-dash-command-actions">
-        <Btn label={sharedSession ? '退出共享治理' : '新局'} variant="ghost" onClick={sharedSession ? backToMenu : newGame} />
-        {!sharedSession && <Btn label="读档" variant="ghost" onClick={() => load()} disabled={!hasSave()} />}
-        {!sharedSession && <Btn label="存档" variant="ghost" onClick={() => save()} />}
-        <Btn label={sharedSession ? '本年准备完毕 →' : '下一回合 →'} variant="primary" onClick={() => nextTurn()} disabled={!!state.victory.type || hasPendingEventBlocker} title={hasPendingEventBlocker ? '先处理待决事件' : sharedSession ? '提交后等待同版图统治者统一结算' : council.title} />
+        <Btn label={t(sharedSession ? '退出共享治理' : '新局')} variant="ghost" onClick={sharedSession ? backToMenu : newGame} />
+        {!sharedSession && <Btn label={t('读档')} variant="ghost" onClick={() => load()} disabled={!hasSave()} />}
+        {!sharedSession && <Btn label={t('存档')} variant="ghost" onClick={() => save()} />}
+        <Btn label={t(sharedSession ? '本年准备完毕 →' : '下一回合 →')} variant="primary" onClick={() => nextTurn()} disabled={!!state.victory.type || hasPendingEventBlocker} title={t(hasPendingEventBlocker ? '先处理待决事件' : sharedSession ? '提交后等待同版图统治者统一结算' : council.title)} />
       </div>
     </section>
     <div className="ia-dash-overview-strip">
-      <Metric label="国库" value={n(player.resources.gold)} tone={player.resources.gold < 0 ? 'danger' : 'gold'} hint={lastNet ? `${lastNet >= 0 ? '+' : ''}${n(lastNet)}/年` : '—'} />
-      <Metric label="粮储" value={n(player.resources.food)} tone={player.resources.food < 0 ? 'danger' : 'good'} />
-      <Metric label="人口" value={n(totalPop)} />
-      <Metric label="疆土" value={`${provs.length} 省`} />
-      <Metric label="军力" value={`${n(armySize)} 卒`} tone={wars.length > 0 ? 'warn' : 'normal'} />
-      <Metric label="体检" value={`${readiness.score}/100`} tone={readiness.tone === 'danger' ? 'danger' : readiness.tone === 'warn' ? 'warn' : 'good'} />
+      <Metric label={t('国库')} value={n(player.resources.gold)} tone={player.resources.gold < 0 ? 'danger' : 'gold'} hint={lastNet ? `${lastNet >= 0 ? '+' : ''}${n(lastNet)}/${t('年')}` : '—'} />
+      <Metric label={t('粮储')} value={n(player.resources.food)} tone={player.resources.food < 0 ? 'danger' : 'good'} />
+      <Metric label={t('人口')} value={n(totalPop)} />
+      <Metric label={t('疆土')} value={t(`${provs.length} 省`)} />
+      <Metric label={t('军力')} value={t(`${n(armySize)} 卒`)} tone={wars.length > 0 ? 'warn' : 'normal'} />
+      <Metric label={t('体检')} value={`${readiness.score}/100`} tone={readiness.tone === 'danger' ? 'danger' : readiness.tone === 'warn' ? 'warn' : 'good'} />
     </div>
-    <section className="ia-dash-priority-grid" aria-label="总览优先决策">
+    <section className="ia-dash-priority-grid" aria-label={t('总览优先决策')}>
       <CommandCenterPanel items={commandActions} jumpToTab={jumpToTab} />
       <CouncilPanel council={council} jumpToTab={jumpToTab} />
       <TurnPreviewPanel preview={turnPreview} jumpToTab={jumpToTab} />
     </section>
     <div className="ia-dash-grid">
       <aside className="ia-dash-col ia-dash-col--left">
-        <Panel title="国家摘要" icon="◈"><div className="ia-dash-kv"><span>政体</span><strong>{player.government.type}</strong></div><div className="ia-dash-kv"><span>国性</span><strong>{player.character}</strong></div><div className="ia-dash-kv"><span>统治者</span><strong>{player.ruler.name} · {player.ruler.age}岁</strong></div><div className="ia-dash-kv"><span>盟友倾向</span><strong>{allies} 个高关系对象</strong></div></Panel>
+        <Panel title={t('国家摘要')} icon="◈"><div className="ia-dash-kv"><span>{t('政体')}</span><strong>{t(player.government.type)}</strong></div><div className="ia-dash-kv"><span>{t('国性')}</span><strong>{t(player.character)}</strong></div><div className="ia-dash-kv"><span>{t('统治者')}</span><strong>{t(player.ruler.name)} · {t(`${player.ruler.age}岁`)}</strong></div><div className="ia-dash-kv"><span>{t('盟友倾向')}</span><strong>{t(`${allies} 个高关系对象`)}</strong></div></Panel>
         <VictoryRoutePanel focus={victoryFocus} jumpToTab={jumpToTab} />
         <RiskPanel risks={risks} />
       </aside>
@@ -234,13 +244,13 @@ export default function Dashboard() {
         <DashboardStrategicHq state={state} commandActions={commandActions} jumpToTab={jumpToTab} />
         <RoadmapPanel roadmap={roadmap} jumpToTab={jumpToTab} />
         <ReadinessPanel report={readiness} jumpToTab={jumpToTab} />
-        {state.victory.type && <section className="ia-dash-section ia-dash-victory"><h3>{state.victory.type.startsWith('win') ? '万世之业已成' : '社稷倾覆'}</h3><p>第 {state.turn} 年 · {player.name}</p></section>}
+        {state.victory.type && <section className="ia-dash-section ia-dash-victory"><h3>{t(state.victory.type.startsWith('win') ? '万世之业已成' : '社稷倾覆')}</h3><p>{t(`第 ${state.turn} 年`)} · {player.name}</p></section>}
       </main>
       <aside className="ia-dash-col ia-dash-col--right">
         <FocusPanel focus={focus} onChange={setFocus} />
-        <section className="ia-dash-section"><header><div><small>State</small><h3>治理指标</h3></div></header><div className="ia-dash-meter-grid ia-dash-meter-grid--compact"><Meter label="安定" value={g.stability} lowBad /><Meter label="法统" value={g.legitimacy} lowBad /><Meter label="治能" value={g.efficiency} lowBad /><Meter label="腐败" value={g.corruption} /><Meter label="厌战" value={player.warExhaustion} /><Meter label="补给" value={player.resources.supply} lowBad /></div></section>
-        <section className="ia-dash-section"><header><div><small>Trend</small><h3>近年趋势</h3></div></header><div className="ia-dash-trends ia-dash-trends--stacked"><Sparkline data={goldTrend} label="财政" /><Sparkline data={foodTrend} label="粮食" /><Sparkline data={stabilityTrend} label="安定" /></div></section>
-        <AdvisorList title="战略机会" items={brief.opportunities} empty="暂无明确机会" jumpToTab={jumpToTab} />
+        <section className="ia-dash-section"><header><div><small>State</small><h3>{t('治理指标')}</h3></div></header><div className="ia-dash-meter-grid ia-dash-meter-grid--compact"><Meter label={t('安定')} value={g.stability} lowBad /><Meter label={t('法统')} value={g.legitimacy} lowBad /><Meter label={t('治能')} value={g.efficiency} lowBad /><Meter label={t('腐败')} value={g.corruption} /><Meter label={t('厌战')} value={player.warExhaustion} /><Meter label={t('补给')} value={player.resources.supply} lowBad /></div></section>
+        <section className="ia-dash-section"><header><div><small>Trend</small><h3>{t('近年趋势')}</h3></div></header><div className="ia-dash-trends ia-dash-trends--stacked"><Sparkline data={goldTrend} label={t('财政')} /><Sparkline data={foodTrend} label={t('粮食')} /><Sparkline data={stabilityTrend} label={t('安定')} /></div></section>
+        <AdvisorList title={t('战略机会')} items={brief.opportunities} empty={t('暂无明确机会')} jumpToTab={jumpToTab} />
         <ChronicleDigestPanel digest={chronicle} />
       </aside>
     </div>

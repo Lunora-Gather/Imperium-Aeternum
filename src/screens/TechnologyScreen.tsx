@@ -1,3 +1,6 @@
+import { registerGovernanceTranslations } from '../i18n/catalogs/governance';
+import { localizeReactTree } from '../i18n/reactTree';
+registerGovernanceTranslations();
 // Technology v3 — 科技路线判断：根据国势推荐农业/军事/行政/文化
 import { useGameStore } from '../store/gameStore';
 import { TECHNOLOGIES } from '../data/technologies';
@@ -41,7 +44,7 @@ export default function TechnologyScreen() {
 
   const doResearch = (techId: string) => { research(techId); };
 
-  return (
+  return localizeReactTree(
     <div>
       <Panel title="科技路线判断" accent>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))', gap: 8 }}>
