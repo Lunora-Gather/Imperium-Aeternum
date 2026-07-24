@@ -21,6 +21,7 @@ interface SocialStore {
   messages: Record<string, WorldChatMessage[]>;
   directMessages: Record<string, DirectMessage[]>;
   loading: boolean;
+  sending: boolean;
   message: string | null;
   reset: () => void;
   initialize: () => Promise<void>;
@@ -37,19 +38,19 @@ interface SocialStore {
   receiveDirectMessage: (message: DirectMessage) => void;
 }
 
-function appendMessage(messages: WorldChatMessage[], entry: WorldChatMessage): WorldChatMessage[] {
-  if (messages.some((item) => item.id === entry.id)) return messages;
-  return [...messages, entry].slice(-50);
+function compareMessages(a: { id: string; createdAt: string }, b: { id: string; createdAt: string }): number {
+  return a.createdAt.localeCompare(b.createdAt) || a.id.localeCompare(b.id);
 }
 
-function appendDirectMessage(messages: DirectMessage[], entry: DirectMessage): DirectMessage[] {
-  if (messages.some((item) => item.id === entry.id)) return messages;
-  return [...messages, entry].slice(-50);
+export function mergeChatMessages<T extends { id: string; createdAt: string }>(current: T[], incoming: T[]): T[] {
+  const byId = new Map(current.map((entry) => [entry.id, entry]));
+  for (const entry of incoming) byId.set(entry.id, entry);
+  return [...byId.values()].sort(compareMessages).slice(-50);
 }
 
 export const useSocialStore = create<SocialStore>((set, get) => ({
-  profile: null, friendships: [], messages: {}, directMessages: {}, loading: false, message: null,
-  reset: () => set({ profile: null, friendships: [], messages: {}, directMessages: {}, loading: false, message: null }),
+  profile: null, friendships: [], messages: {}, directMessages: {}, loading: false, sending: false, message: null,
+  reset: () => set({ profile: null, friendships: [], messages: {}, directMessages: {}, loading: false, sending: false, message: null }),
   initialize: async () => {
     set({ loading: true, message: null });
     try {
@@ -81,51 +82,55 @@ export const useSocialStore = create<SocialStore>((set, get) => ({
   refreshMessages: async (worldId) => {
     try {
       const messages = await listWorldMessages(worldId);
-      set((state) => ({ messages: { ...state.messages, [worldId]: messages }, message: null }));
+      set((state) => ({ messages: { ...state.messages, [worldId]: mergeChatMessages(state.messages[worldId] ?? [], messages) }, message: null }));
     } catch (error) { set({ message: error instanceof Error ? error.message : '版图聊天加载失败' }); }
   },
   sendMessage: async (worldId, body, nationId) => {
     const text = body.trim();
     if (!text) return false;
-    set({ loading: true, message: null });
+    if (get().sending) return false;
+    set({ sending: true, message: null });
     try {
       const entry = await sendWorldMessage(worldId, text, nationId);
-      set((state) => ({ messages: { ...state.messages, [worldId]: appendMessage(state.messages[worldId] ?? [], entry) } }));
+      set((state) => ({ messages: { ...state.messages, [worldId]: mergeChatMessages(state.messages[worldId] ?? [], [entry]) } }));
       return true;
     }
     catch (error) { set({ message: error instanceof Error ? error.message : '消息发送失败' }); return false; }
-    finally { set({ loading: false }); }
+    finally { set({ sending: false }); }
   },
   sendImage: async (worldId, file, caption, nationId) => {
-    set({ loading: true, message: null });
+    if (get().sending) return false;
+    set({ sending: true, message: null });
     try {
       const entry = await sendWorldImage(worldId, file, caption, nationId);
-      set((state) => ({ messages: { ...state.messages, [worldId]: appendMessage(state.messages[worldId] ?? [], entry) } }));
+      set((state) => ({ messages: { ...state.messages, [worldId]: mergeChatMessages(state.messages[worldId] ?? [], [entry]) } }));
       return true;
     } catch (error) { set({ message: error instanceof Error ? error.message : '图片发送失败' }); return false; }
-    finally { set({ loading: false }); }
+    finally { set({ sending: false }); }
   },
-  receiveMessage: (entry) => set((state) => ({ messages: { ...state.messages, [entry.worldId]: appendMessage(state.messages[entry.worldId] ?? [], entry) } })),
+  receiveMessage: (entry) => set((state) => ({ messages: { ...state.messages, [entry.worldId]: mergeChatMessages(state.messages[entry.worldId] ?? [], [entry]) } })),
   refreshDirectMessages: async (friendUserId) => {
-    try { set((state) => ({ directMessages: { ...state.directMessages, [friendUserId]: [] } })); const entries = await listDirectMessages(friendUserId); set((state) => ({ directMessages: { ...state.directMessages, [friendUserId]: entries }, message: null })); }
+    try { const entries = await listDirectMessages(friendUserId); set((state) => ({ directMessages: { ...state.directMessages, [friendUserId]: mergeChatMessages(state.directMessages[friendUserId] ?? [], entries) }, message: null })); }
     catch (error) { set({ message: error instanceof Error ? error.message : '好友对话加载失败' }); }
   },
   sendDirect: async (friendUserId, body) => {
     const text = body.trim(); if (!text) return false;
-    set({ loading: true, message: null });
-    try { const entry = await sendDirectMessage(friendUserId, text); set((state) => ({ directMessages: { ...state.directMessages, [friendUserId]: appendDirectMessage(state.directMessages[friendUserId] ?? [], entry) } })); return true; }
+    if (get().sending) return false;
+    set({ sending: true, message: null });
+    try { const entry = await sendDirectMessage(friendUserId, text); set((state) => ({ directMessages: { ...state.directMessages, [friendUserId]: mergeChatMessages(state.directMessages[friendUserId] ?? [], [entry]) } })); return true; }
     catch (error) { set({ message: error instanceof Error ? error.message : '私信发送失败' }); return false; }
-    finally { set({ loading: false }); }
+    finally { set({ sending: false }); }
   },
   sendDirectImage: async (friendUserId, file, caption) => {
-    set({ loading: true, message: null });
-    try { const entry = await sendDirectImage(friendUserId, file, caption); set((state) => ({ directMessages: { ...state.directMessages, [friendUserId]: appendDirectMessage(state.directMessages[friendUserId] ?? [], entry) } })); return true; }
+    if (get().sending) return false;
+    set({ sending: true, message: null });
+    try { const entry = await sendDirectImage(friendUserId, file, caption); set((state) => ({ directMessages: { ...state.directMessages, [friendUserId]: mergeChatMessages(state.directMessages[friendUserId] ?? [], [entry]) } })); return true; }
     catch (error) { set({ message: error instanceof Error ? error.message : '私信图片发送失败' }); return false; }
-    finally { set({ loading: false }); }
+    finally { set({ sending: false }); }
   },
   receiveDirectMessage: (entry) => {
     const selfId = get().profile?.userId;
     const friendUserId = entry.senderId === selfId ? entry.recipientId : entry.senderId;
-    set((state) => ({ directMessages: { ...state.directMessages, [friendUserId]: appendDirectMessage(state.directMessages[friendUserId] ?? [], entry) } }));
+    set((state) => ({ directMessages: { ...state.directMessages, [friendUserId]: mergeChatMessages(state.directMessages[friendUserId] ?? [], [entry]) } }));
   },
 }));

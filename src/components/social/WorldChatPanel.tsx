@@ -25,9 +25,12 @@ export function WorldChatPanel({ worldId, nationId }: { worldId: string; nationI
     setOpen(false);
     setSeenMessageId(null);
     void store.refreshMessages(worldId);
+    let cancelled = false;
     let dispose: (() => Promise<void>) | undefined;
-    void subscribeToWorldChat(worldId, (entry) => store.receiveMessage(entry)).then((cleanup) => { dispose = cleanup; });
-    return () => { if (dispose) void dispose(); };
+    void subscribeToWorldChat(worldId, (entry) => store.receiveMessage(entry))
+      .then((cleanup) => { if (cancelled) void cleanup(); else dispose = cleanup; })
+      .catch((error) => { if (!cancelled) useSocialStore.setState({ message: error instanceof Error ? error.message : '实时频道连接失败' }); });
+    return () => { cancelled = true; if (dispose) void dispose(); };
   }, [worldId]);
 
   useEffect(() => {
@@ -68,7 +71,7 @@ export function WorldChatPanel({ worldId, nationId }: { worldId: string; nationI
       <form className="ia-world-chat-compose" onSubmit={(event) => { event.preventDefault(); void send(); }}>
         {attachment && <div className="ia-chat-attachment">{previewUrl && <img src={previewUrl} alt="待发送图片预览" />}<div><strong>{attachment.name}</strong><span>{Math.max(1, Math.round(attachment.size / 1024))} KB · 可附带说明</span></div><button type="button" aria-label="移除待发送图片" onClick={() => { setAttachment(null); if (fileRef.current) fileRef.current.value = ''; }}>×</button></div>}
         <textarea className="ia-input" aria-label={t('版图消息')} value={body} onChange={(event) => setBody(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter' && !event.shiftKey && !attachment) { event.preventDefault(); void send(); } }} maxLength={attachment ? 300 : 500} rows={2} placeholder={t(attachment ? '为图片添加说明（可选）' : '输入消息；Enter 发送，Shift + Enter 换行')} />
-        <div><input ref={fileRef} type="file" accept="image/jpeg,image/png,image/webp,image/gif" hidden onChange={(event) => setAttachment(event.target.files?.[0] ?? null)} /><button className="ia-chat-attach-btn" type="button" disabled={store.loading} onClick={() => fileRef.current?.click()}>▧ {t('图片')}</button><span>{body.length}/{attachment ? 300 : 500}</span><Btn type="submit" label={t(attachment ? '发送图片' : '发送')} variant="primary" busy={store.loading} disabled={store.loading || (!body.trim() && !attachment)} /></div>
+        <div><input ref={fileRef} type="file" accept="image/jpeg,image/png,image/webp,image/gif" hidden onChange={(event) => setAttachment(event.target.files?.[0] ?? null)} /><button className="ia-chat-attach-btn" type="button" disabled={store.sending} onClick={() => fileRef.current?.click()}>▧ {t('图片')}</button><span>{body.length}/{attachment ? 300 : 500}</span><Btn type="submit" label={t(attachment ? '发送图片' : '发送')} variant="primary" busy={store.sending} disabled={store.sending || (!body.trim() && !attachment)} /></div>
       </form>
     </div>}
   </section>;

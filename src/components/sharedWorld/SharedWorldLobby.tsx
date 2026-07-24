@@ -35,9 +35,12 @@ function SharedWorldLobby({ onClose }: { onClose: () => void }) {
   useEffect(() => {
     if (!selectedWorldId || !user) return;
     void store.join(selectedWorldId);
+    let cancelled = false;
     let dispose: (() => Promise<void>) | undefined;
-    void subscribeToWorldLobby(selectedWorldId, () => void store.refreshControls(selectedWorldId)).then((cleanup) => { dispose = cleanup; });
-    return () => { if (dispose) void dispose(); };
+    void subscribeToWorldLobby(selectedWorldId, () => void store.refreshControls(selectedWorldId))
+      .then((cleanup) => { if (cancelled) void cleanup(); else dispose = cleanup; })
+      .catch((error) => { if (!cancelled) useSharedWorldStore.setState({ message: error instanceof Error ? error.message : '版图实时连接失败' }); });
+    return () => { cancelled = true; if (dispose) void dispose(); };
   }, [selectedWorldId, user]);
 
   useEffect(() => {
