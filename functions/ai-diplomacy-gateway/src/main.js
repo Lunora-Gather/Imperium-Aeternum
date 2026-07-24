@@ -38,7 +38,7 @@ async function consumeDailyQuota(db, userId) {
 async function inferBrief(data) {
   const token = process.env.HF_TOKEN;
   if (!token) throw new Error('Hugging Face 推理尚未配置');
-  const model = process.env.HF_MODEL || 'Qwen/Qwen2.5-7B-Instruct-1M:preferred';
+  const model = process.env.HF_MODEL || 'Qwen/Qwen2.5-7B-Instruct';
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 18_000);
   try {
