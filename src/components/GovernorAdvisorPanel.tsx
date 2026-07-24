@@ -3,6 +3,9 @@
 import { Tag } from './ui';
 import type { GovernorAdvisorPlan } from '../gameplay/governorAdvisor';
 import type { TurnRiskTone } from '../gameplay/turnRiskCenter';
+import { createScopedTranslator } from '../i18n/scoped';
+import { dashboardCatalog } from '../i18n/catalogs/dashboard';
+const t = createScopedTranslator(dashboardCatalog);
 
 function tagTone(tone: TurnRiskTone): 'danger' | 'warn' | 'good' | 'info' | 'gold' {
   return tone === 'danger' ? 'danger' : tone === 'warn' ? 'warn' : 'good';
@@ -19,7 +22,7 @@ export default function GovernorAdvisorPanel({ plan, jumpToTab }: { plan: Govern
       <div><small>Governor</small><h3>Governor Advisor</h3></div>
       <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
         <Tag text={plan.guidanceLabel} tone={tagTone(tone)} />
-        <Tag text={`信心 ${plan.confidence}`} tone={tagTone(tone)} />
+        <Tag text={t(`信心 ${plan.confidence}`)} tone={tagTone(tone)} />
       </div>
     </header>
 
@@ -30,7 +33,7 @@ export default function GovernorAdvisorPanel({ plan, jumpToTab }: { plan: Govern
 
     <div className="ia-action-list">
       {plan.queue.slice(0, 5).map((a, i) => <button key={a.id} className={`tone-${a.tone === 'danger' ? 'danger' : a.tone === 'warn' ? 'warn' : 'normal'}`} onClick={() => jumpToTab?.(a.tab)} disabled={!jumpToTab}>
-        <b>{i === 0 ? `首要：${a.title}` : a.title}</b>
+        <b>{i === 0 ? t(`首要：${a.title}`) : a.title}</b>
         <span>{a.body}</span>
       </button>)}
     </div>

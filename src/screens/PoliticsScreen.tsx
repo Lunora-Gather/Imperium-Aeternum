@@ -1,3 +1,6 @@
+import { registerGovernanceTranslations } from '../i18n/catalogs/governance';
+import { localizeReactTree } from '../i18n/reactTree';
+registerGovernanceTranslations();
 // Politics v3 — 政局判断：稳定、合法、腐败、派系风险先于政策列表
 import { useState } from 'react';
 import { useGameStore } from '../store/gameStore';
@@ -38,7 +41,7 @@ export default function PoliticsScreen() {
   if (player.resources.adminPt < 2) advice.push({ title: '行政点不足', body: '大多数政策和法律需要行动点，先处理最紧急事项。', tone: 'warn' });
   if (advice.length === 0) advice.push({ title: '政局尚稳', body: '可根据国运路线选择：稳国内政、降腐败、提高治能或补合法性。', tone: 'good' });
 
-  return (
+  return localizeReactTree(
     <div>
       <Panel title="政局判断" accent>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 8, marginBottom: 10 }}>
@@ -137,18 +140,18 @@ function Guide({ title, body, tone, onClick }: { title: string; body: string; to
 }
 
 function PolicyCard({ title, desc, already, can, cost, actionCost, blocker, factionReaction, onClick }: { title: string; desc: string; already: boolean; can: boolean; cost: number; actionCost: number; blocker?: string | null; factionReaction: Record<string, number>; onClick: () => void }) {
-  return <div className="ia-card" style={{ padding: 10, opacity: can || already ? 1 : 0.7, border: already ? '1px solid var(--good)' : can ? '1px solid var(--border-gold)' : '1px solid var(--border)' }}><div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 6 }}><strong style={{ fontSize: 13 }}>{title}</strong>{already ? <Tag text="已推行" tone="good" /> : blocker ? <Tag text={blocker} tone="danger" /> : <Tag text={`${actionCost}政 · ${cost}金`} tone="info" />}</div><p className="dim" style={{ fontSize: 11, margin: '0 0 8px 0', lineHeight: 1.5 }}>{desc}</p><FactionBadges reaction={factionReaction} /><Btn label={already ? '已推行' : '推行'} variant={can ? 'primary' : 'ghost'} onClick={onClick} disabled={!can} /></div>;
+  return localizeReactTree(<div className="ia-card" style={{ padding: 10, opacity: can || already ? 1 : 0.7, border: already ? '1px solid var(--good)' : can ? '1px solid var(--border-gold)' : '1px solid var(--border)' }}><div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 6 }}><strong style={{ fontSize: 13 }}>{title}</strong>{already ? <Tag text="已推行" tone="good" /> : blocker ? <Tag text={blocker} tone="danger" /> : <Tag text={`${actionCost}政 · ${cost}金`} tone="info" />}</div><p className="dim" style={{ fontSize: 11, margin: '0 0 8px 0', lineHeight: 1.5 }}>{desc}</p><FactionBadges reaction={factionReaction} /><Btn label={already ? '已推行' : '推行'} variant={can ? 'primary' : 'ghost'} onClick={onClick} disabled={!can} /></div>);
 }
 
 function LawCard({ title, desc, effects, already, can, cost, blocker, factionReaction, onClick }: { title: string; desc: string; effects: Record<string, number | undefined>; already: boolean; can: boolean; cost: number; blocker?: string | null; factionReaction: Record<string, number>; onClick: () => void }) {
   const effectText = [effects.corruptionMod ? `腐败${effects.corruptionMod > 0 ? '+' : ''}${effects.corruptionMod}` : '', effects.stabilityMod ? `稳定${effects.stabilityMod > 0 ? '+' : ''}${effects.stabilityMod}` : '', effects.efficiencyMod ? `治能${effects.efficiencyMod > 0 ? '+' : ''}${effects.efficiencyMod}` : '', effects.legitimacyMod ? `合法${effects.legitimacyMod > 0 ? '+' : ''}${effects.legitimacyMod}` : '', effects.taxEffMod && effects.taxEffMod !== 1 ? `税率×${Number(effects.taxEffMod).toFixed(2)}` : '', effects.unrestReduction ? `不满-${effects.unrestReduction}/回合` : '', effects.rebellionReduction ? `叛乱-${effects.rebellionReduction}/回合` : ''].filter(Boolean).join(' · ');
-  return <div className="ia-card" style={{ padding: 10, opacity: can || already ? 1 : 0.7, border: already ? '1px solid var(--good)' : can ? '1px solid var(--border-gold)' : '1px solid var(--border)' }}><div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 4 }}><strong style={{ fontSize: 12 }}>{title}</strong>{already ? <Tag text="已推行" tone="good" /> : blocker ? <Tag text={blocker} tone="danger" /> : <Tag text={`${cost}金`} tone="info" />}</div><p className="dim" style={{ fontSize: 10, margin: '0 0 6px 0', lineHeight: 1.4 }}>{desc}</p>{effectText && <div style={{ fontSize: 10, color: 'var(--text-dim)', marginBottom: 6 }}>{effectText}</div>}<FactionBadges reaction={factionReaction} /><Btn label={already ? '已推行' : '推行'} variant={can ? 'primary' : 'ghost'} onClick={onClick} disabled={!can} /></div>;
+  return localizeReactTree(<div className="ia-card" style={{ padding: 10, opacity: can || already ? 1 : 0.7, border: already ? '1px solid var(--good)' : can ? '1px solid var(--border-gold)' : '1px solid var(--border)' }}><div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 4 }}><strong style={{ fontSize: 12 }}>{title}</strong>{already ? <Tag text="已推行" tone="good" /> : blocker ? <Tag text={blocker} tone="danger" /> : <Tag text={`${cost}金`} tone="info" />}</div><p className="dim" style={{ fontSize: 10, margin: '0 0 6px 0', lineHeight: 1.4 }}>{desc}</p>{effectText && <div style={{ fontSize: 10, color: 'var(--text-dim)', marginBottom: 6 }}>{effectText}</div>}<FactionBadges reaction={factionReaction} /><Btn label={already ? '已推行' : '推行'} variant={can ? 'primary' : 'ghost'} onClick={onClick} disabled={!can} /></div>);
 }
 
 function FactionBadges({ reaction }: { reaction: Record<string, number> }) {
   const entries = Object.entries(reaction).filter(([, delta]) => delta !== 0);
   if (entries.length === 0) return null;
-  return <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginBottom: 6 }}>{entries.map(([fid, delta]) => <span key={fid} style={{ fontSize: 10, padding: '1px 5px', borderRadius: 3, color: delta > 0 ? 'var(--good)' : 'var(--war)', background: delta > 0 ? 'rgba(122,154,62,0.1)' : 'rgba(162,61,40,0.1)' }}>{factionLabel(fid)} {delta > 0 ? '+' : ''}{delta}</span>)}</div>;
+  return localizeReactTree(<div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginBottom: 6 }}>{entries.map(([fid, delta]) => <span key={fid} style={{ fontSize: 10, padding: '1px 5px', borderRadius: 3, color: delta > 0 ? 'var(--good)' : 'var(--war)', background: delta > 0 ? 'rgba(122,154,62,0.1)' : 'rgba(162,61,40,0.1)' }}>{factionLabel(fid)} {delta > 0 ? '+' : ''}{delta}</span>)}</div>);
 }
 
 function MiniBar({ value }: { value: number }) {

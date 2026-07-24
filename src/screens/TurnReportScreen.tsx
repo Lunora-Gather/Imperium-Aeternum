@@ -1,3 +1,6 @@
+import { registerGovernanceTranslations } from '../i18n/catalogs/governance';
+import { localizeReactTree } from '../i18n/reactTree';
+registerGovernanceTranslations();
 // TurnReport v29 — 回合后复盘 + 胜利路线仪表盘：计划 → 推进 → 复盘 → 修正计划
 import { useGameStore } from '../store/gameStore';
 import { Panel, Tag, Btn, Divider } from '../components/ui';
@@ -15,7 +18,7 @@ function toneBorder(t: string): string { return t === 'danger' ? 'var(--war)' : 
 export default function TurnReportScreen({ onContinue }: { onContinue?: () => void }) {
   const { state, jumpToTab } = useGameStore();
   const r = state.lastReport;
-  if (!r) return <Panel title="回合报告"><p className="dim">尚无报告。点击「下一回合」开始。</p></Panel>;
+  if (!r) return localizeReactTree(<Panel title="回合报告"><p className="dim">尚无报告。点击「下一回合」开始。</p></Panel>);
 
   const income = r.income.tax + r.income.trade + r.income.building;
   const expense = r.expense.military + r.expense.corruption;
@@ -33,7 +36,7 @@ export default function TurnReportScreen({ onContinue }: { onContinue?: () => vo
   if (r.legitimacyDelta < 0) stories.push({ txt: `合法性 ${r.legitimacyDelta}`, tone: 'warn' });
   if (r.events.length > 0) stories.push({ txt: `发生 ${r.events.length} 起事件`, tone: 'info' });
 
-  return <div>
+  return localizeReactTree(<div>
     <Panel title={`第 ${r.turn} 年 · 年度报告`} accent actions={<div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>{debrief && <Btn label={`复盘：${debrief.nextFocus.title}`} variant={debrief.nextFocus.tone === 'danger' ? 'warn' : 'primary'} onClick={() => jumpToTab(debrief.nextFocus.tab)} />}{primary && <Btn label={`处理：${primary.title}`} variant={primary.tone === 'danger' ? 'warn' : 'primary'} onClick={() => jumpToTab(primary.tab)} />}{onContinue && <Btn label="← 继续治理" variant="ghost" onClick={onContinue} />}</div>}>
       {debrief && <DebriefPanel debrief={debrief} jumpToTab={jumpToTab} />}
 
@@ -64,7 +67,7 @@ export default function TurnReportScreen({ onContinue }: { onContinue?: () => vo
       {r.provinceChanges.length > 0 && <><Divider label="疆域变动" /><div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginBottom: 12 }}>{r.provinceChanges.map((pc, i) => { const gained = pc.to === state.playerNationId; return <div key={i} style={{ fontSize: 13, color: gained ? 'var(--good)' : 'var(--war)' }}>{gained ? '获得' : '失去'} {pc.name}</div>; })}</div></>}
       {r.warnings.length > 0 && <><Divider label="警告" /><div className="ia-pulse" style={{ background: 'rgba(245,166,35,0.08)', border: '1px solid var(--warn)', borderRadius: 6, padding: 10 }}>{r.warnings.map((w, i) => <div key={i} className="warn" style={{ fontSize: 13, padding: '2px 0' }}>⚠ {w}</div>)}</div></>}
     </Panel>
-  </div>;
+  </div>);
 }
 
 function DebriefPanel({ debrief, jumpToTab }: { debrief: NonNullable<ReturnType<typeof buildTurnDebrief>>; jumpToTab: (tab: string) => void }) {

@@ -1,3 +1,6 @@
+import { registerGovernanceTranslations } from '../i18n/catalogs/governance';
+import { localizeReactTree } from '../i18n/reactTree';
+registerGovernanceTranslations();
 // Province v3 — 摘要 → 风险 → 省份操作，减少盲点选省
 import { useState, useEffect } from 'react';
 import { useGameStore } from '../store/gameStore';
@@ -134,7 +137,7 @@ export default function ProvinceScreen() {
     </div>
   );
 
-  return (
+  return localizeReactTree(
     <div>
       <Panel title="省政判断" accent>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 10, marginBottom: 10 }}>

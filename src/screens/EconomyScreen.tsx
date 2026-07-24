@@ -1,3 +1,6 @@
+import { registerGovernanceTranslations } from '../i18n/catalogs/governance';
+import { localizeReactTree } from '../i18n/reactTree';
+registerGovernanceTranslations();
 // Economy v3 — 经济判断：赤字、缺粮、税率、贸易风险先于操作
 import { useEffect } from 'react';
 import { useGameStore } from '../store/gameStore';
@@ -54,7 +57,7 @@ export default function EconomyScreen() {
   if (riskyTrade.length > 0) advice.push({ title: '贸易依赖风险', body: `${riskyTrade.length} 条贸易关系恶化，收入可能折损。`, tone: 'warn' });
   if (advice.length === 0) advice.push({ title: '经济尚稳', body: '可按国运目标选择贸易扩张、低税养民或积累国库。', tone: 'good' });
 
-  return (
+  return localizeReactTree(
     <div>
       <Panel title="经济判断" accent>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 8 }}>

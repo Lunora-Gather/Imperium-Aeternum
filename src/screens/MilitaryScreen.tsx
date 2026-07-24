@@ -1,3 +1,6 @@
+import { registerGovernanceTranslations } from '../i18n/catalogs/governance';
+import { localizeReactTree } from '../i18n/reactTree';
+registerGovernanceTranslations();
 import { useMemo, useState } from 'react';
 import { useGameStore } from '../store/gameStore';
 import { provincesOf } from '../engine/init';
@@ -167,7 +170,7 @@ export default function MilitaryScreen() {
 
   const doDeclare = (target: string, provId: string) => { storeDeclareWar(target, provId); setPreviewTarget(null); };
 
-  return <div>
+  return localizeReactTree(<div>
     <Panel title="军情判断" accent>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))', gap: 8 }}>
         {guidance.slice(0, 3).map((g, i) => <div key={i} className="ia-card" style={{ padding: 10, borderLeft: `3px solid var(--${g.tone === 'danger' ? 'war' : g.tone === 'warn' ? 'warn' : g.tone === 'good' ? 'good' : 'border'})` }}>
@@ -241,7 +244,7 @@ export default function MilitaryScreen() {
     </Panel>
 
     <Panel title="征兵"><div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: 8 }}>{provs.map((p) => <div key={p.id} className="ia-card" style={{ padding: 8 }}><div style={{ fontSize: 12, marginBottom: 4 }}>{p.name} <span className="dim">({p.population}人)</span></div><div style={{ display: 'flex', gap: 4 }}><Btn label="+50" variant="ghost" onClick={() => recruit(p.id, 50)} /><Btn label="+100" variant="ghost" onClick={() => recruit(p.id, 100)} /></div></div>)}</div></Panel>
-  </div>;
+  </div>);
 }
 
 function StatRowMini({ label, value, kind }: { label: string; value: number; kind: 'high' | 'low' }) {

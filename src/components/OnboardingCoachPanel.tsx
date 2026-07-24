@@ -3,6 +3,9 @@
 import { Tag } from './ui';
 import type { CoachStepStatus, OnboardingCoachPlan } from '../gameplay/onboardingCoach';
 import type { TurnRiskTone } from '../gameplay/turnRiskCenter';
+import { createScopedTranslator } from '../i18n/scoped';
+import { dashboardCatalog } from '../i18n/catalogs/dashboard';
+const t = createScopedTranslator(dashboardCatalog);
 
 function tagTone(tone: TurnRiskTone): 'danger' | 'warn' | 'good' | 'info' | 'gold' {
   return tone === 'danger' ? 'danger' : tone === 'warn' ? 'warn' : 'good';
@@ -22,9 +25,9 @@ function toneBorder(tone: TurnRiskTone): string {
 export default function OnboardingCoachPanel({ plan, jumpToTab }: { plan: OnboardingCoachPlan; jumpToTab?: (tab: string) => void }) {
   return <section className="ia-dash-section" style={{ borderColor: toneBorder(plan.tone) }}>
     <header>
-      <div><small>Coach</small><h3>目标教练</h3></div>
+      <div><small>Coach</small><h3>{t('目标教练')}</h3></div>
       <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
-        <Tag text={plan.stage === 'survive' ? '生存' : plan.stage === 'stabilize' ? '稳定' : plan.stage === 'expand' ? '扩张' : '优化'} tone={tagTone(plan.tone)} />
+        <Tag text={t(plan.stage === 'survive' ? '生存' : plan.stage === 'stabilize' ? '稳定' : plan.stage === 'expand' ? '扩张' : '优化')} tone={tagTone(plan.tone)} />
         <Tag text={`${plan.progress}%`} tone={tagTone(plan.tone)} />
       </div>
     </header>
@@ -38,7 +41,7 @@ export default function OnboardingCoachPanel({ plan, jumpToTab }: { plan: Onboar
       {plan.steps.slice(0, 6).map((s) => <button key={s.id} className="ia-card" onClick={() => jumpToTab?.(s.tab)} disabled={!jumpToTab} style={{ padding: 10, textAlign: 'left', cursor: jumpToTab ? 'pointer' : 'default', borderLeft: `3px solid ${toneBorder(s.tone)}` }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', gap: 6, marginBottom: 5 }}>
           <strong style={{ fontSize: 12 }}>{s.title}</strong>
-          <Tag text={statusText(s.status)} tone={tagTone(s.tone)} />
+          <Tag text={t(statusText(s.status))} tone={tagTone(s.tone)} />
         </div>
         <div style={{ fontSize: 11, color: 'var(--text-dim)', lineHeight: 1.45 }}>{s.body}</div>
       </button>)}

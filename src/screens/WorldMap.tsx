@@ -1,3 +1,6 @@
+import { registerGovernanceTranslations } from '../i18n/catalogs/governance';
+import { localizeReactTree } from '../i18n/reactTree';
+registerGovernanceTranslations();
 // 世界地图 SVG — 羊皮战略舆图：底纹、国土光晕、首都、悬停情报
 import { useState, useMemo } from 'react';
 import { useGameStore } from '../store/gameStore';
@@ -66,7 +69,7 @@ export default function WorldMap() {
   const H = Math.max(240, bounds.maxY - bounds.minY);
   const capitalCount = visible.filter((p) => p.isCapital).length;
 
-  return (
+  return localizeReactTree(
     <section className="ia-map-page">
       <header className="ia-map-head">
         <div>

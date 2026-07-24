@@ -37,6 +37,9 @@ GameStore.nextTurn
 | `src/store/gameStore.ts` | Zustand 薄适配层、场景切换、存读档和管线调用 |
 | `src/store/scenarioCatalog.ts` | 剧本类型、目录和随机区域配置 |
 | `src/store/persistence.ts` | 存档迁移、规范化和瘦身 |
+| `src/i18n/index.ts` | 全局语言状态、基础词典、延迟词典注册和繁体字符回退 |
+| `src/i18n/scoped.ts` | 懒页面精确／模式／片段翻译，不得被引擎层导入 |
+| `src/i18n/catalogs/` | 按页面拆分的展示词典；治理词典只随治理页面加载 |
 
 ## 3. 永久不变量
 
@@ -71,7 +74,15 @@ npm run rc:check
 `simulate:benchmark` 使用 5 个样本输出 min/p50/p95/max/avg，适合判断性能趋势；CI 门禁仍使用较快的单样本稳定性检查。
 `check:bundle` 对入口块、App 块、最大 JS、JS 总量和 CSS 总量设置预算；`rc:check` 会在生产构建后自动执行。
 
-## 5. 改动规则
+## 5. 国际化与部署边界
+
+- 模拟、规则和存档仍以简体中文规范文案作为稳定数据源；翻译只发生在 React 展示层，禁止把已翻译文本送回规则判断。
+- 简体中文、繁体中文、英文共享一个 `Locale` 状态。繁体优先使用人工术语，缺项由构建期生成的字符表回退；英文动态顾问文案使用页面级精确、正则和片段组合翻译。
+- `npm run generate:i18n` 使用开发依赖 OpenCC 生成约 6 KiB 的字符表；OpenCC 的完整 6 MB 词库不会进入浏览器产物。
+- 当前部署保持 GitHub Pages 静态前端 + Appwrite 认证、数据、实时和 Functions。只有需要 SSR、边缘路由或服务端保密接口时才迁入 Vercel；只有接入模型推理时才使用 Hugging Face。业务层不得绑定任一静态托管商。
+- 这是网页项目，但 JS/CSS 预算仍约束首屏下载和弱网体验。三语增加的原始 JS 预算为 64 KiB（压缩后约 12 KiB），入口、App 与 CSS 上限不放宽。
+
+## 6. 改动规则
 
 1. 引擎规则保持纯数据输入输出，不导入 React、DOM 或 Zustand。
 2. 新增长期状态字段时，同步更新 `GameState`、存档迁移/规范化、净化和不变量测试。

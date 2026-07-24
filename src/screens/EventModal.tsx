@@ -1,3 +1,6 @@
+import { registerGovernanceTranslations } from '../i18n/catalogs/governance';
+import { localizeReactTree } from '../i18n/reactTree';
+registerGovernanceTranslations();
 // EventModal v4 — 事件后果预览更完整：即时数值 + 长期治理影响 + 快捷键
 import { useCallback, useEffect, useRef } from 'react';
 import { useGameStore } from '../store/gameStore';
@@ -124,7 +127,7 @@ export default function EventModal() {
   const tone = CATEGORY_TONE[ev.category] ?? 'info';
   const icon = CATEGORY_ICON[ev.category] ?? '📢';
 
-  return (
+  return localizeReactTree(
     <div style={{
       position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
       background: 'rgba(0,0,0,0.75)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 200,

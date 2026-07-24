@@ -327,11 +327,11 @@ export default function App() {
           <div className="ia-ruler-kicker ia-up">Imperium Aeternum</div>
           <div className="ia-ruler-main">
             <div>
-              <h1 className="ia-ruler-title">{player?.name ?? t('未名之国')}</h1>
+              <h1 className="ia-ruler-title">{player?.name ? t(player.name) : t('未名之国')}</h1>
               <div className="ia-ruler-subline">
                 <span>Anno · {state.turn + 1}</span>
                 <span>{t('永恒帝国')}</span>
-                <span>{player?.ruler?.name ? `Ruler · ${player.ruler.name}` : t('君主 · 无名')}</span>
+                <span>{player?.ruler?.name ? `Ruler · ${t(player.ruler.name)}` : t('君主 · 无名')}</span>
                 {atWar && <span className="danger">⚔ {t('战时')}</span>}
                 {pendingCount > 0 && <span className="warn">✦ {t('待决事件 {{count}}', { count: pendingCount })}</span>}
                 {state.victory.type && <span className={state.victory.type.startsWith('win') ? 'good' : 'danger'}>{state.victory.type.startsWith('win') ? `🏆 ${t('已胜利')}` : `💀 ${t('已陨落')}`}</span>}
@@ -442,23 +442,23 @@ export default function App() {
       )}
 
       <footer className="ia-footer ia-display ia-up">
-        Imperium Aeternum · 永恒帝国 · {BUILD_MARK}
+        Imperium Aeternum · {t('永恒帝国')} · {BUILD_MARK}
       </footer>
 
       {showHelp && scene === 'playing' && (
         <div className="ia-modal-backdrop" onClick={() => setShowHelp(false)}>
-          <div className="ia-help-card" role="dialog" aria-modal="true" aria-label="治国路线说明" onClick={(e) => e.stopPropagation()}>
-            <div className="ia-display ia-help-title">✦ 治国路线 · 第 {helpProgress.current} / {helpProgress.total} 步</div>
-            <div className="ia-help-step-title">{helpStep.title}</div>
-            <div className="ia-help-step-body">{helpStep.body}</div>
+          <div className="ia-help-card" role="dialog" aria-modal="true" aria-label={t('治国路线说明')} onClick={(e) => e.stopPropagation()}>
+            <div className="ia-display ia-help-title">{t('✦ 治国路线 · 第 {{current}} / {{total}} 步', { current: helpProgress.current, total: helpProgress.total })}</div>
+            <div className="ia-help-step-title">{t(helpStep.title)}</div>
+            <div className="ia-help-step-body">{t(helpStep.body)}</div>
             <div className="ia-dash-note" style={{ marginTop: 10 }}>
-              推荐页面：{ALL_TABS.find((x) => x.id === helpStep.tab)?.label ?? helpStep.tab}{helpStep.shortcut ? ` · 快捷键 ${helpStep.shortcut}` : ''}
+              {t('推荐页面：{{page}}', { page: t(ALL_TABS.find((x) => x.id === helpStep.tab)?.label ?? helpStep.tab) })}{helpStep.shortcut ? t(' · 快捷键 {{shortcut}}', { shortcut: helpStep.shortcut }) : ''}
             </div>
             <div className="ia-help-actions">
-              <button className="ia-btn ia-btn--ghost" onClick={dismissGuidance}>不再提示</button>
-              {tutorialStep > 0 && <button className="ia-btn" onClick={() => setTutorialStep((s) => prevOnboardingIndex(s))}>上一步</button>}
-              <button className="ia-btn" onClick={goHelpTab}>{helpStep.cta}</button>
-              {!helpProgress.done ? <button className="ia-btn ia-btn--primary" onClick={() => setTutorialStep((s) => nextOnboardingIndex(s))}>下一步</button> : <button className="ia-btn ia-btn--primary" onClick={startNoviceJourney}>开始实战引导</button>}
+              <button className="ia-btn ia-btn--ghost" onClick={dismissGuidance}>{t('不再提示')}</button>
+              {tutorialStep > 0 && <button className="ia-btn" onClick={() => setTutorialStep((s) => prevOnboardingIndex(s))}>{t('上一步')}</button>}
+              <button className="ia-btn" onClick={goHelpTab}>{t(helpStep.cta)}</button>
+              {!helpProgress.done ? <button className="ia-btn ia-btn--primary" onClick={() => setTutorialStep((s) => nextOnboardingIndex(s))}>{t('下一步')}</button> : <button className="ia-btn ia-btn--primary" onClick={startNoviceJourney}>{t('开始实战引导')}</button>}
             </div>
           </div>
         </div>
