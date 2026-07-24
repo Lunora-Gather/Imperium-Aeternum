@@ -16,6 +16,8 @@ describe('localizeReactTree', () => {
     expect(isValidElement(tree)).toBe(true);
     const root = tree as ReactElement<{ children: ReactElement[] }>;
     const [heading, card] = root.props.children;
+    expect(heading.key).toBe('i18n-0');
+    expect(card.key).toBe('i18n-1');
     expect(heading.props.children).toBe('World Map');
     expect(card.type).toBe(Card);
     expect(card.props.title).toBe('Provincial Assessment');
