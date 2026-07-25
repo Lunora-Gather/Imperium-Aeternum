@@ -8,14 +8,13 @@ import DashboardStrategicHq from '../components/DashboardStrategicHq';
 import type { TurnReport } from '../types/game';
 import type { StrategyFocusId } from '../gameplay/strategyFocus';
 import { buildReadinessReport, type ReadinessReport, type ReadinessItem } from '../gameplay/readiness';
-import { buildStrategicBrief, type StrategicBrief, type StrategicItem } from '../gameplay/strategicAdvisor';
+import { buildStrategicBrief, type StrategicItem } from '../gameplay/strategicAdvisor';
 import { buildTurnReportActions } from '../gameplay/turnReportActions';
 import { buildCommandCenterActions, type CommandCenterAction } from '../gameplay/commandCenterActions';
 import { buildEmpireRoadmap, type EmpireRoadmap } from '../gameplay/empireRoadmap';
 import { buildTurnPreview, type TurnPreview } from '../gameplay/turnPreview';
 import { buildPreTurnCouncil, type PreTurnCouncil } from '../gameplay/preTurnCouncil';
 import { buildChronicleDigest, type ChronicleDigest, type ChronicleHighlight } from '../gameplay/chronicleDigest';
-import { buildContextualGuidance, type ContextualGuidance } from '../gameplay/contextualGuidance';
 import { buildVictoryRouteFocus, type VictoryRouteFocus } from '../gameplay/victoryRoutes';
 import { createScopedTranslator, localizeDeep } from '../i18n/scoped';
 import { dashboardCatalog } from '../i18n/catalogs/dashboard';
@@ -74,10 +73,6 @@ function RoadmapPanel({ roadmap, jumpToTab }: { roadmap: EmpireRoadmap; jumpToTa
   </section>;
 }
 
-function GuidancePanel({ guidance, jumpToTab }: { guidance: ContextualGuidance; jumpToTab: (tab: string) => void }) {
-  return <section className="ia-dash-section" style={{ borderColor: toneBorder(guidance.tone) }}><header><div><small>Guide</small><h3>{t('情境式提示')}</h3></div><Tag text={t(guidance.title)} tone={tagTone(guidance.tone)} /></header><div className="ia-card" style={{ padding: 10, marginBottom: 8, borderLeft: `3px solid ${toneBorder(guidance.tone)}` }}><strong style={{ fontSize: 13 }}>{t(guidance.primary.title)}</strong><div style={{ fontSize: 11, color: 'var(--text-dim)', lineHeight: 1.55, marginTop: 5 }}>{t(guidance.primary.body)}</div></div><div className="ia-action-list">{guidance.tips.slice(0, 3).map((tip) => <button key={tip.id} className={`tone-${tip.tone === 'danger' ? 'danger' : tip.tone === 'warn' ? 'warn' : 'normal'}`} onClick={() => jumpToTab(tip.tab)}><b>{t(tip.action)}</b><span>{t(tip.title)} · {t(tip.body)}</span></button>)}</div></section>;
-}
-
 function CouncilPanel({ council, jumpToTab }: { council: PreTurnCouncil; jumpToTab: (tab: string) => void }) {
   const visible = council.blockers.length > 0 ? council.blockers : council.recommendations;
   return <section className="ia-dash-section" style={{ borderColor: toneBorder(council.tone) }}>
@@ -121,16 +116,6 @@ function ReadinessPanel({ report, jumpToTab }: { report: ReadinessReport; jumpTo
   </section>;
 }
 
-function StrategicDirectorPanel({ brief, jumpToTab }: { brief: StrategicBrief; jumpToTab: (tab: string) => void }) {
-  const top = brief.urgent[0] ?? brief.opportunities[0];
-  return <section className="ia-dash-section" style={{ borderColor: brief.score < 40 ? 'var(--war)' : brief.score < 60 ? 'var(--warn)' : 'var(--border)' }}>
-    <header><div><small>Grand Strategy</small><h3>{t('帝国总参谋部')}</h3></div><div style={{ display: 'flex', gap: 5, flexWrap: 'wrap', justifyContent: 'flex-end' }}><Tag text={t(brief.phase)} tone={brief.score < 40 ? 'danger' : brief.score < 60 ? 'warn' : 'gold'} /><Tag text={`${t(brief.scoreLabel)} ${Math.round(brief.score)}`} tone={brief.score < 40 ? 'danger' : brief.score < 60 ? 'warn' : 'good'} /></div></header>
-    <div className="ia-card" style={{ padding: 10, marginBottom: 8 }}><strong style={{ fontSize: 13 }}>{t(brief.doctrine)}</strong><div style={{ fontSize: 11, color: 'var(--text-dim)', marginTop: 4, lineHeight: 1.55 }}>{t(brief.doctrineBody)}</div></div>
-    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', gap: 6, marginBottom: 8 }}>{brief.horizon.map((x, i) => <div key={i} className="ia-card" style={{ padding: 8 }}><Tag text={t(i === 0 ? '今年' : i === 1 ? '三年' : '长期')} tone={i === 0 && brief.score < 45 ? 'warn' : 'info'} /><div style={{ fontSize: 11, color: 'var(--text-mute)', marginTop: 5 }}>{t(x)}</div></div>)}</div>
-    {top && <button className="ia-card" onClick={() => jumpToTab(top.tab)} style={{ width: '100%', padding: 10, textAlign: 'left', cursor: 'pointer', border: `1px solid var(--${top.tone === 'danger' ? 'war' : top.tone === 'warn' ? 'warn' : 'border'})` }}><div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, marginBottom: 4 }}><strong style={{ fontSize: 13 }}>{t(top.title)}</strong><Tag text={t(top.tone === 'danger' ? '最高优先' : top.tone === 'warn' ? '需处理' : '可推进')} tone={tagTone(top.tone)} /></div><div style={{ fontSize: 11, color: 'var(--text-dim)', lineHeight: 1.5 }}>{t(top.body)}</div></button>}
-  </section>;
-}
-
 function AdvisorList({ title, items, empty, jumpToTab }: { title: string; items: StrategicItem[]; empty: string; jumpToTab: (tab: string) => void }) {
   return <section className="ia-dash-section"><header><div><small>Advisor</small><h3>{t(title)}</h3></div></header><div className="ia-action-list">{items.length === 0 ? <div className="ia-risk-empty">{t(empty)}</div> : items.slice(0, 4).map((x, i) => <button key={`${x.title}-${i}`} className={`tone-${x.tone === 'danger' ? 'danger' : x.tone === 'warn' ? 'warn' : 'normal'}`} onClick={() => jumpToTab(x.tab)}><b>{t(x.title)}</b><span>{t(x.body)}</span></button>)}</div></section>;
 }
@@ -171,7 +156,6 @@ export default function Dashboard() {
   const turnPreview = localizeDeep(turnPreviewRaw, t);
   const council = localizeDeep(councilRaw, t);
   const chronicle = localizeDeep(useMemo(() => buildChronicleDigest(state), [state]), t);
-  const guidance = localizeDeep(useMemo(() => buildContextualGuidance(state), [state]), t);
   const victoryFocus = localizeDeep(useMemo(() => buildVictoryRouteFocus(state), [state]), t);
 
   const lastNet = state.lastReport ? state.lastReport.income.tax + state.lastReport.income.trade + state.lastReport.income.building - state.lastReport.expense.military - state.lastReport.expense.corruption : 0;

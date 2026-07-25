@@ -119,7 +119,7 @@ export function settlePolitics(nation: Nation, state: GameState): PoliticsResult
 }
 
 // 切换政体
-export function changeGovernment(nation: Nation, newGov: GovernmentId, state: GameState): boolean {
+export function changeGovernment(nation: Nation, newGov: GovernmentId, _state: GameState): boolean {
   if (nation.government.legitimacy < 40) return false;
   if (nation.resources.gold < 100) return false;
   const def = GOVERNMENTS[newGov];

@@ -2,12 +2,12 @@
 // 不依赖浏览器，纯逻辑验证
 
 import { describe, it, expect } from 'vitest';
-import { createInitialState } from '../engine/init';
-import { processTurn } from '../engine/turn';
-import { saveGame, loadGame } from '../store/persistence';
-import { PLAYER_ID } from '../data/nations';
-import { moveArmy, declareWar, makePeace } from '../engine/military';
-import type { GameState, Province, Army } from '../types/game';
+import { createInitialState } from '../init';
+import { processTurn } from '../turn';
+import { saveGame, loadGame } from '../../store/persistence';
+import { PLAYER_ID } from '../../data/nations';
+import { moveArmy, makePeace } from '../military';
+import type { GameState, Province, Army } from '../../types/game';
 
 // localStorage polyfill（node 环境无）
 const store: Record<string, string> = {};
@@ -188,8 +188,7 @@ describe('A1 叛乱机制', () => {
     p.garrison = 0;
     p.rebellionRisk = 100;
     // 玩家稳定度拉低，让 stabMod 不压制叛乱
-    const player = state.nations[PLAYER_ID];
-    player.government.stability = 10;
+    state.nations[PLAYER_ID].government.stability = 10;
   }
 
   it('叛乱省创建临时 rebel_* Nation 并剥离归属', () => {
@@ -288,7 +287,6 @@ describe('A2 内战机制', () => {
 
   it('3-4 省叛乱激活内战状态（civilWar.active=true）', () => {
     const state = createInitialState();
-    const player = state.nations[PLAYER_ID];
     // 选 3 个非首都省份强制叛乱
     const playerProvs = Object.values(state.provinces).filter((p) => p.ownerId === PLAYER_ID && !p.isCapital);
     expect(playerProvs.length).toBeGreaterThanOrEqual(3);
@@ -340,7 +338,6 @@ describe('A2 内战机制', () => {
     state = r.state;
     expect(state.nations[PLAYER_ID].civilWar?.active).toBe(true);
     // 推进第 2 回合，税收应有内战折扣（无法直接断言具体值，验证内战状态下 gold 增长被压制）
-    const goldBefore = state.nations[PLAYER_ID].resources.gold;
     r = processTurn(state);
     state = r.state;
     // 内战期间 gold 不应暴涨（×0.7 折扣生效），至少证明内战未导致金异常增长

@@ -6,16 +6,12 @@ import type {
   DiplomaticRelation, ResourceStockpile, Government, NationalTendency,
 } from '../types/game';
 import { SAVE_VERSION } from '../types/game';
-import type { NationId, NationTier, NationDef } from '../data/nations';
-import {
-  NATIONS, PLAYER_ID,
-} from '../data/nations';
+import { NATIONS, PLAYER_ID } from '../data/nations';
 import { PROVINCES } from '../data/provinces';
-import type { ProvinceDef } from '../data/provinces';
 import { GOVERNMENTS } from '../data/governments';
 import { FACTIONS } from '../data/factions';
 import { NATIONAL_CHARACTERS } from '../data/national-characters';
-import { generateWorld, type WorldGenResult } from './worldgen';
+import { generateWorld } from './worldgen';
 
 function buildClasses(totalPop: number, ratio: Province['classes'] extends never ? never : {
   peasants: number; workers: number; merchants: number;

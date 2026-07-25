@@ -343,7 +343,7 @@ export default function App() {
               <button className="ia-icon-btn ia-icon-btn--gold" onClick={toggleTheme} title={t('切换主题')} aria-label={t('切换主题')}>
                 {theme === 'night' ? '☾' : theme === 'day' ? '☀' : theme === 'bamboo' ? '筠' : '墨'}
               </button>
-              <button className="ia-icon-btn" onClick={() => { setShowHelp(true); setTutorialStep(0); }} title={t('治国引导')} aria-label={t('治国引导')}>?</button>
+              <button className="ia-icon-btn" onClick={() => { setShowHelp(true); setTutorialStep(0); }} title={t('新手帮助')} aria-label={t('新手帮助')}>?</button>
               <button className="ia-icon-btn" onClick={sfxMute.toggle} title={t(sfxMute.muted ? '音效已关（点击开启）' : '音效已开（点击静音）')} aria-label={t('音效开关')}>{sfxMute.muted ? '🔇' : '🔊'}</button>
               <button className="ia-icon-btn ia-icon-btn--back" onClick={goBackPage} title={t('返回上一页')} aria-label={t('返回上一页')}>↩</button>
               <button className="ia-icon-btn ia-icon-btn--back" onClick={safeBackToMenu} title={t('返回标题页')} aria-label={t('返回标题页')}>⌂</button>
@@ -447,8 +447,8 @@ export default function App() {
 
       {showHelp && scene === 'playing' && (
         <div className="ia-modal-backdrop" onClick={() => setShowHelp(false)}>
-          <div className="ia-help-card" role="dialog" aria-modal="true" aria-label={t('治国路线说明')} onClick={(e) => e.stopPropagation()}>
-            <div className="ia-display ia-help-title">{t('✦ 治国路线 · 第 {{current}} / {{total}} 步', { current: helpProgress.current, total: helpProgress.total })}</div>
+          <div className="ia-help-card" role="dialog" aria-modal="true" aria-label={t('第一次玩：六步上手')} onClick={(e) => e.stopPropagation()}>
+            <div className="ia-display ia-help-title">{t('✦ 第一次玩 · 第 {{current}} / {{total}} 步', { current: helpProgress.current, total: helpProgress.total })}</div>
             <div className="ia-help-step-title">{t(helpStep.title)}</div>
             <div className="ia-help-step-body">{t(helpStep.body)}</div>
             <div className="ia-dash-note" style={{ marginTop: 10 }}>

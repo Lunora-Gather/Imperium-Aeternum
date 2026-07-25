@@ -7,7 +7,7 @@ import { TECHNOLOGIES, TECH_BY_ID } from '../data/technologies';
 import type { TechBranch } from '../data/technologies';
 
 // 每回合科研点产出 + 累积
-export function settleTechnology(nation: Nation, state: GameState): void {
+export function settleTechnology(nation: Nation, _state: GameState): void {
   // 已在 economy.ts 中通过建筑产出 sciPt；这里补充学者产出
   // 实际 sciPt 已在 economy settleEconomy 中累加，这里不再重复
   // 处理研发进度：若 researchProgress 存在，扣点推进

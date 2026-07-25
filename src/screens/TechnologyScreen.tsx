@@ -4,7 +4,7 @@ registerGovernanceTranslations();
 // Technology v3 — 科技路线判断：根据国势推荐农业/军事/行政/文化
 import { useGameStore } from '../store/gameStore';
 import { TECHNOLOGIES } from '../data/technologies';
-import { Panel, Stat, Btn, Tag, Bar, Divider } from '../components/ui';
+import { Panel, Stat, Btn, Tag, Bar } from '../components/ui';
 
 const BRANCH_LABEL: Record<string, string> = { agri: '农业', mil: '军事', admin: '行政', culture: '文化' };
 const BRANCH_COLOR: Record<string, string> = { agri: 'var(--food)', mil: 'var(--war)', admin: 'var(--accent)', culture: 'var(--gold)' };

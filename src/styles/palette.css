@@ -848,7 +848,6 @@ body > div[style*="position:fixed"][style*="right:8px"] {
 .ia-continue-panel,
 .ia-difficulty-track,
 .ia-launch-handbook,
-.ia-launch-guide,
 .ia-challenge-panel,
 .ia-nation-advice {
   border: 1px solid color-mix(in srgb, var(--border) 82%, transparent);
@@ -871,7 +870,6 @@ body > div[style*="position:fixed"][style*="right:8px"] {
 .ia-difficulty-copy,
 .ia-handbook-head,
 .ia-handbook-item,
-.ia-launch-guide,
 .ia-challenge-panel {
   min-width: 0;
 }
@@ -904,7 +902,6 @@ body > div[style*="position:fixed"][style*="right:8px"] {
 .ia-difficulty-copy p,
 .ia-handbook-head p,
 .ia-handbook-item p,
-.ia-launch-guide p,
 .ia-challenge-panel p,
 .ia-nation-advice {
   color: var(--text-mute);
@@ -1011,8 +1008,7 @@ body > div[style*="position:fixed"][style*="right:8px"] {
 }
 
 :root[data-theme="day"] .ia-difficulty-step,
-:root[data-theme="day"] .ia-handbook-item,
-:root[data-theme="day"] .ia-launch-guide {
+:root[data-theme="day"] .ia-handbook-item {
   background-color: rgba(228, 215, 189, .28);
 }
 
@@ -1046,6 +1042,33 @@ body > div[style*="position:fixed"][style*="right:8px"] {
   gap: 8px;
 }
 
+.ia-first-year-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.ia-first-year-grid .ia-handbook-item {
+  min-height: 86px;
+}
+
+.ia-handbook-details {
+  margin-top: 10px;
+  border-top: 1px solid var(--border);
+}
+
+.ia-handbook-details summary {
+  padding: 10px 2px 0;
+  color: var(--text-mute);
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.ia-handbook-details[open] summary {
+  margin-bottom: 10px;
+  color: var(--gold);
+}
+
 .ia-handbook-item {
   padding: 11px 10px;
   border-left: 2px solid var(--border);
@@ -1067,31 +1090,6 @@ body > div[style*="position:fixed"][style*="right:8px"] {
   margin: 5px 0 8px;
   font-size: 11px;
   line-height: 1.45;
-}
-
-.ia-launch-guide {
-  min-height: 94px;
-  padding: 12px;
-  border-radius: 9px;
-  border-top-width: 2px;
-}
-
-.ia-launch-guide--good { border-top-color: var(--good); }
-.ia-launch-guide--warn { border-top-color: var(--warn); }
-.ia-launch-guide--danger { border-top-color: var(--war); }
-.ia-launch-guide--info { border-top-color: var(--stable); }
-
-.ia-launch-guide p {
-  margin: 8px 0 0;
-  font-size: 11px;
-}
-
-.ia-launch-guide-grid {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 10px;
-  max-width: 1120px;
-  margin: 0 auto 16px;
 }
 
 .ia-scenario-library-head {
@@ -1265,10 +1263,6 @@ body > div[style*="position:fixed"][style*="right:8px"] {
     margin-top: 38px;
   }
 
-  .ia-launch-guide-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
   .ia-difficulty-track {
     grid-template-columns: 1fr;
   }
@@ -1335,7 +1329,7 @@ body > div[style*="position:fixed"][style*="right:8px"] {
   }
 
   .ia-handbook-grid,
-  .ia-launch-guide-grid {
+  .ia-first-year-grid {
     grid-template-columns: 1fr;
   }
 

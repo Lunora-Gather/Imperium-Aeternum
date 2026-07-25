@@ -1,8 +1,8 @@
 // Imperium Aeternum — 人口系统 engine
 // 阶段 5b：完整实现 docs/02-system-rules.md §10
 
-import type { Nation, Province, PopulationGroup, ClassId } from '../types/game';
-import { popGrowth, satisfactionDelta, classRebellionRisk } from './formulas';
+import type { Nation, Province, ClassId } from '../types/game';
+import { popGrowth, classRebellionRisk } from './formulas';
 import { clamp } from '../utils/math';
 import { NATIONAL_CHARACTERS } from '../data/national-characters';
 import type { NationalCharacterId, NationalCharacterMods } from '../data/national-characters';

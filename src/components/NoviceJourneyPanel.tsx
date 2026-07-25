@@ -39,7 +39,7 @@ export default function NoviceJourneyPanel({ step, current, total, percent, curr
     <div className="ia-novice-actions">
       <button className="ia-btn ia-btn--ghost" onClick={onDismiss}>{t('结束引导')}</button>
       {currentTab !== step.tab && <button className="ia-btn ia-btn--primary" onClick={onGo}>{t(step.cta)}</button>}
-      {canConfirm && <button className="ia-btn ia-btn--primary" onClick={onComplete}>{t('我看懂了，下一步')}</button>}
+      {canConfirm && <button className="ia-btn ia-btn--primary" onClick={onComplete}>{t('完成这一步')}</button>}
     </div>
   </aside>;
 }

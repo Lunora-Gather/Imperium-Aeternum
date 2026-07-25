@@ -82,11 +82,15 @@ export function buildLaunchHandbook(): LaunchHandbook {
     },
   ];
   return {
-    headline: '先会治理，再谈征服',
-    subtitle: 'Imperium Aeternum 的核心不是点完所有按钮，而是建立“计划 → 推进 → 复盘 → 修正计划”的长期治理循环。',
-    primaryAdvice: '第一局建议选地中海黎明；每年先看总览页，再决定是否结束本年。',
+    headline: '第一局只要记住三件事',
+    subtitle: '看总览、做一件有效行动、存档后推进。年报会告诉你下一年该改什么。',
+    primaryAdvice: '新手推荐：地中海黎明',
     sections,
-    quickStart: sections.flatMap((s) => s.steps).filter((x) => ['roadmap', 'guidance', 'council', 'preview', 'report', 'save'].includes(x.id)),
+    quickStart: [
+      { id: 'look', label: '1 · 看总览', body: '先看行动中心；红色风险必须先处理。', tone: 'gold' },
+      { id: 'act', label: '2 · 做一件事', body: '只解决今年最重要的问题，不必点遍所有页面。', tone: 'good' },
+      { id: 'advance', label: '3 · 存档并推进', body: '保存后结束本年，再用年报决定下一步。', tone: 'info' },
+    ],
   };
 }
 

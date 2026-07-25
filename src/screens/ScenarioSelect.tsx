@@ -5,12 +5,12 @@ import { SCENARIOS, type ScenarioId } from '../store/scenarioCatalog';
 import { clearAllSaves, SAVE_VERSION } from '../store/persistence';
 import { inspectAllSaveSlots, type SaveRecoveryPreview } from '../gameplay/saveRecovery';
 import { getScenarioProfile, nationStyleTags, recommendedScenarioIds, summarizeSavePreviews, type LaunchTone } from '../gameplay/launchHub';
-import { buildScenarioChallengeGuide, recommendedChallengePath, summarizeChallengePath, type ScenarioChallengeGuide } from '../gameplay/difficultyGuide';
+import { buildScenarioChallengeGuide, summarizeChallengePath, type ScenarioChallengeGuide } from '../gameplay/difficultyGuide';
 import { buildLaunchHandbook, type LaunchHandbook } from '../gameplay/launchHandbook';
 import { BUILD_MARK } from '../buildInfo';
 import { Btn, Tag } from '../components/ui';
 import { AccountButton } from '../components/account/AccountPanel';
-import { SharedWorldButton } from '../components/sharedWorld/SharedWorldLobby';
+import { SharedWorldButton } from '../components/shared-world/SharedWorldLobby';
 import { SocialButton } from '../components/social/SocialPanel';
 import { LocaleSwitch } from '../components/LocaleSwitch';
 import { useI18n } from '../i18n';
@@ -114,7 +114,6 @@ export default function ScenarioSelect() {
       <DifficultyTrack path={challengePath.ids} headline={challengePath.headline} advice={challengePath.advice} onPick={startPickedScenario} />
     </section>
     <HandbookPanel handbook={handbook} />
-    <div className="ia-launch-guide-grid"><Guide title={t('第一次玩')} body={t('选地中海黎明，最快理解财政、省份、战争和事件。')} tone="good" /><Guide title={t('喜欢经营')} body={t('选印度洋贸易，经济和海贸路线更清晰。')} tone="info" /><Guide title={t('喜欢冲突')} body={t('选地中海争霸，战争、贸易和外交都很密集。')} tone="warn" /><Guide title={t('追求旗舰长局')} body={t('选万邦纪元，但建议熟悉系统后再玩。')} tone="danger" /></div>
     <div id="scenario-library" className="ia-scenario-library-head"><div><span className="ia-up">Campaign Library</span><h2 className="ia-display">{t('选择剧本')}</h2></div><p>{t('按压力和玩法定位选择，不同剧本对应不同学习曲线。')}</p></div>
     <div className="ia-scenario-grid">{SCENARIOS.map((s) => { const hint = getScenarioProfile(s.id); const challenge = buildScenarioChallengeGuide(s.id); const isRecommended = recommended.has(s.id); return <button key={s.id} className={`ia-scenario-card ${isRecommended ? 'is-recommended' : ''}`} onClick={() => startPickedScenario(s.id)} style={{ borderColor: isRecommended ? `var(--${toneVar(hint.tone)})` : undefined }}><div className="ia-scenario-card__top"><h3 className="ia-display">{t(s.name)}</h3><Tag text={t(s.nationCount)} tone="gold" /></div><div className="ia-scenario-sub">{t(s.subtitle)}</div><p>{t(s.description)}</p><div className="ia-scenario-tags"><Tag text={t(hint.marketTag)} tone={hint.tone} /><Tag text={t(challenge.label)} tone={challenge.tone} /><Tag text={`${t('压力')} ${challenge.pressure}`} tone={challenge.tone} />{isRecommended && <Tag text={t('推荐')} tone="gold" />}</div><div className="ia-scenario-advice">{t(challenge.headline)} · {t(challenge.recommendedAfter)}</div><div className="ia-scenario-foot">{t(s.needsNationPick ? '选择邦国' : '开始剧本')}<span>→</span></div></button>; })}</div>
     <div className="ia-menu-actions">{saveExists && <Btn label={t('读取自动存档')} variant="ghost" onClick={() => loadFromSlot(0)} />}{saveSummary.best && <Btn label={t('继续槽位 {{slot}}', { slot: saveSummary.best.slot })} variant="primary" onClick={continueBest} />}{previews.some((p) => p.status !== 'empty') && <Btn label={t('刷新存档体检')} variant="ghost" onClick={refreshSaves} />}{previews.some((p) => p.status !== 'empty') && <Btn label={t('清理本地存档')} warn onClick={clearLocal} />}</div>
@@ -133,14 +132,23 @@ function HandbookPanel({ handbook }: { handbook: LaunchHandbook }) {
       </div>
       <Tag text={t(handbook.primaryAdvice)} tone="good" />
     </div>
-    <div className="ia-handbook-grid">
-      {handbook.sections.map((section) => <article key={section.id} className={`ia-handbook-item ia-handbook-item--${section.tone}`}>
-        <Tag text={section.kicker} tone={section.tone} />
-        <strong>{t(section.title)}</strong>
-        <p>{t(section.summary)}</p>
-        <div>{section.steps.slice(0, 3).map((x) => <Tag key={x.id} text={t(x.label)} tone={x.tone} />)}</div>
+    <div className="ia-first-year-grid">
+      {handbook.quickStart.map((step) => <article key={step.id} className={`ia-handbook-item ia-handbook-item--${step.tone}`}>
+        <strong>{t(step.label)}</strong>
+        <p>{t(step.body)}</p>
       </article>)}
     </div>
+    <details className="ia-handbook-details">
+      <summary>{t('展开完整玩法速查')}</summary>
+      <div className="ia-handbook-grid">
+        {handbook.sections.map((section) => <article key={section.id} className={`ia-handbook-item ia-handbook-item--${section.tone}`}>
+          <Tag text={section.kicker} tone={section.tone} />
+          <strong>{t(section.title)}</strong>
+          <p>{t(section.summary)}</p>
+          <div>{section.steps.slice(0, 3).map((x) => <Tag key={x.id} text={t(x.label)} tone={x.tone} />)}</div>
+        </article>)}
+      </div>
+    </details>
   </section>;
 }
 
@@ -202,10 +210,6 @@ function ContinuePanel({ summary, onContinue, onStartRecommended, onRefresh }: {
       <Btn label={t('刷新体检')} variant="ghost" onClick={onRefresh} />
     </div>
   </section>;
-}
-
-function Guide({ title, body, tone }: { title: string; body: string; tone: 'good' | 'warn' | 'danger' | 'info' }) {
-  return <article className={`ia-launch-guide ia-launch-guide--${tone}`}><Tag text={title} tone={tone} /><p>{body}</p></article>;
 }
 
 function ThemeSwitch({ theme, applyTheme }: { theme: string; applyTheme: (theme: string) => void }) {

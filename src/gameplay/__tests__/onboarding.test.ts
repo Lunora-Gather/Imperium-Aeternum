@@ -8,8 +8,8 @@ describe('guided onboarding route', () => {
       'ambition',
       'readiness',
       'action',
-      'turn',
       'save',
+      'turn',
     ]);
     expect(new Set(ONBOARDING_STEPS.map((step) => step.id)).size).toBe(ONBOARDING_STEPS.length);
   });

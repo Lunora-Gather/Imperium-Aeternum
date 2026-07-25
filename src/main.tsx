@@ -3,12 +3,12 @@
 
 import { createRoot } from 'react-dom/client';
 import ErrorBoundary from './components/ErrorBoundary';
-import './index.css';
-import './layout.css';
-import './restraint.css';
-import './quiet.css';
-import './dashboard.css';
-import './palette.css';
+import './styles/base.css';
+import './styles/layout.css';
+import './styles/restraint.css';
+import './styles/quiet.css';
+import './styles/dashboard.css';
+import './styles/palette.css';
 import { BUILD_MARK } from './buildInfo';
 
 function showFatalError(error: unknown) {

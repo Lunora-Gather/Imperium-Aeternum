@@ -2,7 +2,7 @@
 // 对应 docs/formulas.md §11 手算示例
 
 import { describe, it, expect } from 'vitest';
-import type { Army } from '../types/game';
+import type { Army } from '../../types/game';
 import {
   computeTax, stabilityTaxModifier, corruptionModifier, assimilationModifier,
   computeFood, agriTechModifier, infrastructureFoodModifier,
@@ -15,7 +15,7 @@ import {
   computeSciPt, researchCost,
   assimilationDelta, loyaltyDelta,
   actionPointsPerTurn, activateTendency,
-} from '../engine/formulas';
+} from '../formulas';
 
 describe('§2.1 税收', () => {
   it('手算示例：pop=1000 tax=0.15 eff=1.0 stab=60 corr=20 assim=80 → ≈156.7', () => {

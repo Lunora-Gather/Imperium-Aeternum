@@ -2,11 +2,10 @@
 // 这不是规划，是真正跑出来的数据
 
 import { describe, it, expect } from 'vitest';
-import { createWorldState } from '../engine/init';
-import { processTurn } from '../engine/turn';
-import { applyEffect } from '../engine/events';
-import { EVENTS, EVENT_BY_ID } from '../data/events';
-import type { GameState } from '../types/game';
+import { createWorldState } from '../init';
+import { processTurn } from '../turn';
+import { applyEffect } from '../events';
+import { EVENTS, EVENT_BY_ID } from '../../data/events';
 
 describe('W4 世界级烟雾测试（192 国 / 600 省）', () => {
   it('创建世界：192 国 / 600 省 / 稀疏外交', () => {

@@ -32,10 +32,6 @@ function clamp(v: number, min = 0, max = 100): number {
   return Math.max(min, Math.min(max, v));
 }
 
-function statusDone(done: boolean): CoachStepStatus {
-  return done ? 'done' : 'todo';
-}
-
 function toneFor(status: CoachStepStatus): TurnRiskTone {
   if (status === 'blocked') return 'danger';
   if (status === 'todo') return 'warn';
