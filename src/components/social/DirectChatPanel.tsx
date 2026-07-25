@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { subscribeToDirectMessages, worldMessageMediaUrl } from '../../services/appwrite/socialService';
+import { worldMessageMediaUrl } from '../../services/appwrite/socialService';
 import { useAccountStore } from '../../store/accountStore';
 import { useSocialStore } from '../../store/socialStore';
 import { Btn } from '../ui';
@@ -19,15 +19,7 @@ export function DirectChatPanel({ friendUserId, friendName, onBack }: { friendUs
 
   useEffect(() => () => { if (previewUrl) URL.revokeObjectURL(previewUrl); }, [previewUrl]);
   useEffect(() => { void store.refreshDirectMessages(friendUserId); }, [friendUserId]);
-  useEffect(() => {
-    if (!userId) return;
-    let cancelled = false;
-    let dispose: (() => Promise<void>) | undefined;
-    void subscribeToDirectMessages(userId, store.receiveDirectMessage)
-      .then((cleanup) => { if (cancelled) void cleanup(); else dispose = cleanup; })
-      .catch((error) => { if (!cancelled) useSocialStore.setState({ message: error instanceof Error ? error.message : '实时私信连接失败' }); });
-    return () => { cancelled = true; if (dispose) void dispose(); };
-  }, [userId]);
+  useEffect(() => { store.markConversationRead(friendUserId); return () => store.markConversationRead(null); }, [friendUserId]);
   useEffect(() => { logRef.current?.scrollTo({ top: logRef.current.scrollHeight, behavior: 'smooth' }); }, [messages.length]);
 
   const submit = async () => {

@@ -5,6 +5,9 @@ export interface GameProfile {
   userId: string;
   displayName: string;
   friendCode: string;
+  title: string;
+  bio: string;
+  avatarColor: string;
   createdAt: string;
   lastSeenAt: string;
 }

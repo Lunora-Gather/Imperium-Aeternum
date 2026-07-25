@@ -3,17 +3,17 @@ import type { DirectMessage, Friendship, GameProfile, WorldChatMessage } from '.
 import { APPWRITE_CONFIG } from './config';
 import { getAppwriteServices } from './client';
 
-interface ProfileRow extends Models.Row { userId: string; displayName: string; friendCode: string; createdAt: string; lastSeenAt: string }
+interface ProfileRow extends Models.Row { userId: string; displayName: string; friendCode: string; title?: string | null; bio?: string | null; avatarColor?: string | null; createdAt: string; lastSeenAt: string }
 interface FriendshipRow extends Models.Row { pairKey: string; requesterId: string; addresseeId: string; requesterName: string; addresseeName: string; status: Friendship['status']; createdAt: string; respondedAt: string | null }
 interface MessageRow extends Models.Row { worldId: string; userId: string; displayName: string; nationId: string | null; body: string; kind?: 'text' | 'image'; mediaFileId?: string | null; mediaMime?: string | null; createdAt: string }
 interface DirectMessageRow extends Models.Row { conversationKey: string; senderId: string; recipientId: string; senderName: string; body: string; kind: 'text' | 'image'; mediaFileId?: string | null; mediaMime?: string | null; createdAt: string }
 
-const profile = (row: ProfileRow): GameProfile => ({ id: row.$id, userId: row.userId, displayName: row.displayName, friendCode: row.friendCode, createdAt: row.createdAt, lastSeenAt: row.lastSeenAt });
+const profile = (row: ProfileRow): GameProfile => ({ id: row.$id, userId: row.userId, displayName: row.displayName, friendCode: row.friendCode, title: row.title ?? '初来乍到的统治者', bio: row.bio ?? '这位统治者还没有写下自己的宣言。', avatarColor: row.avatarColor ?? 'gold', createdAt: row.createdAt, lastSeenAt: row.lastSeenAt });
 const friendship = (row: FriendshipRow): Friendship => ({ id: row.$id, pairKey: row.pairKey, requesterId: row.requesterId, addresseeId: row.addresseeId, requesterName: row.requesterName, addresseeName: row.addresseeName, status: row.status, createdAt: row.createdAt, respondedAt: row.respondedAt });
 const message = (row: MessageRow): WorldChatMessage => ({ id: row.$id, worldId: row.worldId, userId: row.userId, displayName: row.displayName, nationId: row.nationId, body: row.body, kind: row.kind ?? 'text', mediaFileId: row.mediaFileId ?? null, mediaMime: row.mediaMime ?? null, createdAt: row.createdAt });
 const directMessage = (row: DirectMessageRow): DirectMessage => ({ id: row.$id, conversationKey: row.conversationKey, senderId: row.senderId, recipientId: row.recipientId, senderName: row.senderName, body: row.body, kind: row.kind, mediaFileId: row.mediaFileId ?? null, mediaMime: row.mediaMime ?? null, createdAt: row.createdAt });
 
-interface SocialGatewayResult { ok: boolean; message?: string | MessageRow | DirectMessageRow; profile?: ProfileRow; messages?: (MessageRow | DirectMessageRow)[] }
+interface SocialGatewayResult { ok: boolean; message?: string | MessageRow | DirectMessageRow; profile?: ProfileRow; profiles?: ProfileRow[]; messages?: (MessageRow | DirectMessageRow)[] }
 
 async function executeSocial(action: string, data: Record<string, unknown> = {}): Promise<SocialGatewayResult> {
   const execution = await getAppwriteServices().functions.createExecution({
@@ -37,6 +37,22 @@ export async function ensureGameProfile(): Promise<GameProfile> {
 export async function findProfileByFriendCode(friendCode: string): Promise<GameProfile | null> {
   const result = await executeSocial('find_profile', { friendCode: friendCode.trim().toUpperCase() });
   return result.profile ? profile(result.profile) : null;
+}
+
+export async function discoverProfiles(): Promise<GameProfile[]> {
+  const result = await executeSocial('discover_profiles');
+  return (result.profiles ?? []).map(profile);
+}
+
+export async function getPublicProfile(userId: string): Promise<GameProfile | null> {
+  const result = await executeSocial('get_profile', { targetUserId: userId });
+  return result.profile ? profile(result.profile) : null;
+}
+
+export async function updateGameProfile(data: Pick<GameProfile, 'displayName' | 'title' | 'bio' | 'avatarColor'>): Promise<GameProfile> {
+  const result = await executeSocial('update_profile', data);
+  if (!result.profile) throw new Error('玩家名片更新失败');
+  return profile(result.profile);
 }
 
 export async function listFriendships(): Promise<Friendship[]> {
@@ -133,6 +149,14 @@ export async function subscribeToDirectMessages(userId: string, onMessage: (entr
       const payload = event.payload as Partial<DirectMessageRow>;
       if (payload.$id && (payload.senderId === userId || payload.recipientId === userId)) onMessage(directMessage(payload as DirectMessageRow));
     },
+  );
+  return async () => { await subscription.unsubscribe(); };
+}
+
+export async function subscribeToFriendships(onChange: () => void): Promise<() => Promise<void>> {
+  const subscription = await getAppwriteServices().realtime.subscribe(
+    Channel.tablesdb(APPWRITE_CONFIG.databaseId).table(APPWRITE_CONFIG.friendshipTableId).row(),
+    () => onChange(),
   );
   return async () => { await subscription.unsubscribe(); };
 }

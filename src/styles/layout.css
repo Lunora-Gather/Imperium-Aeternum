@@ -210,10 +210,77 @@
 .ia-world-nation p { min-height: 35px; color: var(--text-mute); font-size: 10.5px; line-height: 1.55; }
 .ia-world-nation-actions { display: flex; gap: 7px; flex-wrap: wrap; }
 .ia-world-message { margin-top: 10px; padding: 8px 10px; border-radius: 8px; background: var(--bg-inset); color: var(--text-mute); font-size: 11px; }
-.ia-social-modal { width: min(620px, calc(100vw - 24px)); max-height: calc(100vh - 32px); overflow-y: auto; padding: 20px; border: 1px solid var(--border-gold); border-radius: 18px; background: linear-gradient(165deg, var(--bg-raised), var(--bg-panel)); box-shadow: 0 24px 80px rgba(0,0,0,.6); }
+.ia-social-modal { width: min(780px, calc(100vw - 24px)); min-height: min(560px, calc(100vh - 32px)); max-height: calc(100vh - 32px); overflow-y: auto; padding: 20px; border: 1px solid var(--border-gold); border-radius: 18px; background: linear-gradient(165deg, var(--bg-raised), var(--bg-panel)); box-shadow: 0 24px 80px rgba(0,0,0,.6); }
 .ia-social-modal > header { display: flex; justify-content: space-between; gap: 12px; align-items: flex-start; }
 .ia-social-modal > header span { color: var(--gold); font-size: 9px; }
 .ia-social-modal h2 { margin: 4px 0 0; }
+.ia-social-tabs { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; margin-top: 18px; padding: 4px; border: 1px solid var(--border); border-radius: 12px; background: var(--bg-inset); }
+.ia-social-tabs button { min-height: 40px; position: relative; border: 0; border-radius: 8px; background: transparent; color: var(--text-mute); cursor: pointer; font: 500 11px var(--font-body); }
+.ia-social-tabs button.is-active { background: var(--bg-raised); color: var(--gold); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--gold) 35%, transparent); }
+.ia-social-tabs button b { min-width: 17px; height: 17px; display: grid; place-items: center; position: absolute; top: 3px; right: 8px; border-radius: 50%; background: var(--danger); color: white; font: 700 8px var(--font-mono); }
+.ia-social-content { min-height: 370px; padding-top: 14px; }
+.ia-social-discover-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 10px; }
+.ia-social-discover-head strong { color: var(--text); font: 600 14px var(--font-display); }
+.ia-social-discover-head p { margin: 3px 0 0; color: var(--text-dim); font-size: 10px; }
+.ia-player-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 9px; }
+.ia-player-tile { min-width: 0; padding: 12px; border: 1px solid var(--border); border-radius: 13px; background: linear-gradient(150deg, color-mix(in srgb, var(--bg-raised) 94%, var(--gold) 2%), var(--bg-inset)); transition: transform .16s ease, border-color .16s ease; }
+.ia-player-tile:hover { transform: translateY(-2px); border-color: color-mix(in srgb, var(--gold) 42%, var(--border)); }
+.ia-player-tile-main { width: 100%; display: flex; align-items: center; gap: 10px; padding: 0; border: 0; background: transparent; color: inherit; text-align: left; cursor: pointer; }
+.ia-player-tile-main > span:last-child { min-width: 0; display: grid; gap: 3px; }
+.ia-player-tile-main strong { overflow: hidden; color: var(--text); font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
+.ia-player-tile-main em, .ia-friend-identity em { overflow: hidden; color: var(--gold); font-size: 9px; font-style: normal; text-overflow: ellipsis; white-space: nowrap; }
+.ia-player-tile > p { height: 34px; overflow: hidden; margin: 10px 0; color: var(--text-mute); font-size: 9.5px; line-height: 1.55; }
+.ia-player-tile > div { display: flex; align-items: center; justify-content: space-between; gap: 7px; }
+.ia-player-tile > div > button:not(.ia-btn) { border: 0; background: transparent; color: var(--text-dim); font-size: 9px; cursor: pointer; }
+.ia-profile-avatar { flex: 0 0 auto; display: grid; place-items: center; border: 1px solid currentColor; border-radius: 34% 66% 58% 42% / 48% 38% 62% 52%; background: color-mix(in srgb, currentColor 13%, var(--bg-raised)); font-family: var(--font-display); box-shadow: inset 0 1px 0 rgba(255,255,255,.08), 0 5px 16px rgba(0,0,0,.25); }
+.ia-profile-avatar--small { width: 28px; height: 28px; font-size: 10px; }
+.ia-profile-avatar--normal { width: 44px; height: 44px; font-size: 17px; }
+.ia-profile-avatar--large { width: 72px; height: 72px; font-size: 29px; }
+.ia-profile-avatar.tone-gold, .ia-color-choice.tone-gold { color: var(--gold); }
+.ia-profile-avatar.tone-jade, .ia-color-choice.tone-jade { color: #69aa78; }
+.ia-profile-avatar.tone-azure, .ia-color-choice.tone-azure { color: #6f9fbd; }
+.ia-profile-avatar.tone-crimson, .ia-color-choice.tone-crimson { color: #b75f55; }
+.ia-profile-avatar.tone-violet, .ia-color-choice.tone-violet { color: #9a78b5; }
+.ia-profile-avatar.tone-silver, .ia-color-choice.tone-silver { color: #a9afb5; }
+.ia-friend-code-entry { margin-top: 14px; padding-top: 10px; border-top: 1px solid var(--border); }
+.ia-friend-code-entry summary { color: var(--text-dim); font-size: 10px; cursor: pointer; }
+.ia-friend-identity { min-width: 0; display: flex; align-items: center; gap: 8px; padding: 0; border: 0; background: transparent; color: inherit; text-align: left; cursor: pointer; }
+.ia-friend-identity > span:last-child { min-width: 0; display: grid; gap: 2px; }
+.ia-mini-avatar { width: 31px; height: 31px; display: grid; place-items: center; border: 1px solid var(--border-gold); border-radius: 10px; background: var(--bg-raised); color: var(--gold); font-family: var(--font-display); }
+.ia-my-profile { max-width: 600px; margin: 0 auto; }
+.ia-my-profile-preview { display: flex; align-items: center; gap: 16px; padding: 18px; border: 1px solid var(--border); border-radius: 16px; background: radial-gradient(circle at 0 0, color-mix(in srgb, var(--gold) 10%, transparent), transparent 45%), var(--bg-inset); }
+.ia-my-profile-preview > div { min-width: 0; }
+.ia-my-profile-preview h3 { margin: 7px 0 3px; color: var(--text); font: 600 21px var(--font-display); }
+.ia-my-profile-preview p { margin: 0; color: var(--text-mute); font-size: 10.5px; line-height: 1.55; }
+.ia-my-profile-actions, .ia-profile-form > div { display: flex; justify-content: flex-end; gap: 8px; margin-top: 12px; }
+.ia-profile-form { display: grid; gap: 11px; margin-top: 13px; }
+.ia-profile-form label { display: grid; gap: 5px; color: var(--text-mute); font-size: 10px; }
+.ia-profile-form textarea { min-height: 86px; resize: vertical; }
+.ia-profile-form fieldset { display: flex; gap: 9px; margin: 0; padding: 9px 0; border: 0; }
+.ia-profile-form legend { margin-bottom: 7px; color: var(--text-mute); font-size: 10px; }
+.ia-color-choice { width: 28px; height: 28px; border: 2px solid var(--border); border-radius: 50%; background: currentColor; cursor: pointer; box-shadow: inset 0 0 0 5px var(--bg-panel); }
+.ia-color-choice.is-active { border-color: currentColor; transform: scale(1.12); }
+.ia-profile-backdrop { position: fixed; inset: 0; z-index: 220; display: grid; place-items: center; padding: 16px; background: rgba(9,7,5,.62); backdrop-filter: blur(8px); }
+.ia-player-card { width: min(440px, calc(100vw - 24px)); position: relative; overflow: hidden; border: 1px solid var(--border-gold); border-radius: 22px; background: var(--bg-panel); box-shadow: 0 30px 100px rgba(0,0,0,.72); }
+.ia-player-card > .ia-modal-close { position: absolute; z-index: 2; top: 12px; right: 12px; }
+.ia-player-card-cover { height: 112px; padding: 18px; background: radial-gradient(circle at 25% 0, currentColor, transparent 34%), linear-gradient(135deg, color-mix(in srgb, currentColor 26%, var(--bg-inset)), var(--bg-panel)); color: var(--gold); opacity: .8; }
+.ia-player-card-cover span { color: color-mix(in srgb, currentColor 72%, white); font: 8px var(--font-mono); letter-spacing: .2em; }
+.ia-player-card-identity { display: flex; align-items: flex-end; gap: 15px; margin-top: -38px; padding: 0 22px; }
+.ia-player-card-identity h2 { margin: 7px 0 2px; font-size: 25px; }
+.ia-player-card-identity p { margin: 0; color: var(--good); font-size: 9px; }
+.ia-player-card blockquote { min-height: 54px; margin: 20px 22px 12px; padding: 13px; border-left: 2px solid var(--gold); background: var(--bg-inset); color: var(--text-soft); font-size: 11px; line-height: 1.65; }
+.ia-player-card-meta { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 0 22px; }
+.ia-player-card-meta > div { display: grid; gap: 4px; padding: 10px; border: 1px solid var(--border); border-radius: 10px; }
+.ia-player-card-meta span { color: var(--text-dim); font-size: 8px; }
+.ia-player-card-meta strong { color: var(--text-mute); font: 10px var(--font-mono); }
+.ia-player-card footer { min-height: 62px; display: flex; justify-content: flex-end; align-items: center; padding: 13px 22px 18px; }
+.ia-social-dock { position: fixed; left: 20px; bottom: 20px; z-index: 145; min-width: 54px; height: 54px; display: flex; align-items: center; justify-content: center; gap: 8px; padding: 0 16px; border: 1px solid var(--border-gold); border-radius: 999px; background: linear-gradient(145deg, var(--bg-raised), var(--bg-panel)); color: var(--gold); cursor: pointer; box-shadow: 0 14px 40px rgba(0,0,0,.5); transition: transform .18s ease, box-shadow .18s ease; }
+.ia-social-dock:hover { transform: translateY(-3px); box-shadow: 0 19px 48px rgba(0,0,0,.58); }
+.ia-social-dock > span { font-size: 21px; }
+.ia-social-dock > em { color: var(--text-mute); font-size: 10px; font-style: normal; }
+.ia-social-dock > b { min-width: 20px; height: 20px; display: grid; place-items: center; position: absolute; right: -3px; top: -5px; border: 2px solid var(--bg); border-radius: 50%; background: var(--danger); color: white; font: 700 8px var(--font-mono); }
+.ia-social-dock.has-unread { animation: ia-social-pulse 2.2s ease-in-out infinite; border-color: var(--danger); }
+@keyframes ia-social-pulse { 0%,100% { box-shadow: 0 14px 40px rgba(0,0,0,.5); } 50% { box-shadow: 0 14px 46px color-mix(in srgb, var(--danger) 45%, transparent); } }
 .ia-social-code { display: flex; justify-content: space-between; gap: 16px; align-items: center; margin-top: 16px; padding: 13px; border: 1px solid var(--border); border-radius: 12px; background: var(--bg-inset); }
 .ia-social-code > div { display: grid; gap: 3px; }
 .ia-social-code span, .ia-social-code p { color: var(--text-dim); font-size: 10px; }
@@ -245,6 +312,7 @@
 .ia-card { box-shadow: inset 0 1px 0 rgba(201,164,78,0.045); }
 .ia-card:hover { border-color: color-mix(in srgb, var(--border-bright) 72%, var(--border)); }
 button:focus-visible, .ia-btn:focus-visible, .ia-tab-btn:focus-visible, .ia-icon-btn:focus-visible { outline: 2px solid color-mix(in srgb, var(--border-gold) 85%, transparent); outline-offset: 2px; }
+.ia-icon-btn--back:disabled { opacity: .28; cursor: default; }
 
 /* ========== 可信账号与社交体验 ========== */
 .ia-account-modal { width: min(600px, calc(100vw - 24px)); max-height: calc(100vh - 28px); overflow-y: auto; padding: 0; border: 1px solid var(--border-gold); border-radius: 20px; background: linear-gradient(155deg, color-mix(in srgb, var(--bg-raised) 96%, var(--gold) 4%), var(--bg-panel)); box-shadow: 0 28px 90px rgba(0,0,0,.64), inset 0 1px 0 rgba(255,255,255,.06); }
@@ -352,7 +420,9 @@ button:focus-visible, .ia-btn:focus-visible, .ia-tab-btn:focus-visible, .ia-icon
 .ia-world-chat-head > div span { color: var(--text-dim); font-size: 9px; }
 .ia-world-chat-log { height: 260px; padding: 10px; }
 .ia-world-chat-log article { display: flex; gap: 8px; align-items: flex-start; padding: 7px 3px; }
-.ia-chat-avatar { width: 26px; height: 26px; flex: 0 0 auto; display: grid; place-items: center; border: 1px solid var(--border); border-radius: 8px; background: var(--bg-raised); color: var(--gold); font: 600 10px var(--font-display); }
+.ia-chat-avatar { width: 26px; height: 26px; flex: 0 0 auto; display: grid; place-items: center; padding: 0; border: 1px solid var(--border); border-radius: 8px; background: var(--bg-raised); color: var(--gold); font: 600 10px var(--font-display); cursor: pointer; }
+.ia-chat-avatar:hover { border-color: var(--border-gold); transform: translateY(-1px); }
+.ia-chat-name { padding: 0; border: 0; background: transparent; color: var(--gold); font: 600 11px var(--font-body); cursor: pointer; }
 .ia-world-chat-log article > div { min-width: 0; max-width: min(78%, 520px); display: block; }
 .ia-world-chat-log article header { display: flex; align-items: center; gap: 6px; }
 .ia-world-chat-log article header em { padding: 2px 4px; border-radius: 4px; background: color-mix(in srgb, var(--gold) 8%, transparent); color: var(--text-dim); font-size: 8px; font-style: normal; }
@@ -400,6 +470,12 @@ button:focus-visible, .ia-btn:focus-visible, .ia-tab-btn:focus-visible, .ia-icon
   .ia-world-start-card > button { width: 100%; }
   .ia-world-start-steps { overflow-x: auto; }
   .ia-direct-chat-log { height: 44dvh; }
+  .ia-social-modal { width: calc(100vw - 16px); min-height: calc(100dvh - 16px); max-height: calc(100dvh - 16px); padding: 15px; border-radius: 16px; }
+  .ia-player-grid { grid-template-columns: 1fr; }
+  .ia-social-content { min-height: 0; }
+  .ia-social-dock { left: 10px; bottom: 10px; width: 50px; min-width: 50px; height: 50px; padding: 0; }
+  .ia-social-dock > em { display: none; }
+  .ia-player-card-identity { align-items: center; }
 }
 
 @media (max-width: 1160px) { .ia-scenario-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } .ia-map-layout { grid-template-columns: 1fr; } .ia-map-info { display: grid; grid-template-columns: 260px 1fr; } .ia-map-legend { grid-column: 1 / -1; } }

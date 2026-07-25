@@ -9,10 +9,10 @@ const budgets = {
   // Three locale catalogs add bounded copy weight. Governance copy stays lazy;
   // the 64 KiB allowance is raw (about 12 KiB gzip) and does not relax entry/App limits.
   // The authenticated HF summit secretary adds 8 KiB of lazy diplomacy code;
-  // entry/App/CSS limits remain unchanged and the diplomacy chunk gets its own cap.
-  totalJavaScript: 1104 * KIB,
-  // Verified auth and responsive social/chat surfaces add intentional UI states; retain bounded headroom.
-  totalCss: 92 * KIB,
+  // player discovery/cards add bounded lazy social code while entry/App caps stay unchanged.
+  totalJavaScript: 1120 * KIB,
+  // Responsive player cards and the in-game message dock establish the measured social UI baseline.
+  totalCss: 102 * KIB,
   entryJavaScript: 180 * KIB,
   appJavaScript: 25 * KIB,
   accountJavaScript: 140 * KIB,

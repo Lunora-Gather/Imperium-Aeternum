@@ -28,6 +28,21 @@ function hash(value) {
 const profileId = (userId) => `profile_${hash(userId)}`;
 const membershipId = (worldId, userId) => `mem_${hash(worldId)}_${hash(userId)}`;
 const readForUsers = (ids) => [...new Set(ids)].slice(0, 100).map((id) => Permission.read(Role.user(id)));
+const PROFILE_COLORS = new Set(['gold', 'jade', 'azure', 'crimson', 'violet', 'silver']);
+
+function publicProfile(row) {
+  return {
+    $id: row.$id,
+    userId: row.userId,
+    displayName: row.displayName,
+    friendCode: row.friendCode,
+    title: row.title || '初来乍到的统治者',
+    bio: row.bio || '这位统治者还没有写下自己的宣言。',
+    avatarColor: row.avatarColor || 'gold',
+    createdAt: row.createdAt,
+    lastSeenAt: row.lastSeenAt,
+  };
+}
 
 function services(req) {
   const client = new Client().setEndpoint(process.env.APPWRITE_FUNCTION_API_ENDPOINT).setProject(process.env.APPWRITE_FUNCTION_PROJECT_ID).setKey(req.headers['x-appwrite-key']);
@@ -150,12 +165,38 @@ export default async ({ req, res, error }) => {
     const { action } = body;
     const { db, users, storage } = services(req);
     const self = await ensureProfile(db, users, userId);
-    if (action === 'ensure_profile') return res.json({ ok: true, profile: self });
+    if (action === 'ensure_profile') return res.json({ ok: true, profile: publicProfile(self) });
+    if (action === 'update_profile') {
+      const displayName = String(body.displayName ?? '').trim();
+      const title = String(body.title ?? '').trim();
+      const bio = String(body.bio ?? '').trim();
+      const avatarColor = String(body.avatarColor ?? 'gold').trim();
+      if (displayName.length < 2 || displayName.length > 32) throw new Error('显示名称需要在 2–32 字之间');
+      if (title.length > 48) throw new Error('称号不能超过 48 字');
+      if (bio.length > 240) throw new Error('个人宣言不能超过 240 字');
+      if (!PROFILE_COLORS.has(avatarColor)) throw new Error('头像主题无效');
+      const updated = await db.updateRow({ databaseId: DATABASE_ID, tableId: PROFILE_TABLE, rowId: self.$id, data: { displayName, title, bio, avatarColor, lastSeenAt: new Date().toISOString() } });
+      return res.json({ ok: true, profile: publicProfile(updated) });
+    }
+    if (action === 'discover_profiles') {
+      const result = await db.listRows({ databaseId: DATABASE_ID, tableId: PROFILE_TABLE, queries: [Query.limit(50)], total: false });
+      const profiles = result.rows
+        .filter((row) => row.userId !== userId)
+        .sort((a, b) => String(b.lastSeenAt).localeCompare(String(a.lastSeenAt)))
+        .slice(0, 24)
+        .map(publicProfile);
+      return res.json({ ok: true, profiles });
+    }
+    if (action === 'get_profile') {
+      const targetUserId = identifier(body.targetUserId, 36, '玩家目标');
+      const found = await db.listRows({ databaseId: DATABASE_ID, tableId: PROFILE_TABLE, queries: [Query.equal('userId', targetUserId), Query.limit(1)], total: false });
+      return res.json({ ok: true, profile: found.rows[0] ? publicProfile(found.rows[0]) : null });
+    }
     if (action === 'find_profile') {
       const code = String(body.friendCode ?? '').trim().toUpperCase();
       if (!/^IA[A-F0-9]{8}$/.test(code)) return res.json({ ok: false, message: '好友码格式不正确' }, 400);
       const found = await db.listRows({ databaseId: DATABASE_ID, tableId: PROFILE_TABLE, queries: [Query.equal('friendCode', code), Query.limit(1)], total: false });
-      return res.json({ ok: true, profile: found.rows[0] ?? null });
+      return res.json({ ok: true, profile: found.rows[0] ? publicProfile(found.rows[0]) : null });
     }
     if (action === 'send_friend_request') {
       const targetUserId = identifier(body.targetUserId, 36, '好友目标');
