@@ -18,6 +18,10 @@ const CATEGORY_ICON: Record<string, string> = {
   crisis: '⚠', military: '⚔', religion: '☯', politics: '⚖',
   economy: '💰', diplomacy: '🤝', science: '🔬', opportunity: '✨', culture: '🎭', population: '👥',
 };
+const CATEGORY_LABEL: Record<string, string> = {
+  crisis: '危机', military: '军事', religion: '宗教', politics: '政治',
+  economy: '经济', diplomacy: '外交', science: '科技', opportunity: '机遇', culture: '文化', population: '人口',
+};
 
 const FACTION_LABEL: Record<string, string> = {
   nobles: '贵族', merchants: '商人', military: '军方', commoners: '民众', clergy: '神职',
@@ -126,51 +130,73 @@ export default function EventModal() {
 
   const tone = CATEGORY_TONE[ev.category] ?? 'info';
   const icon = CATEGORY_ICON[ev.category] ?? '📢';
+  const playerEvents = state.pendingEvents.filter((event) => event.nationId === pid);
+  const eventPosition = Math.max(0, playerEvents.findIndex((event) => event.eventId === pending.eventId)) + 1;
+  const shortcutHint = `数字键 1–${Math.min(3, ev.options.length)} 可快速选择`;
 
   return localizeReactTree(
-    <div style={{
-      position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
-      background: 'rgba(0,0,0,0.75)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 200,
-      backdropFilter: 'blur(2px)',
-    }}>
-      <div ref={dialogRef} role="dialog" aria-modal="true" aria-labelledby="event-dialog-title" aria-describedby="event-dialog-description" style={{
-        background: 'var(--bg-panel)', borderRadius: 10, padding: 18, maxWidth: 620, width: '92%',
-        border: `1px solid var(--${tone === 'danger' ? 'war' : tone === 'warn' ? 'warn' : tone === 'good' ? 'good' : 'border-gold'})`,
-        boxShadow: '0 8px 28px rgba(0,0,0,0.38)',
-      }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
-          <span style={{ fontSize: 26 }}>{icon}</span>
-          <div style={{ flex: 1 }}>
-            <div style={{ fontSize: 11, color: 'var(--text-dim)', marginBottom: 2 }}>
-              <Tag text={ev.category} tone={tone} />
+    <div className="ia-event-backdrop">
+      <section
+        ref={dialogRef}
+        className={`ia-event-dialog tone-${tone}`}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="event-dialog-title"
+        aria-describedby="event-dialog-description"
+      >
+        <header className="ia-event-header">
+          <span className="ia-event-icon" aria-hidden="true">{icon}</span>
+          <div className="ia-event-heading">
+            <div className="ia-event-kicker">
+              <Tag text={CATEGORY_LABEL[ev.category] ?? ev.category} tone={tone} />
+              <span>待决事件</span>
+              {playerEvents.length > 1 && <span className="ia-event-progress">{eventPosition} / {playerEvents.length}</span>}
             </div>
-            <h3 id="event-dialog-title" style={{ margin: 0, fontSize: 18, fontWeight: 700 }}>{ev.title}</h3>
+            <h3 id="event-dialog-title">{ev.title}</h3>
           </div>
-        </div>
-        <p id="event-dialog-description" style={{ color: 'var(--text)', marginBottom: 14, fontSize: 14, lineHeight: 1.6 }}>{ev.description}</p>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+        </header>
+
+        <div className="ia-event-body">
+          <p id="event-dialog-description" className="ia-event-description">{ev.description}</p>
+          <div className="ia-event-options">
           {ev.options.map((opt, i) => {
             const sums = effectSummary(opt.effects);
             const note = consequenceText(opt.effects);
             return (
-              <button key={i} className="ia-btn" onClick={() => choose(i)}
+              <button
+                key={i}
+                className="ia-event-option"
+                onClick={() => choose(i)}
                 title={`快捷键 ${i + 1}`}
-                style={{ textAlign: 'left', padding: 11, flexDirection: 'column', alignItems: 'stretch', gap: 7 }}>
-                <div style={{ fontWeight: 600, fontSize: 14, display: 'flex', alignItems: 'center', gap: 8 }}>
-                  {ev.options.length <= 3 && <span style={{ fontSize: 10, color: 'var(--gold)', opacity: 0.7, border: '1px solid var(--border-gold)', borderRadius: 3, padding: '0 4px' }}>[{i + 1}]</span>}
-                  {opt.text}
+                aria-label={`${i + 1}. ${opt.text}`}
+              >
+                <div className="ia-event-option-head">
+                  <span className="ia-event-shortcut" aria-hidden="true">{i + 1}</span>
+                  <strong>{opt.text}</strong>
+                  <span className="ia-event-select"><span>选择</span><b aria-hidden="true">→</b></span>
                 </div>
                 {sums.length > 0 && (
-                  <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
-                    {sums.map((s, j) => <Tag key={j} text={s.txt} tone={s.tone} />)}
+                  <div className="ia-event-impact">
+                    <span className="ia-event-section-label">即时影响</span>
+                    <div className="ia-event-effect-tags">
+                      {sums.map((s, j) => <Tag key={j} text={s.txt} tone={s.tone} />)}
+                    </div>
                   </div>
                 )}
-                <div style={{ fontSize: 10, color: 'var(--text-dim)', lineHeight: 1.5 }}>后果：{note}</div>
+                <div className="ia-event-consequence">
+                  <span className="ia-event-section-label">后续影响</span>
+                  <span>{note}</span>
+                </div>
               </button>
             );
           })}
+          </div>
         </div>
-      </div>
+        <footer className="ia-event-footer">
+          <span>{shortcutHint}</span>
+          <span>选择后立即生效</span>
+        </footer>
+      </section>
     </div>
   );
 }

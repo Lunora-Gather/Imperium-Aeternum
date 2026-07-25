@@ -1,6 +1,10 @@
 import { registerEnglishPatterns, registerEnglishTranslations } from '..';
 
 const en: Record<string, string> = {
+  '危机': 'Crisis', '宗教': 'Religion', '机遇': 'Opportunity', '待决事件': 'Pending event',
+  '即时影响': 'Immediate effects', '后续影响': 'Long-term impact', '选择': 'Choose',
+  '数字键 1–2 可快速选择': 'Press 1–2 to choose quickly', '数字键 1–3 可快速选择': 'Press 1–3 to choose quickly',
+  '选择后立即生效': 'Takes effect immediately',
   '天下舆图': 'World Map', '羊皮战略图 · 点为省份，光晕为国土影响，线为道路/边境联系。': 'Parchment strategy map · dots are provinces, halos show national influence, and lines show roads or borders.',
   '全图': 'All', '吾土': 'Our realm', '边境': 'Frontier', '显示省份': 'Show provinces', '首都': 'Capital', '边境点': 'Frontier nodes',
   '悬停省份查看详情': 'Hover over a province for details', '金色外圈为吾土，大圆为首都。点击吾土省份可进入省份治理。': 'Gold outlines mark your realm; large circles are capitals. Select one of your provinces to govern it.',
