@@ -23,6 +23,7 @@ import LogToast from './components/LogToast';
 import ErrorBoundary from './components/ErrorBoundary';
 import { AccountButton } from './components/account/AccountPanel';
 import { LocaleSwitch } from './components/LocaleSwitch';
+import { SocialDock } from './components/social/SocialPanel';
 import { useI18n } from './i18n';
 
 const ScenarioSelect = lazy(() => import('./screens/ScenarioSelect'));
@@ -132,6 +133,7 @@ export default function App() {
     setTabHistory(resolved.history);
     setTab(resolved.target);
   }, [tab, tabHistory]);
+  const canGoBack = !resolveBackTarget(tabHistory, tab, 'dashboard').usedFallback;
 
   const dismissGuidance = useCallback(() => {
     setShowHelp(false);
@@ -345,7 +347,7 @@ export default function App() {
               </button>
               <button className="ia-icon-btn" onClick={() => { setShowHelp(true); setTutorialStep(0); }} title={t('新手帮助')} aria-label={t('新手帮助')}>?</button>
               <button className="ia-icon-btn" onClick={sfxMute.toggle} title={t(sfxMute.muted ? '音效已关（点击开启）' : '音效已开（点击静音）')} aria-label={t('音效开关')}>{sfxMute.muted ? '🔇' : '🔊'}</button>
-              <button className="ia-icon-btn ia-icon-btn--back" onClick={goBackPage} title={t('返回上一页')} aria-label={t('返回上一页')}>↩</button>
+              <button className="ia-icon-btn ia-icon-btn--back" onClick={goBackPage} disabled={!canGoBack} title={t(canGoBack ? '返回上一个游戏页面' : '当前已在导航起点')} aria-label={t(canGoBack ? '返回上一个游戏页面' : '当前已在导航起点')}>↩</button>
               <button className="ia-icon-btn ia-icon-btn--back" onClick={safeBackToMenu} title={t('返回标题页')} aria-label={t('返回标题页')}>⌂</button>
             </div>
           </div>
@@ -411,6 +413,7 @@ export default function App() {
 
       {state.pendingEvents.some((p) => p.nationId === pid) && <Suspense fallback={null}><EventModal /></Suspense>}
       <LogToast />
+      <SocialDock />
 
       {noviceJourney.status === 'active' && noviceStep && !showHelp && (
         <Suspense fallback={null}>

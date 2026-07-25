@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { mergeChatMessages, reconcileSentMessage } from '../socialStore';
+import { applyIncomingUnread, mergeChatMessages, reconcileSentMessage } from '../socialStore';
 
 const entry = (id: string, createdAt: string, body = id) => ({ id, createdAt, body });
 
@@ -42,5 +42,12 @@ describe('social message reconciliation', () => {
     expect(merged).toHaveLength(50);
     expect(merged[0].id).toBe('message-05');
     expect(merged[merged.length - 1]?.id).toBe('message-54');
+  });
+
+  it('increments unread only for incoming messages outside the active conversation', () => {
+    expect(applyIncomingUnread({}, 'friend-a', null, true)).toEqual({ 'friend-a': 1 });
+    expect(applyIncomingUnread({ 'friend-a': 2 }, 'friend-a', null, true)).toEqual({ 'friend-a': 3 });
+    expect(applyIncomingUnread({ 'friend-a': 2 }, 'friend-a', 'friend-a', true)).toEqual({ 'friend-a': 2 });
+    expect(applyIncomingUnread({ 'friend-a': 2 }, 'friend-a', null, false)).toEqual({ 'friend-a': 2 });
   });
 });

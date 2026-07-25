@@ -4,6 +4,8 @@ import { useAccountStore } from '../../store/accountStore';
 import { useSocialStore } from '../../store/socialStore';
 import { Btn } from '../ui';
 import { useI18n } from '../../i18n';
+import type { GameProfile } from '../../social/types';
+import { PlayerProfileCard } from './PlayerProfileCard';
 
 export function WorldChatPanel({ worldId, nationId }: { worldId: string; nationId?: string }) {
   const { locale, t } = useI18n();
@@ -14,6 +16,7 @@ export function WorldChatPanel({ worldId, nationId }: { worldId: string; nationI
   const [attachment, setAttachment] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [seenMessageId, setSeenMessageId] = useState<string | null>(null);
+  const [viewProfile, setViewProfile] = useState<GameProfile | null>(null);
   const logRef = useRef<HTMLDivElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const messages = store.messages[worldId] ?? [];
@@ -21,6 +24,12 @@ export function WorldChatPanel({ worldId, nationId }: { worldId: string; nationI
   const newest = messages[messages.length - 1];
   const seenIndex = seenMessageId ? messages.findIndex((item) => item.id === seenMessageId) : messages.length - 1;
   const unread = seenIndex < 0 ? 0 : Math.max(0, messages.length - seenIndex - 1);
+  const profileRelation = viewProfile ? (() => {
+    const relation = store.friendships.find((item) => [item.requesterId, item.addresseeId].includes(userId ?? '') && [item.requesterId, item.addresseeId].includes(viewProfile.userId));
+    if (!relation) return 'none' as const;
+    if (relation.status === 'accepted') return 'friend' as const;
+    return relation.requesterId === userId ? 'outgoing' as const : 'incoming' as const;
+  })() : 'none';
 
   useEffect(() => {
     setOpen(false);
@@ -70,7 +79,7 @@ export function WorldChatPanel({ worldId, nationId }: { worldId: string; nationI
       {store.message && <div className="ia-world-message" role="status">{store.message}</div>}
       <div ref={logRef} className="ia-world-chat-log" aria-live="polite">{messages.length ? messages.map((item) => {
         const mine = item.delivery === 'pending' || item.userId === userId;
-        return <article key={item.id} className={mine ? 'is-mine' : ''}><span className="ia-chat-avatar">{item.displayName.slice(0, 1).toUpperCase()}</span><div><header><strong>{mine ? t('我') : item.displayName}</strong>{item.delivery === 'pending' && <em>{t('发送中…')}</em>}{item.nationId && <em>{t(item.nationId === nationId ? '当前执政国' : '版图成员')}</em>}<time>{new Date(item.createdAt).toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit' })}</time></header>{item.kind === 'image' && item.mediaFileId && <a className="ia-chat-image" href={worldMessageMediaUrl(item.mediaFileId)} target="_blank" rel="noreferrer"><img src={worldMessageMediaUrl(item.mediaFileId)} alt={item.body === '图片' ? t('{{name}} 分享的图片', { name: item.displayName }) : item.body} loading="lazy" /></a>}{(item.kind !== 'image' || item.body !== '图片') && <p>{item.body}</p>}</div></article>;
+        return <article key={item.id} className={mine ? 'is-mine' : ''}><button className="ia-chat-avatar" title={t('查看 {{name}} 的名片', { name: item.displayName })} onClick={() => void store.loadProfile(item.userId).then((profile) => profile && setViewProfile(profile))}>{item.displayName.slice(0, 1).toUpperCase()}</button><div><header><button className="ia-chat-name" onClick={() => void store.loadProfile(item.userId).then((profile) => profile && setViewProfile(profile))}>{mine ? t('我') : item.displayName}</button>{item.delivery === 'pending' && <em>{t('发送中…')}</em>}{item.nationId && <em>{t(item.nationId === nationId ? '当前执政国' : '版图成员')}</em>}<time>{new Date(item.createdAt).toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit' })}</time></header>{item.kind === 'image' && item.mediaFileId && <a className="ia-chat-image" href={worldMessageMediaUrl(item.mediaFileId)} target="_blank" rel="noreferrer"><img src={worldMessageMediaUrl(item.mediaFileId)} alt={item.body === '图片' ? t('{{name}} 分享的图片', { name: item.displayName }) : item.body} loading="lazy" /></a>}{(item.kind !== 'image' || item.body !== '图片') && <p>{item.body}</p>}</div></article>;
       }) : <div className="ia-chat-empty"><span>✦</span><strong>{t('频道尚未留下记录')}</strong><p>{t('向同版图统治者发送第一条消息。')}</p></div>}</div>
       <form className="ia-world-chat-compose" onSubmit={(event) => { event.preventDefault(); void send(); }}>
         {attachment && <div className="ia-chat-attachment">{previewUrl && <img src={previewUrl} alt="待发送图片预览" />}<div><strong>{attachment.name}</strong><span>{Math.max(1, Math.round(attachment.size / 1024))} KB · 可附带说明</span></div><button type="button" aria-label="移除待发送图片" onClick={() => { setAttachment(null); if (fileRef.current) fileRef.current.value = ''; }}>×</button></div>}
@@ -78,5 +87,6 @@ export function WorldChatPanel({ worldId, nationId }: { worldId: string; nationI
         <div><input ref={fileRef} type="file" accept="image/jpeg,image/png,image/webp,image/gif" hidden onChange={(event) => setAttachment(event.target.files?.[0] ?? null)} /><button className="ia-chat-attach-btn" type="button" disabled={sending} onClick={() => fileRef.current?.click()}>▧ {t('图片')}</button><span>{body.length}/{attachment ? 300 : 500}</span><Btn type="submit" label={t(attachment ? '发送图片' : '发送')} variant="primary" busy={sending} disabled={sending || (!body.trim() && !attachment)} /></div>
       </form>
     </div>}
+    {viewProfile && <PlayerProfileCard profile={viewProfile} isSelf={viewProfile.userId === userId} relation={profileRelation} onAdd={() => void store.addByCode(viewProfile.friendCode).then((ok) => ok && setViewProfile(null))} onClose={() => setViewProfile(null)} />}
   </section>;
 }

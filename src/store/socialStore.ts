@@ -1,8 +1,10 @@
 import { create } from 'zustand';
 import type { DirectMessage, Friendship, GameProfile, WorldChatMessage } from '../social/types';
 import {
+  discoverProfiles,
   ensureGameProfile,
   findProfileByFriendCode,
+  getPublicProfile,
   listFriendships,
   listDirectMessages,
   listWorldMessages,
@@ -13,18 +15,27 @@ import {
   sendDirectMessage,
   sendWorldImage,
   sendWorldMessage,
+  updateGameProfile,
 } from '../services/appwrite/socialService';
 
 interface SocialStore {
   profile: GameProfile | null;
+  discoveredProfiles: GameProfile[];
+  profileCache: Record<string, GameProfile>;
   friendships: Friendship[];
   messages: Record<string, WorldChatMessage[]>;
   directMessages: Record<string, DirectMessage[]>;
+  unreadDirect: Record<string, number>;
+  activeConversation: string | null;
   loading: boolean;
   sending: Record<string, boolean>;
   message: string | null;
   reset: () => void;
   initialize: () => Promise<void>;
+  refreshFriendships: () => Promise<void>;
+  discover: () => Promise<void>;
+  loadProfile: (userId: string) => Promise<GameProfile | null>;
+  updateProfile: (data: Pick<GameProfile, 'displayName' | 'title' | 'bio' | 'avatarColor'>) => Promise<boolean>;
   addByCode: (friendCode: string) => Promise<boolean>;
   respond: (friendshipId: string, accept: boolean) => Promise<void>;
   remove: (friendshipId: string) => Promise<void>;
@@ -36,6 +47,7 @@ interface SocialStore {
   sendDirect: (friendUserId: string, body: string) => Promise<boolean>;
   sendDirectImage: (friendUserId: string, file: File, caption: string) => Promise<boolean>;
   receiveDirectMessage: (message: DirectMessage) => void;
+  markConversationRead: (friendUserId: string | null) => void;
 }
 
 function compareMessages(a: { id: string; createdAt: string }, b: { id: string; createdAt: string }): number {
@@ -52,18 +64,53 @@ export function reconcileSentMessage<T extends { id: string; createdAt: string }
   return mergeChatMessages(current.filter((entry) => entry.id !== localId), [sent]);
 }
 
+export function applyIncomingUnread(current: Record<string, number>, friendUserId: string, activeConversation: string | null, incoming: boolean): Record<string, number> {
+  if (!incoming || activeConversation === friendUserId) return current;
+  return { ...current, [friendUserId]: (current[friendUserId] ?? 0) + 1 };
+}
+
 const localMessageId = () => `local:${typeof crypto !== 'undefined' && 'randomUUID' in crypto ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`}`;
 const withoutMessage = <T extends { id: string }>(messages: T[], id: string) => messages.filter((entry) => entry.id !== id);
 
 export const useSocialStore = create<SocialStore>((set, get) => ({
-  profile: null, friendships: [], messages: {}, directMessages: {}, loading: false, sending: {}, message: null,
-  reset: () => set({ profile: null, friendships: [], messages: {}, directMessages: {}, loading: false, sending: {}, message: null }),
+  profile: null, discoveredProfiles: [], profileCache: {}, friendships: [], messages: {}, directMessages: {}, unreadDirect: {}, activeConversation: null, loading: false, sending: {}, message: null,
+  reset: () => set({ profile: null, discoveredProfiles: [], profileCache: {}, friendships: [], messages: {}, directMessages: {}, unreadDirect: {}, activeConversation: null, loading: false, sending: {}, message: null }),
   initialize: async () => {
     set({ loading: true, message: null });
     try {
       const [profile, friendships] = await Promise.all([ensureGameProfile(), listFriendships()]);
-      set({ profile, friendships });
+      set({ profile, friendships, profileCache: { ...get().profileCache, [profile.userId]: profile } });
     } catch (error) { set({ message: error instanceof Error ? error.message : '社交资料加载失败' }); }
+    finally { set({ loading: false }); }
+  },
+  refreshFriendships: async () => {
+    try { set({ friendships: await listFriendships() }); }
+    catch (error) { set({ message: error instanceof Error ? error.message : '好友列表刷新失败' }); }
+  },
+  discover: async () => {
+    set({ loading: true, message: null });
+    try {
+      const discoveredProfiles = await discoverProfiles();
+      set((state) => ({ discoveredProfiles, profileCache: { ...state.profileCache, ...Object.fromEntries(discoveredProfiles.map((entry) => [entry.userId, entry])) } }));
+    } catch (error) { set({ message: error instanceof Error ? error.message : '玩家发现失败' }); }
+    finally { set({ loading: false }); }
+  },
+  loadProfile: async (userId) => {
+    const cached = get().profileCache[userId];
+    if (cached) return cached;
+    try {
+      const found = await getPublicProfile(userId);
+      if (found) set((state) => ({ profileCache: { ...state.profileCache, [found.userId]: found } }));
+      return found;
+    } catch (error) { set({ message: error instanceof Error ? error.message : '玩家名片加载失败' }); return null; }
+  },
+  updateProfile: async (data) => {
+    set({ loading: true, message: null });
+    try {
+      const profile = await updateGameProfile(data);
+      set((state) => ({ profile, profileCache: { ...state.profileCache, [profile.userId]: profile }, message: '个人名片已更新' }));
+      return true;
+    } catch (error) { set({ message: error instanceof Error ? error.message : '个人名片更新失败' }); return false; }
     finally { set({ loading: false }); }
   },
   addByCode: async (friendCode) => {
@@ -148,6 +195,13 @@ export const useSocialStore = create<SocialStore>((set, get) => ({
   receiveDirectMessage: (entry) => {
     const selfId = get().profile?.userId;
     const friendUserId = entry.senderId === selfId ? entry.recipientId : entry.senderId;
-    set((state) => ({ directMessages: { ...state.directMessages, [friendUserId]: mergeChatMessages(state.directMessages[friendUserId] ?? [], [entry]) } }));
+    set((state) => ({
+      directMessages: { ...state.directMessages, [friendUserId]: mergeChatMessages(state.directMessages[friendUserId] ?? [], [entry]) },
+      unreadDirect: applyIncomingUnread(state.unreadDirect, friendUserId, state.activeConversation, entry.senderId !== selfId),
+    }));
   },
+  markConversationRead: (friendUserId) => set((state) => {
+    if (!friendUserId) return { activeConversation: null };
+    return { activeConversation: friendUserId, unreadDirect: { ...state.unreadDirect, [friendUserId]: 0 } };
+  }),
 }));
