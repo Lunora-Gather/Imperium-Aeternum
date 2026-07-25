@@ -1,5 +1,6 @@
 import { Client, TablesDB } from 'node-appwrite';
 import { aiErrorStatus, createSummitMessages, normalizeSummitRequest, parseSummitBrief } from './policy.js';
+import { readBoundedJsonResponse } from './provider.js';
 import { releaseAIQuota, reserveAIQuota } from './quota.js';
 
 function database(req) {
@@ -19,12 +20,12 @@ async function inferBrief(data) {
   try {
     const response = await fetch('https://router.huggingface.co/v1/chat/completions', {
       method: 'POST',
-      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      headers: { Authorization: `Bearer ${token}`, Accept: 'application/json', 'Content-Type': 'application/json' },
       body: JSON.stringify({ model, messages: createSummitMessages(data), temperature: 0.35, max_tokens: 420 }),
       signal: controller.signal,
     });
     if (!response.ok) throw new Error(`Hugging Face 推理暂不可用（${response.status}）`);
-    const payload = await response.json();
+    const payload = await readBoundedJsonResponse(response);
     const content = payload?.choices?.[0]?.message?.content;
     return { brief: parseSummitBrief(content), model };
   } finally {
@@ -50,7 +51,9 @@ export default async ({ req, res, error }) => {
     }
   } catch (cause) {
     error(cause instanceof Error ? cause.message : String(cause));
-    const message = cause instanceof Error ? cause.message : 'AI 研判失败';
+    const message = typeof cause?.code === 'number'
+      ? 'AI 配额或推理服务暂不可用'
+      : cause instanceof Error ? cause.message : 'AI 研判失败';
     const status = aiErrorStatus(message);
     return res.json({ ok: false, available: status !== 503, message }, status);
   }

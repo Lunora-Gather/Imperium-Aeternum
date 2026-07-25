@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto';
 import { Client, ID, Permission, Role, Storage, TablesDB } from 'node-appwrite';
 import { InputFile } from 'node-appwrite/file';
 import { buildCloudSaveRowId } from './identity.js';
+import { normalizeCloudSavePayload } from './policy.js';
 
 export { buildCloudSaveRowId } from './identity.js';
 
@@ -32,18 +33,9 @@ async function uploadSave(db, storage, userId, body) {
   const raw = typeof body.raw === 'string' ? body.raw : '';
   const bytes = Buffer.from(raw, 'utf8');
   if (!bytes.length || bytes.length > MAX_SAVE_BYTES) throw new Error('云存档大小需要在 5MB 以内');
-  try {
-    const parsed = JSON.parse(raw);
-    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) throw new Error();
-  } catch { throw new Error('云存档内容不是有效 JSON'); }
-  const saveVersion = integer(body.saveVersion, 1, Number.MAX_SAFE_INTEGER, '存档版本');
-  const turn = integer(body.turn, 0, Number.MAX_SAFE_INTEGER, '存档回合');
-  const nationName = String(body.nationName ?? '未知国家').trim().slice(0, 128) || '未知国家';
+  const { saveVersion, turn, nationName, clientUpdatedAt } = normalizeCloudSavePayload(raw);
   const deviceId = String(body.deviceId ?? '').trim().slice(0, 64);
   if (!deviceId) throw new Error('设备标识无效');
-  const updatedMs = Date.parse(String(body.clientUpdatedAt ?? ''));
-  if (!Number.isFinite(updatedMs) || updatedMs > Date.now() + 300_000) throw new Error('存档更新时间无效');
-  const clientUpdatedAt = new Date(updatedMs).toISOString();
   const contentHash = createHash('sha256').update(bytes).digest('hex');
   const previous = await currentRow(db, userId, slot);
   if (previous?.contentHash === contentHash) return previous;
@@ -75,7 +67,9 @@ export default async ({ req, res, error }) => {
     return res.json({ ok: true, row: await uploadSave(db, storage, userId, body) });
   } catch (cause) {
     error(cause instanceof Error ? cause.message : String(cause));
-    const status = cause?.code === 409 ? 409 : cause?.code === 404 ? 404 : 400;
-    return res.json({ ok: false, message: cause instanceof Error ? cause.message : '云存档同步失败' }, status);
+    const appwriteFailure = typeof cause?.code === 'number' && ![404, 409].includes(cause.code);
+    const status = cause?.code === 409 ? 409 : cause?.code === 404 ? 404 : appwriteFailure ? 503 : 400;
+    const message = appwriteFailure ? '云存档服务暂不可用，请稍后重试' : cause instanceof Error ? cause.message : '云存档同步失败';
+    return res.json({ ok: false, message }, status);
   }
 };

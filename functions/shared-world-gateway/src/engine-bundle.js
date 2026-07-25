@@ -9588,6 +9588,7 @@ function resolvePendingEventChoice(state, nationId, eventId, optionIndex) {
 }
 
 // scripts/shared-world-engine-entry.ts
+var STRATEGY_FOCUSES = /* @__PURE__ */ new Set(["balance", "stability", "prosperity", "military", "diplomacy", "reform"]);
 function selectNation(state, nationId) {
   if (!state.nations[nationId] || state.nations[nationId].defeated) throw new Error("\u56FD\u5BB6\u4E0D\u5B58\u5728\u6216\u5DF2\u7ECF\u8986\u4EA1");
   state.playerNationId = nationId;
@@ -9611,10 +9612,13 @@ function applySharedWorldCommand(state, nationId, payload) {
       result = { ok: true, state: eventResult.state, messages: [`\u4E8B\u4EF6 ${eventResult.eventTitle}\uFF1A\u9009\u62E9\u300C${eventResult.optionText}\u300D`] };
       break;
     }
-    case "set_strategy_focus":
-      working.strategyFocus = text(0);
+    case "set_strategy_focus": {
+      const focus = text(0);
+      if (!STRATEGY_FOCUSES.has(focus)) throw new Error("\u56FD\u7B56\u7126\u70B9\u65E0\u6548");
+      working.strategyFocus = focus;
       result = { ok: true, state: working, messages: ["\u56FD\u7B56\u7126\u70B9\u5DF2\u66F4\u65B0"] };
       break;
+    }
     case "set_tax_rate":
       result = setTaxRateAction(working, num(0));
       break;

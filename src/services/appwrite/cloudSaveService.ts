@@ -1,4 +1,4 @@
-import { AppwriteException, ExecutionMethod, Query, type Models } from 'appwrite';
+import { ExecutionMethod, Query, type Models } from 'appwrite';
 import { APPWRITE_CONFIG } from './config';
 import { getAppwriteServices } from './client';
 import {
@@ -62,20 +62,18 @@ async function contentHash(raw: string): Promise<string> {
     const digest = await crypto.subtle.digest('SHA-256', bytes);
     return [...new Uint8Array(digest)].map((part) => part.toString(16).padStart(2, '0')).join('');
   }
-  return shortHash(raw);
+  throw new Error('当前浏览器不支持云存档完整性校验');
 }
 
 async function getCloudRow(userId: string, slot: number): Promise<CloudSaveRow | null> {
-  try {
-    return await getAppwriteServices().tablesDB.getRow<CloudSaveRow>({
-      databaseId: APPWRITE_CONFIG.databaseId,
-      tableId: APPWRITE_CONFIG.saveTableId,
-      rowId: buildCloudSaveRowId(userId, slot),
-    });
-  } catch (error) {
-    if (error instanceof AppwriteException && error.code === 404) return null;
-    throw error;
-  }
+  const result = await getAppwriteServices().tablesDB.listRows<CloudSaveRow>({
+    databaseId: APPWRITE_CONFIG.databaseId,
+    tableId: APPWRITE_CONFIG.saveTableId,
+    queries: [Query.equal('slot', [slot]), Query.limit(10)],
+    total: false,
+    ttl: 0,
+  });
+  return result.rows.find((row) => row.userId === userId) ?? null;
 }
 
 export async function listCloudSaves(userId: string): Promise<CloudSaveRow[]> {
@@ -110,7 +108,7 @@ export async function uploadLocalSave(userId: string, slot: number, force = fals
 
   const execution = await getAppwriteServices().functions.createExecution({
     functionId: APPWRITE_CONFIG.cloudSaveGatewayFunctionId,
-    body: JSON.stringify({ action: 'upload_save', slot, raw: local.raw, saveVersion: localMeta.version, turn: localMeta.turn, nationName: localMeta.nationName ?? '未知国家', deviceId: getDeviceId(), clientUpdatedAt: localMeta.createdAt, force }),
+    body: JSON.stringify({ action: 'upload_save', slot, raw: local.raw, deviceId: getDeviceId(), force }),
     async: false,
     xpath: '/',
     method: ExecutionMethod.POST,
@@ -148,6 +146,9 @@ export async function downloadCloudSave(userId: string, slot: number, force = fa
   const response = await fetch(url, { credentials: 'include' });
   if (!response.ok) throw new Error(`云存档下载失败（${response.status}）`);
   const raw = await response.text();
+  const rawBytes = new TextEncoder().encode(raw);
+  if (rawBytes.byteLength > 5 * 1024 * 1024) throw new Error('云存档超过 5MB 安全上限');
+  if (await contentHash(raw) !== cloud.contentHash) throw new Error('云存档完整性校验失败，文件可能已损坏');
   const imported = importSaveGameToSlot(slot, raw);
   if (!imported.ok) throw new Error(imported.error);
 }

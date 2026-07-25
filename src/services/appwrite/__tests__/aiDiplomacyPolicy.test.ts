@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { aiErrorStatus, buildAIQuotaPlan, createSummitMessages, normalizeSummitRequest, parseSummitBrief } from '../../../../functions/ai-diplomacy-gateway/src/policy.js';
+import { readBoundedJsonResponse } from '../../../../functions/ai-diplomacy-gateway/src/provider.js';
 import { releaseAIQuota, reserveAIQuota } from '../../../../functions/ai-diplomacy-gateway/src/quota.js';
 
 const request = {
@@ -23,6 +24,12 @@ const request = {
 };
 
 describe('AI diplomacy gateway policy', () => {
+  it('bounds and parses provider response bodies', async () => {
+    await expect(readBoundedJsonResponse(new Response('{"ok":true}'), 32)).resolves.toEqual({ ok: true });
+    await expect(readBoundedJsonResponse(new Response('x'.repeat(33)), 32)).rejects.toThrow('过大');
+    await expect(readBoundedJsonResponse(new Response('not-json'), 32)).rejects.toThrow('格式');
+  });
+
   it('builds bounded per-user and global cost limits', () => {
     const plan = buildAIQuotaPlan('user-a', { AI_DAILY_LIMIT: '999', AI_GLOBAL_DAILY_LIMIT: '0', AI_GLOBAL_MONTHLY_LIMIT: '250' }, new Date('2026-07-24T12:00:00Z'));
     expect(plan.map((entry) => [entry.scope, entry.limit, entry.period])).toEqual([

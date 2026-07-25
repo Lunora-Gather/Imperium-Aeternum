@@ -3,6 +3,7 @@ import { createInitialState, createWorldState } from '../init';
 import { processAITurn } from '../ai';
 import { cloneGameState } from '../stateClone';
 import { processTurn } from '../turn';
+import { applySharedWorldCommand, createSharedWorldSnapshot } from '../../../scripts/shared-world-engine-entry';
 
 describe('shared world turn isolation', () => {
   it('does not let AI issue orders for a human-controlled nation', () => {
@@ -24,5 +25,13 @@ describe('shared world turn isolation', () => {
     state.provinces[player.capital].ownerId = Object.keys(state.nations).find((id) => id !== player.id)!;
     expect(processTurn(cloneGameState(state)).state.victory.type).toBe('fail_capital_lost');
     expect(processTurn(cloneGameState(state), { sharedWorld: true, humanNationIds: [state.playerNationId] }).state.victory.type).toBeNull();
+  });
+
+  it('rejects an injected strategy focus before it reaches shared state', () => {
+    const state = createSharedWorldSnapshot();
+    expect(() => applySharedWorldCommand(state, 'n_med_rome', {
+      action: 'set_strategy_focus',
+      args: ['__proto__'],
+    })).toThrow('国策焦点无效');
   });
 });

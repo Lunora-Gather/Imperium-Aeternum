@@ -11,6 +11,11 @@ const COMMAND_TABLE = 'world_commands';
 const SNAPSHOT_BUCKET = 'world_snapshots';
 const LEASE_DAYS = 14;
 const MAX_WORLD_MEMBERS = 100;
+const identifier = (value, max, label) => {
+  const result = String(value ?? '').trim();
+  if (!result || result.length > max || !/^[a-zA-Z0-9._:-]+$/.test(result)) throw new Error(`${label}无效`);
+  return result;
+};
 
 function hash(value) {
   let result = 0x811c9dc5;
@@ -289,15 +294,17 @@ async function setReady(db, storage, worldId, nationId, userId, body) {
 export default async ({ req, res, error }) => {
   try {
     const { db, storage } = services(req);
-    if (req.headers['x-appwrite-trigger'] === 'schedule') {
+    const userId = req.headers['x-appwrite-user-id'];
+    if (req.headers['x-appwrite-trigger'] === 'schedule' && !userId) {
       const results = await resolveDueWorlds(db, storage);
       return res.json({ ok: true, checked: results.length, results });
     }
-    const userId = req.headers['x-appwrite-user-id'];
+    if (req.method !== 'POST') return res.json({ ok: false, message: '仅支持 POST 请求' }, 405);
     if (!userId) return res.json({ ok: false, message: '需要登录后操作共享版图' }, 401);
     const body = req.bodyJson ?? {};
-    const { action, worldId, nationId } = body;
-    if (!worldId || typeof worldId !== 'string') return res.json({ ok: false, message: '缺少版图标识' }, 400);
+    const { action } = body;
+    const worldId = identifier(body.worldId, 36, '版图标识');
+    const nationId = body.nationId == null ? undefined : identifier(body.nationId, 64, '国家标识');
     const now = new Date();
     await ensureMembership(db, worldId, userId, now);
     if (action === 'join_world') return res.json({ ok: true });
@@ -317,7 +324,9 @@ export default async ({ req, res, error }) => {
     return res.json({ ok: true, control: await mutateControl(db, action, worldId, nationId, userId, now) });
   } catch (cause) {
     error(cause instanceof Error ? cause.message : String(cause));
-    const status = cause?.code === 409 ? 409 : cause?.code === 404 ? 404 : 400;
-    return res.json({ ok: false, message: cause instanceof Error ? cause.message : '共享版图操作失败' }, status);
+    const appwriteFailure = typeof cause?.code === 'number' && ![404, 409].includes(cause.code);
+    const status = cause?.code === 409 ? 409 : cause?.code === 404 ? 404 : appwriteFailure ? 503 : 400;
+    const message = appwriteFailure ? '共享版图服务暂不可用，请稍后重试' : cause instanceof Error ? cause.message : '共享版图操作失败';
+    return res.json({ ok: false, message }, status);
   }
 };

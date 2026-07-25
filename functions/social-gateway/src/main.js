@@ -1,6 +1,6 @@
 import { Client, ID, Permission, Query, Role, Storage, TablesDB, Users } from 'node-appwrite';
 import { InputFile } from 'node-appwrite/file';
-import { messageRateRowId, verifiedNationIdentity } from './policy.js';
+import { assertFriendshipParticipants, assertMembershipOwner, friendshipPairKey, friendshipRowId, messageRateRowId, verifiedNationIdentity } from './policy.js';
 
 const DATABASE_ID = 'imperium_game';
 const PROFILE_TABLE = 'game_profiles';
@@ -14,6 +14,11 @@ const MAX_WORLD_MEMBERS = 100;
 const WORLD_MESSAGE_WINDOW_MS = 1800;
 const DIRECT_MESSAGE_WINDOW_MS = 1200;
 const ALLOWED_IMAGE_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/gif']);
+const identifier = (value, max, label) => {
+  const result = String(value ?? '').trim();
+  if (!result || result.length > max || !/^[a-zA-Z0-9._:-]+$/.test(result)) throw new Error(`${label}无效`);
+  return result;
+};
 
 function hash(value) {
   let result = 0x811c9dc5;
@@ -22,8 +27,6 @@ function hash(value) {
 }
 const profileId = (userId) => `profile_${hash(userId)}`;
 const membershipId = (worldId, userId) => `mem_${hash(worldId)}_${hash(userId)}`;
-const pairKey = (a, b) => [a, b].sort().join(':');
-const friendshipId = (a, b) => `friend_${hash(pairKey(a, b))}_${hash(`${b}:${a}`)}`;
 const readForUsers = (ids) => [...new Set(ids)].slice(0, 100).map((id) => Permission.read(Role.user(id)));
 
 function services(req) {
@@ -55,7 +58,10 @@ async function ensureProfile(db, users, userId) {
 }
 
 async function requireMembership(db, worldId, userId) {
-  try { return await db.getRow({ databaseId: DATABASE_ID, tableId: MEMBERSHIP_TABLE, rowId: membershipId(worldId, userId) }); }
+  try {
+    const membership = await db.getRow({ databaseId: DATABASE_ID, tableId: MEMBERSHIP_TABLE, rowId: membershipId(worldId, userId) });
+    return assertMembershipOwner(membership, worldId, userId);
+  }
   catch (error) { if (error?.code === 404) throw new Error('只有该版图成员可以使用聊天室'); throw error; }
 }
 
@@ -85,6 +91,14 @@ function safeImageName(fileName, mime, fallback) {
   return `${stem}.${extension}`;
 }
 
+function decodeImage(base64) {
+  const encoded = String(base64 ?? '');
+  if (!encoded || encoded.length > Math.ceil(MAX_IMAGE_BYTES / 3) * 4 + 4) throw new Error('图片大小需要在 2MB 以内');
+  const buffer = Buffer.from(encoded, 'base64');
+  if (buffer.length <= 0 || buffer.length > MAX_IMAGE_BYTES) throw new Error('图片大小需要在 2MB 以内');
+  return buffer;
+}
+
 async function enforceMessageRate(db, worldId, userId) {
   const recent = await db.listRows({ databaseId: DATABASE_ID, tableId: MESSAGE_TABLE, queries: [Query.equal('worldId', worldId), Query.equal('userId', userId), Query.orderDesc('createdAt'), Query.limit(1)], total: false });
   if (recent.rows[0] && Date.now() - Date.parse(recent.rows[0].createdAt) < 1800) throw new Error('发送太快，请稍后再试');
@@ -92,10 +106,15 @@ async function enforceMessageRate(db, worldId, userId) {
 
 async function requireFriendship(db, userId, friendUserId) {
   if (!friendUserId || friendUserId === userId) throw new Error('好友目标无效');
-  const id = friendshipId(userId, friendUserId);
-  const relation = await db.getRow({ databaseId: DATABASE_ID, tableId: FRIENDSHIP_TABLE, rowId: id });
-  if (relation.status !== 'accepted' || ![relation.requesterId, relation.addresseeId].includes(userId)) throw new Error('只有已接受的好友可以私聊');
-  return relation;
+  const result = await db.listRows({
+    databaseId: DATABASE_ID,
+    tableId: FRIENDSHIP_TABLE,
+    queries: [Query.equal('pairKey', friendshipPairKey(userId, friendUserId)), Query.limit(1)],
+    total: false,
+  });
+  const relation = result.rows[0];
+  if (!relation) throw new Error('好友关系不存在');
+  return assertFriendshipParticipants(relation, userId, friendUserId);
 }
 
 async function enforceDirectRate(db, key, userId) {
@@ -104,7 +123,7 @@ async function enforceDirectRate(db, key, userId) {
 }
 
 async function createDirectMessage(db, userId, friendUserId, senderName, data) {
-  const key = pairKey(userId, friendUserId);
+  const key = friendshipPairKey(userId, friendUserId);
   try {
     return await db.createRow({ databaseId: DATABASE_ID, tableId: DIRECT_MESSAGE_TABLE, rowId: messageRateRowId('direct', key, userId, Date.now(), DIRECT_MESSAGE_WINDOW_MS), data: { conversationKey: key, senderId: userId, recipientId: friendUserId, senderName, createdAt: new Date().toISOString(), ...data }, permissions: readForUsers([userId, friendUserId]) });
   } catch (error) {
@@ -124,6 +143,7 @@ async function createWorldMessage(db, members, data) {
 
 export default async ({ req, res, error }) => {
   try {
+    if (req.method !== 'POST') return res.json({ ok: false, message: '仅支持 POST 请求' }, 405);
     const userId = req.headers['x-appwrite-user-id'];
     if (!userId) return res.json({ ok: false, message: '需要登录后使用社交功能' }, 401);
     const body = req.bodyJson ?? {};
@@ -133,24 +153,29 @@ export default async ({ req, res, error }) => {
     if (action === 'ensure_profile') return res.json({ ok: true, profile: self });
     if (action === 'find_profile') {
       const code = String(body.friendCode ?? '').trim().toUpperCase();
-      if (code.length < 4) return res.json({ ok: false, message: '好友码格式不正确' }, 400);
+      if (!/^IA[A-F0-9]{8}$/.test(code)) return res.json({ ok: false, message: '好友码格式不正确' }, 400);
       const found = await db.listRows({ databaseId: DATABASE_ID, tableId: PROFILE_TABLE, queries: [Query.equal('friendCode', code), Query.limit(1)], total: false });
       return res.json({ ok: true, profile: found.rows[0] ?? null });
     }
     if (action === 'send_friend_request') {
-      const targetUserId = String(body.targetUserId ?? '');
+      const targetUserId = identifier(body.targetUserId, 36, '好友目标');
       if (!targetUserId || targetUserId === userId) throw new Error('好友目标无效');
       const target = await ensureProfile(db, users, targetUserId);
-      const id = friendshipId(userId, targetUserId);
-      const key = pairKey(userId, targetUserId);
-      try { await db.getRow({ databaseId: DATABASE_ID, tableId: FRIENDSHIP_TABLE, rowId: id }); throw new Error('好友关系或申请已经存在'); }
-      catch (lookupError) { if (lookupError?.code !== 404) throw lookupError; }
+      const id = friendshipRowId(userId, targetUserId);
+      const key = friendshipPairKey(userId, targetUserId);
+      const existing = await db.listRows({
+        databaseId: DATABASE_ID,
+        tableId: FRIENDSHIP_TABLE,
+        queries: [Query.equal('pairKey', key), Query.limit(1)],
+        total: false,
+      });
+      if (existing.rows[0]) throw new Error('好友关系或申请已经存在');
       const now = new Date().toISOString();
       await db.createRow({ databaseId: DATABASE_ID, tableId: FRIENDSHIP_TABLE, rowId: id, data: { pairKey: key, requesterId: userId, addresseeId: targetUserId, requesterName: self.displayName, addresseeName: target.displayName, status: 'pending', createdAt: now, respondedAt: null }, permissions: readForUsers([userId, targetUserId]) });
       return res.json({ ok: true });
     }
     if (action === 'respond_friend_request' || action === 'remove_friend') {
-      const id = String(body.friendshipId ?? '');
+      const id = identifier(body.friendshipId, 36, '好友关系');
       const relation = await db.getRow({ databaseId: DATABASE_ID, tableId: FRIENDSHIP_TABLE, rowId: id });
       if (![relation.requesterId, relation.addresseeId].includes(userId)) throw new Error('无权操作该好友关系');
       if (action === 'respond_friend_request') {
@@ -161,28 +186,28 @@ export default async ({ req, res, error }) => {
       return res.json({ ok: true });
     }
     if (action === 'list_world_messages') {
-      const worldId = String(body.worldId ?? '');
+      const worldId = identifier(body.worldId, 36, '版图标识');
       await requireMembership(db, worldId, userId);
       const messages = await db.listRows({ databaseId: DATABASE_ID, tableId: MESSAGE_TABLE, queries: [Query.equal('worldId', worldId), Query.orderDesc('createdAt'), Query.limit(50)], total: false });
       return res.json({ ok: true, messages: messages.rows });
     }
     if (action === 'list_direct_messages') {
-      const friendUserId = String(body.friendUserId ?? '');
+      const friendUserId = identifier(body.friendUserId, 36, '好友目标');
       await requireFriendship(db, userId, friendUserId);
-      const messages = await db.listRows({ databaseId: DATABASE_ID, tableId: DIRECT_MESSAGE_TABLE, queries: [Query.equal('conversationKey', pairKey(userId, friendUserId)), Query.orderDesc('createdAt'), Query.limit(50)], total: false });
+      const messages = await db.listRows({ databaseId: DATABASE_ID, tableId: DIRECT_MESSAGE_TABLE, queries: [Query.equal('conversationKey', friendshipPairKey(userId, friendUserId)), Query.orderDesc('createdAt'), Query.limit(50)], total: false });
       return res.json({ ok: true, messages: messages.rows });
     }
     if (action === 'send_direct_message') {
-      const friendUserId = String(body.friendUserId ?? '');
+      const friendUserId = identifier(body.friendUserId, 36, '好友目标');
       const text = String(body.body ?? '').trim();
       await requireFriendship(db, userId, friendUserId);
       if (!text || text.length > 500) throw new Error('消息需要在 1–500 字之间');
-      await enforceDirectRate(db, pairKey(userId, friendUserId), userId);
+      await enforceDirectRate(db, friendshipPairKey(userId, friendUserId), userId);
       const direct = await createDirectMessage(db, userId, friendUserId, self.displayName, { body: text, kind: 'text', mediaFileId: null, mediaMime: null });
       return res.json({ ok: true, message: direct });
     }
     if (action === 'send_world_message') {
-      const worldId = String(body.worldId ?? '');
+      const worldId = identifier(body.worldId, 36, '版图标识');
       const text = String(body.body ?? '').trim();
       await requireMembership(db, worldId, userId);
       const nationId = await requireNationIdentity(db, worldId, userId, body.nationId ? String(body.nationId) : null);
@@ -193,15 +218,14 @@ export default async ({ req, res, error }) => {
       return res.json({ ok: true, message });
     }
     if (action === 'send_world_image') {
-      const worldId = String(body.worldId ?? '');
+      const worldId = identifier(body.worldId, 36, '版图标识');
       const caption = String(body.caption ?? '').trim().slice(0, 300);
       const mime = String(body.mime ?? '').toLowerCase();
       await requireMembership(db, worldId, userId);
       const nationId = await requireNationIdentity(db, worldId, userId, body.nationId ? String(body.nationId) : null);
       await enforceMessageRate(db, worldId, userId);
       if (!ALLOWED_IMAGE_TYPES.has(mime)) throw new Error('仅支持 JPG、PNG、WebP 或 GIF 图片');
-      const buffer = Buffer.from(String(body.base64 ?? ''), 'base64');
-      if (buffer.length <= 0 || buffer.length > MAX_IMAGE_BYTES) throw new Error('图片大小需要在 2MB 以内');
+      const buffer = decodeImage(body.base64);
       if (!hasValidImageSignature(buffer, mime)) throw new Error('图片内容与文件类型不匹配');
       const members = await worldMembers(db, worldId);
       const fileId = ID.unique();
@@ -216,14 +240,13 @@ export default async ({ req, res, error }) => {
       }
     }
     if (action === 'send_direct_image') {
-      const friendUserId = String(body.friendUserId ?? '');
+      const friendUserId = identifier(body.friendUserId, 36, '好友目标');
       const caption = String(body.caption ?? '').trim().slice(0, 300);
       const mime = String(body.mime ?? '').toLowerCase();
       await requireFriendship(db, userId, friendUserId);
-      await enforceDirectRate(db, pairKey(userId, friendUserId), userId);
+      await enforceDirectRate(db, friendshipPairKey(userId, friendUserId), userId);
       if (!ALLOWED_IMAGE_TYPES.has(mime)) throw new Error('仅支持 JPG、PNG、WebP 或 GIF 图片');
-      const buffer = Buffer.from(String(body.base64 ?? ''), 'base64');
-      if (buffer.length <= 0 || buffer.length > MAX_IMAGE_BYTES) throw new Error('图片大小需要在 2MB 以内');
+      const buffer = decodeImage(body.base64);
       if (!hasValidImageSignature(buffer, mime)) throw new Error('图片内容与文件类型不匹配');
       const fileId = ID.unique();
       const safeName = safeImageName(body.fileName, mime, 'direct-image');
@@ -239,7 +262,9 @@ export default async ({ req, res, error }) => {
     return res.json({ ok: false, message: '不支持的社交操作' }, 400);
   } catch (cause) {
     error(cause instanceof Error ? cause.message : String(cause));
-    const status = cause?.code === 409 ? 409 : cause?.code === 404 ? 404 : 400;
-    return res.json({ ok: false, message: cause instanceof Error ? cause.message : '社交操作失败' }, status);
+    const appwriteFailure = typeof cause?.code === 'number' && ![404, 409].includes(cause.code);
+    const status = cause?.code === 409 ? 409 : cause?.code === 404 ? 404 : appwriteFailure ? 503 : 400;
+    const message = appwriteFailure ? '社交服务暂不可用，请稍后重试' : cause instanceof Error ? cause.message : '社交操作失败';
+    return res.json({ ok: false, message }, status);
   }
 };

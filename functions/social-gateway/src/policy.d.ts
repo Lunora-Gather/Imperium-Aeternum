@@ -11,5 +11,9 @@ export function verifiedNationIdentity(
   requestedNationId: string | null | undefined,
   nowMs?: number,
 ): string | null;
+export function friendshipPairKey(leftUserId: string, rightUserId: string): string;
+export function friendshipRowId(leftUserId: string, rightUserId: string): string;
 export function messageRateRowId(kind: 'world' | 'direct', channelId: string, userId: string, nowMs: number, windowMs: number): string;
+export function assertMembershipOwner<T>(membership: T, worldId: string, userId: string): T;
+export function assertFriendshipParticipants<T>(friendship: T, userId: string, friendUserId: string): T;
 
