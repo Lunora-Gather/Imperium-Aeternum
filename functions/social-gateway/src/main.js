@@ -255,6 +255,15 @@ export default async ({ req, res, error }) => {
       const messages = await db.listRows({ databaseId: DATABASE_ID, tableId: DIRECT_MESSAGE_TABLE, queries: [Query.equal('conversationKey', friendshipPairKey(userId, friendUserId)), Query.orderDesc('createdAt'), Query.limit(50)], total: false });
       return res.json({ ok: true, messages: messages.rows });
     }
+    if (action === 'list_direct_inbox') {
+      const messages = await db.listRows({
+        databaseId: DATABASE_ID,
+        tableId: DIRECT_MESSAGE_TABLE,
+        queries: [Query.equal('recipientId', userId), Query.orderDesc('createdAt'), Query.limit(100)],
+        total: false,
+      });
+      return res.json({ ok: true, messages: messages.rows });
+    }
     if (action === 'send_direct_message') {
       const friendUserId = identifier(body.friendUserId, 36, '好友目标');
       const text = String(body.body ?? '').trim();

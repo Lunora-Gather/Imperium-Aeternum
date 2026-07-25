@@ -16,11 +16,12 @@ export function ProfileAvatar({ profile, size = 'normal' }: { profile: GameProfi
   return <span className={`ia-profile-avatar ia-profile-avatar--${size} tone-${profile.avatarColor}`} aria-hidden="true">{profile.displayName.slice(0, 1).toUpperCase()}</span>;
 }
 
-export function PlayerProfileCard({ profile, relation, isSelf = false, onAdd, onChat, onClose }: {
+export function PlayerProfileCard({ profile, relation, isSelf = false, onAdd, onAccept, onChat, onClose }: {
   profile: GameProfile;
   relation?: 'none' | 'outgoing' | 'incoming' | 'friend';
   isSelf?: boolean;
   onAdd?: () => void;
+  onAccept?: () => void;
   onChat?: () => void;
   onClose: () => void;
 }) {
@@ -48,7 +49,7 @@ export function PlayerProfileCard({ profile, relation, isSelf = false, onAdd, on
         {isSelf && <Tag text={t('这是你的公开名片')} tone="info" />}
         {!isSelf && relation === 'none' && <Btn label={t('加为好友')} variant="primary" onClick={onAdd} />}
         {!isSelf && relation === 'outgoing' && <Btn label={t('申请已发送')} disabled />}
-        {!isSelf && relation === 'incoming' && <Tag text={t('对方正在等待你的回应')} tone="warn" />}
+        {!isSelf && relation === 'incoming' && (onAccept ? <Btn label={t('接受好友申请')} variant="primary" onClick={onAccept} /> : <Tag text={t('对方正在等待你的回应')} tone="warn" />)}
         {!isSelf && relation === 'friend' && (onChat ? <Btn label={t('发送消息')} variant="primary" onClick={onChat} /> : <Tag text={t('已经是好友')} tone="good" />)}
       </footer>
     </section>
