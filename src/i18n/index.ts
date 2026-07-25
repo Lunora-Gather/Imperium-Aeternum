@@ -310,6 +310,7 @@ const registeredEnPatterns: Array<{ pattern: RegExp; replacement: EnglishReplace
     pattern: /^已选剧本：(.+)，请选择你的邦国$/,
     replacement: (_all, scenario) => `Campaign selected: ${en[scenario] ?? enLaunch[scenario] ?? scenario}. Choose your nation.`,
   },
+  { pattern: /^([+-]?\d+)\/年$/, replacement: '$1/year' },
   { pattern: /^(\d+) 个槽位损坏$/, replacement: (_all, count) => `${count} damaged ${count === '1' ? 'slot' : 'slots'}` },
   { pattern: /^(\d+) 个存档可自动修复$/, replacement: (_all, count) => `${count} ${count === '1' ? 'save can' : 'saves can'} be repaired automatically` },
   { pattern: /^(\d+) 个存档可读但有风险$/, replacement: (_all, count) => `${count} playable ${count === '1' ? 'save has' : 'saves have'} risks` },

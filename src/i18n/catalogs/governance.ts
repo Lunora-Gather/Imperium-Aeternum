@@ -268,6 +268,7 @@ export function registerGovernanceTranslations(): void {
     { pattern: /^(\d+) 年 \/ (\d+) 年$/, replacement: '$1 years / $2 years' },
     { pattern: /^(\d+) 金 · (\d+) 年 \/ (\d+) 金 · (\d+) 年$/, replacement: '$1 gold · $2 years / $3 gold · $4 years' },
     { pattern: /^(\d+) 影响 · (\d+) 友邦 \/ (\d+) 影响 · (\d+) 友邦$/, replacement: '$1 influence · $2 allies / $3 influence · $4 allies' },
+    { pattern: /^(贵族|商人|军方|民众|神职) ([+-]\d+)$/, replacement: (_all, faction, amount) => `${en[faction] ?? faction} ${amount}` },
     { pattern: /^(今年|三年内|长期)：(.+)$/, replacement: (_all, horizon, action) => `${en[horizon] ?? horizon}: ${en[action] ?? action}` },
     { pattern: /^(金|粮|木|铁|人口|稳定|合法|腐败|治能|厌战|影响|行政|科研) ([+-]\d+)$/, replacement: (_all, resource, amount) => `${({ 金: 'Gold', 粮: 'Food', 木: 'Wood', 铁: 'Iron', 人口: 'Population', 稳定: 'Stability', 合法: 'Legitimacy', 腐败: 'Corruption', 治能: 'Administration', 厌战: 'War exhaustion', 影响: 'Influence', 行政: 'Admin', 科研: 'Research' } as Record<string, string>)[resource] ?? resource} ${amount}` },
     { pattern: /^(\d+)\. (.+)$/, replacement: (_all, number, choice) => `${number}. ${en[choice] ?? choice}` },
