@@ -87,6 +87,6 @@ export function WorldChatPanel({ worldId, nationId }: { worldId: string; nationI
         <div><input ref={fileRef} type="file" accept="image/jpeg,image/png,image/webp,image/gif" hidden onChange={(event) => setAttachment(event.target.files?.[0] ?? null)} /><button className="ia-chat-attach-btn" type="button" disabled={sending} onClick={() => fileRef.current?.click()}>▧ {t('图片')}</button><span>{body.length}/{attachment ? 300 : 500}</span><Btn type="submit" label={t(attachment ? '发送图片' : '发送')} variant="primary" busy={sending} disabled={sending || (!body.trim() && !attachment)} /></div>
       </form>
     </div>}
-    {viewProfile && <PlayerProfileCard profile={viewProfile} isSelf={viewProfile.userId === userId} relation={profileRelation} onAdd={() => void store.addByCode(viewProfile.friendCode).then((ok) => ok && setViewProfile(null))} onClose={() => setViewProfile(null)} />}
+    {viewProfile && <PlayerProfileCard profile={viewProfile} isSelf={viewProfile.userId === userId} relation={profileRelation} onAdd={() => void store.addPlayer(viewProfile).then((ok) => ok && setViewProfile(null))} onAccept={() => { const relation = store.friendships.find((item) => item.status === 'pending' && item.addresseeId === userId && item.requesterId === viewProfile.userId); if (relation) void store.respond(relation.id, true).then(() => setViewProfile(null)); }} onClose={() => setViewProfile(null)} />}
   </section>;
 }

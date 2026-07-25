@@ -5,6 +5,7 @@ import {
   ensureGameProfile,
   findProfileByFriendCode,
   getPublicProfile,
+  listDirectInbox,
   listFriendships,
   listDirectMessages,
   listWorldMessages,
@@ -37,6 +38,7 @@ interface SocialStore {
   loadProfile: (userId: string) => Promise<GameProfile | null>;
   updateProfile: (data: Pick<GameProfile, 'displayName' | 'title' | 'bio' | 'avatarColor'>) => Promise<boolean>;
   addByCode: (friendCode: string) => Promise<boolean>;
+  addPlayer: (profile: GameProfile) => Promise<boolean>;
   respond: (friendshipId: string, accept: boolean) => Promise<void>;
   remove: (friendshipId: string) => Promise<void>;
   refreshMessages: (worldId: string) => Promise<void>;
@@ -69,6 +71,50 @@ export function applyIncomingUnread(current: Record<string, number>, friendUserI
   return { ...current, [friendUserId]: (current[friendUserId] ?? 0) + 1 };
 }
 
+type DirectReadReceipts = Record<string, string>;
+
+const readReceiptKey = (userId: string) => `imperium-aeternum:direct-read:v1:${userId}`;
+export const directMessageCursor = (entry: Pick<DirectMessage, 'id' | 'createdAt'>) => `${entry.createdAt}|${entry.id}`;
+
+function loadReadReceipts(userId: string): DirectReadReceipts {
+  if (typeof localStorage === 'undefined') return {};
+  try {
+    const value = JSON.parse(localStorage.getItem(readReceiptKey(userId)) ?? '{}');
+    return value && typeof value === 'object' ? value as DirectReadReceipts : {};
+  } catch { return {}; }
+}
+
+function saveReadReceipt(userId: string, friendUserId: string, cursor: string): void {
+  if (typeof localStorage === 'undefined' || !cursor) return;
+  const receipts = loadReadReceipts(userId);
+  if ((receipts[friendUserId] ?? '').localeCompare(cursor) >= 0) return;
+  try { localStorage.setItem(readReceiptKey(userId), JSON.stringify({ ...receipts, [friendUserId]: cursor })); }
+  catch { /* Browsers may disable storage; realtime unread still works for this session. */ }
+}
+
+export function recoverDirectInbox(
+  inbox: DirectMessage[],
+  selfId: string,
+  acceptedFriendIds: Set<string>,
+  receipts: DirectReadReceipts,
+): { messages: Record<string, DirectMessage[]>; unread: Record<string, number> } {
+  const messages: Record<string, DirectMessage[]> = {};
+  const unread: Record<string, number> = {};
+  for (const entry of inbox) {
+    if (entry.recipientId !== selfId || !acceptedFriendIds.has(entry.senderId)) continue;
+    messages[entry.senderId] = mergeChatMessages(messages[entry.senderId] ?? [], [entry]);
+    if (directMessageCursor(entry).localeCompare(receipts[entry.senderId] ?? '') > 0) unread[entry.senderId] = (unread[entry.senderId] ?? 0) + 1;
+  }
+  return { messages, unread };
+}
+
+function persistLatestConversationRead(selfId: string | undefined, friendUserId: string, entries: DirectMessage[]): void {
+  if (!selfId) return;
+  const incoming = entries.filter((entry) => entry.senderId === friendUserId && entry.recipientId === selfId).sort(compareMessages);
+  const latestIncoming = incoming[incoming.length - 1];
+  if (latestIncoming) saveReadReceipt(selfId, friendUserId, directMessageCursor(latestIncoming));
+}
+
 const localMessageId = () => `local:${typeof crypto !== 'undefined' && 'randomUUID' in crypto ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`}`;
 const withoutMessage = <T extends { id: string }>(messages: T[], id: string) => messages.filter((entry) => entry.id !== id);
 
@@ -79,7 +125,16 @@ export const useSocialStore = create<SocialStore>((set, get) => ({
     set({ loading: true, message: null });
     try {
       const [profile, friendships] = await Promise.all([ensureGameProfile(), listFriendships()]);
-      set({ profile, friendships, profileCache: { ...get().profileCache, [profile.userId]: profile } });
+      const inbox = await listDirectInbox();
+      const acceptedFriendIds = new Set(friendships.filter((entry) => entry.status === 'accepted').map((entry) => entry.requesterId === profile.userId ? entry.addresseeId : entry.requesterId));
+      const recovered = recoverDirectInbox(inbox, profile.userId, acceptedFriendIds, loadReadReceipts(profile.userId));
+      set((state) => ({
+        profile,
+        friendships,
+        profileCache: { ...state.profileCache, [profile.userId]: profile },
+        directMessages: { ...state.directMessages, ...Object.fromEntries(Object.entries(recovered.messages).map(([friendId, entries]) => [friendId, mergeChatMessages(state.directMessages[friendId] ?? [], entries)])) },
+        unreadDirect: recovered.unread,
+      }));
     } catch (error) { set({ message: error instanceof Error ? error.message : '社交资料加载失败' }); }
     finally { set({ loading: false }); }
   },
@@ -122,6 +177,16 @@ export const useSocialStore = create<SocialStore>((set, get) => ({
     try {
       const target = await findProfileByFriendCode(friendCode);
       if (!target) throw new Error('没有找到该好友码');
+      if (target.userId === get().profile?.userId) throw new Error('不能添加自己为好友');
+      await sendFriendRequest(target.userId);
+      set({ friendships: await listFriendships(), message: `已向 ${target.displayName} 发送好友申请` });
+      return true;
+    } catch (error) { set({ message: error instanceof Error ? error.message : '好友申请失败' }); return false; }
+    finally { set({ loading: false }); }
+  },
+  addPlayer: async (target) => {
+    set({ loading: true, message: null });
+    try {
       if (target.userId === get().profile?.userId) throw new Error('不能添加自己为好友');
       await sendFriendRequest(target.userId);
       set({ friendships: await listFriendships(), message: `已向 ${target.displayName} 发送好友申请` });
@@ -173,7 +238,12 @@ export const useSocialStore = create<SocialStore>((set, get) => ({
   },
   receiveMessage: (entry) => set((state) => ({ messages: { ...state.messages, [entry.worldId]: mergeChatMessages(state.messages[entry.worldId] ?? [], [entry]) } })),
   refreshDirectMessages: async (friendUserId) => {
-    try { const entries = await listDirectMessages(friendUserId); set((state) => ({ directMessages: { ...state.directMessages, [friendUserId]: mergeChatMessages(state.directMessages[friendUserId] ?? [], entries) }, message: null })); }
+    try {
+      const entries = await listDirectMessages(friendUserId);
+      const merged = mergeChatMessages(get().directMessages[friendUserId] ?? [], entries);
+      if (get().activeConversation === friendUserId) persistLatestConversationRead(get().profile?.userId, friendUserId, merged);
+      set((state) => ({ directMessages: { ...state.directMessages, [friendUserId]: merged }, unreadDirect: state.activeConversation === friendUserId ? { ...state.unreadDirect, [friendUserId]: 0 } : state.unreadDirect, message: null }));
+    }
     catch (error) { set({ message: error instanceof Error ? error.message : '好友对话加载失败' }); }
   },
   sendDirect: async (friendUserId, body) => {
@@ -199,13 +269,17 @@ export const useSocialStore = create<SocialStore>((set, get) => ({
   receiveDirectMessage: (entry) => {
     const selfId = get().profile?.userId;
     const friendUserId = entry.senderId === selfId ? entry.recipientId : entry.senderId;
+    const existing = (get().directMessages[friendUserId] ?? []).some((message) => message.id === entry.id);
+    const incoming = entry.senderId !== selfId && !existing;
+    if (incoming && get().activeConversation === friendUserId) saveReadReceipt(selfId ?? '', friendUserId, directMessageCursor(entry));
     set((state) => ({
       directMessages: { ...state.directMessages, [friendUserId]: mergeChatMessages(state.directMessages[friendUserId] ?? [], [entry]) },
-      unreadDirect: applyIncomingUnread(state.unreadDirect, friendUserId, state.activeConversation, entry.senderId !== selfId),
+      unreadDirect: applyIncomingUnread(state.unreadDirect, friendUserId, state.activeConversation, incoming),
     }));
   },
   markConversationRead: (friendUserId) => set((state) => {
     if (!friendUserId) return { activeConversation: null };
+    persistLatestConversationRead(state.profile?.userId, friendUserId, state.directMessages[friendUserId] ?? []);
     return { activeConversation: friendUserId, unreadDirect: { ...state.unreadDirect, [friendUserId]: 0 } };
   }),
 }));

@@ -16,7 +16,8 @@ const budgets = {
   // Structured pending-event cards add a small lazy presentation layer; entry/App caps stay unchanged.
   // Stale-chunk recovery plus complete lazy advisor/report/event copy add bounded weight;
   // entry/App caps remain fixed, so initial navigation performance cannot regress unnoticed.
-  totalJavaScript: 1160 * KIB,
+  // Offline private-message recovery and direct friend-request actions add a bounded social layer.
+  totalJavaScript: 1164 * KIB,
   // Purpose/crisis panels and the responsive event decision surface extend the measured UI baseline.
   totalCss: 115 * KIB,
   entryJavaScript: 180 * KIB,

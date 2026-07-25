@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { applyIncomingUnread, mergeChatMessages, reconcileSentMessage } from '../socialStore';
+import { applyIncomingUnread, directMessageCursor, mergeChatMessages, reconcileSentMessage, recoverDirectInbox } from '../socialStore';
+import type { DirectMessage } from '../../social/types';
 
 const entry = (id: string, createdAt: string, body = id) => ({ id, createdAt, body });
 
@@ -49,5 +50,34 @@ describe('social message reconciliation', () => {
     expect(applyIncomingUnread({ 'friend-a': 2 }, 'friend-a', null, true)).toEqual({ 'friend-a': 3 });
     expect(applyIncomingUnread({ 'friend-a': 2 }, 'friend-a', 'friend-a', true)).toEqual({ 'friend-a': 2 });
     expect(applyIncomingUnread({ 'friend-a': 2 }, 'friend-a', null, false)).toEqual({ 'friend-a': 2 });
+  });
+
+  it('recovers unread conversations after a reload without exposing non-friends', () => {
+    const direct = (id: string, senderId: string, createdAt: string): DirectMessage => ({
+      id,
+      conversationKey: `self:${senderId}`,
+      senderId,
+      recipientId: 'self',
+      senderName: senderId,
+      body: id,
+      kind: 'text',
+      mediaFileId: null,
+      mediaMime: null,
+      createdAt,
+    });
+    const read = direct('read', 'friend-a', '2026-07-24T10:00:00.000Z');
+    const unread = direct('unread', 'friend-a', '2026-07-24T10:00:01.000Z');
+    const removed = direct('removed', 'former-friend', '2026-07-24T10:00:02.000Z');
+
+    const recovered = recoverDirectInbox(
+      [read, unread, removed],
+      'self',
+      new Set(['friend-a']),
+      { 'friend-a': directMessageCursor(read) },
+    );
+
+    expect(recovered.unread).toEqual({ 'friend-a': 1 });
+    expect(recovered.messages['friend-a']?.map((message) => message.id)).toEqual(['read', 'unread']);
+    expect(recovered.messages['former-friend']).toBeUndefined();
   });
 });

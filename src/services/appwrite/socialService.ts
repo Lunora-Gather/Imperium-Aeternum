@@ -112,6 +112,11 @@ export async function listDirectMessages(friendUserId: string): Promise<DirectMe
   return (result.messages ?? []).map((row) => directMessage(row as DirectMessageRow)).reverse();
 }
 
+export async function listDirectInbox(): Promise<DirectMessage[]> {
+  const result = await executeSocial('list_direct_inbox');
+  return (result.messages ?? []).map((row) => directMessage(row as DirectMessageRow)).reverse();
+}
+
 export async function sendDirectMessage(friendUserId: string, body: string): Promise<DirectMessage> {
   const result = await executeSocial('send_direct_message', { friendUserId, body });
   if (!result.message || typeof result.message === 'string') throw new Error('私信发送后未返回记录');
