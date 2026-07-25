@@ -78,9 +78,9 @@
     }
   ],
   "buckets": [
-    {"$id":"cloud_saves","$permissions":[],"fileSecurity":true,"name":"Private Cloud Save Payloads","enabled":true,"maximumFileSize":5242880,"allowedFileExtensions":["json"],"compression":"gzip","encryption":true,"antivirus":false},
-    {"$id":"world_snapshots","$permissions":[],"fileSecurity":true,"name":"Authoritative World Snapshots","enabled":true,"maximumFileSize":20971520,"allowedFileExtensions":["json","gz"],"compression":"gzip","encryption":true,"antivirus":false},
-    {"$id":"world_chat_media","$permissions":[],"fileSecurity":true,"name":"World Member Chat Media","enabled":true,"maximumFileSize":2097152,"allowedFileExtensions":["jpg","jpeg","png","webp","gif"],"compression":"none","encryption":true,"antivirus":false}
+    {"$id":"cloud_saves","$permissions":[],"fileSecurity":true,"name":"Private Cloud Save Payloads","enabled":true,"maximumFileSize":5242880,"allowedFileExtensions":["json"],"compression":"gzip","encryption":true,"antivirus":true},
+    {"$id":"world_snapshots","$permissions":[],"fileSecurity":true,"name":"Authoritative World Snapshots","enabled":true,"maximumFileSize":20971520,"allowedFileExtensions":["json","gz"],"compression":"gzip","encryption":true,"antivirus":true},
+    {"$id":"world_chat_media","$permissions":[],"fileSecurity":true,"name":"World Member Chat Media","enabled":true,"maximumFileSize":2097152,"allowedFileExtensions":["jpg","jpeg","png","webp","gif"],"compression":"none","encryption":true,"antivirus":true}
   ],
   "functions": [
     {"$id":"shared-world-gateway","name":"Shared World Gateway","enabled":true,"logging":true,"runtime":"node-22","execute":["users"],"events":[],"schedule":"*/5 * * * *","timeout":120,"entrypoint":"src/main.js","commands":"npm install","scopes":["rows.read","rows.write","files.read","files.write"],"buildSpecification":"s-2vcpu-2gb","runtimeSpecification":"s-1vcpu-512mb","deploymentRetention":7,"path":"functions/shared-world-gateway"},
