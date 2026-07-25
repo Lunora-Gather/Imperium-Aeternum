@@ -4,7 +4,7 @@
    ============================================================ */
 
 :root {
-  --shell-max: 1240px;
+  --shell-max: 1440px;
   --shell-pad-x: clamp(12px, 2vw, 22px);
   --shell-pad-y: 10px;
 }
@@ -62,7 +62,7 @@
 }
 .ia-ruler-subline {
   margin-top: 6px !important;
-  font-size: 10.5px !important;
+  font-size: 11px !important;
   gap: 4px 9px !important;
 }
 .ia-resource-dock {
@@ -98,7 +98,7 @@
   min-height: 28px !important;
   padding: 4px 7px !important;
   border-radius: 7px !important;
-  font-size: 11.5px !important;
+  font-size: 12px !important;
 }
 .ia-tab-btn.is-active {
   background: color-mix(in srgb, var(--gold) 8%, transparent) !important;
@@ -120,7 +120,7 @@
 
 /* 开场页：四列保留，但不浮夸 */
 .ia-menu {
-  width: min(1180px, calc(100vw - 30px)) !important;
+  width: min(1340px, calc(100vw - 30px)) !important;
   padding-top: 18px !important;
 }
 .ia-menu-toolbar {

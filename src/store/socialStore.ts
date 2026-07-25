@@ -33,7 +33,7 @@ interface SocialStore {
   reset: () => void;
   initialize: () => Promise<void>;
   refreshFriendships: () => Promise<void>;
-  discover: () => Promise<void>;
+  discover: (worldId: string | null) => Promise<void>;
   loadProfile: (userId: string) => Promise<GameProfile | null>;
   updateProfile: (data: Pick<GameProfile, 'displayName' | 'title' | 'bio' | 'avatarColor'>) => Promise<boolean>;
   addByCode: (friendCode: string) => Promise<boolean>;
@@ -87,10 +87,14 @@ export const useSocialStore = create<SocialStore>((set, get) => ({
     try { set({ friendships: await listFriendships() }); }
     catch (error) { set({ message: error instanceof Error ? error.message : '好友列表刷新失败' }); }
   },
-  discover: async () => {
+  discover: async (worldId) => {
+    if (!worldId) {
+      set({ discoveredProfiles: [], loading: false, message: null });
+      return;
+    }
     set({ loading: true, message: null });
     try {
-      const discoveredProfiles = await discoverProfiles();
+      const discoveredProfiles = await discoverProfiles(worldId);
       set((state) => ({ discoveredProfiles, profileCache: { ...state.profileCache, ...Object.fromEntries(discoveredProfiles.map((entry) => [entry.userId, entry])) } }));
     } catch (error) { set({ message: error instanceof Error ? error.message : '玩家发现失败' }); }
     finally { set({ loading: false }); }

@@ -39,8 +39,8 @@ export async function findProfileByFriendCode(friendCode: string): Promise<GameP
   return result.profile ? profile(result.profile) : null;
 }
 
-export async function discoverProfiles(): Promise<GameProfile[]> {
-  const result = await executeSocial('discover_profiles');
+export async function discoverProfiles(worldId: string): Promise<GameProfile[]> {
+  const result = await executeSocial('discover_profiles', { worldId });
   return (result.profiles ?? []).map(profile);
 }
 

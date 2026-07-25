@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { assertCommandOwnership, isControlActive, isWorldDue, readyCommandKey, wasWorldActiveDuringWindow } from '../../../../functions/shared-world-gateway/src/policy.js';
-import { assertFriendshipParticipants, assertMembershipOwner, friendshipPairKey, friendshipRowId, messageRateRowId, verifiedNationIdentity } from '../../../../functions/social-gateway/src/policy.js';
+import { assertFriendshipParticipants, assertMembershipOwner, discoverableMemberIds, friendshipPairKey, friendshipRowId, messageRateRowId, verifiedNationIdentity } from '../../../../functions/social-gateway/src/policy.js';
 import { normalizeCloudSavePayload } from '../../../../functions/cloud-save-gateway/src/policy.js';
 import { assertFreshEmailOtpSession, assertRecoverablePasswordUser } from '../../../../functions/account-gateway/src/policy.js';
 
@@ -65,6 +65,12 @@ describe('social gateway nation identity', () => {
     const friendship = { requesterId: 'user-a', addresseeId: 'user-b', status: 'accepted' };
     expect(assertFriendshipParticipants(friendship, 'user-a', 'user-b')).toBe(friendship);
     expect(() => assertFriendshipParticipants(friendship, 'user-a', 'user-c')).toThrow('好友');
+  });
+
+  it('discovers only other unique members of the current world', () => {
+    const memberships = [{ userId: 'self' }, { userId: 'friend-a' }, { userId: 'friend-a' }, { userId: 'friend-b' }];
+    expect(discoverableMemberIds(memberships, 'self')).toEqual(['friend-a', 'friend-b']);
+    expect(discoverableMemberIds(memberships, 'self', 1)).toEqual(['friend-a']);
   });
 });
 

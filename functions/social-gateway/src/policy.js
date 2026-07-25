@@ -34,6 +34,14 @@ export function assertMembershipOwner(membership, worldId, userId) {
   return membership;
 }
 
+export function discoverableMemberIds(memberships, userId, limit = 100) {
+  return [...new Set(
+    memberships
+      .map((membership) => String(membership?.userId ?? '').trim())
+      .filter((memberId) => memberId && memberId !== userId),
+  )].slice(0, limit);
+}
+
 export function assertFriendshipParticipants(friendship, userId, friendUserId) {
   const participants = [friendship?.requesterId, friendship?.addresseeId];
   if (friendship?.status !== 'accepted' || !participants.includes(userId) || !participants.includes(friendUserId)) {
