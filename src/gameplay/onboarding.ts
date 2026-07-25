@@ -3,7 +3,7 @@
 
 import type { NavigationTab } from './navigationTabs';
 
-export type OnboardingStepId = 'dashboard' | 'ambition' | 'readiness' | 'action' | 'turn' | 'save';
+export type OnboardingStepId = 'dashboard' | 'ambition' | 'readiness' | 'action' | 'save' | 'turn';
 
 export interface OnboardingStep {
   id: OnboardingStepId;
@@ -17,49 +17,49 @@ export interface OnboardingStep {
 export const ONBOARDING_STEPS: OnboardingStep[] = [
   {
     id: 'dashboard',
-    title: '① 先看总览',
-    body: '总览页现在是总参谋部。先看“下一回合前检查”，红色是推进前必须处理，黄色是最好先关注。',
+    title: '① 先认 5 个关键数字',
+    body: '顶部的国库、粮储、人口、安定和疆土，是国家最重要的状态。国库、粮储或安定变红时，先别急着推进年份。',
     tab: 'dashboard',
-    cta: '打开总览',
+    cta: '看看关键数字',
     shortcut: 'Esc / 1',
   },
   {
     id: 'ambition',
-    title: '② 对齐国运目标',
-    body: '右侧“国运目标”会按剧本规模给出征服、富国、合纵、永恒四条路线。先选一个主线，不要每回合乱点。',
+    title: '② 每年只定一个目标',
+    body: '先看总览里的“行动中心”。第一年只解决最重要的一件事：缺钱就理财，地方不稳就治理，有战事再整军。',
     tab: 'dashboard',
-    cta: '查看国运目标',
+    cta: '查看行动中心',
   },
   {
     id: 'readiness',
-    title: '③ 修红黄项',
-    body: '回合前检查项可以跳转到对应页面。国库、粮储、安定、待决事件最优先；战时再看军队补给和士气。',
+    title: '③ 红色必须处理，黄色建议处理',
+    body: '“下一回合前检查”会直接告诉你风险。点提示就能去对应页面；红色代表继续推进可能出大问题。',
     tab: 'dashboard',
-    cta: '查看体检项',
+    cta: '查看回合前检查',
   },
   {
     id: 'action',
-    title: '④ 做一件关键事',
-    body: '每回合先做一件最能解决当前风险的事：缺钱看经济，地方乱看省份/政治，战时看军事，合纵看外交。',
+    title: '④ 做一件有效的事',
+    body: '不用把所有页面都点一遍。跟着行动中心进入经济、省份、政治、军事或外交页，完成一项能改善当前问题的行动。',
     tab: 'province',
-    cta: '去处理内政',
+    cta: '去看看省份',
     shortcut: '2 / 3 / 5',
   },
   {
-    id: 'turn',
-    title: '⑤ 推进并读年报',
-    body: '确认没有待决事件后，点“下一回合”或按空格。结算后先看年报，再回总览看趋势是否好转。',
-    tab: 'report',
-    cta: '理解年报',
-    shortcut: 'Space / 9',
+    id: 'save',
+    title: '⑤ 第一次推进前先存档',
+    body: '存档让你可以放心尝试。第一次结束年份前先保存；以后在开战、改革和重大选择前再保存一次。',
+    tab: 'save',
+    cta: '保存当前进度',
+    shortcut: '0',
   },
   {
-    id: 'save',
-    title: '⑥ 关键点手动存档',
-    body: '开战、改革、读旧档、连续胜利前都去存档页。槽位体检会告诉你存档是否健康、是否会自动修复。',
-    tab: 'save',
-    cta: '打开存档体检',
-    shortcut: '0',
+    id: 'turn',
+    title: '⑥ 推进一年，再读结果',
+    body: '没有待决事件和红色阻断后，点“下一回合”或按空格。结算后读年报：哪些变好、哪些变坏，就是下一年的计划。',
+    tab: 'report',
+    cta: '看看年报怎么读',
+    shortcut: 'Space / 9',
   },
 ];
 

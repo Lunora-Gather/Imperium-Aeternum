@@ -1,6 +1,6 @@
 import { Client, ID, Permission, Query, Role, Storage, TablesDB } from 'node-appwrite';
 import { InputFile } from 'node-appwrite/file';
-import { advanceSharedWorld, applySharedWorldCommand, createSharedWorldSnapshot } from './engine-bundle.js';
+import { advanceSharedWorld, applySharedWorldCommand, createSharedWorldSnapshot } from './generated/engine-bundle.js';
 import { assertCommandOwnership, isControlActive, isWorldDue, readyCommandKey, wasWorldActiveDuringWindow } from './policy.js';
 
 const DATABASE_ID = 'imperium_game';

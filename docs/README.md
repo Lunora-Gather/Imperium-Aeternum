@@ -12,6 +12,7 @@
 | [`maintenance/SHARED-WORLD.md`](maintenance/SHARED-WORLD.md) | 共享版图、国家控制与自动推进的当前设计 |
 | [`maintenance/AUTH-AND-SOCIAL.md`](maintenance/AUTH-AND-SOCIAL.md) | 邮箱验证注册、账号反馈、好友与版图聊天体验 |
 | [`maintenance/BUG-AUDIT-CHECKLIST.md`](maintenance/BUG-AUDIT-CHECKLIST.md) | 漏洞复现、检查、修复和回归清单 |
+| [`maintenance/PROJECT-STRUCTURE.md`](maintenance/PROJECT-STRUCTURE.md) | 当前目录职责、命名规则和依赖方向 |
 | [`04-architecture.md`](04-architecture.md) | 引擎与模块的详细历史架构说明 |
 | [`formulas.md`](formulas.md) | 数值公式 |
 | [`decisions.md`](decisions.md) | 架构与玩法决策记录 |

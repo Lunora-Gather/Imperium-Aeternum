@@ -1,20 +1,19 @@
 // C3: 引擎针对性测试扩充——economy/politics/military/diplomacy 各 ≥3 个
 import { describe, it, expect } from 'vitest';
-import { createInitialState } from '../engine/init';
-import { computeBuildingYields, settleEconomy, establishTradeRoute, settleEconomyPure } from '../engine/economy';
-import { settlePolitics, settlePoliticsPure, changeGovernment, enactPolicy, enactLaw } from '../engine/politics';
-import { settleTechnology, settleTechnologyPure, startResearch } from '../engine/technology';
-import { settleCultureReligion, settleCultureReligionPure } from '../engine/culture';
-import { settleDiplomacy, settleDiplomacyPure, improveRelation, establishTrade, espionage, formAlliance } from '../engine/diplomacy';
-import { applySettleWarsResult, declareWar, makePeace, recruit, moveArmy, settleWars, settleWarsPure } from '../engine/military';
-import { draftFromPopulation, settlePopulation, settlePopulationPure } from '../engine/population';
-import { checkTrigger, rollEvents, applyEffect, applyEffectPure, recordEvent, recordEventPure } from '../engine/events';
-import { ageRulers, ageRulersPure } from '../engine/dynasty';
-import { lawPerTurnEffects, lawPerTurnEffectsPure } from '../engine/politics';
-import { processTurn } from '../engine/turn';
-import { PLAYER_ID } from '../data/nations';
-import type { GameState } from '../types/game';
-import { mulberry32 } from '../utils/random';
+import { createInitialState } from '../init';
+import { computeBuildingYields, settleEconomy, settleEconomyPure } from '../economy';
+import { settlePolitics, settlePoliticsPure, changeGovernment, enactPolicy } from '../politics';
+import { settleTechnology, settleTechnologyPure, startResearch } from '../technology';
+import { settleCultureReligion, settleCultureReligionPure } from '../culture';
+import { settleDiplomacy, settleDiplomacyPure, improveRelation, establishTrade, espionage, formAlliance } from '../diplomacy';
+import { applySettleWarsResult, declareWar, makePeace, recruit, moveArmy, settleWars, settleWarsPure } from '../military';
+import { draftFromPopulation, settlePopulation, settlePopulationPure } from '../population';
+import { checkTrigger, rollEvents, applyEffect, applyEffectPure, recordEvent, recordEventPure } from '../events';
+import { ageRulers, ageRulersPure } from '../dynasty';
+import { lawPerTurnEffects, lawPerTurnEffectsPure } from '../politics';
+import { processTurn } from '../turn';
+import { PLAYER_ID } from '../../data/nations';
+import { mulberry32 } from '../../utils/random';
 
 describe('C3 economy 针对性', () => {
   it('高税率降低民心（通过腐败/稳定修正间接体现）', () => {
@@ -322,7 +321,6 @@ describe('C3 military 补充', () => {
     const state = createInitialState();
     const aiNations = Object.values(state.nations).filter((n) => !n.isPlayer);
     const target = aiNations[0];
-    const player = state.nations[PLAYER_ID];
     // 设为停战期
     let rel = state.relations.find((rr) => rr.from === PLAYER_ID && rr.to === target.id);
     if (!rel) {
@@ -446,7 +444,7 @@ describe('C1 settleEconomyPure 纯函数对照', () => {
 });
 
 // C1: settlePopulationPure 纯函数对照测试——delta 与 settlePopulation mutate 结果一致
-import { provincesOf } from '../engine/init';
+import { provincesOf } from '../init';
 describe('C1 settlePopulationPure 纯函数对照', () => {
   it('delta 与 settlePopulation mutate 后的增量一致', () => {
     const state1 = createInitialState();
@@ -844,7 +842,7 @@ describe('processTurn 正式入口契约', () => {
     const provs1 = Object.values(r1.state.provinces).filter((p) => p.ownerId === PLAYER_ID);
     const provs2 = Object.values(r2.state.provinces).filter((p) => p.ownerId === PLAYER_ID);
     expect(provs2.length).toBe(provs1.length);
-    provs1.forEach((p1, i) => {
+    provs1.forEach((p1) => {
       const p2 = provs2.find((pp) => pp.id === p1.id);
       if (!p2) return;
       expect(p2.population).toBe(p1.population);

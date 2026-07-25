@@ -5,7 +5,7 @@
 
 import { clamp } from '../utils/math';
 import type {
-  Army, Government, Nation, Province, NationalTendency,
+  Army, Nation, Province, NationalTendency,
 } from '../types/game';
 import type { Terrain } from '../data/provinces';
 

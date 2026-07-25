@@ -11,7 +11,7 @@ const phaseTimers: { name: string; start: number }[] = [];
 let turnStart = 0;
 
 /** 开始计时一个回合 */
-export function startTurn(turn: number): void {
+export function startTurn(_turn: number): void {
   turnStart = performance.now();
   phaseTimers.length = 0;
 }

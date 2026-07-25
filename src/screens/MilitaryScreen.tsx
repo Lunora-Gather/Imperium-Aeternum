@@ -12,7 +12,7 @@ import { assessWar } from '../gameplay/warAssessment';
 import { buildWarPreview } from '../gameplay/warPreview';
 import type { War, Army, GameState } from '../types/game';
 
-function peaceTermsText(war: War, state: GameState, pid: string): { txt: string; tone: 'good' | 'warn' | 'danger' | 'info' }[] {
+function peaceTermsText(war: War, _state: GameState, pid: string): { txt: string; tone: 'good' | 'warn' | 'danger' | 'info' }[] {
   const attacking = war.attackerId === pid;
   const out: { txt: string; tone: 'good' | 'warn' | 'danger' | 'info' }[] = [];
   if (war.progress >= 60) {

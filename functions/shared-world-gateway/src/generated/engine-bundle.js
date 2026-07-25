@@ -2072,7 +2072,7 @@ function generateRegionNations(region, rng, idOffset, playerNationId) {
   }
   return result;
 }
-function buildKeyNation(key, nationId, region, rng) {
+function buildKeyNation(key, nationId, _region, rng) {
   return {
     id: key.id ?? nationId,
     name: key.name ?? "\u672A\u540D",
@@ -2093,7 +2093,7 @@ function buildKeyNation(key, nationId, region, rng) {
     initRelations: []
   };
 }
-function buildAIWeights(tier, rng) {
+function buildAIWeights(tier, _rng) {
   const base = { taxUp: 1, buildFarm: 1, suppress: 0.8, expandArmy: 0.8, alliance: 1, declareWar: 0.6, research: 1 };
   if (tier === "S" || tier === "A") {
     return { ...base, expandArmy: 1.2, declareWar: 0.9, research: 1.2 };
@@ -5559,7 +5559,7 @@ var TECH_BY_ID = Object.fromEntries(
 );
 
 // src/engine/technology.ts
-function settleTechnology(nation, state) {
+function settleTechnology(nation, _state) {
   if (nation.tech.researchProgress) {
     const tech = TECH_BY_ID[nation.tech.researchProgress.techId];
     if (!tech) {

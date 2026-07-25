@@ -2,7 +2,7 @@
 // 在回合结算时检测关键里程碑，记入 GameState.chronicle
 // 目的：让玩家感受帝国百年历程，增强叙事感与记忆点
 
-import type { GameState, Nation, ChronicleEntry } from '../types/game';
+import type { GameState, ChronicleEntry } from '../types/game';
 import { provincesOf } from './init';
 
 const CHRONICLE_MAX = 50;

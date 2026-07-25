@@ -1,6 +1,7 @@
 # 维护手册
 
 Hugging Face 推理的服务端密钥、使用边界和降级策略见 [`AI-INFERENCE.md`](AI-INFERENCE.md)。
+目录职责、文件命名和新增模块规则见 [`PROJECT-STRUCTURE.md`](PROJECT-STRUCTURE.md)。
 
 ## 1. 当前架构基线
 

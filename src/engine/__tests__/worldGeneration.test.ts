@@ -1,12 +1,11 @@
 // W2 世界生成器测试
 
 import { describe, it, expect } from 'vitest';
-import { generateWorld, worldStats } from '../engine/worldgen';
+import { generateWorld, worldStats } from '../worldgen';
 
 describe('W2 世界生成器', () => {
   it('生成 192 国 / 600 省（±10% 容差）', () => {
     const result = generateWorld(12345);
-    const stats = worldStats(result);
     // ~195 国 ±10%
     expect(result.nations.length).toBeGreaterThanOrEqual(180);
     expect(result.nations.length).toBeLessThanOrEqual(220);

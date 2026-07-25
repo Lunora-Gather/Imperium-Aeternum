@@ -3,8 +3,8 @@
 // 接入 7 系统 engine + AI + 事件
 
 import type { GameState, Nation, TurnReport, Province, TreatyType } from '../types/game';
-import { clamp, avg } from '../utils/math';
-import { mulberry32, weightedPick } from '../utils/random';
+import { clamp } from '../utils/math';
+import { mulberry32 } from '../utils/random';
 import { provincesOf } from './init';
 import { applyEconomyResult, settleEconomyPure } from './economy';
 import { settlePopulationPure } from './population';

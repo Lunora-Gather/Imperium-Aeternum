@@ -7,7 +7,7 @@ describe('launch handbook', () => {
 
     expect(handbook.sections).toHaveLength(4);
     expect(handbook.sections.every((x) => x.title.length > 0 && x.steps.length > 0)).toBe(true);
-    expect(handbook.headline).toContain('治理');
+    expect(handbook.headline).toContain('三件事');
     expect(handbook.primaryAdvice).toContain('地中海黎明');
   });
 
@@ -36,6 +36,6 @@ describe('launch handbook', () => {
 
     expect(checklist.length).toBeGreaterThan(0);
     expect(checklist.every((x) => x.length > 0)).toBe(true);
-    expect(checklist.join(' / ')).toContain('帝国路线图');
+    expect(checklist).toEqual(['1 · 看总览', '2 · 做一件事', '3 · 存档并推进']);
   });
 });

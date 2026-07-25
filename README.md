@@ -1,157 +1,151 @@
 # Imperium Aeternum
 
-界面支持简体中文、繁體中文与 English。语言选择会保存在当前浏览器，并同步更新页面语言属性；新增界面文案统一收录在 `src/i18n`，避免业务组件各自维护翻译状态。
-
 <p align="center">
-  <b>一款以国家治理、长期稳定和战略取舍为核心的历史大策略模拟游戏。</b>
+  <strong>治理国家，而不只是征服地图。</strong><br>
+  一款围绕财政、民生、权力、外交与长期稳定展开的历史大策略模拟游戏。
 </p>
 
 <p align="center">
-  <a href="https://lunora-gather.github.io/Imperium-Aeternum/">在线试玩</a>
+  <a href="https://lunora-gather.github.io/Imperium-Aeternum/"><strong>在线游玩</strong></a>
   ·
-  <a href="#核心体验">核心体验</a>
+  <a href="#第一次玩">新手上手</a>
   ·
-  <a href="#本地运行">本地运行</a>
+  <a href="#开发与验证">本地开发</a>
   ·
-  <a href="#发布状态">发布状态</a>
+  <a href="docs/README.md">文档中心</a>
 </p>
 
 <p align="center">
-  <img alt="TypeScript" src="https://img.shields.io/badge/TypeScript-strict-blue?style=flat-square">
-  <img alt="React" src="https://img.shields.io/badge/React-18-61dafb?style=flat-square">
-  <img alt="Vite" src="https://img.shields.io/badge/Vite-8-646cff?style=flat-square">
-  <img alt="Release" src="https://img.shields.io/badge/release-v1.0.0--preview-gold?style=flat-square">
+  <img alt="TypeScript strict" src="https://img.shields.io/badge/TypeScript-strict-3178c6?style=flat-square">
+  <img alt="React 18" src="https://img.shields.io/badge/React-18-61dafb?style=flat-square">
+  <img alt="Vite 8" src="https://img.shields.io/badge/Vite-8-646cff?style=flat-square">
+  <img alt="Release" src="https://img.shields.io/badge/release-1.0.0--preview-c9a44e?style=flat-square">
 </p>
+
+支持简体中文、繁體中文和 English。游客可以完整游玩单机模式；登录后可使用私有云存档、共享活版图、好友与实时聊天。
+
+## 第一次玩
+
+选择推荐剧本“地中海黎明”，记住这个循环就能开始：
+
+| 1 · 看总览 | 2 · 做一件事 | 3 · 存档并推进 |
+| --- | --- | --- |
+| 先读“行动中心”，红色风险必须处理 | 只解决今年最重要的问题，不必点遍所有页面 | 保存后结束本年，再用年报决定下一步 |
+
+游戏内还有两层互不重复的帮助：
+
+- `?` 新手帮助：用 6 张短说明讲清完整循环。
+- 首局实战引导：带你实际查看经济、省份，完成存档、推进和年报复盘。
 
 ## 核心体验
 
-**Imperium Aeternum** 不是单纯的扩张游戏。你需要在财政、粮食、人口、法律、派系、战争、外交、科技和地方治理之间做取舍，让国家机器在数百年的压力下继续运转。
+- **长期治理**：财政、粮食、人口、安定、合法性、腐败和地方不满相互影响。
+- **有依据的决策**：行动中心、回合前检查、战争预演和顾问建议解释“现在为什么要做”。
+- **多条国家路线**：经营、扩张、外交与长治久安都能成为有效目标。
+- **可复盘的历史**：年度报告和帝国史册记录国家的改善、危机、战争与继承。
+- **可靠存档**：多槽位本地存档、旧档迁移、损坏检测，以及登录后的 5 个私有云槽位。
+- **共享世界**：玩家控制部分国家，其余国家由 AI 统一推进；服务端负责控制权、行动校验和版本化快照。
+- **安全社交**：好友码、版图频道、好友私聊和图片消息均通过服务端权限与限流。
+- **可控 AI**：Hugging Face 只负责把规则引擎已计算的外交事实整理成简报；失败时自动回退到本地建议，不参与结算。
 
-当前 1.0 public preview 的主循环已经成型：
+## 技术架构
 
-```text
-选择剧本
-  -> Dashboard 指挥中枢
-  -> 顾问与风险判断
-  -> 执行内政、外交或军事行动
-  -> 推进年度
-  -> 阅读年报
-  -> 存档并修正下一年路线
+```mermaid
+flowchart LR
+  UI["React 界面"] --> Store["Zustand / GameStore"]
+  Store --> Pipeline["回合与玩家行动管线"]
+  Pipeline --> Engine["纯 TypeScript 规则引擎"]
+  Store --> Local["本地多槽位存档"]
+  UI --> Appwrite["Appwrite 认证 / 数据 / 存储 / 实时"]
+  Appwrite --> Functions["5 个权威网关 Functions"]
+  Functions --> HF["Hugging Face 推理（可降级）"]
 ```
 
-## 你可以做什么
+浏览器只持有公开的 Appwrite 项目标识。API Key 和 Hugging Face Token 只存在于 Appwrite Function 环境变量中。
 
-- 经营国家财政、粮食、人口、安定和合法性。
-- 在经济、外交、军事和长期稳定之间选择发展路线。
-- 使用 Dashboard 的指挥分组快速判断本年优先级。
-- 在宣战前查看战争机会、胜率、后勤和外交风险。
-- 通过年度报告复盘国家状态变化。
-- 使用多槽位本地存档继续长期局。
-- 在满足关系、信任、资源、国内稳定与冷却期前提后召开元首峰会，让协议持续影响国势。
-- 登录后参与共享活版图、控制多个未被占用的国家，并通过版图频道或好友私聊协作。
-
-## 主要系统
-
-| 系统 | 作用 |
-| --- | --- |
-| Dashboard 指挥中枢 | 汇总目标、总参、发布状态、推进风险、经济、外交和战争建议 |
-| Governor Advisor | 给出地方治理优先级和页面跳转建议，不自动改动存档 |
-| Strategic HQ | 识别国家当前路线、主目标和三步行动计划 |
-| Pre-turn Risk Center | 在推进年度前提示硬阻断、风险和可推进状态 |
-| Economy / Diplomacy Advisors | 汇总财政、粮食、外交关系、威胁和可行动建议 |
-| War Preview | 在宣战前展示胜率、准备度、后勤压力和外部风险 |
-| Save Recovery | 支持多槽位存档、旧档 normalize 和损坏存档安全失败 |
-| 首局实战引导 | 用 6 个可执行任务带玩家完成总览、经济、省份、存档、推进和年报复盘；进度自动识别，可收起、跳过、重开，并在完成后给出下一局规划建议 |
-| 元首峰会 | 只有关系、信任、国内稳定、资源和冷却期满足时才能举行；协议会持续影响后续国势 |
-| Appwrite 账号 | 新注册强制邮箱验证码；密码或验证码均可登录，忘记密码可用 6 位邮箱验证码找回；游客仍可离线游玩，登录后可同步 5 个私有云存档槽位 |
-| 共享活版图 | 认领后可初始化并进入统一世界；行动经服务端校验和版本化快照保存，无人控制国家在所有玩家准备后由 AI 统一推进；支持版图实时图文频道、好友码和好友实时图文私聊 |
-| Hugging Face 外交简报 | 仅把规则引擎已经计算出的峰会事实整理为建议，不参与结算；超时、异常或额度耗尽时自动使用本地规则简报 |
-
-## 在线能力与安全边界
-
-网页前端继续由 GitHub Pages 托管；Appwrite 提供邮箱认证、TablesDB、Storage、Realtime 与 Functions，因此账号、共享世界和实时聊天不依赖常驻网页服务器。敏感密钥只存在于 Appwrite Function 变量中，浏览器产物只包含公开项目标识。
-
-- 云存档上传由 `cloud-save-gateway` 从登录会话确定所有者，重新校验槽位、版本、时间、设备与 SHA-256；浏览器不能直接创建或覆盖云端行和文件。
-- 共享世界的认领、释放、准备、行动与结算全部经过权威网关，使用租约、世界修订、事务与服务端幂等键避免重复控制和并发覆盖。
-- 世界频道和好友私聊使用服务端原子限流、成员权限与 2 MB 图片限制；文本消息先本地即时回显，再与 Realtime 和服务器行 ID 去重。
-- AI 简报按用户日额度、全站日额度和全站月额度事务化预占；推理失败会返还额度，避免异常请求持续计费。
-- 360px 手机、390px 手机、768px 平板与 1280px 桌面断点均纳入发布验收；核心按钮与语言、主题控件的触控高度不低于约 38px。
-
-## 发布状态
+## 项目结构
 
 ```text
-Public URL: https://lunora-gather.github.io/Imperium-Aeternum/
-Release tag: v1.0.0-preview
-Package version: 1.0.0-preview
-Build marker: 1.0.0-public-preview
-Primary branch: main
+src/
+  components/          可复用界面组件
+    account/           账号入口
+    shared-world/      共享世界大厅
+    social/            好友与聊天
+    ui/                基础 UI primitives
+  data/                剧本与静态规则数据
+  engine/              纯规则引擎与回合结算
+  gameplay/            产品规则、顾问、行动管线与新手引导
+    actions/           事务化玩家命令
+  i18n/                语言状态、词典与生成映射
+  screens/             页面级组件
+  services/            外部基础设施适配器
+  shared-world/        共享世界领域模型
+  social/              社交领域模型
+  store/               状态、场景与存档
+  styles/              全局样式层
+  types/               共享 TypeScript 类型
+
+functions/
+  account-gateway/       账号验证码与密码恢复
+  ai-diplomacy-gateway/  AI 简报、配额和降级
+  cloud-save-gateway/    私有云存档校验与原子替换
+  shared-world-gateway/  控制租约、命令和统一结算
+  social-gateway/        好友、频道、私聊和媒体
+
+appwrite/               Appwrite 资源声明与维护脚本
+scripts/                构建、数据导出和稳定性模拟
+docs/                   当前文档、发布资料与历史记录
 ```
 
-当前仓库保留一个正式 Pages 部署工作流：`Deploy Pages`。它会在 `main` 推送后运行完整 `npm run rc:check`，再部署 GitHub Pages。
+目录职责、文件命名和新增模块规则见 [项目结构与命名规范](docs/maintenance/PROJECT-STRUCTURE.md)。
 
-## 本地运行
+## 开发与验证
+
+要求 Node.js 22。
 
 ```bash
 npm ci
 npm run dev
 ```
 
-常用检查：
+常用命令：
 
 ```bash
-npm run typecheck
-npm run test:invariants
-npm run simulate:stability
-npm run simulate:benchmark
-npm run check:bundle
-npm run validate
-npm run test
+npm run typecheck          # strict + 未使用代码检查
+npm run validate           # 静态游戏数据验证
+npm test                   # 完整 Vitest 回归
+npm run simulate:stability # 长局稳定性模拟
+npm run pages:build        # GitHub Pages 兼容构建
 ```
 
-发布候选门禁：
+合并或发布前只需运行统一门禁：
 
 ```bash
 VITE_BASE=/Imperium-Aeternum/ npm run rc:check
 ```
 
-`rc:check` 包含 TypeScript 检查、数据校验、完整 Vitest 回归套件、经典/区域/世界稳定性与性能模拟、Pages 兼容构建及构建体积预算。
+它会依次执行类型检查、数据验证、完整测试、稳定性模拟、生产构建和产物体积预算。
 
-## 项目结构
+## Appwrite 与 Hugging Face
 
-```text
-src/
-  components/   通用 UI 与 Dashboard 面板
-  data/         国家、省份、事件、建筑、政策、法律、科技等数据
-  engine/       回合结算、战争、外交、AI、事件、王朝等核心逻辑
-  gameplay/     顾问、路线判断、风险中心、行动建议和发布状态
-    actions/     事务化玩家命令（内政、外交、军事、政治、省份）
-  screens/      地图、Dashboard、年报、外交、军事、存档等页面
-  services/     Appwrite 客户端、认证与云存档基础设施适配器（无服务端密钥）
-  store/        全局状态、存档、迁移和游戏入口
-  shared-world/ 共享版图时钟、控制权与命令领域模型
-  social/       好友、版图频道和私聊领域模型
-  types/        TypeScript 类型定义
-functions/
-  account-gateway/       验证码找回密码的权威账号网关
-  ai-diplomacy-gateway/  Hugging Face 外交简报、配额与降级边界
-  cloud-save-gateway/    私有云存档校验、哈希与原子替换
-  shared-world-gateway/  控制租约、命令、准备与统一世界结算
-  social-gateway/        好友、频道、私聊、媒体与原子限流
-```
+前端由 GitHub Pages 托管，在线能力由 Appwrite 提供。配置入口：
 
-服务端资源和部署声明集中在 `appwrite.config.json`、`functions/` 与 `appwrite/`；共享世界引擎适配入口为 `scripts/shared-world-engine-entry.ts`，构建时生成网关内的 `engine-bundle.js`。
+- [Appwrite 账号、数据库、存储与 Functions](docs/maintenance/APPWRITE_SETUP.md)
+- [账号、好友与社交边界](docs/maintenance/AUTH-AND-SOCIAL.md)
+- [共享活版图架构](docs/maintenance/SHARED-WORLD.md)
+- [Hugging Face 推理与降级策略](docs/maintenance/AI-INFERENCE.md)
+- [.env.example](.env.example) 中的浏览器公开变量示例
 
-## 有用文档
+不要把 API Key、Function Secret 或 Hugging Face Token 写入 `.env.example`、前端源码、提交记录或截图。
 
-- [文档导航](docs/README.md)
-- [维护手册](docs/maintenance/README.md)
-- [后续完善路线图](docs/maintenance/ROADMAP.md)
-- [漏洞检查清单](docs/maintenance/BUG-AUDIT-CHECKLIST.md)
-- [Appwrite 账号与云存档维护](docs/maintenance/APPWRITE_SETUP.md)
-- [Release notes](docs/release-notes-v1.0.0-preview.md)
-- [Public preview QA](docs/public-preview-qa.md)
-- [Release checklist](docs/release-checklist.md)
-- [Final QA checklist](docs/FINAL_QA.md)
-- [Post-1.0 backlog](docs/POST_1_0_BACKLOG.md)
+## 发布状态
 
-更底层的设计、公式和 ADR 文档保留在 `docs/`，用于追溯玩法规则和数据来源。
+| 项目 | 当前值 |
+| --- | --- |
+| 在线地址 | [lunora-gather.github.io/Imperium-Aeternum](https://lunora-gather.github.io/Imperium-Aeternum/) |
+| 版本 | `1.0.0-preview` |
+| 主分支 | `main` |
+| 部署 | GitHub Actions → GitHub Pages |
+| 线上后端 | Appwrite Cloud |
+
+`main` 的每次发布都必须通过 `npm run rc:check`。当前风险、验收与后续计划统一收录在 [维护文档](docs/maintenance/README.md)，历史阶段报告不作为当前实现依据。

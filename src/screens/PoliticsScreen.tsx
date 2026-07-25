@@ -20,7 +20,7 @@ function toneByValue(value: number, lowBad = true): 'danger' | 'warn' | 'good' |
 }
 
 export default function PoliticsScreen() {
-  const { state, enactPolicy, enactLaw, suppressRebellion, negotiateRebellion } = useGameStore();
+  const { enactPolicy, enactLaw, suppressRebellion, negotiateRebellion } = useGameStore();
   const player = useGameStore((s) => s.state.nations[s.state.playerNationId]);
   const govDef = GOVERNMENTS[player.government.type];
   const [tab, setTab] = useState<'policy' | 'law'>('policy');

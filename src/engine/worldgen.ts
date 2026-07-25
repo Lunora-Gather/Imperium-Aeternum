@@ -3,7 +3,7 @@
 // S/A 级手写覆盖，B/C/D 级模板生成
 
 import type { NationDef, NationTier } from '../data/nations';
-import type { ProvinceDef, Terrain, Climate, Elevation, CultureId, ReligionId, ProvinceType } from '../data/provinces';
+import type { ProvinceDef } from '../data/provinces';
 import type { GovernmentId } from '../data/governments';
 import type { NationalCharacterId } from '../data/national-characters';
 import { REGIONS, type RegionTemplate } from '../data/regions';
@@ -198,7 +198,7 @@ function generateRegionNations(region: RegionTemplate, rng: () => number, idOffs
   return result;
 }
 
-function buildKeyNation(key: Partial<NationDef>, nationId: string, region: RegionTemplate, rng: () => number): NationDef {
+function buildKeyNation(key: Partial<NationDef>, nationId: string, _region: RegionTemplate, rng: () => number): NationDef {
   return {
     id: key.id ?? nationId,
     name: key.name ?? '未名',
@@ -220,7 +220,7 @@ function buildKeyNation(key: Partial<NationDef>, nationId: string, region: Regio
   };
 }
 
-function buildAIWeights(tier: NationTier, rng: () => number): NationDef['aiWeights'] {
+function buildAIWeights(tier: NationTier, _rng: () => number): NationDef['aiWeights'] {
   const base = { taxUp: 1.0, buildFarm: 1.0, suppress: 0.8, expandArmy: 0.8, alliance: 1.0, declareWar: 0.6, research: 1.0 };
   if (tier === 'S' || tier === 'A') {
     return { ...base, expandArmy: 1.2, declareWar: 0.9, research: 1.2 };

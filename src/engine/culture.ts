@@ -1,7 +1,7 @@
 // Imperium Aeternum — 文化与宗教系统 engine
 // 阶段 5b：完整实现 docs/02-system-rules.md §14
 
-import type { Nation, Province, GameState } from '../types/game';
+import type { Nation, GameState } from '../types/game';
 import { assimilationDelta, loyaltyDelta, computeRebellion } from './formulas';
 import { clamp } from '../utils/math';
 import { provincesOf } from './init';

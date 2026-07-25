@@ -1,6 +1,6 @@
 // Imperium Aeternum — UI 组件 v4（青铜铭文设计语言）
-import type { CSSProperties, ReactNode } from 'react';
-import { translate } from '../i18n';
+import type { ReactNode } from 'react';
+import { translate } from '../../i18n';
 
 // ── Panel：分区面板，display 字体标题，金色顶饰 ──
 export function Panel({ title, children, actions, accent, icon }: {
@@ -197,6 +197,3 @@ export function ResourceStrip({ items }: { items: { label: string; value: number
   );
 }
 
-// ── helpers ──
-export const flex: CSSProperties = { display: 'flex', gap: 'var(--space-2)' };
-export const grid2: CSSProperties = { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-4)' };

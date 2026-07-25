@@ -21,7 +21,7 @@
     "rc:check": "npm run typecheck && npm run validate && npm run test && npm run simulate:stability && npm run pages:build && npm run check:bundle",
     "validate": "tsx src/data/__validate__.ts",
     "export-data": "tsx scripts/export-data.ts",
-    "build:shared-world-engine": "esbuild scripts/shared-world-engine-entry.ts --bundle --platform=node --format=esm --target=node22 --outfile=functions/shared-world-gateway/src/engine-bundle.js"
+    "build:shared-world-engine": "esbuild scripts/shared-world-engine-entry.ts --bundle --platform=node --format=esm --target=node22 --outfile=functions/shared-world-gateway/src/generated/engine-bundle.js"
   },
   "dependencies": {
     "appwrite": "^26.2.0",

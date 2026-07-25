@@ -111,7 +111,6 @@ export function buildStrategicBrief(state: GameState): StrategicBrief {
   const highRiskProvs = provs.filter((p) => p.rebellionRisk > 65 || p.unrest > 55 || p.loyalty < 35).sort((a, b) => (b.rebellionRisk + b.unrest + Math.max(0, 50 - b.loyalty)) - (a.rebellionRisk + a.unrest + Math.max(0, 50 - a.loyalty)));
   const lowFaction = [...player.factions].sort((a, b) => a.satisfaction - b.satisfaction)[0];
   const avgUnrest = avg(provs.map((p) => p.unrest));
-  const avgLoyalty = avg(provs.map((p) => p.loyalty));
   const threats = externalThreats(state, player);
   const techGap = weakestTech(player);
   const goldTrend = trend(state.history.map(netOf));
