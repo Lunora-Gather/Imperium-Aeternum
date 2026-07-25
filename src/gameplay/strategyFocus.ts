@@ -96,7 +96,22 @@ function revengeProvince(state: GameState, nation: Nation): string | undefined {
 
 function scoreTargets(state: GameState, nation: Nation, index: StrategyIndex) {
   const neighbors = neighborsOf(state, nation.id, index);
-  return neighbors.map((id) => { const target = state.nations[id]; const rel = relationOf(state, nation.id, id, index); const war = state.wars.some((w) => [w.attackerId, w.defenderId].includes(nation.id) && [w.attackerId, w.defenderId].includes(id)); const myArmy = armySize(nation); const otherArmy = target ? armySize(target) : 0; const relation = rel?.relation ?? 0; const threat = rel?.threat ?? 0; const trust = rel?.trust ?? 50; const weakness = Math.max(0, myArmy - otherArmy) / Math.max(80, otherArmy + 1); return { id, relation, threat, trust, treaty: rel?.treaty ?? 'none', rival: (war ? 80 : 0) + threat * 0.8 + Math.max(0, -relation) * 0.7 + weakness * 12, partner: (rel?.treaty === 'trade' ? 45 : 0) + (rel?.treaty === 'alliance' ? 55 : 0) + Math.max(0, relation) * 0.7 + trust * 0.4, watch: threat * 0.7 + Math.abs(relation) * 0.25 + Math.max(0, otherArmy - myArmy) / Math.max(80, myArmy + 1) * 20 }; }).filter((x) => !!state.nations[x.id] && !state.nations[x.id].defeated);
+  return neighbors.map((id) => {
+    const target = state.nations[id]; const rel = relationOf(state, nation.id, id, index);
+    const war = state.wars.some((w) => [w.attackerId, w.defenderId].includes(nation.id) && [w.attackerId, w.defenderId].includes(id));
+    const myArmy = armySize(nation); const otherArmy = target ? armySize(target) : 0;
+    const relation = rel?.relation ?? 0; const threat = rel?.threat ?? 0; const trust = rel?.trust ?? 50;
+    const weakness = Math.max(0, myArmy - otherArmy) / Math.max(80, otherArmy + 1);
+    const remembered = (state.aiMemory?.[nation.id]?.incidents ?? [])
+      .filter((incident) => incident.actorId === id && state.turn - incident.turn <= 30)
+      .reduce((sum, incident) => sum + incident.impact * Math.max(0.25, 1 - (state.turn - incident.turn) / 40), 0);
+    return {
+      id, relation, threat, trust, treaty: rel?.treaty ?? 'none',
+      rival: (war ? 80 : 0) + threat * 0.8 + Math.max(0, -relation) * 0.7 + weakness * 12 + Math.max(0, -remembered),
+      partner: (rel?.treaty === 'trade' ? 45 : 0) + (rel?.treaty === 'alliance' ? 55 : 0) + Math.max(0, relation) * 0.7 + trust * 0.4 + Math.max(0, remembered),
+      watch: threat * 0.7 + Math.abs(relation) * 0.25 + Math.max(0, otherArmy - myArmy) / Math.max(80, myArmy + 1) * 20,
+    };
+  }).filter((x) => !!state.nations[x.id] && !state.nations[x.id].defeated);
 }
 
 function updateAIMemory(state: GameState, nation: Nation, index: StrategyIndex): AIMemoryEntry {
@@ -106,7 +121,7 @@ function updateAIMemory(state: GameState, nation: Nation, index: StrategyIndex):
   const desired = bestDesiredProvince(state, nation, index); const core = bestCoreProvince(state, nation, index); const revenge = revengeProvince(state, nation);
   const oldTerr = old.territory;
   const terr: AITerritoryMemory = { coreProvinceId: core ?? oldTerr?.coreProvinceId, desiredProvinceId: desired.score >= 32 ? desired.id : oldTerr?.desiredProvinceId, revengeProvinceId: revenge ?? oldTerr?.revengeProvinceId, pressure: clamp(Math.max((oldTerr?.pressure ?? 0) * 0.8, desired.score, revenge ? 70 : 0), 0, 100), lastUpdated: state.turn };
-  const next: AIMemoryEntry = { rivalId: rival && rival.rival >= 35 ? rival.id : old.rivalId, rivalScore: clamp(Math.max((old.rivalScore ?? 0) * 0.72, rival?.rival ?? 0), 0, 100), partnerId: partner && partner.partner >= 45 ? partner.id : old.partnerId, partnerScore: clamp(Math.max((old.partnerScore ?? 0) * 0.76, partner?.partner ?? 0), 0, 100), watchId: watch && watch.watch >= 30 ? watch.id : old.watchId, watchScore: clamp(Math.max((old.watchScore ?? 0) * 0.78, watch?.watch ?? 0), 0, 100), territory: terr, lastUpdated: state.turn };
+  const next: AIMemoryEntry = { rivalId: rival && rival.rival >= 35 ? rival.id : old.rivalId, rivalScore: clamp(Math.max((old.rivalScore ?? 0) * 0.72, rival?.rival ?? 0), 0, 100), partnerId: partner && partner.partner >= 45 ? partner.id : old.partnerId, partnerScore: clamp(Math.max((old.partnerScore ?? 0) * 0.76, partner?.partner ?? 0), 0, 100), watchId: watch && watch.watch >= 30 ? watch.id : old.watchId, watchScore: clamp(Math.max((old.watchScore ?? 0) * 0.78, watch?.watch ?? 0), 0, 100), territory: terr, incidents: (old.incidents ?? []).filter((incident) => state.turn - incident.turn <= 30).slice(-8), lastUpdated: state.turn };
   state.aiMemory[nation.id] = next; return next;
 }
 

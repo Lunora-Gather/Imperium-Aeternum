@@ -72,10 +72,16 @@ export function normalizeGameState(gs: GameState): GameState {
   state.pendingEventOptions = state.pendingEventOptions ?? null;
   state.history = Array.isArray(state.history) ? state.history : [];
   state.lastReport = state.lastReport ?? null;
+  for (const report of state.history) report.strategicNotes = Array.isArray(report.strategicNotes) ? report.strategicNotes : [];
+  if (state.lastReport) state.lastReport.strategicNotes = Array.isArray(state.lastReport.strategicNotes) ? state.lastReport.strategicNotes : [];
   state.victory = state.victory ?? { type: null };
   state.bankruptTurns = num(state.bankruptTurns);
   state.lowStabilityTurns = num(state.lowStabilityTurns);
   state.chronicle = Array.isArray(state.chronicle) ? state.chronicle : [];
+  state.nationalMission = state.nationalMission && Array.isArray(state.nationalMission.completedStages)
+    ? state.nationalMission
+    : undefined;
+  state.nationalCrisis = state.nationalCrisis ?? undefined;
 
   if (!gs.playerNationId || !gs.nations[gs.playerNationId]) {
     const fallback = Object.values(gs.nations).find((n) => !n.defeated) ?? Object.values(gs.nations)[0];
@@ -209,10 +215,12 @@ const migrations: { from: number; to: number; apply: (s: SaveGame) => SaveGame }
       for (const r of gs.history ?? []) {
         if (!r.worldEvents) r.worldEvents = [];
         if (!r.provinceChanges) r.provinceChanges = [];
+        if (!r.strategicNotes) r.strategicNotes = [];
       }
       if (gs.lastReport) {
         if (!gs.lastReport.worldEvents) gs.lastReport.worldEvents = [];
         if (!gs.lastReport.provinceChanges) gs.lastReport.provinceChanges = [];
+        if (!gs.lastReport.strategicNotes) gs.lastReport.strategicNotes = [];
       }
       return { ...s, version: 3 };
     },
@@ -220,6 +228,7 @@ const migrations: { from: number; to: number; apply: (s: SaveGame) => SaveGame }
   { from: 3, to: 4, apply: (s) => ({ ...s, version: 4, gameState: normalizeGameState(s.gameState) }) },
   { from: 4, to: 5, apply: (s) => ({ ...s, version: 5, gameState: normalizeGameState(s.gameState) }) },
   { from: 5, to: 6, apply: (s) => ({ ...s, version: 6, gameState: normalizeGameState(s.gameState) }) },
+  { from: 6, to: 7, apply: (s) => ({ ...s, version: 7, gameState: normalizeGameState(s.gameState) }) },
 ];
 
 export function migrate(save: SaveGame): SaveGame {

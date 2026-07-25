@@ -292,20 +292,30 @@ export function findRelation(relations: DiplomaticRelation[], from: string, to: 
 // key=`${from}|${to}`，value=relation 对象引用
 // 运行时只 mutate 字段（treaty/relation/trust），不新增条目，故索引无需重建
 // worldgen/init 阶段批量建好后调用 buildRelationMap()；push 新 relation 后需重建
+const relationMapCache = new WeakMap<GameState, Map<string, DiplomaticRelation>>();
+
 export function buildRelationMap(state: GameState): void {
-  if (!state._relMap) {
-    state._relMap = new Map();
-    for (const r of state.relations) state._relMap.set(`${r.from}|${r.to}`, r);
-  }
+  if (state._relMap) return;
+  const map = new Map<string, DiplomaticRelation>();
+  for (const relation of state.relations) map.set(`${relation.from}|${relation.to}`, relation);
+  relationMapCache.set(state, map);
+  // Immer freezes successful action snapshots. A read helper must never crash
+  // merely because the transient cache cannot be attached to that snapshot.
+  if (Object.isExtensible(state)) state._relMap = map;
 }
 
 export function getRelationObj(from: string, to: string, state: GameState): DiplomaticRelation | undefined {
-  if (!state._relMap) buildRelationMap(state);
-  return state._relMap!.get(`${from}|${to}`);
+  let map = state._relMap ?? relationMapCache.get(state);
+  if (!map) {
+    buildRelationMap(state);
+    map = state._relMap ?? relationMapCache.get(state);
+  }
+  return map?.get(`${from}|${to}`);
 }
 
 export function invalidateRelationMap(state: GameState): void {
-  state._relMap = undefined;
+  relationMapCache.delete(state);
+  if (Object.isExtensible(state)) state._relMap = undefined;
 }
 
 export function provincesOf(nationId: string, provinces: Record<string, Province>): Province[] {

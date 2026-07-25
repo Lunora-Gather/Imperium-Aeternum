@@ -107,6 +107,14 @@ const en: Record<string, string> = {
   '注意': 'Attention', '先整备': 'Prepare first', '厌战': 'War exhaustion', '向相邻非同盟国家宣战。先点“预演”查看胜率、后勤、财政、厌战与外交风险，再决定是否发动战争。': 'Declare war on an adjacent non-allied nation. Review win chance, logistics, finance, exhaustion, and diplomatic risk before committing.',
   '⚠ 战略要点：宣战后须在“军队部署”区把军队调动到与敌省相邻的己省（前线），否则无军队在前线将自动议和。': '⚠ Strategic note: after declaring war, move an army to one of your provinces adjacent to the enemy. Without a front-line army, peace is automatic.',
   '外交判断': 'Diplomatic Assessment', '威胁': 'Threat', '暂无迫切威胁': 'No urgent threats', '暂无合适贸易对象': 'No suitable trade partners', '暂无可结盟对象': 'No alliance candidates', '外交总览': 'Diplomatic Overview', '列表': 'List', '图谱': 'Network', '元首协议': 'Leader accords', '各国关系': 'Foreign Relations', '关系': 'Relations', '信任': 'Trust', '元首会谈': 'Leader Summit', ' 处于观察区 · 先用低成本改善关系或保留影响力，等待更明确的合作/威胁信号。': ' is under observation. Improve relations cheaply or preserve influence until cooperation or threat signals become clearer.', '应对：': 'Response: ', '先用低成本改善关系或保留影响力，等待更明确的合作/威胁信号。': 'Improve relations cheaply or preserve influence until cooperation or threat signals become clearer.', '级': '',
+  '记得善意': 'Remembers goodwill', '牢记敌意': 'Remembers hostility', '保持戒备': 'Remains guarded', '旧事渐淡': 'Memories fading', '暂无旧账': 'No history',
+  '双方尚未留下足以影响长期判断的重大往来。': 'No major interaction is shaping long-term judgment yet.',
+  '近期往来的影响正在消退，新的行动会改变其判断。': 'Recent interactions are fading; new actions can change its judgment.',
+  '最近记忆：': 'Recent memory: ',
+  '派遣使节并兑现了改善关系的承诺': 'sent envoys and honored a promise to improve relations',
+  '建立了互利贸易关系': 'established a mutually beneficial trade relationship', '签订了正式同盟': 'signed a formal alliance',
+  '针对本国实施了秘密行动': 'conducted covert operations against this nation', '通过王室联姻建立了长期纽带': 'built a lasting bond through royal marriage',
+  '推动了受到欢迎的文化交流': 'promoted welcomed cultural exchange', '接受议和并进入停战期': 'accepted peace and entered a truce',
   'AI 书记官': 'AI Diplomatic Secretary', '会谈研判与措辞辅助': 'Summit analysis and wording support', '研判中…': 'Analyzing…', '生成 AI 会谈简报': 'Generate AI summit brief', '登录后启用 AI 书记官': 'Sign in to enable the AI secretary',
   'Hugging Face 只解释规则已经计算出的外交事实，不改变成功率、协议、资源或实际会谈结果。': 'Hugging Face only explains diplomatic facts already computed by the rules. It cannot change success chances, agreements, resources, or actual summit outcomes.',
   'Hugging Face 推理': 'Hugging Face inference', '规则降级': 'Rules fallback', '对方立场': 'Counterparty position', '建议开场': 'Recommended opening', '依据：': 'Basis: ',
@@ -167,6 +175,10 @@ export function registerGovernanceTranslations(): void {
     { pattern: /^联姻 (\d+)政(\d+)影(\d+)金$/, replacement: 'Marriage · $1 admin / $2 influence / $3 gold' },
     { pattern: /^文化输出 (\d+)政(\d+)科$/, replacement: 'Cultural outreach · $1 admin / $2 research' },
     { pattern: /^情报 (\d+)政(\d+)影$/, replacement: 'Intelligence · $1 admin / $2 influence' },
+    { pattern: /^近期的善意仍在影响其判断：(.+)。$/, replacement: (_all, detail) => `Recent goodwill still shapes its judgment: ${en[detail] ?? detail}.` },
+    { pattern: /^其决策仍受旧怨驱动：(.+)。$/, replacement: (_all, detail) => `Its decisions are still driven by grievance: ${en[detail] ?? detail}.` },
+    { pattern: /^其仍对近期行为有所顾虑：(.+)。$/, replacement: (_all, detail) => `It remains concerned about recent behavior: ${en[detail] ?? detail}.` },
+    { pattern: /^最近记忆：第(\d+)年 (.+)$/, replacement: (_all, year, detail) => `Recent memory: Year ${year} · ${en[detail] ?? detail}` },
   ]);
   registered = true;
 }

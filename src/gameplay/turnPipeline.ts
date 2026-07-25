@@ -6,6 +6,7 @@ import { applyAmbitionsAfterTurn, syncAmbitionMeta } from './ambitions';
 import { processTurn } from '../engine/turn';
 import { sanitizeState } from './stateHygiene';
 import { applyAIStrategy, applyPlayerFocus } from './strategyFocus';
+import { applyNationalPurposeAfterTurn, initializeNationalPurpose } from './nationalPurpose';
 
 export interface TurnPipelineResult {
   state: GameState;
@@ -14,13 +15,14 @@ export interface TurnPipelineResult {
 }
 
 export function prepareGameState(state: GameState): GameState {
-  return sanitizeState(syncAmbitionMeta(state));
+  return sanitizeState(initializeNationalPurpose(syncAmbitionMeta(state)));
 }
 
 export function advanceTurnPipeline(state: GameState): TurnPipelineResult {
   const turn = processTurn(state);
-  const ambition = applyAmbitionsAfterTurn(turn.state);
-  const notes = ambition.note ? [ambition.note] : [];
+  const purpose = applyNationalPurposeAfterTurn(turn.state);
+  const ambition = applyAmbitionsAfterTurn(purpose.state);
+  const notes = [...purpose.notes, ...(ambition.note ? [ambition.note] : [])];
   let next = ambition.state;
 
   if (!next.victory.type) {

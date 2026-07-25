@@ -254,3 +254,74 @@
   .ia-dash-grid { grid-template-columns: 1fr; }
   .ia-dash-brief-grid, .ia-command-stack-items, .ia-action-list, .ia-dash-meter-grid, .ia-dash-trends { grid-template-columns: 1fr; }
 }
+.ia-purpose {
+  padding: 14px;
+  border: 1px solid var(--border-gold);
+  border-radius: var(--radius-lg);
+  background:
+    linear-gradient(135deg, color-mix(in srgb, var(--gold) 8%, transparent), transparent 42%),
+    var(--bg-panel);
+  box-shadow: var(--shadow-sm);
+}
+.ia-purpose > header,
+.ia-purpose-title {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+.ia-purpose > header { margin-bottom: 10px; }
+.ia-purpose > header > div:last-child { display: flex; gap: 5px; flex-wrap: wrap; }
+.ia-purpose > header small,
+.ia-purpose-title span,
+.ia-purpose-calm > span {
+  display: block;
+  color: var(--text-mute);
+  font-size: 9px;
+  letter-spacing: .15em;
+  text-transform: uppercase;
+}
+.ia-purpose > header h3 { margin: 2px 0 0; font-family: var(--font-display); font-size: 17px; }
+.ia-purpose-grid { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(220px, .75fr); gap: 10px; }
+.ia-purpose-grid > article {
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--bg-inset) 82%, transparent);
+}
+.ia-purpose-title strong { display: block; margin-top: 3px; font-family: var(--font-display); font-size: 16px; }
+.ia-purpose-title em { color: var(--gold); font-family: var(--font-display); font-size: 22px; font-style: normal; }
+.ia-purpose-grid p { margin: 7px 0; color: var(--text-dim); font-size: 11px; line-height: 1.55; }
+.ia-purpose-progress { height: 7px; overflow: hidden; border-radius: 99px; background: var(--bg-deep); }
+.ia-purpose-progress i,
+.ia-purpose-progress b { display: block; height: 100%; }
+.ia-purpose-progress b { border-radius: inherit; background: linear-gradient(90deg, var(--gold-dim), var(--gold)); transition: width .3s ease; }
+.ia-purpose-current { display: grid; gap: 3px; margin-top: 9px; }
+.ia-purpose-current span { color: var(--gold); font-size: 10px; font-weight: 700; }
+.ia-purpose-current strong { font-size: 11px; line-height: 1.45; }
+.ia-purpose-current em { color: var(--text-mute); font-size: 10px; font-style: normal; }
+.ia-purpose-stages { display: grid; grid-template-columns: repeat(3, 1fr); gap: 5px; margin-top: 10px; }
+.ia-purpose-stages > div { display: flex; align-items: center; gap: 5px; min-width: 0; color: var(--text-mute); font-size: 10px; }
+.ia-purpose-stages i { display: grid; width: 18px; height: 18px; flex: 0 0 auto; place-items: center; border: 1px solid var(--border); border-radius: 50%; font-style: normal; }
+.ia-purpose-stages .is-current { color: var(--text); }
+.ia-purpose-stages .is-current i { border-color: var(--gold); color: var(--gold); }
+.ia-purpose-stages .is-done { color: var(--good); }
+.ia-purpose-stages .is-done i { border-color: var(--good); }
+.ia-purpose-crisis { border-color: var(--warn) !important; background: color-mix(in srgb, var(--warn) 8%, var(--bg-inset)) !important; }
+.ia-purpose-crisis.stage-3 { border-color: var(--war) !important; background: color-mix(in srgb, var(--war) 9%, var(--bg-inset)) !important; }
+.ia-purpose-crisis .ia-purpose-title em { color: var(--warn); }
+.ia-purpose-crisis.stage-3 .ia-purpose-title em { color: var(--war); }
+.ia-purpose-crisis-line { display: grid; gap: 2px; padding: 7px 0; border-top: 1px solid var(--border); }
+.ia-purpose-crisis-line span { color: var(--text-mute); font-size: 9px; }
+.ia-purpose-crisis-line strong { font-size: 10.5px; line-height: 1.45; }
+.ia-purpose-calm { display: flex; flex-direction: column; justify-content: center; }
+.ia-purpose-calm strong { margin-top: 5px; color: var(--good); font-family: var(--font-display); font-size: 15px; }
+.ia-purpose.is-compact { margin-bottom: 12px; }
+.ia-purpose.is-compact .ia-purpose-stages { display: none; }
+.ia-purpose-notes { display: grid; gap: 6px; margin-bottom: 12px; }
+.ia-purpose-notes > div { padding: 8px 10px; border-left: 3px solid var(--gold); background: color-mix(in srgb, var(--gold) 7%, var(--bg-inset)); font-size: 12px; line-height: 1.5; }
+@media (max-width: 760px) {
+  .ia-purpose-grid { grid-template-columns: 1fr; }
+  .ia-purpose-stages { grid-template-columns: 1fr; }
+}

@@ -79,8 +79,10 @@ function cloneState(state: GameState): GameState {
     victory: { ...(state.victory ?? { type: null }) },
     chronicle: Array.isArray(state.chronicle) ? state.chronicle.map((c) => ({ ...c })) : [],
     aiStrategyMeta: state.aiStrategyMeta ? Object.fromEntries(Object.entries(state.aiStrategyMeta).map(([id, entry]) => [id, { ...entry }])) : undefined,
-    aiMemory: state.aiMemory ? Object.fromEntries(Object.entries(state.aiMemory).map(([id, memory]) => [id, { ...memory, territory: memory.territory ? { ...memory.territory } : undefined }])) : undefined,
+    aiMemory: state.aiMemory ? Object.fromEntries(Object.entries(state.aiMemory).map(([id, memory]) => [id, { ...memory, territory: memory.territory ? { ...memory.territory } : undefined, incidents: memory.incidents?.map((incident) => ({ ...incident })) }])) : undefined,
     ambitionMeta: state.ambitionMeta ? { ...state.ambitionMeta } : undefined,
+    nationalMission: state.nationalMission ? { ...state.nationalMission, completedStages: [...state.nationalMission.completedStages] } : undefined,
+    nationalCrisis: state.nationalCrisis ? { ...state.nationalCrisis } : undefined,
     _relMap: undefined,
   };
 }
@@ -339,6 +341,8 @@ export function sanitizeState(state: GameState): GameState {
     )
   ) next.pendingEventOptions = null;
   next.history = next.history.slice(-12);
+  for (const report of next.history) report.strategicNotes = Array.isArray(report.strategicNotes) ? report.strategicNotes.slice(-8) : [];
+  if (next.lastReport) next.lastReport.strategicNotes = Array.isArray(next.lastReport.strategicNotes) ? next.lastReport.strategicNotes.slice(-8) : [];
   next.chronicle = next.chronicle.slice(-60);
   next._relMap = undefined;
   return next;

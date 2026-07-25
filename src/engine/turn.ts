@@ -108,6 +108,7 @@ function buildReport(
     exhaustSnapshot: Math.round(nation.warExhaustion),
     worldEvents: worldEvents.slice(-10),  // A4: 上限 10 条防溢出
     provinceChanges: [],  // B2: 在 buildReport 外计算（需对比 prev/next 省份归属）
+    strategicNotes: [],
   };
 }
 
