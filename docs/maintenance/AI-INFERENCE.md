@@ -17,8 +17,10 @@ Hugging Face 只把上述事实整理为对方立场、建议开场、风险和�
 - 浏览器不保存或接触 `HF_TOKEN`。
 - Function `ai-diplomacy-gateway` 仅允许已登录用户执行。
 - 请求只包含当前会谈所需的最小外交事实，不包含邮箱、聊天、好友或完整存档。
-- `ai_usage` 保存散列用户键和每日次数，默认每用户每天 5 次。
+- `ai_usage` 使用事务同时保存用户日额度、全站日额度和全站月额度；默认每用户每天 5 次、全站每天 20 次、每月 200 次。
+- 并发预占会同时检查三层额度；推理或解析失败会补偿返还次数，避免服务故障消耗玩家额度。
 - 推理超时、配额耗尽、Token 未配置或响应格式异常时，客户端自动返回规则简报。
+- 网关最多读取 64 KiB 的提供方响应，再执行 JSON 结构与字段长度校验，避免异常响应占满 Function 内存。
 - AI 客户端只进入懒加载外交块；总 JS 预算为此登记 8 KiB，外交块另设 34 KiB 硬上限，首屏与 CSS 预算不变。
 
 ## Appwrite 变量
@@ -29,6 +31,8 @@ Hugging Face 只把上述事实整理为对方立场、建议开场、风险和�
 HF_TOKEN=<Hugging Face user access token>
 HF_MODEL=Qwen/Qwen2.5-7B-Instruct
 AI_DAILY_LIMIT=5
+AI_GLOBAL_DAILY_LIMIT=20
+AI_GLOBAL_MONTHLY_LIMIT=200
 ```
 
 更新 Function 源码时默认不传 `--with-variables`，避免意外覆盖远端密钥。只有明确需要同步本地 `.env` 时才使用该参数。

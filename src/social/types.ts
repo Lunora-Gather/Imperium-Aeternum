@@ -32,6 +32,7 @@ export interface WorldChatMessage {
   mediaFileId: string | null;
   mediaMime: string | null;
   createdAt: string;
+  delivery?: 'pending';
 }
 
 export interface DirectMessage {
@@ -45,4 +46,5 @@ export interface DirectMessage {
   mediaFileId: string | null;
   mediaMime: string | null;
   createdAt: string;
+  delivery?: 'pending';
 }

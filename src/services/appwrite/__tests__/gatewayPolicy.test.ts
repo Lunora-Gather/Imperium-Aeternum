@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { assertCommandOwnership, isControlActive, isWorldDue, wasWorldActiveDuringWindow } from '../../../../functions/shared-world-gateway/src/policy.js';
-import { verifiedNationIdentity } from '../../../../functions/social-gateway/src/policy.js';
+import { assertCommandOwnership, isControlActive, isWorldDue, readyCommandKey, wasWorldActiveDuringWindow } from '../../../../functions/shared-world-gateway/src/policy.js';
+import { assertFriendshipParticipants, assertMembershipOwner, friendshipPairKey, friendshipRowId, messageRateRowId, verifiedNationIdentity } from '../../../../functions/social-gateway/src/policy.js';
+import { normalizeCloudSavePayload } from '../../../../functions/cloud-save-gateway/src/policy.js';
 import { assertFreshEmailOtpSession, assertRecoverablePasswordUser } from '../../../../functions/account-gateway/src/policy.js';
 
 describe('shared world gateway policy', () => {
@@ -28,6 +29,11 @@ describe('shared world gateway policy', () => {
     expect(assertCommandOwnership(command, command)).toBe(command);
     expect(() => assertCommandOwnership(command, { ...command, userId: 'u2' })).toThrow('幂等标识');
   });
+
+  it('uses one server-owned ready command per nation and turn', () => {
+    expect(readyCommandKey('world-1', 7, 'rome')).toBe('ready:world-1:7:rome');
+    expect(readyCommandKey('world-1', 8, 'rome')).not.toBe(readyCommandKey('world-1', 7, 'rome'));
+  });
 });
 
 describe('social gateway nation identity', () => {
@@ -38,6 +44,49 @@ describe('social gateway nation identity', () => {
     expect(verifiedNationIdentity(control, 'u1', 'rome', now)).toBe('rome');
     expect(verifiedNationIdentity(null, 'u1', undefined, now)).toBeNull();
     expect(() => verifiedNationIdentity(control, 'u2', 'rome', now)).toThrow('未受你控制');
+  });
+
+  it('uses one atomic message row per sender and rate window', () => {
+    expect(messageRateRowId('world', 'world-1', 'user-a', 10_000, 1800)).toBe(messageRateRowId('world', 'world-1', 'user-a', 10_500, 1800));
+    expect(messageRateRowId('world', 'world-1', 'user-a', 10_000, 1800)).not.toBe(messageRateRowId('world', 'world-1', 'user-b', 10_000, 1800));
+    expect(messageRateRowId('direct', 'pair', 'user-a', 10_000, 1200)).not.toBe(messageRateRowId('world', 'pair', 'user-a', 10_000, 1200));
+  });
+
+  it('uses the same friendship identity in both user directions', () => {
+    expect(friendshipPairKey('user-a', 'user-b')).toBe(friendshipPairKey('user-b', 'user-a'));
+    expect(friendshipRowId('user-a', 'user-b')).toBe(friendshipRowId('user-b', 'user-a'));
+  });
+
+  it('rechecks deterministic row identities against their stored owners', () => {
+    const membership = { worldId: 'world-1', userId: 'user-a' };
+    expect(assertMembershipOwner(membership, 'world-1', 'user-a')).toBe(membership);
+    expect(() => assertMembershipOwner(membership, 'world-2', 'user-a')).toThrow('版图成员');
+
+    const friendship = { requesterId: 'user-a', addresseeId: 'user-b', status: 'accepted' };
+    expect(assertFriendshipParticipants(friendship, 'user-a', 'user-b')).toBe(friendship);
+    expect(() => assertFriendshipParticipants(friendship, 'user-a', 'user-c')).toThrow('好友');
+  });
+});
+
+describe('cloud save gateway payload policy', () => {
+  it('derives trusted metadata from the uploaded save payload', () => {
+    const raw = JSON.stringify({
+      version: 6,
+      createdAt: '2026-07-23T00:00:00.000Z',
+      gameState: { turn: 17, playerNationId: 'rome', nations: { rome: { name: '罗马' } } },
+    });
+    expect(normalizeCloudSavePayload(raw, Date.parse('2026-07-23T00:01:00.000Z'))).toEqual({
+      saveVersion: 6,
+      turn: 17,
+      nationName: '罗马',
+      clientUpdatedAt: '2026-07-23T00:00:00.000Z',
+    });
+  });
+
+  it('rejects malformed or future-dated save payloads', () => {
+    expect(() => normalizeCloudSavePayload('{"version":6}', Date.now())).toThrow('游戏状态');
+    const future = JSON.stringify({ version: 6, createdAt: '2099-01-01T00:00:00.000Z', gameState: { turn: 1 } });
+    expect(() => normalizeCloudSavePayload(future, Date.parse('2026-07-23T00:00:00.000Z'))).toThrow('更新时间');
   });
 });
 

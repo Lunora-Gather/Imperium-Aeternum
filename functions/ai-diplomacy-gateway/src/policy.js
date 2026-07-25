@@ -2,6 +2,29 @@ const AGENDAS = new Set(['trade', 'security', 'normalization', 'technology']);
 const STANCES = new Set(['conciliatory', 'pragmatic', 'firm']);
 const LOCALES = new Set(['zh-CN', 'zh-TW', 'en']);
 
+function hash(value) {
+  let result = 0x811c9dc5;
+  for (let index = 0; index < value.length; index += 1) result = Math.imul(result ^ value.charCodeAt(index), 0x01000193);
+  return (result >>> 0).toString(16).padStart(8, '0');
+}
+
+const limit = (value, fallback, max) => Math.max(1, Math.min(max, Number.isFinite(Number(value)) ? Math.floor(Number(value)) : fallback));
+
+export function buildAIQuotaPlan(userId, env = {}, now = new Date()) {
+  const day = now.toISOString().slice(0, 10);
+  const month = day.slice(0, 7);
+  const userKey = hash(String(userId));
+  return [
+    { scope: 'user', rowId: `ai_${userKey}_${day.replaceAll('-', '')}`, userKey, period: day, limit: limit(env.AI_DAILY_LIMIT, 5, 20), message: '今日 AI 研判次数已用完' },
+    { scope: 'global-day', rowId: `ai_global_day_${day.replaceAll('-', '')}`, userKey: 'global-day', period: day, limit: limit(env.AI_GLOBAL_DAILY_LIMIT, 20, 1000), message: '今日全站 AI 额度已用完' },
+    { scope: 'global-month', rowId: `ai_global_month_${month.replace('-', '')}`, userKey: 'global-month', period: month, limit: limit(env.AI_GLOBAL_MONTHLY_LIMIT, 200, 10000), message: '本月全站 AI 额度已用完' },
+  ];
+}
+
+export function aiErrorStatus(message) {
+  return /已用完/.test(String(message)) ? 429 : /无效|格式/.test(String(message)) ? 400 : 503;
+}
+
 const text = (value, max = 120) => String(value ?? '').replace(/[\u0000-\u001f\u007f]/g, ' ').trim().slice(0, max);
 const number = (value, min, max) => Math.max(min, Math.min(max, Number.isFinite(Number(value)) ? Number(value) : 0));
 const texts = (value, maxItems = 5, maxLength = 160) => Array.isArray(value) ? value.slice(0, maxItems).map((item) => text(item, maxLength)).filter(Boolean) : [];

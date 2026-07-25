@@ -13,7 +13,7 @@
   "tablesDB": [{"$id":"imperium_game","name":"Imperium Game Data","enabled":true}],
   "tables": [
     {
-      "$id":"cloud_saves","$permissions":["create(\"users\")"],"databaseId":"imperium_game","name":"Private Cloud Saves","enabled":true,"rowSecurity":true,
+      "$id":"cloud_saves","$permissions":[],"databaseId":"imperium_game","name":"Private Cloud Saves","enabled":true,"rowSecurity":true,
       "columns":[
         {"key":"userId","type":"varchar","required":true,"array":false,"size":64,"default":null,"encrypt":false},
         {"key":"slot","type":"integer","required":true,"array":false,"default":null,"min":0,"max":4},
@@ -78,7 +78,7 @@
     }
   ],
   "buckets": [
-    {"$id":"cloud_saves","$permissions":["create(\"users\")"],"fileSecurity":true,"name":"Private Cloud Save Payloads","enabled":true,"maximumFileSize":5242880,"allowedFileExtensions":["json"],"compression":"gzip","encryption":true,"antivirus":false},
+    {"$id":"cloud_saves","$permissions":[],"fileSecurity":true,"name":"Private Cloud Save Payloads","enabled":true,"maximumFileSize":5242880,"allowedFileExtensions":["json"],"compression":"gzip","encryption":true,"antivirus":false},
     {"$id":"world_snapshots","$permissions":[],"fileSecurity":true,"name":"Authoritative World Snapshots","enabled":true,"maximumFileSize":20971520,"allowedFileExtensions":["json","gz"],"compression":"gzip","encryption":true,"antivirus":false},
     {"$id":"world_chat_media","$permissions":[],"fileSecurity":true,"name":"World Member Chat Media","enabled":true,"maximumFileSize":2097152,"allowedFileExtensions":["jpg","jpeg","png","webp","gif"],"compression":"none","encryption":true,"antivirus":false}
   ],
@@ -86,6 +86,7 @@
     {"$id":"shared-world-gateway","name":"Shared World Gateway","enabled":true,"logging":true,"runtime":"node-22","execute":["users"],"events":[],"schedule":"*/5 * * * *","timeout":120,"entrypoint":"src/main.js","commands":"npm install","scopes":["rows.read","rows.write","files.read","files.write"],"buildSpecification":"s-2vcpu-2gb","runtimeSpecification":"s-1vcpu-512mb","deploymentRetention":7,"path":"functions/shared-world-gateway"},
     {"$id":"social-gateway","name":"Social and World Chat Gateway","enabled":true,"logging":true,"runtime":"node-22","execute":["users"],"events":[],"schedule":"","timeout":15,"entrypoint":"src/main.js","commands":"npm install","scopes":["rows.read","rows.write","files.read","files.write","users.read"],"buildSpecification":"s-2vcpu-2gb","runtimeSpecification":"s-1vcpu-512mb","deploymentRetention":7,"path":"functions/social-gateway"},
     {"$id":"account-gateway","name":"Verified Account Recovery Gateway","enabled":true,"logging":true,"runtime":"node-22","execute":["users"],"events":[],"schedule":"","timeout":15,"entrypoint":"src/main.js","commands":"npm install","scopes":["users.read","users.write"],"buildSpecification":"s-2vcpu-2gb","runtimeSpecification":"s-1vcpu-512mb","deploymentRetention":7,"path":"functions/account-gateway"},
-    {"$id":"ai-diplomacy-gateway","name":"Hugging Face Diplomatic Briefing Gateway","enabled":true,"logging":true,"runtime":"node-22","execute":["users"],"events":[],"schedule":"","timeout":25,"entrypoint":"src/main.js","commands":"npm install","scopes":["rows.read","rows.write"],"buildSpecification":"s-2vcpu-2gb","runtimeSpecification":"s-1vcpu-512mb","deploymentRetention":7,"path":"functions/ai-diplomacy-gateway"}
+    {"$id":"ai-diplomacy-gateway","name":"Hugging Face Diplomatic Briefing Gateway","enabled":true,"logging":true,"runtime":"node-22","execute":["users"],"events":[],"schedule":"","timeout":25,"entrypoint":"src/main.js","commands":"npm install","scopes":["rows.read","rows.write"],"buildSpecification":"s-2vcpu-2gb","runtimeSpecification":"s-1vcpu-512mb","deploymentRetention":7,"path":"functions/ai-diplomacy-gateway"},
+    {"$id":"cloud-save-gateway","name":"Private Cloud Save Gateway","enabled":true,"logging":true,"runtime":"node-22","execute":["users"],"events":[],"schedule":"","timeout":30,"entrypoint":"src/main.js","commands":"npm install","scopes":["rows.read","rows.write","files.read","files.write"],"buildSpecification":"s-2vcpu-2gb","runtimeSpecification":"s-1vcpu-512mb","deploymentRetention":7,"path":"functions/cloud-save-gateway"}
   ]
 }

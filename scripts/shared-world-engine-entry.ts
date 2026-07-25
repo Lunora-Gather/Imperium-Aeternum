@@ -12,6 +12,7 @@ import {
 import { resolvePendingEventChoice } from '../src/gameplay/pendingEventResolution';
 
 type ActionPayload = { action?: string; args?: unknown[] };
+const STRATEGY_FOCUSES = new Set(['balance', 'stability', 'prosperity', 'military', 'diplomacy', 'reform']);
 
 function selectNation(state: GameState, nationId: string): void {
   if (!state.nations[nationId] || state.nations[nationId].defeated) throw new Error('国家不存在或已经覆亡');
@@ -38,7 +39,13 @@ export function applySharedWorldCommand(state: GameState, nationId: string, payl
       result = { ok: true, state: eventResult.state, messages: [`事件 ${eventResult.eventTitle}：选择「${eventResult.optionText}」`] };
       break;
     }
-    case 'set_strategy_focus': working.strategyFocus = text(0) as never; result = { ok: true, state: working, messages: ['国策焦点已更新'] }; break;
+    case 'set_strategy_focus': {
+      const focus = text(0);
+      if (!STRATEGY_FOCUSES.has(focus)) throw new Error('国策焦点无效');
+      working.strategyFocus = focus as never;
+      result = { ok: true, state: working, messages: ['国策焦点已更新'] };
+      break;
+    }
     case 'set_tax_rate': result = setTaxRateAction(working, num(0)); break;
     case 'appease_faction': result = appeaseFactionAction(working, text(0)); break;
     case 'build': result = buildAction(working, text(0), text(1)); break;

@@ -4,8 +4,9 @@
 
 - Cloud 项目：`imperium-aeternum`，区域 `fra`
 - Web 平台：`localhost`、`127.0.0.1`、`lunora-gather.github.io`
-- TablesDB：数据库 `imperium_game`，表 `cloud_saves`
+- TablesDB：数据库 `imperium_game`，私有表 `cloud_saves`
 - Storage：桶 `cloud_saves`，5 MB、仅 JSON、gzip、加密、文件级权限
+- Function：`cloud-save-gateway`，仅允许登录用户执行，以会话用户 ID 作为权威所有者
 - 登录方式：新注册强制邮箱 OTP；已验证账号可使用邮箱密码或 OTP 登录
 
 `appwrite.config.json` 是基础设施的可复现配置。变更前先拉取并审阅差异，变更后再推送：
@@ -25,9 +26,9 @@ appwrite push buckets --all --force
 
 ## 权限模型
 
-表和桶只授予 `create("users")`。每个存档元数据行和载荷文件在创建时再授予当前用户 `read/update/delete`，因此其他已登录用户也不能枚举或读取。客户端写入的 `userId` 仅用于检索和诊断，真正的隔离边界是 Appwrite 行与文件权限。
+表和桶不授予客户端创建权限。浏览器只读取本人行与文件；所有创建、覆盖和旧文件清理都经过 `cloud-save-gateway`。网关从 `x-appwrite-user-id` 获取权威所有者，不接受客户端指定用户，因此好友公开用户 ID 不能被用于抢占或污染其他账号的存档槽位。
 
-上传顺序为“新文件 → upsert 元数据 → 删除旧文件”；元数据失败时回滚新文件，避免先删后传导致丢档。下载必须经过本地存档迁移与规范化。不同设备都有本地设备 ID、内容哈希和客户端更新时间；检测到双向修改时必须由玩家明确选择覆盖方向。
+上传顺序仍为“新文件 → upsert 元数据 → 删除旧文件”；元数据失败时由网关回滚新文件，避免先删后传导致丢档。服务端从 JSON 正文重新派生版本、回合、国家和更新时间，不接受客户端另报的元数据，并重新计算 SHA-256、验证大小、槽位与时间、重复执行跨设备冲突判断；客户端检查只负责提前反馈。下载会先核对 5 MB 上限和 SHA-256，再经过本地存档迁移与规范化。
 
 ## 认证策略
 

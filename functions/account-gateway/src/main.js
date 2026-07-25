@@ -11,6 +11,7 @@ function clients(req) {
 
 export default async ({ req, res, error }) => {
   try {
+    if (req.method !== 'POST') return res.json({ ok: false, message: '仅支持 POST 请求' }, 405);
     const userId = req.headers['x-appwrite-user-id'];
     const jwt = req.headers['x-appwrite-user-jwt'];
     if (!userId || !jwt) return res.json({ ok: false, message: '必须先通过邮箱验证码' }, 401);
@@ -25,6 +26,12 @@ export default async ({ req, res, error }) => {
     return res.json({ ok: true });
   } catch (cause) {
     error(cause instanceof Error ? cause.message : String(cause));
-    return res.json({ ok: false, message: cause instanceof Error ? cause.message : '密码找回失败' }, 400);
+    const appwriteFailure = typeof cause?.code === 'number';
+    const status = cause?.code === 429 ? 429 : cause?.code === 400 ? 400 : appwriteFailure ? 503 : 400;
+    const message = cause?.code === 429
+      ? '请求过于频繁，请稍后再试'
+      : cause?.code === 400 ? '新密码不符合账号安全策略'
+      : appwriteFailure ? '账号服务暂不可用，请稍后重试' : cause instanceof Error ? cause.message : '密码找回失败';
+    return res.json({ ok: false, message }, status);
   }
 };

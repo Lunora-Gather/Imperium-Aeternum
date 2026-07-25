@@ -217,7 +217,9 @@ Zustand store。`pid(s)` helper = `s.playerNationId || PLAYER_ID`。
 | `TurnReportScreen` | 回合报告叙事流 |
 | `SaveLoadScreen` | 存档管理 |
 
-账号弹窗位于 `components/account/`。`services/appwrite/` 只包含 Appwrite Client、Account、TablesDB 与 Storage 适配；浏览器端只保存公开项目标识，不包含 API key。云端元数据和 JSON 文件都使用用户专属行/文件权限。
+账号弹窗位于 `components/account/`。`services/appwrite/` 只包含 Appwrite Client、Account、TablesDB、Storage 与 Functions 客户端适配；浏览器端只保存公开项目标识，不包含 API key。云存档读取依赖用户专属行/文件权限，上传则必须经过 `cloud-save-gateway`：Function 从登录会话确定所有者，重新校验存档元数据与 SHA-256，并以“新文件 → upsert 行 → 删除旧文件”的顺序替换。浏览器不具备云存档表或桶的直接创建权限。
+
+共享世界、社交聊天、账号找回与 AI 外交简报同样通过 `functions/` 下的独立权威网关写入或访问敏感能力。Function 密钥只保存在 Appwrite 变量中，不进入 `appwrite.config.json`、前端环境变量或浏览器构建产物。
 
 `components/ui.tsx`：通用组件（Panel/Stat/StatRow/Btn/Tag/Bar/Divider/StatusDot/ResourceStrip）。
 
