@@ -9,10 +9,11 @@ const en: Record<string, string> = {
   '建议': 'Recommendation', '局势尚可，可按国运目标选择经济、科研或军事建设。': 'Conditions are manageable. Develop the economy, research, or military according to your national objective.',
   '高风险省份': 'High-risk provinces', '省份列表（6）': 'Province List (6)', '稳定 不满 叛乱风险': 'Stable · Unrest · Rebellion risk', '风险': 'Risk', '驻军': 'Garrison', '建筑': 'Buildings', '同化': 'Assimilation', '忠诚': 'Loyalty', '不满': 'Unrest', '叛乱': 'Rebellion',
   '阶层': 'Classes', '农民': 'Farmers', '工人': 'Workers', '商人': 'Merchants', '士兵': 'Soldiers', '学者': 'Scholars', '贵族': 'Nobles', '神职': 'Clergy', '无': 'None',
-  '建设与征兵': 'Construction and Recruitment', '▸ 可建（19）': '▸ Available (19)', '农田': 'Farm', '道路': 'Road', '市场': 'Market', '兵营': 'Barracks', '矿山': 'Mine', '神殿': 'Temple', '城墙': 'Walls', '工坊': 'Workshop', '驿站': 'Relay station', '粮仓': 'Granary', '军港': 'Naval base', '神像': 'Monument', '园林': 'Gardens', '铁匠铺': 'Smithy', '驿馆': 'Post house', '筒仓': 'Silo',
-  '叛乱风险': 'Rebellion risk', '罗马 ★ 首都': 'Rome ★ Capital',
+  '建设与征兵': 'Construction and Recruitment', '▸ 可建（19）': '▸ Available (19)', '农田': 'Farm', '道路': 'Road', '市场': 'Market', '兵营': 'Barracks', '矿山': 'Mine', '学院': 'Academy', '神殿': 'Temple', '法院': 'Courthouse', '城墙': 'Walls', '引渠': 'Aqueduct', '工坊': 'Workshop', '书院': 'Scholarly Academy', '驿站': 'Relay station', '驿馆': 'Post house', '铸币厂': 'Mint', '铸币工坊': 'Coin Workshop', '医署': 'Clinic', '药铺': 'Apothecary', '粮仓': 'Granary', '军港': 'Naval base', '灯塔': 'Lighthouse', '神像': 'Monument', '园林': 'Gardens', '万卷楼': 'Great Library', '武库': 'Arsenal', '帝国粮仓': 'Imperial Granary', '大圣堂': 'Cathedral', '铁匠铺': 'Smithy', '漕运码头': 'Canal Wharf', '城墙加固': 'Fortified Walls', '筒仓': 'Silo', '望楼': 'Watchtower', '会馆': 'Guild Hall', '军械库': 'Armory', '观象台': 'Observatory', '王家粮仓': 'Royal Granary', '贸易站': 'Trade Post', '修道院': 'Monastery', '化肥厂': 'Fertilizer Works', '总动员营': 'Mobilization Camp',
+  '叛乱风险': 'Rebellion risk', '罗马 ★ 首都': 'Rome ★ Capital', '消耗人口与补给': 'Consumes population and supply', '开发与驻军': 'Development and Garrison', '开垦 +2农 (60金)': 'Reclaim land · +2 agriculture (60 gold)', '部署驻军50': 'Deploy 50 garrison', '召回驻军50': 'Recall 50 garrison', '开垦增产 · 驻军压叛乱': 'Reclamation raises output · garrisons suppress rebellion', '军事页': 'Military screen',
   '经济判断': 'Economic Assessment', '经济尚稳': 'Economy stable', '良好': 'Good', '可按国运目标选择贸易扩张、低税养民或积累国库。': 'Choose trade expansion, lower taxes, or treasury accumulation according to your national objective.',
   '经济总览': 'Economic Overview', '粮食': 'Food', '净收入/年': 'Net income/year', '木材': 'Wood', '铁矿': 'Iron', '税率调整': 'Tax Rate', '当前税率': 'Current rate', '均衡·推荐': 'Balanced · Recommended', '键盘 ←/→ 微调 ±2%': 'Keyboard ←/→ adjusts ±2%', '重置 15%': 'Reset to 15%', '税率预估': 'Tax Estimate',
+  '当前税': 'Current tax', '金/年': 'gold/year', '+5% 后': 'After +5%', '增税收益': 'Additional revenue', '降税损失': 'Revenue forgone',
   '贸易路线': 'Trade Routes', '丝绸之路': 'Silk Road', '横贯东西的商道，运丝绸香料。': 'An east–west route carrying silk and spices.', '地中海商路': 'Mediterranean Route', '连接地中海各港的海上商路。': 'A maritime route linking Mediterranean ports.', '琥珀之路': 'Amber Road', '北方琥珀南运的古老商道。': 'An ancient route carrying northern amber south.', '粮道': 'Grain Route', '内陆粮运专线，保障京师供给。': 'An inland grain line securing the capital.', '铁料商路': 'Iron Route', '铁矿产地到冶炼中心的运输线。': 'A route from mines to smelting centers.', '盐道': 'Salt Route', '盐运专线，民生刚需。': 'A dedicated route for essential salt.', '奢侈品商路': 'Luxury Route', '运送丝绸香料宝石的高端商路。': 'A premium route for silk, spices, and gems.', '边关互市': 'Frontier Market', '与边境民族的互市贸易。': 'Cross-border trade with frontier peoples.', '建立': 'Establish',
   '补给': 'Supply', '两端均不归本国': 'Neither endpoint belongs to this nation', '长途': 'Long-distance', '中途': 'Medium-distance', '短途': 'Short-distance',
   '人口判断': 'Population Assessment', '社会尚稳': 'Society stable', '人口和派系状态可支撑继续发展，适合转向经济、科技或外交目标。': 'Population and factions can support continued development; shift toward economic, technology, or diplomatic goals.', '人口与阶层': 'Population and Classes', '总人口': 'Total population', '省份数': 'Provinces', '阶层满意': 'Class satisfaction', '阶层（全国汇总）': 'Classes (national total)', '派系权力与满意度': 'Faction Power and Satisfaction', '派系满意度低会增加政治事件风险。安抚消耗 30 金；长期更应通过政策和法律解决。': 'Low faction satisfaction increases political-event risk. Appeasement costs 30 gold; policies and laws are the lasting solution.', '满意': 'Satisfaction', '军方': 'Military', '民众': 'Populace',
@@ -68,7 +69,7 @@ const en: Record<string, string> = {
   '编户齐民法': 'Household Registration Act', '普查人口户籍，税收效率大升但贵族抵制。': 'Register households to raise tax efficiency despite noble resistance.',
   '商团特许法': 'Guild Charter Act', '授予商团专营特权，贸易升但小商户不满。': 'Grant guild monopolies, increasing trade but angering small merchants.',
   '宗教宽容法': 'Religious Tolerance Act',
-  '科技路线判断': 'Technology Route Assessment', '⚖ 补行政': '⚖ Improve administration', '补行政': 'Improve administration', '腐败和治能问题会拖累全局，行政科技能打开政策和法律空间。': 'Corruption and weak administration hold the state back; administrative technology unlocks policies and laws.', '✦ 补文化': '✦ Improve culture', '补文化': 'Improve culture', '文化': 'Culture', '文化科技适合外交、合法性和长期影响力路线。': 'Cultural technology supports diplomacy, legitimacy, and long-term influence.', '⚖ 通用路线': '⚖ General route', '通用路线': 'General route', '行政科技通常最稳，能解锁政策、法律和治理效率。': 'Administrative technology is usually safest and unlocks policies, laws, and governing efficiency.', '科技总览': 'Technology Overview', '农业': 'Agriculture', '军事': 'Military', '行政': 'Administration', '点下方科技即时研发完成（扣科研点+金）。优先按上方路线判断选择关键突破。': 'Research a technology below instantly by spending research and gold. Follow the route assessment for key breakthroughs.', '已学': 'Learned', '科研不足': 'Insufficient research', '锁定': 'Locked', '下一项：': 'Next: ', '科技树 · 当前 Lv': ' Technology · Current Lv.', '科/': ' research / ', '科 · ': ' research · ', '科': ' research', '金': ' gold',
+  '科技路线判断': 'Technology Route Assessment', '⚖ 补行政': '⚖ Improve administration', '补行政': 'Improve administration', '腐败和治能问题会拖累全局，行政科技能打开政策和法律空间。': 'Corruption and weak administration hold the state back; administrative technology unlocks policies and laws.', '✦ 补文化': '✦ Improve culture', '补文化': 'Improve culture', '文化': 'Culture', '文化科技适合外交、合法性和长期影响力路线。': 'Cultural technology supports diplomacy, legitimacy, and long-term influence.', '⚖ 通用路线': '⚖ General route', '通用路线': 'General route', '行政科技通常最稳，能解锁政策、法律和治理效率。': 'Administrative technology is usually safest and unlocks policies, laws, and governing efficiency.', '科技总览': 'Technology Overview', '农业': 'Agriculture', '军事': 'Military', '行政': 'Administration', '点下方科技即时研发完成（扣科研点+金）。优先按上方路线判断选择关键突破。': 'Research a technology below instantly by spending research and gold. Follow the route assessment for key breakthroughs.', '已学': 'Learned', '科研不足': 'Insufficient research', '锁定': 'Locked', '下一项：': 'Next: ', '科/': ' research / ', '科 · ': ' research · ', '科': ' research', '金': ' gold',
   '政策（': 'Policies (', '法律（': 'Laws (', '）': ')', '岁': ' years old', '岁 · 能力 ': ' years old · Ability ', ' · 能力 ': ' · Ability ', '政 · ': ' admin · ',
   '休耕轮作': 'Crop Rotation', '基础耕作改进，提升粮食产量。': 'Improved basic cultivation raises food output.',
   '铁制农具': 'Iron Farm Tools', '推广铁犁铁锄，粮产再提升。': 'Iron plows and hoes raise food output again.',
@@ -104,7 +105,7 @@ const en: Record<string, string> = {
   '永恒文脉': 'Eternal Heritage', '文脉永续，帝国精神不朽。': 'An enduring cultural lineage makes the imperial spirit immortal.',
   '统计图表': 'Statistics', '尚无回合数据，推进一步后可见趋势。': 'No turn data yet. Advance one year to reveal trends.',
   '军情判断': 'Military Assessment', '兵力偏少': 'Forces too small', '当前兵力不足以支撑扩张，优先征兵或提升补给。': 'Current forces cannot support expansion. Recruit or improve supply first.', '战争机会顾问': 'War Opportunity Advisor', '首选：维尼托': 'Preferred: Veneto', '军力概览': 'Military Overview', '总兵力': 'Total forces', '状态': 'Status', '和平': 'Peace', '士气均值': 'Average morale', '训练均值': 'Average training', '前线': 'Front line', '士气': 'Morale', '训练': 'Training', '装备': 'Equipment', '调动': 'Move', '进行中的战争（0）': 'Active Wars (0)', '宣战': 'Declare War', '预演': 'Forecast', '均势': 'Even', '征兵': 'Recruit',
-  '注意': 'Attention', '先整备': 'Prepare first', '厌战': 'War exhaustion', '向相邻非同盟国家宣战。先点“预演”查看胜率、后勤、财政、厌战与外交风险，再决定是否发动战争。': 'Declare war on an adjacent non-allied nation. Review win chance, logistics, finance, exhaustion, and diplomatic risk before committing.',
+  '注意': 'Attention', '先整备': 'Prepare first', '可扩张': 'Ready to expand', '暂缓': 'Hold', '扩张阻断': 'Expansion blockers', '暂无合法战争目标。': 'No legal war targets are available.', '邻省': 'Neighbor', '属': 'Owned by', '厌战': 'War exhaustion', '向相邻非同盟国家宣战。先点“预演”查看胜率、后勤、财政、厌战与外交风险，再决定是否发动战争。': 'Declare war on an adjacent non-allied nation. Review win chance, logistics, finance, exhaustion, and diplomatic risk before committing.',
   '⚠ 战略要点：宣战后须在“军队部署”区把军队调动到与敌省相邻的己省（前线），否则无军队在前线将自动议和。': '⚠ Strategic note: after declaring war, move an army to one of your provinces adjacent to the enemy. Without a front-line army, peace is automatic.',
   '外交判断': 'Diplomatic Assessment', '威胁': 'Threat', '暂无迫切威胁': 'No urgent threats', '暂无合适贸易对象': 'No suitable trade partners', '暂无可结盟对象': 'No alliance candidates', '外交总览': 'Diplomatic Overview', '列表': 'List', '图谱': 'Network', '元首协议': 'Leader accords', '各国关系': 'Foreign Relations', '关系': 'Relations', '信任': 'Trust', '元首会谈': 'Leader Summit', ' 处于观察区 · 先用低成本改善关系或保留影响力，等待更明确的合作/威胁信号。': ' is under observation. Improve relations cheaply or preserve influence until cooperation or threat signals become clearer.', '应对：': 'Response: ', '先用低成本改善关系或保留影响力，等待更明确的合作/威胁信号。': 'Improve relations cheaply or preserve influence until cooperation or threat signals become clearer.', '级': '',
   '记得善意': 'Remembers goodwill', '牢记敌意': 'Remembers hostility', '保持戒备': 'Remains guarded', '旧事渐淡': 'Memories fading', '暂无旧账': 'No history',
@@ -132,6 +133,18 @@ const en: Record<string, string> = {
 };
 
 let registered = false;
+
+const RESOURCE_UNIT_EN: Record<string, string> = {
+  金: 'gold', 粮: 'food', 木: 'wood', 铁: 'iron',
+  影: 'influence', 科: 'research', 补: 'supply', 政: 'admin',
+};
+
+function translateResourceSummary(source: string): string {
+  return source
+    .replace(/([+-]?\d+(?:\.\d+)?)(金|粮|木|铁|影|科|补|政)/g, (_all, amount, unit) => `${amount} ${RESOURCE_UNIT_EN[unit] ?? unit}`)
+    .replace(/\s*·\s*/g, ' · ');
+}
+
 export function registerGovernanceTranslations(): void {
   if (registered) return;
   registerEnglishTranslations(en);
@@ -140,23 +153,46 @@ export function registerGovernanceTranslations(): void {
     { pattern: /^当前：第 (\d+) 年$/, replacement: 'Current: Year $1' },
     { pattern: /^存档架构 v?(\d+)$/i, replacement: 'Save schema v$1' },
     { pattern: /^省份 (\d+)$/, replacement: 'Provinces $1' },
+    { pattern: /^省份列表（(\d+)）$/, replacement: 'Province List ($1)' },
+    { pattern: /^(.+) ★ 首都$/, replacement: (_all, province) => `${en[province] ?? province} ★ Capital` },
     { pattern: /^国库 ([-\d]+)$/, replacement: 'Treasury $1' },
     { pattern: /^粮储 ([-\d]+)$/, replacement: 'Food $1' },
     { pattern: /^稳定 ([-\d]+)$/, replacement: 'Stability $1' },
     { pattern: /^统治者 (.+)$/, replacement: 'Ruler $1' },
     { pattern: /^(\d+) 省$/, replacement: '$1 provinces' },
+    { pattern: /^▸ 可建（(\d+)）$/, replacement: '▸ Available ($1)' },
+    { pattern: /^▸ 待解锁（(\d+)·需科技）$/, replacement: '▸ Locked ($1 · technology required)' },
+    { pattern: /^(🌾|⚔|⚖|✦) (农业|军事|行政|文化)科技树 · 当前 Lv\.?(\d+)$/, replacement: (_all, icon, branch, level) => `${icon} ${en[branch] ?? branch} Technology · Current Lv.${level}` },
+    { pattern: /^(.+) Lv(\d+)$/, replacement: (_all, name, level) => `${en[name] ?? name} Lv.${level}` },
+    { pattern: /^需科技：(.+)$/, replacement: (_all, technology) => `Requires technology: ${en[technology] ?? technology}` },
     { pattern: /^人口 ([\d.]+)$/, replacement: 'Population $1' },
     { pattern: /^风险 (\d+)$/, replacement: 'Risk $1' },
     { pattern: /^(\d+)人$/, replacement: '$1 people' },
     { pattern: /^(\d+)金$/, replacement: '$1 gold' },
     { pattern: /^(.+)权力 (\d+)$/, replacement: '$1 power $2' },
+    { pattern: /^权力 (\d+)$/, replacement: 'Power $1' },
     { pattern: /^安抚 (\d+)金$/, replacement: 'Appease · $1 gold' },
     { pattern: /^(.+) \((\d+)人\)$/, replacement: '$1 ($2 people)' },
+    { pattern: /^\((\d+)人\)$/, replacement: '($1 people)' },
     { pattern: /^邻省 (.+) 属 (.+)$/, replacement: 'Neighbor $1 · owned by $2' },
     { pattern: /^宣战 (\d+)政$/, replacement: 'Declare war · $1 admin' },
-    { pattern: /^需行政LV(\d+)$/, replacement: 'Requires Administration Lv.$1' },
+    { pattern: /^需行政Lv(\d+)$/i, replacement: 'Requires Administration Lv.$1' },
+    { pattern: /^军队部署（(\d+)）$/, replacement: 'Army Deployment ($1)' },
+    { pattern: /^进行中的战争（(\d+)）$/, replacement: 'Active Wars ($1)' },
+    { pattern: /^战争机会：先整备 (.+)$/, replacement: (_all, province) => `War opportunity: prepare first in ${en[province] ?? province}` },
+    { pattern: /^战争机会：可攻 (.+)$/, replacement: (_all, province) => `War opportunity: attack ${en[province] ?? province}` },
+    { pattern: /^战争机会：暂缓扩张$/, replacement: 'War opportunity: hold expansion' },
+    { pattern: /^战争机会：暂无目标$/, replacement: 'War opportunity: no target' },
+    { pattern: /^最佳候选为 (.+)（(.+)），胜率 (\d+)%[，,]备战度 (\d+)%[。.]?$/, replacement: (_all, province, nation, win, readiness) => `Best candidate: ${en[province] ?? province} (${en[nation] ?? nation}), ${win}% win chance and ${readiness}% readiness.` },
+    { pattern: /^(.+) 最佳候选为 (.+)，胜率 (\d+)%[。.]?$/, replacement: (_all, blocker, province, win) => `${en[blocker] ?? blocker} Best candidate: ${en[province] ?? province}, with a ${win}% win chance.` },
+    { pattern: /^首选：(.+)$/, replacement: (_all, province) => `Preferred: ${en[province] ?? province}` },
+    { pattern: /^(.+) · 胜率 (\d+)% · 备战 (\d+)%$/, replacement: (_all, nation, win, readiness) => `${en[nation] ?? nation} · ${win}% win chance · ${readiness}% readiness` },
+    { pattern: /^属 (.+)$/, replacement: (_all, nation) => `Owned by ${en[nation] ?? nation}` },
+    { pattern: /^(.+) · (.+) 治下 · 已历 (\d+) 年$/, replacement: (_all, nation, ruler, years) => `${en[nation] ?? nation} · under ${en[ruler] ?? ruler} · ${years} years elapsed` },
+    { pattern: /^➤ 战略军队调动请至 军事页 · 农业基础 ([\d.]+) · 驻军 (\d+)$/, replacement: '➤ Move strategic armies on the Military screen · Agriculture $1 · Garrison $2' },
+    { pattern: /^[+-]?\d+(?:\.\d+)?(?:金|粮|木|铁|影|科|补|政)(?:[· /]+[+-]?\d+(?:\.\d+)?(?:金|粮|木|铁|影|科|补|政))*$/, replacement: (source) => translateResourceSummary(source) },
+    { pattern: /^((?:[+-]?\d+(?:\.\d+)?(?:金|粮|木|铁|影|科|补|政))(?:\s*·\s*[+-]?\d+(?:\.\d+)?(?:金|粮|木|铁|影|科|补|政))*) · (长途|中途|短途)$/, replacement: (_all, resources, distance) => `${translateResourceSummary(resources)} · ${en[distance] ?? distance}` },
     { pattern: /^下一项：(.+) · (\d+)科\/(\d+)金$/, replacement: 'Next: $1 · $2 research / $3 gold' },
-    { pattern: /^(.+)科技树 · 当前 Lv(\d+)$/, replacement: (_all, branch, level) => `${[...branch].slice(0, 2).join('')}${en[[...branch].slice(2).join('')] ?? [...branch].slice(2).join('')} Technology · Current Lv.${level}` },
     { pattern: /^(\d+)科 · (\d+)金$/, replacement: '$1 research · $2 gold' },
     { pattern: /^(\d+)政 · (\d+)金$/, replacement: '$1 admin · $2 gold' },
     { pattern: /^需ADMIN_LV(\d+)$/, replacement: 'Requires Administration Lv.$1' },

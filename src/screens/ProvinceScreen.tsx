@@ -9,7 +9,7 @@ import { BUILDINGS } from '../data/buildings';
 import { TECHNOLOGIES } from '../data/technologies';
 import { computeBuildingYield } from '../engine/economy';
 import { Panel, StatRow, Btn, Tag, StatusDot, Divider } from '../components/ui';
-import type { BuildingId } from '../data/buildings';
+import type { BuildingDef, BuildingId } from '../data/buildings';
 import type { Nation, Province } from '../types/game';
 
 function techUnlocked(player: Nation, prereqTech?: string): boolean {
@@ -50,6 +50,13 @@ function yieldText(bid: BuildingId, province: Province, level = 1): string {
     y.supply ? `+${formatYield(y.supply)}补` : '', y.adminPt ? `+${formatYield(y.adminPt)}政` : '',
   ].filter(Boolean);
   return parts.join(' ') || '治理加成';
+}
+function buildCostText(building: Pick<BuildingDef, 'costGold' | 'costWood' | 'costIron'>): string {
+  return [
+    `${building.costGold}金`,
+    building.costWood > 0 ? `${building.costWood}木` : '',
+    building.costIron > 0 ? `${building.costIron}铁` : '',
+  ].filter(Boolean).join('·');
 }
 
 export default function ProvinceScreen() {
@@ -116,7 +123,7 @@ export default function ProvinceScreen() {
         ? '国库偏紧，优先建市场或保留行政点处理危机。'
         : '局势尚可，可按国运目标选择经济、科研或军事建设。';
 
-  const BuildGrid = ({ ids, locked: isLocked }: { ids: BuildingId[]; locked?: boolean }) => (
+  const BuildGrid = ({ ids, locked: isLocked }: { ids: BuildingId[]; locked?: boolean }) => localizeReactTree(
     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(118px, 1fr))', gap: 6, opacity: isLocked ? 0.58 : 1 }}>
       {ids.map((bid) => {
         const b = BUILDINGS[bid];
@@ -127,7 +134,7 @@ export default function ProvinceScreen() {
             style={{ flexDirection: 'column', alignItems: 'stretch', textAlign: 'left', fontSize: 12, padding: 8 }}>
             <div style={{ fontWeight: 600 }}>{b.name}</div>
             <div style={{ fontSize: 10, color: 'var(--text-dim)', marginTop: 2 }}>
-              {b.costGold}金{b.costWood > 0 ? `·${b.costWood}木` : ''}{b.costIron > 0 ? `·${b.costIron}铁` : ''}
+              {buildCostText(b)}
               {isLocked && <span style={{ color: 'var(--war)' }}> · 🔒{techLabel(b.prereqTech)}</span>}
             </div>
             <div style={{ fontSize: 9, color: isLocked ? 'var(--text-dim)' : 'var(--good)', marginTop: 2 }}>{yieldText(bid, prov)}</div>
@@ -141,7 +148,7 @@ export default function ProvinceScreen() {
     <div>
       <Panel title="省政判断" accent>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 10, marginBottom: 10 }}>
-          <div className="ia-card" style={{ padding: 10 }}><Tag text="疆土" tone="info" /><div style={{ fontSize: 18, marginTop: 6 }}>{provs.length} 省</div><div className="dim" style={{ fontSize: 11 }}>人口 {Math.round(totalPop)}</div></div>
+          <div className="ia-card" style={{ padding: 10 }}><Tag text="疆土" tone="info" /><div style={{ fontSize: 18, marginTop: 6 }}>{`${provs.length} 省`}</div><div className="dim" style={{ fontSize: 11 }}>{`人口 ${Math.round(totalPop)}`}</div></div>
           <div className="ia-card" style={{ padding: 10 }}><Tag text="平均不满" tone={avgUnrest > 50 ? 'danger' : avgUnrest > 30 ? 'warn' : 'good'} /><div style={{ fontSize: 18, marginTop: 6 }}>{Math.round(avgUnrest)}</div><div className="dim" style={{ fontSize: 11 }}>越低越稳</div></div>
           <div className="ia-card" style={{ padding: 10 }}><Tag text="平均忠诚" tone={avgLoyalty < 40 ? 'danger' : avgLoyalty < 60 ? 'warn' : 'good'} /><div style={{ fontSize: 18, marginTop: 6 }}>{Math.round(avgLoyalty)}</div><div className="dim" style={{ fontSize: 11 }}>越高越稳</div></div>
           <div className="ia-card" style={{ padding: 10 }}><Tag text="建议" tone={riskScore(dangerous[0] ?? prov) > 110 ? 'danger' : 'info'} /><div style={{ fontSize: 11, lineHeight: 1.55, marginTop: 6 }}>{advice}</div></div>
@@ -194,14 +201,14 @@ export default function ProvinceScreen() {
         </div>
 
         <Divider label="建设与征兵" />
-        {unlocked.length > 0 && <div style={{ fontSize: 10, color: 'var(--good)', marginBottom: 4, letterSpacing: '0.05em' }}>▸ 可建（{unlocked.length}）</div>}
+        {unlocked.length > 0 && <div style={{ fontSize: 10, color: 'var(--good)', marginBottom: 4, letterSpacing: '0.05em' }}>{`▸ 可建（${unlocked.length}）`}</div>}
         <BuildGrid ids={unlocked} />
-        {locked.length > 0 && <><div style={{ fontSize: 10, color: 'var(--text-dim)', marginTop: 8, marginBottom: 4, letterSpacing: '0.05em' }}>▸ 待解锁（{locked.length}·需科技）</div><BuildGrid ids={locked} locked /></>}
+        {locked.length > 0 && <><div style={{ fontSize: 10, color: 'var(--text-dim)', marginTop: 8, marginBottom: 4, letterSpacing: '0.05em' }}>{`▸ 待解锁（${locked.length}·需科技）`}</div><BuildGrid ids={locked} locked /></>}
         <div style={{ marginTop: 10, display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}><span style={{ fontSize: 12, color: 'var(--text-mute)' }}>征兵</span><Btn label="+50" variant="ghost" onClick={() => recruit(prov.id, 50)} /><Btn label="+100" variant="ghost" onClick={() => recruit(prov.id, 100)} /><span className="dim" style={{ fontSize: 11 }}>消耗人口与补给</span></div>
 
         <Divider label="开发与驻军" />
         <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}><Btn label="开垦 +2农 (60金)" variant="ghost" onClick={() => developProvince(prov.id, 'reclaim')} disabled={player.resources.gold < 60} /><Btn label="部署驻军50" variant="ghost" onClick={() => developProvince(prov.id, 'garrison_deploy')} /><Btn label="召回驻军50" variant="ghost" onClick={() => developProvince(prov.id, 'garrison_recall')} disabled={prov.garrison < 50} /><span className="dim" style={{ fontSize: 11 }}>开垦增产 · 驻军压叛乱</span></div>
-        <div style={{ marginTop: 6, fontSize: 11, color: 'var(--text-dim)' }}>➤ 战略军队调动请至 <span style={{ color: 'var(--war)' }}>军事页</span> · 农业基础 {prov.agriBase} · 驻军 {prov.garrison}</div>
+        <div style={{ marginTop: 6, fontSize: 11, color: 'var(--text-dim)' }}>{`➤ 战略军队调动请至 军事页 · 农业基础 ${prov.agriBase} · 驻军 ${prov.garrison}`}</div>
       </Panel>
     </div>
   );
