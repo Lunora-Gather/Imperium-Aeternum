@@ -96,6 +96,14 @@ const en = {
   '战争会压低外交态势并放大内政压力。': 'Wars weaken diplomatic posture and amplify domestic pressure.',
   '高威胁、高敌意或战争对象需要优先处理。': 'Prioritize high-threat, hostile, or wartime counterparts.',
   '1 回合内止血': 'Stop the losses within 1 turn', '2～3 回合修正': 'Correct course over 2–3 turns', '3～5 回合推进': 'Advance over 3–5 turns',
+  '会议结论：暂停推进': 'Council verdict: pause', '会议结论：先存档再推进': 'Council verdict: save before advancing',
+  '会议结论：谨慎推进': 'Council verdict: advance cautiously', '常规年度结算': 'Standard annual settlement',
+  '上年净收': 'Last year’s net income', '总参谋部将其列为高优先战略事项。': 'Headquarters classifies this as a high-priority strategic matter.',
+  '总参谋部认为它能改善中长期路线。': 'Headquarters expects this to improve the medium- and long-term strategy.',
+  '关系/威胁偏高': 'elevated relations risk or threat', '外交顾问：先解除孤立': 'Diplomacy advisor: break isolation',
+  '外交顾问：可主动结盟贸易': 'Diplomacy advisor: pursue alliances and trade',
+  '帕提亚': 'Parthia', '波斯': 'Persia', '西顿': 'Sidon',
+  '外部威胁': 'External threat',
 } as const;
 
 const zhTW = {
@@ -127,6 +135,12 @@ export const dashboardCatalog: ScopedCatalog = {
       { pattern: /^国势 (\d+)$/, replacement: 'National strength $1' },
       { pattern: /^共享 · (.*)$/, replacement: 'Shared · $1' },
       { pattern: /^([+-]?\d+)\/年$/, replacement: '$1/year' },
+      { pattern: /^体检 (\d+)\/100，(.+)。先处理阻断或红色事项，再结束本年。$/, replacement: (_all, score, preview) => `Check ${score}/100. ${(en as Readonly<Record<string, string>>)[preview] ?? preview}. Resolve blockers or red items before ending this year.` },
+      { pattern: /^(.+)：(.+)：(.+)。外交页确认是否贸易、结盟或备战。$/, replacement: (_all, title, nation, note) => {
+        const copy = en as Readonly<Record<string, string>>;
+        return `${copy[title] ?? title}: ${copy[nation] ?? nation} — ${copy[note] ?? note}. Open Diplomacy to decide whether to trade, ally, or prepare for war.`;
+      } },
+      { pattern: /^第 (\d+) 年$/, replacement: 'Year $1' },
     ],
     // Domain helpers deliberately keep canonical Chinese copy. These
     // fragments compose their runtime summaries in the lazy dashboard chunk
