@@ -13,9 +13,10 @@ const budgets = {
   // National missions, crisis chains and diplomatic memory add deterministic gameplay and lazy presentation.
   // Dynamic governance copy closes the English province/economy/technology/military coverage gap.
   // Mobile tab visibility and dialog shortcut isolation add a bounded shell safety layer.
-  totalJavaScript: 1149 * KIB,
-  // Purpose/crisis panels extend the measured cross-theme gameplay UI baseline.
-  totalCss: 109 * KIB,
+  // Structured pending-event cards add a small lazy presentation layer; entry/App caps stay unchanged.
+  totalJavaScript: 1150 * KIB,
+  // Purpose/crisis panels and the responsive event decision surface extend the measured UI baseline.
+  totalCss: 115 * KIB,
   entryJavaScript: 180 * KIB,
   appJavaScript: 25 * KIB,
   accountJavaScript: 140 * KIB,
