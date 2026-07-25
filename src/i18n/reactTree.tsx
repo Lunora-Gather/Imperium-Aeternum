@@ -1,7 +1,7 @@
 import { cloneElement, isValidElement, type ReactElement, type ReactNode } from 'react';
 import { translate } from '.';
 
-const TEXT_PROPS = new Set(['children', 'label', 'text', 'title', 'body', 'summary', 'description', 'desc', 'empty', 'placeholder', 'alt', 'aria-label', 'aria-description']);
+const TEXT_PROPS = new Set(['children', 'label', 'text', 'title', 'body', 'summary', 'description', 'desc', 'empty', 'placeholder', 'alt', 'aria-label', 'aria-description', 'value']);
 
 function localizeString(source: string): string {
   const direct = translate(source);

@@ -10,6 +10,16 @@ import { provincesOf } from '../engine/init';
 import { TRADE_ROUTE_BY_ID } from '../data/trade-routes';
 import { Panel, Stat, Btn, Tag, Divider } from '../components/ui';
 
+function routeYieldText(yieldEstimate: ReturnType<typeof routeYieldEstimate>, length: 'short' | 'medium' | 'long'): string {
+  const resources = [
+    `+${yieldEstimate.gold}金`,
+    `+${yieldEstimate.influence}影`,
+    yieldEstimate.food > 0 ? `+${yieldEstimate.food}粮` : '',
+  ].filter(Boolean).join(' · ');
+  const distance = length === 'long' ? '长途' : length === 'medium' ? '中途' : '短途';
+  return `${resources} · ${distance}`;
+}
+
 export default function EconomyScreen() {
   const { state, setTaxRate, establishTradeRoute, embargoTradeRoute } = useGameStore();
   const player = useGameStore((s) => s.state.nations[s.state.playerNationId]);
@@ -125,7 +135,7 @@ export default function EconomyScreen() {
         {riskyTrade.length > 0 && <div className="ia-card" style={{ marginBottom: 10, padding: 8, background: 'rgba(201,120,40,0.08)', border: '1px solid var(--warn)' }}><span style={{ fontSize: 11, color: 'var(--warn)' }}>⚠ 贸易依赖风险：</span>{riskyTrade.map((r) => { const dep = Math.round(r.tradeDep ?? 0); const cut = Math.round((1 - Math.max(0.5, 1 - dep / 200)) * 100); const target = state.nations[r.to]; return <Tag key={r.to} text={`${target?.name ?? r.to}·依赖${dep}%·收入-${cut}%`} tone="warn" />; })}</div>}
         {activeRoutes.length > 0 && <div style={{ marginBottom: 10 }}><strong style={{ fontSize: 13, color: 'var(--good)' }}>已建立（{activeRoutes.length}）</strong><div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 6 }}>{activeRoutes.map((r) => { const y = routeYieldEstimate(r.id); const embargoed = player.embargoedRoutes?.includes(r.id); return <div key={r.id} style={{ display: 'inline-flex', gap: 4, alignItems: 'center', padding: '2px 6px', background: embargoed ? 'var(--bg-inset)' : 'rgba(122,154,62,0.08)', borderRadius: 3, opacity: embargoed ? 0.6 : 1 }}><span style={{ fontSize: 11, color: embargoed ? 'var(--text-dim)' : 'var(--good)' }}>{r.name}{embargoed ? '·禁运' : `·+${y.gold}金/+${y.influence}影`}</span><Btn label={embargoed ? '解除' : '禁运'} variant="ghost" onClick={() => embargoTradeRoute(r.id)} /></div>; })}</div></div>}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))', gap: 8 }}>
-          {routes.map(({ def, can, blocker }) => { const y = routeYieldEstimate(def.id); return <div key={def.id} className="ia-card" style={{ padding: 10, opacity: can ? 1 : 0.7, border: can ? '1px solid var(--border-gold)' : '1px solid var(--border)' }}><div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 4 }}><strong style={{ fontSize: 12 }}>{def.name}</strong>{blocker ? <Tag text={blocker} tone="danger" /> : <Tag text={`${def.costGold}金`} tone="info" />}</div><p className="dim" style={{ fontSize: 10, margin: '0 0 6px 0', lineHeight: 1.4 }}>{def.description}</p><div style={{ fontSize: 10, color: 'var(--text-dim)', marginBottom: 6 }}>+{y.gold}金 · +{y.influence}影{y.food > 0 ? ` · +${y.food}粮` : ''} · {def.length === 'long' ? '长途' : def.length === 'medium' ? '中途' : '短途'}</div><Btn label="建立" variant={can ? 'primary' : 'ghost'} onClick={() => establishTradeRoute(def.id)} disabled={!can} /></div>; })}
+          {routes.map(({ def, can, blocker }) => { const y = routeYieldEstimate(def.id); return <div key={def.id} className="ia-card" style={{ padding: 10, opacity: can ? 1 : 0.7, border: can ? '1px solid var(--border-gold)' : '1px solid var(--border)' }}><div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 4 }}><strong style={{ fontSize: 12 }}>{def.name}</strong>{blocker ? <Tag text={blocker} tone="danger" /> : <Tag text={`${def.costGold}金`} tone="info" />}</div><p className="dim" style={{ fontSize: 10, margin: '0 0 6px 0', lineHeight: 1.4 }}>{def.description}</p><div style={{ fontSize: 10, color: 'var(--text-dim)', marginBottom: 6 }}>{routeYieldText(y, def.length)}</div><Btn label="建立" variant={can ? 'primary' : 'ghost'} onClick={() => establishTradeRoute(def.id)} disabled={!can} /></div>; })}
         </div>
       </Panel>
     </div>

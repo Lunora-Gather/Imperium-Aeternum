@@ -243,7 +243,7 @@ export default function MilitaryScreen() {
       })}</div>
     </Panel>
 
-    <Panel title="征兵"><div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: 8 }}>{provs.map((p) => <div key={p.id} className="ia-card" style={{ padding: 8 }}><div style={{ fontSize: 12, marginBottom: 4 }}>{p.name} <span className="dim">({p.population}人)</span></div><div style={{ display: 'flex', gap: 4 }}><Btn label="+50" variant="ghost" onClick={() => recruit(p.id, 50)} /><Btn label="+100" variant="ghost" onClick={() => recruit(p.id, 100)} /></div></div>)}</div></Panel>
+    <Panel title="征兵"><div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: 8 }}>{provs.map((p) => <div key={p.id} className="ia-card" style={{ padding: 8 }}><div style={{ fontSize: 12, marginBottom: 4 }}>{p.name} <span className="dim">{`(${p.population}人)`}</span></div><div style={{ display: 'flex', gap: 4 }}><Btn label="+50" variant="ghost" onClick={() => recruit(p.id, 50)} /><Btn label="+100" variant="ghost" onClick={() => recruit(p.id, 100)} /></div></div>)}</div></Panel>
   </div>);
 }
 

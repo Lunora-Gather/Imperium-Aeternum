@@ -3,6 +3,11 @@
 import { Tag } from './ui';
 import type { WarOpportunityAdvice } from '../gameplay/warOpportunityAdvisor';
 import type { WarAssessmentTone } from '../gameplay/warAssessment';
+import { localizeReactTree } from '../i18n/reactTree';
+import { registerGovernanceTranslations } from '../i18n/catalogs/governance';
+import { useI18n } from '../i18n';
+
+registerGovernanceTranslations();
 
 function tagTone(tone: WarAssessmentTone): 'danger' | 'warn' | 'good' | 'info' | 'gold' {
   return tone === 'danger' ? 'danger' : tone === 'warn' ? 'warn' : 'good';
@@ -13,7 +18,8 @@ function toneBorder(tone: WarAssessmentTone): string {
 }
 
 export default function WarOpportunityPanel({ advice, onPreview }: { advice: WarOpportunityAdvice; onPreview?: (defenderId: string, provinceId: string) => void }) {
-  return <section className="ia-dash-section" style={{ borderColor: toneBorder(advice.tone) }}>
+  const { locale, t } = useI18n();
+  return localizeReactTree(<section className="ia-dash-section" style={{ borderColor: toneBorder(advice.tone) }}>
     <header>
       <div><small>War Opportunity</small><h3>战争机会顾问</h3></div>
       <Tag text={advice.tone === 'good' ? '可扩张' : advice.tone === 'warn' ? '先整备' : '暂缓'} tone={tagTone(advice.tone)} />
@@ -37,8 +43,12 @@ export default function WarOpportunityPanel({ advice, onPreview }: { advice: War
           <strong style={{ fontSize: 12 }}>{i === 0 ? `首选：${c.provinceName}` : c.provinceName}</strong>
           <Tag text={`${c.score}`} tone={tagTone(c.preview.tone)} />
         </div>
-        <div style={{ fontSize: 11, color: 'var(--text-dim)', lineHeight: 1.45 }}>{c.defenderName} · 胜率 {c.assessment.winChance}% · 备战 {c.assessment.readiness}%</div>
+        <div style={{ fontSize: 11, color: 'var(--text-dim)', lineHeight: 1.45 }}>
+          {locale === 'en'
+            ? `${t(c.defenderName)} · ${c.assessment.winChance}% win chance · ${c.assessment.readiness}% readiness`
+            : t(`${c.defenderName} · 胜率 ${c.assessment.winChance}% · 备战 ${c.assessment.readiness}%`)}
+        </div>
       </button>)}
     </div>
-  </section>;
+  </section>);
 }
