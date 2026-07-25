@@ -83,6 +83,19 @@ const en = {
   '外交态势': 'Diplomatic posture', '贸易协定': 'Trade agreements', '同盟': 'Alliances', '威胁对象': 'Threats',
   '潘诺尼亚帝国': 'Pannonian Empire', '叙拉古': 'Syracuse', '蛮族联盟': 'Tribal Alliance', '维尼托联邦': 'Veneto Federation',
   '整备一年': 'Prepare for one year',
+  '年度净收入来自税收、贸易、建筑、军费和腐败估算。': 'Annual net income estimates taxes, trade, buildings, military spending, and corruption.',
+  '粮食趋势由农业基础、农场和人口消耗估算。': 'The food trend estimates agricultural output, farms, and population consumption.',
+  '补给姿态会影响战争承受力和军队扩张节奏。': 'Supply posture affects wartime endurance and the pace of military expansion.',
+  '安定不足会增加叛乱、事件和治理失控风险。': 'Low stability increases the risk of rebellion, events, and loss of control.',
+  '腐败会吞噬财政并降低长期治理效率。': 'Corruption consumes revenue and weakens long-term governing efficiency.',
+  '高不满或高叛乱风险省份需要优先处理。': 'Prioritize provinces with high unrest or rebellion risk.',
+  '综合平均关系、信任、影响力、贸易、同盟、战争和威胁。': 'Combines average relations, trust, influence, trade, alliances, wars, and threats.',
+  '影响力决定贸易、改善关系和同盟操作空间。': 'Influence determines room for trade, improved relations, and alliances.',
+  '贸易可提高收入并降低外交摩擦。': 'Trade raises income and reduces diplomatic friction.',
+  '同盟可缓冲威胁和多线战争风险。': 'Alliances buffer threats and the risk of multi-front wars.',
+  '战争会压低外交态势并放大内政压力。': 'Wars weaken diplomatic posture and amplify domestic pressure.',
+  '高威胁、高敌意或战争对象需要优先处理。': 'Prioritize high-threat, hostile, or wartime counterparts.',
+  '1 回合内止血': 'Stop the losses within 1 turn', '2～3 回合修正': 'Correct course over 2–3 turns', '3～5 回合推进': 'Advance over 3–5 turns',
 } as const;
 
 const zhTW = {
@@ -113,6 +126,7 @@ export const dashboardCatalog: ScopedCatalog = {
       { pattern: /^把握 (\d+)$/, replacement: 'Confidence $1' },
       { pattern: /^国势 (\d+)$/, replacement: 'National strength $1' },
       { pattern: /^共享 · (.*)$/, replacement: 'Shared · $1' },
+      { pattern: /^([+-]?\d+)\/年$/, replacement: '$1/year' },
     ],
     // Domain helpers deliberately keep canonical Chinese copy. These
     // fragments compose their runtime summaries in the lazy dashboard chunk
@@ -152,6 +166,7 @@ export const dashboardCatalog: ScopedCatalog = {
       '已有可用军队，下一步看补给和战机': 'A usable army is available; review supply and opportunities next',
       '选择扩张或发展': 'Choose expansion or development', '没有安全战机时，优先建设、科研或外交': 'When no safe war opportunity exists, prioritize construction, research, or diplomacy',
       '回合推进': 'turn horizon', '本年首要目标是': 'This year’s primary objective is ', '当前最优先入口是': 'The highest-priority entry is ',
+      '处理后再看建设项和推进项。': 'After resolving it, review development and turn actions.',
       '处理后再看建设': 'After resolving it, review development ', '和推进': 'and turn ', '没有硬性阻断': 'No hard blockers',
       '暂无必须建设': 'No mandatory development ', '可选择长期发展': 'choose long-term growth', '规划：': 'Plan: ', '前往': 'Open ',
       '推进前检查：': 'Pre-turn check: ', '可以进入下一年': 'ready for the next year', '未发现硬性阻断，国家': 'No hard blockers found; national ',
