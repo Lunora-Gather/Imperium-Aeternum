@@ -13,6 +13,8 @@ describe('i18n catalog', () => {
 
   it('interpolates values without exposing template tokens', () => {
     expect(translate('第 {{year}} 年 · 修订 {{revision}}', { year: 12, revision: 7 }, 'en')).toBe('Year 12 · Revision 7');
+    expect(translate('{{value}}/年', { value: '+451' }, 'en')).toBe('+451/year');
+    expect(translate('第 {{year}} 年 · 年度报告', { year: 1 }, 'en')).toBe('Year 1 · Annual Report');
   });
 
   it('falls back to the source text when a translation is not ready', () => {

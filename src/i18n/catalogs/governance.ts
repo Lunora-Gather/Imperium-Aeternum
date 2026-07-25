@@ -265,7 +265,7 @@ export function registerGovernanceTranslations(): void {
     { pattern: /^支出 −(\d+)$/, replacement: 'Expenses −$1' },
     { pattern: /^([+-]?\d+)\/年$/, replacement: '$1/year' },
     { pattern: /^(\d+) 省 \/ (\d+) 省$/, replacement: '$1 provinces / $2 provinces' },
-    { pattern: /^(\d+) 年 \/ (\d+) 年$/, replacement: '$1 years / $2 years' },
+    { pattern: /^(\d+) 年 \/ (\d+) 年$/, replacement: (_all, current, target) => `${current} ${current === '1' ? 'year' : 'years'} / ${target} ${target === '1' ? 'year' : 'years'}` },
     { pattern: /^(\d+) 金 · (\d+) 年 \/ (\d+) 金 · (\d+) 年$/, replacement: '$1 gold · $2 years / $3 gold · $4 years' },
     { pattern: /^(\d+) 影响 · (\d+) 友邦 \/ (\d+) 影响 · (\d+) 友邦$/, replacement: '$1 influence · $2 allies / $3 influence · $4 allies' },
     { pattern: /^(贵族|商人|军方|民众|神职) ([+-]\d+)$/, replacement: (_all, faction, amount) => `${en[faction] ?? faction} ${amount}` },

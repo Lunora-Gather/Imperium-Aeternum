@@ -116,6 +116,7 @@ const enLaunch: Record<string, string> = {
   '选择你的邦国': 'Choose your nation', '即将开始': 'Campaign ready', '你的邦国': 'Your nation', '← 返回': '← Back', '开启纪元 →': 'Begin era →',
   '读取自动存档': 'Load autosave', '刷新存档体检': 'Refresh save check', '清理本地存档': 'Delete local saves', '修复并继续': 'Repair and continue', '继续最佳存档': 'Continue best save',
   '{{label}} · 体检 {{score}}/100{{repairs}}': '{{label}} · Check {{score}}/100{{repairs}}', ' · 将自动：{{items}}': ' · Automatic: {{items}}', '、': ', ',
+  '{{value}}/年': '{{value}}/year', '第 {{year}} 年 · 年度报告': 'Year {{year}} · Annual Report',
   '挑战': 'Challenge', '贸易': 'Trade', '军事': 'Military', '行政': 'Administration', '民生': 'Welfare', '强国': 'Great power', '稳健': 'Balanced',
   '波斯帝国': 'Persian Empire', '秦帝国': 'Qin Empire', '罗马': 'Rome', '迦太基': 'Carthage', '汉': 'Han', '孔雀帝国': 'Maurya Empire', '印加': 'Inca', '法兰克': 'Franks',
   '匈奴汗国': 'Xiongnu Khanate', '努米底亚': 'Numidia', '阿兹特克': 'Aztec', '玛雅': 'Maya', '基辅罗斯': 'Kievan Rus’', '室利佛逝': 'Srivijaya', '埃及王国': 'Kingdom of Egypt',

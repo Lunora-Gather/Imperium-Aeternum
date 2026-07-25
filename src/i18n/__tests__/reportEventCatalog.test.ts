@@ -23,6 +23,7 @@ describe('annual report and event English copy', () => {
       'Net income rose by 451, leaving room to keep the state functioning.',
     );
     expect(en('6 省 / 9 省')).toBe('6 provinces / 9 provinces');
+    expect(en('1 年 / 80 年')).toBe('1 year / 80 years');
     expect(en('◇ 维尼托联邦 将 罗马 视为宿敌')).toBe(
       '◇ Veneto Federation now regards Rome as a rival',
     );
