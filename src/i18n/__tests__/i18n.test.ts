@@ -27,4 +27,12 @@ describe('i18n catalog', () => {
     });
     expect(sources.filter((source) => /[\p{Script=Han}]/u.test(source) && !hasExplicitTranslation(source, 'en'))).toEqual([]);
   });
+
+  it('keeps save-health summaries fully translated in English', () => {
+    expect(translate('存档健康', {}, 'en')).toBe('Saves healthy');
+    expect(translate('健康', {}, 'en')).toBe('Healthy');
+    expect(translate('2 个存档可自动修复', {}, 'en')).toBe('2 saves can be repaired automatically');
+    expect(translate('1 个存档可读但有风险', {}, 'en')).toBe('1 playable save has risks');
+    expect(translate('1 个槽位损坏', {}, 'en')).toBe('1 damaged slot');
+  });
 });
