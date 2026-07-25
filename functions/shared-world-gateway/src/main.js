@@ -1,7 +1,8 @@
 import { Client, ID, Permission, Query, Role, Storage, TablesDB } from 'node-appwrite';
 import { InputFile } from 'node-appwrite/file';
+import { gzipSync } from 'node:zlib';
 import { advanceSharedWorld, applySharedWorldCommand, createSharedWorldSnapshot } from './generated/engine-bundle.js';
-import { assertCommandOwnership, isControlActive, isWorldDue, readyCommandKey, wasWorldActiveDuringWindow } from './policy.js';
+import { assertCommandOwnership, decodeSnapshotPayload, isControlActive, isWorldDue, readyCommandKey, wasWorldActiveDuringWindow } from './policy.js';
 
 const DATABASE_ID = 'imperium_game';
 const WORLD_TABLE = 'shared_worlds';
@@ -146,7 +147,14 @@ async function mutateControl(db, action, worldId, nationId, userId, now) {
 
 async function readSnapshot(storage, fileId) {
   const payload = await storage.getFileDownload({ bucketId: SNAPSHOT_BUCKET, fileId });
-  return JSON.parse(Buffer.from(payload).toString('utf8'));
+  return decodeSnapshotPayload(payload);
+}
+
+function encodeState(state) {
+  return {
+    stateEncoding: 'gzip-base64',
+    statePayload: gzipSync(JSON.stringify(state), { level: 6 }).toString('base64'),
+  };
 }
 
 async function writeSnapshot(storage, worldId, state) {
@@ -313,13 +321,20 @@ export default async ({ req, res, error }) => {
       await requireControl(db, worldId, nationId, userId);
       let world = await db.getRow({ databaseId: DATABASE_ID, tableId: WORLD_TABLE, rowId: worldId });
       world = await initializeWorld(db, storage, world);
-      return res.json({ ok: true, world, state: await readSnapshot(storage, world.snapshotFileId), controls: await listControls(db, worldId) });
+      const state = await readSnapshot(storage, world.snapshotFileId);
+      return res.json({ ok: true, world, ...encodeState(state), controls: await listControls(db, worldId) });
     }
     if (action === 'submit_command') {
       const result = await submitCommand(db, storage, worldId, nationId, userId, body);
-      return res.json({ ok: true, ...result });
+      const { state, ...metadata } = result;
+      return res.json({ ok: true, ...metadata, ...encodeState(state) });
     }
-    if (action === 'set_ready') return res.json({ ok: true, ...(await setReady(db, storage, worldId, nationId, userId, body)) });
+    if (action === 'set_ready') {
+      const result = await setReady(db, storage, worldId, nationId, userId, body);
+      if (!result.resolved?.state) return res.json({ ok: true, ...result });
+      const { state, ...resolved } = result.resolved;
+      return res.json({ ok: true, ...result, resolved: { ...resolved, ...encodeState(state) } });
+    }
     if (!['claim_nation', 'release_nation', 'renew_control'].includes(action)) return res.json({ ok: false, message: '不支持的共享版图操作' }, 400);
     return res.json({ ok: true, control: await mutateControl(db, action, worldId, nationId, userId, now) });
   } catch (cause) {

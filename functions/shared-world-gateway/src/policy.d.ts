@@ -25,3 +25,4 @@ export function assertCommandOwnership<T extends CommandPolicyRow>(command: T, e
 export function wasWorldActiveDuringWindow(world: WorldSchedulePolicyRow, memberships: { lastSeenAt: string }[]): boolean;
 export function isWorldDue(world: WorldSchedulePolicyRow | null | undefined, nowMs?: number): boolean;
 export function readyCommandKey(worldId: string, turn: number, nationId: string): string;
+export function decodeSnapshotPayload(payload: unknown): Record<string, unknown>;

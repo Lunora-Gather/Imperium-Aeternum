@@ -33,3 +33,23 @@ export function readyCommandKey(worldId, turn, nationId) {
   return `ready:${worldId}:${turn}:${nationId}`;
 }
 
+export function decodeSnapshotPayload(payload) {
+  if (payload && typeof payload === 'object'
+    && !Buffer.isBuffer(payload)
+    && !(payload instanceof ArrayBuffer)
+    && !ArrayBuffer.isView(payload)) {
+    // JSON downloads are parsed by node-appwrite before they are returned.
+    // json-bigint uses null-prototype objects, so normalize the snapshot here.
+    return JSON.parse(JSON.stringify(payload));
+  }
+
+  const text = typeof payload === 'string'
+    ? payload
+    : Buffer.from(payload).toString('utf8');
+  const parsed = JSON.parse(text);
+  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+    throw new Error('共享版图快照格式无效');
+  }
+  return parsed;
+}
+

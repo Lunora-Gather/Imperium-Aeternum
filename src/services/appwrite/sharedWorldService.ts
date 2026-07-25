@@ -87,7 +87,36 @@ export async function listNationControls(worldId: string): Promise<NationControl
   return (result.controls ?? []).map(toControl);
 }
 
-interface GatewayResult { ok: boolean; message?: string; control?: NationControlRow; controls?: NationControlRow[]; world?: SharedWorldRow; state?: GameState; ready?: boolean; readyCount?: number; requiredCount?: number; resolved?: { world: SharedWorldRow; state: GameState } | null }
+interface EncodedState {
+  state?: GameState;
+  stateEncoding?: 'gzip-base64';
+  statePayload?: string;
+}
+
+interface GatewayResult extends EncodedState {
+  ok: boolean;
+  message?: string;
+  control?: NationControlRow;
+  controls?: NationControlRow[];
+  world?: SharedWorldRow;
+  ready?: boolean;
+  readyCount?: number;
+  requiredCount?: number;
+  resolved?: ({ world: SharedWorldRow } & EncodedState) | null;
+}
+
+export async function decodeGatewayState(payload: EncodedState): Promise<GameState | undefined> {
+  if (payload.state) return payload.state;
+  if (payload.stateEncoding !== 'gzip-base64' || !payload.statePayload) return undefined;
+  if (typeof DecompressionStream === 'undefined') {
+    throw new Error('当前浏览器版本过旧，无法载入共享版图压缩快照');
+  }
+
+  const binary = atob(payload.statePayload);
+  const bytes = Uint8Array.from(binary, (character) => character.charCodeAt(0));
+  const stream = new Blob([bytes]).stream().pipeThrough(new DecompressionStream('gzip'));
+  return JSON.parse(await new Response(stream).text()) as GameState;
+}
 
 async function executeGateway(action: string, worldId: string, nationId?: string, data: Record<string, unknown> = {}): Promise<GatewayResult> {
   const execution = await getAppwriteServices().functions.createExecution({
@@ -109,19 +138,22 @@ export const renewSharedNationControl = (worldId: string, nationId: string) => e
 
 export async function enterSharedWorld(worldId: string, nationId: string): Promise<{ world: SharedWorldInstance; state: GameState; controls: NationControl[] }> {
   const result = await executeGateway('enter_world', worldId, nationId);
-  if (!result.world || !result.state) throw new Error('共享版图快照尚未准备完成');
-  return { world: toWorld(result.world), state: result.state, controls: (result.controls ?? []).map(toControl) };
+  const state = await decodeGatewayState(result);
+  if (!result.world || !state) throw new Error('共享版图快照尚未准备完成');
+  return { world: toWorld(result.world), state, controls: (result.controls ?? []).map(toControl) };
 }
 
 export async function submitSharedWorldAction(worldId: string, nationId: string, baseRevision: number, commandType: string, action: string, args: unknown[]): Promise<{ world: SharedWorldInstance; state: GameState }> {
   const result = await executeGateway('submit_command', worldId, nationId, { baseRevision, commandType, idempotencyKey: crypto.randomUUID(), payload: { action, args } });
-  if (!result.world || !result.state) throw new Error('共享行动没有返回最新世界状态');
-  return { world: toWorld(result.world), state: result.state };
+  const state = await decodeGatewayState(result);
+  if (!result.world || !state) throw new Error('共享行动没有返回最新世界状态');
+  return { world: toWorld(result.world), state };
 }
 
 export async function markSharedWorldReady(worldId: string, nationId: string, baseRevision: number): Promise<{ resolved: boolean; world?: SharedWorldInstance; state?: GameState; readyCount?: number; requiredCount?: number }> {
   const result = await executeGateway('set_ready', worldId, nationId, { baseRevision, idempotencyKey: `ready:${worldId}:${nationId}:${crypto.randomUUID()}` });
-  return { resolved: !!result.resolved, world: result.resolved?.world ? toWorld(result.resolved.world) : undefined, state: result.resolved?.state, readyCount: result.readyCount, requiredCount: result.requiredCount };
+  const state = result.resolved ? await decodeGatewayState(result.resolved) : undefined;
+  return { resolved: !!result.resolved, world: result.resolved?.world ? toWorld(result.resolved.world) : undefined, state, readyCount: result.readyCount, requiredCount: result.requiredCount };
 }
 
 export async function subscribeToWorldLobby(worldId: string, onChange: () => void): Promise<() => Promise<void>> {

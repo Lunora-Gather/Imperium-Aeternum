@@ -1,11 +1,30 @@
 import { describe, expect, it } from 'vitest';
-import { assertCommandOwnership, isControlActive, isWorldDue, readyCommandKey, wasWorldActiveDuringWindow } from '../../../../functions/shared-world-gateway/src/policy.js';
+import { assertCommandOwnership, decodeSnapshotPayload, isControlActive, isWorldDue, readyCommandKey, wasWorldActiveDuringWindow } from '../../../../functions/shared-world-gateway/src/policy.js';
 import { assertFriendshipParticipants, assertMembershipOwner, discoverableMemberIds, friendshipPairKey, friendshipRowId, messageRateRowId, verifiedNationIdentity } from '../../../../functions/social-gateway/src/policy.js';
 import { normalizeCloudSavePayload } from '../../../../functions/cloud-save-gateway/src/policy.js';
 import { assertFreshEmailOtpSession, assertRecoverablePasswordUser } from '../../../../functions/account-gateway/src/policy.js';
 
 describe('shared world gateway policy', () => {
   const now = Date.parse('2026-07-23T00:00:00.000Z');
+
+  it('normalizes Appwrite JSON downloads with a null prototype', () => {
+    const payload = Object.assign(Object.create(null), {
+      turn: 4,
+      nations: [{ id: 'rome' }],
+    });
+
+    const decoded = decodeSnapshotPayload(payload);
+
+    expect(decoded).toEqual({ turn: 4, nations: [{ id: 'rome' }] });
+    expect(Object.getPrototypeOf(decoded)).toBe(Object.prototype);
+  });
+
+  it('decodes raw snapshot bytes', () => {
+    expect(decodeSnapshotPayload(Buffer.from('{"turn":5,"nations":[]}'))).toEqual({
+      turn: 5,
+      nations: [],
+    });
+  });
 
   it('returns expired nation control to AI eligibility', () => {
     expect(isControlActive({ controllerUserId: 'u1', status: 'controlled', leaseExpiresAt: '2026-07-22T00:00:00.000Z' }, now)).toBe(false);
