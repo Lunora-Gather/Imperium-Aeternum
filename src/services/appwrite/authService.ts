@@ -76,7 +76,9 @@ export async function completePasswordRecovery(userId: string, secret: string, p
 }
 
 export async function logoutCurrentSession(): Promise<void> {
-  await getAppwriteServices().account.deleteSession({ sessionId: 'current' });
+  // Logging out is also a local state transition. A dropped response must not
+  // leave an unhandled rejection after the account has already been cleared.
+  await getAppwriteServices().account.deleteSession({ sessionId: 'current' }).catch(() => undefined);
 }
 
 export function describeAppwriteError(error: unknown): string {
