@@ -1,9 +1,11 @@
 // Imperium Aeternum — App shell
 // V23：主导航使用统一 NavigationTab 合约，避免各模块手写 tab 字符串漂移。
-import { lazy, Suspense, useState, useEffect, useCallback, useRef } from 'react';
+import { lazy, Suspense, useState, useEffect, useCallback, useRef, type ComponentType } from 'react';
 import { useGameStore } from './store/gameStore';
+import { useSharedWorldSessionStore } from './store/sharedWorldSessionStore';
 import { playSfx, useSfxMute } from './utils/audio';
 import { BUILD_MARK } from './buildInfo';
+import { canAttemptLazyRecovery, isRecoverableLazyImportError } from './utils/lazyRecovery';
 import { getOnboardingStep, nextOnboardingIndex, onboardingProgress, prevOnboardingIndex } from './gameplay/onboarding';
 import { pushPageHistory, resetPageHistory, resolveBackTarget } from './gameplay/pageHistory';
 import {
@@ -31,25 +33,59 @@ import { LocaleSwitch } from './components/LocaleSwitch';
 import { SocialDock } from './components/social/SocialPanel';
 import { useI18n } from './i18n';
 
-const ScenarioSelect = lazy(() => import('./screens/ScenarioSelect'));
-const WorldMap = lazy(() => import('./screens/WorldMap'));
-const Dashboard = lazy(() => import('./screens/Dashboard'));
-const ProvinceScreen = lazy(() => import('./screens/ProvinceScreen'));
-const EconomyScreen = lazy(() => import('./screens/EconomyScreen'));
-const PopulationScreen = lazy(() => import('./screens/PopulationScreen'));
-const PoliticsScreen = lazy(() => import('./screens/PoliticsScreen'));
-const MilitaryScreen = lazy(() => import('./screens/MilitaryScreen'));
-const DiplomacyScreen = lazy(() => import('./screens/DiplomacyScreen'));
-const TechnologyScreen = lazy(() => import('./screens/TechnologyScreen'));
-const StatsScreen = lazy(() => import('./screens/StatsScreen'));
-const TurnReportScreen = lazy(() => import('./screens/TurnReportScreen'));
-const ChronicleScreen = lazy(() => import('./screens/ChronicleScreen'));
-const SaveLoadScreen = lazy(() => import('./screens/SaveLoadScreen'));
-const EventModal = lazy(() => import('./screens/EventModal'));
-const NoviceJourneyPanel = lazy(() => import('./components/NoviceJourneyPanel'));
-const NoviceJourneyCompletion = lazy(() => import('./components/NoviceJourneyCompletion'));
-
 type Tab = NavigationTab;
+type LazyModule<T extends ComponentType<any>> = { default: T };
+
+const LAZY_RECOVERY_ATTEMPT_KEY = 'ia-lazy-recovery-attempt-v1';
+function attemptLazyImportRecovery(): boolean {
+  if (typeof window === 'undefined') return false;
+  const now = Date.now();
+  try {
+    if (!canAttemptLazyRecovery(sessionStorage.getItem(LAZY_RECOVERY_ATTEMPT_KEY), now)) return false;
+    sessionStorage.setItem(LAZY_RECOVERY_ATTEMPT_KEY, String(now));
+
+    const store = useGameStore.getState();
+    const isLocalCampaign = store.scene === 'playing' && !useSharedWorldSessionStore.getState().session;
+    if (isLocalCampaign) store.saveToSlot(0);
+  } catch {
+    return false;
+  }
+  window.location.reload();
+  return true;
+}
+
+function lazyScreen<T extends ComponentType<any>>(
+  loader: () => Promise<LazyModule<T>>,
+) {
+  return lazy<T>(async () => {
+    try {
+      return await loader();
+    } catch (error) {
+      if (isRecoverableLazyImportError(error) && attemptLazyImportRecovery()) {
+        return await new Promise<LazyModule<T>>(() => undefined);
+      }
+      throw error;
+    }
+  });
+}
+
+const ScenarioSelect = lazyScreen(() => import('./screens/ScenarioSelect'));
+const WorldMap = lazyScreen(() => import('./screens/WorldMap'));
+const Dashboard = lazyScreen(() => import('./screens/Dashboard'));
+const ProvinceScreen = lazyScreen(() => import('./screens/ProvinceScreen'));
+const EconomyScreen = lazyScreen(() => import('./screens/EconomyScreen'));
+const PopulationScreen = lazyScreen(() => import('./screens/PopulationScreen'));
+const PoliticsScreen = lazyScreen(() => import('./screens/PoliticsScreen'));
+const MilitaryScreen = lazyScreen(() => import('./screens/MilitaryScreen'));
+const DiplomacyScreen = lazyScreen(() => import('./screens/DiplomacyScreen'));
+const TechnologyScreen = lazyScreen(() => import('./screens/TechnologyScreen'));
+const StatsScreen = lazyScreen(() => import('./screens/StatsScreen'));
+const TurnReportScreen = lazyScreen(() => import('./screens/TurnReportScreen'));
+const ChronicleScreen = lazyScreen(() => import('./screens/ChronicleScreen'));
+const SaveLoadScreen = lazyScreen(() => import('./screens/SaveLoadScreen'));
+const EventModal = lazyScreen(() => import('./screens/EventModal'));
+const NoviceJourneyPanel = lazyScreen(() => import('./components/NoviceJourneyPanel'));
+const NoviceJourneyCompletion = lazyScreen(() => import('./components/NoviceJourneyCompletion'));
 
 const TAB_GROUPS: { group: string; tabs: { id: Tab; label: string; key: string; icon: string }[] }[] = [
   { group: '治理', tabs: [

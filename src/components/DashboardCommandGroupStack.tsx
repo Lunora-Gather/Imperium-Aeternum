@@ -23,16 +23,17 @@ export default function DashboardCommandGroupStack({ groups, renderItem }: { gro
   return <div className="ia-command-stack">
     {groups.map((g) => {
       const expanded = open[g.id] ?? g.defaultOpen;
+      const panelId = `ia-command-group-${g.id}`;
       return <section key={g.id} className="ia-dash-section" style={{ borderColor: border(g.tone) }}>
         <header style={{ marginBottom: expanded ? 8 : 0 }}>
-          <button onClick={() => setOpen((x) => ({ ...x, [g.id]: !expanded }))} style={{ flex: 1, textAlign: 'left', background: 'transparent', color: 'inherit', border: 0, padding: 0, cursor: 'pointer' }}>
+          <button type="button" aria-expanded={expanded} aria-controls={panelId} onClick={() => setOpen((x) => ({ ...x, [g.id]: !expanded }))} style={{ flex: 1, textAlign: 'left', background: 'transparent', color: 'inherit', border: 0, padding: 0, cursor: 'pointer' }}>
             <small>{expanded ? '▼' : '▶'} Command Group</small>
             <h3>{t(g.title)}</h3>
             <div style={{ fontSize: 11, color: 'var(--text-dim)', lineHeight: 1.45 }}>{t(g.subtitle)}</div>
           </button>
           <Tag text={t(g.tone === 'danger' ? '紧急' : g.tone === 'warn' ? '注意' : '良好')} tone={tagTone(g.tone)} />
         </header>
-        {expanded && <div className="ia-command-stack-items">
+        {expanded && <div id={panelId} className="ia-command-stack-items">
           {g.itemIds.map((id) => <div key={id}>{renderItem(id)}</div>)}
         </div>}
       </section>;
