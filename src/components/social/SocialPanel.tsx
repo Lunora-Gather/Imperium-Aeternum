@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import { subscribeToDirectMessages, subscribeToFriendships } from '../../services/appwrite/socialService';
 import type { Friendship, GameProfile } from '../../social/types';
 import { useAccountStore } from '../../store/accountStore';
+import { useSharedWorldSessionStore } from '../../store/sharedWorldSessionStore';
 import { useSocialStore } from '../../store/socialStore';
 import { Btn, Tag } from '../ui';
 import { DirectChatPanel } from './DirectChatPanel';
@@ -71,6 +72,7 @@ export function SocialDock() {
 export function SocialPanel({ onClose }: { onClose: () => void }) {
   const { t } = useI18n();
   const user = useAccountStore((state) => state.user);
+  const worldSession = useSharedWorldSessionStore((state) => state.session);
   const store = useSocialStore();
   const [tab, setTab] = useState<SocialTab>('discover');
   const [friendCode, setFriendCode] = useState('');
@@ -81,7 +83,11 @@ export function SocialPanel({ onClose }: { onClose: () => void }) {
   const pending = useMemo(() => store.friendships.filter((item) => item.status === 'pending' && item.addresseeId === user?.$id), [store.friendships, user?.$id]);
   const friends = useMemo(() => store.friendships.filter((item) => item.status === 'accepted'), [store.friendships]);
 
-  useEffect(() => { if (user) { void store.initialize(); void store.discover(); } }, [user?.$id]);
+  useEffect(() => {
+    if (!user) return;
+    void store.initialize();
+    void store.discover(worldSession?.worldId ?? null);
+  }, [user?.$id, worldSession?.worldId]);
   useEffect(() => {
     if (!store.profile || editing) return;
     setDraft({
@@ -119,7 +125,7 @@ export function SocialPanel({ onClose }: { onClose: () => void }) {
   const add = async (profile: GameProfile) => {
     await store.addByCode(profile.friendCode);
     setViewProfile(null);
-    await store.discover();
+    await store.discover(worldSession?.worldId ?? null);
   };
 
   return <div className="ia-modal-backdrop" onClick={onClose}><section className="ia-social-modal ia-fade-in" role="dialog" aria-modal="true" aria-labelledby="social-title" onClick={(event) => event.stopPropagation()}>
@@ -130,11 +136,11 @@ export function SocialPanel({ onClose }: { onClose: () => void }) {
       </nav>
 
       {tab === 'discover' && <section className="ia-social-content">
-        <div className="ia-social-discover-head"><div><strong>{t('遇见新的统治者')}</strong><p>{t('点击头像查看名片，喜欢就直接发送好友申请。')}</p></div><button className="ia-btn ia-btn--ghost" onClick={() => void store.discover()}>{t('换一批')}</button></div>
-        <div className="ia-player-grid">{store.discoveredProfiles.length ? store.discoveredProfiles.map((profile) => {
+        <div className="ia-social-discover-head"><div><strong>{t(worldSession ? '{{world}} · 同图统治者' : '当前没有共享版图', { world: worldSession?.worldName ?? '' })}</strong><p>{t(worldSession ? '这里只显示当前版图的成员；成为好友后可以一直聊天。' : '进入共享版图后，可以发现同一版图的统治者。')}</p></div>{worldSession && <button className="ia-btn ia-btn--ghost" onClick={() => void store.discover(worldSession.worldId)}>{t('刷新')}</button>}</div>
+        {!worldSession ? <div className="ia-social-context-empty"><span>⌾</span><strong>{t('先进入一张共享版图')}</strong><p>{t('发现列表不会展示全站玩家，避免人数增长后变得庞大混乱。已有好友仍可在“好友”页随时聊天。')}</p></div> : <div className="ia-player-grid">{store.discoveredProfiles.length ? store.discoveredProfiles.map((profile) => {
           const relation = relationFor(store.friendships, user.$id, profile.userId);
           return <article key={profile.userId} className="ia-player-tile"><button className="ia-player-tile-main" onClick={() => setViewProfile(profile)}><ProfileAvatar profile={profile} /><span><strong>{profile.displayName}</strong><em>{t(profile.title)}</em></span></button><p>{t(profile.bio)}</p><div>{relation === 'none' ? <Btn label={t('加为好友')} variant="primary" onClick={() => void add(profile)} /> : relation === 'friend' ? <Btn label={t('发消息')} onClick={() => openChat(profile.userId, profile.displayName)} /> : <Tag text={t(relation === 'incoming' ? '等待你回应' : '申请已发送')} tone="info" />}<button onClick={() => setViewProfile(profile)}>{t('查看名片')}</button></div></article>;
-        }) : <div className="ia-chat-empty"><span>♧</span><strong>{t(store.loading ? '正在寻找玩家…' : '暂时没有更多玩家')}</strong></div>}</div>
+        }) : <div className="ia-chat-empty"><span>♧</span><strong>{t(store.loading ? '正在读取同图玩家…' : '当前版图暂时没有其他玩家')}</strong></div>}</div>}
         <details className="ia-friend-code-entry"><summary>{t('使用好友码添加')}</summary><form className="ia-social-add" onSubmit={(event) => { event.preventDefault(); void store.addByCode(friendCode).then((ok) => { if (ok) setFriendCode(''); }); }}><input className="ia-input" aria-label={t('好友码')} value={friendCode} onChange={(event) => setFriendCode(event.target.value.toUpperCase().replace(/[^A-Z0-9]/g, ''))} maxLength={12} placeholder={t('输入 IA 开头的好友码')} /><Btn type="submit" label={t('发送申请')} variant="primary" busy={store.loading} disabled={store.loading || friendCode.trim().length < 4} /></form></details>
       </section>}
 

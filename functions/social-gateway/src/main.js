@@ -1,6 +1,6 @@
 import { Client, ID, Permission, Query, Role, Storage, TablesDB, Users } from 'node-appwrite';
 import { InputFile } from 'node-appwrite/file';
-import { assertFriendshipParticipants, assertMembershipOwner, friendshipPairKey, friendshipRowId, messageRateRowId, verifiedNationIdentity } from './policy.js';
+import { assertFriendshipParticipants, assertMembershipOwner, discoverableMemberIds, friendshipPairKey, friendshipRowId, messageRateRowId, verifiedNationIdentity } from './policy.js';
 
 const DATABASE_ID = 'imperium_game';
 const PROFILE_TABLE = 'game_profiles';
@@ -179,11 +179,28 @@ export default async ({ req, res, error }) => {
       return res.json({ ok: true, profile: publicProfile(updated) });
     }
     if (action === 'discover_profiles') {
-      const result = await db.listRows({ databaseId: DATABASE_ID, tableId: PROFILE_TABLE, queries: [Query.limit(50)], total: false });
+      // Keep the previous frontend safe during a rolling deployment without
+      // reopening the removed global profile directory.
+      if (!body.worldId) return res.json({ ok: true, profiles: [] });
+      const worldId = identifier(body.worldId, 36, '版图标识');
+      await requireMembership(db, worldId, userId);
+      const memberships = await db.listRows({
+        databaseId: DATABASE_ID,
+        tableId: MEMBERSHIP_TABLE,
+        queries: [Query.equal('worldId', worldId), Query.limit(MAX_WORLD_MEMBERS)],
+        total: true,
+      });
+      if (Number(memberships.total ?? memberships.rows.length) > MAX_WORLD_MEMBERS) throw new Error(`当前版图超过 ${MAX_WORLD_MEMBERS} 人，玩家发现需要分页后才能继续使用`);
+      const memberIds = discoverableMemberIds(memberships.rows, userId, MAX_WORLD_MEMBERS);
+      if (memberIds.length === 0) return res.json({ ok: true, profiles: [] });
+      const result = await db.listRows({
+        databaseId: DATABASE_ID,
+        tableId: PROFILE_TABLE,
+        queries: [Query.equal('userId', memberIds), Query.limit(MAX_WORLD_MEMBERS)],
+        total: false,
+      });
       const profiles = result.rows
-        .filter((row) => row.userId !== userId)
         .sort((a, b) => String(b.lastSeenAt).localeCompare(String(a.lastSeenAt)))
-        .slice(0, 24)
         .map(publicProfile);
       return res.json({ ok: true, profiles });
     }
