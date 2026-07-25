@@ -14,8 +14,9 @@ const budgets = {
   // Dynamic governance copy closes the English province/economy/technology/military coverage gap.
   // Mobile tab visibility and dialog shortcut isolation add a bounded shell safety layer.
   // Structured pending-event cards add a small lazy presentation layer; entry/App caps stay unchanged.
-  // Stale-chunk recovery and complete English advisor copy add 1.9 KiB while entry/App caps remain fixed.
-  totalJavaScript: 1153 * KIB,
+  // Stale-chunk recovery plus complete lazy advisor/report/event copy add bounded weight;
+  // entry/App caps remain fixed, so initial navigation performance cannot regress unnoticed.
+  totalJavaScript: 1160 * KIB,
   // Purpose/crisis panels and the responsive event decision surface extend the measured UI baseline.
   totalCss: 115 * KIB,
   entryJavaScript: 180 * KIB,

@@ -10,6 +10,7 @@ import { buildTurnDebrief, type DebriefPoint } from '../gameplay/turnDebrief';
 import type { VictoryRouteCard } from '../gameplay/victoryRoutes';
 import NationalPurposePanel from '../components/NationalPurposePanel';
 import { useSharedWorldSessionStore } from '../store/sharedWorldSessionStore';
+import { EVENT_BY_ID } from '../engine/events';
 
 const FACTION_LABEL: Record<string, string> = { nobles: '贵族', merchants: '商人', military: '军方', commoners: '民众', clergy: '神职' };
 
@@ -65,7 +66,7 @@ export default function TurnReportScreen({ onContinue }: { onContinue?: () => vo
       <div style={{ marginBottom: 12 }}><div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, marginBottom: 4 }}><span style={{ color: 'var(--text-mute)' }}>净收入</span><strong style={{ color: net >= 0 ? 'var(--good)' : 'var(--war)', fontVariantNumeric: 'tabular-nums' }}>{net >= 0 ? '+' : ''}{Math.round(net)} 金</strong></div><Bar value={Math.abs(net)} max={Math.max(100, Math.abs(net) * 1.5)} positive={net >= 0} /></div>
       <Divider label="社会变化" />
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 10, marginBottom: 12 }}><DeltaBox label="粮食" v={r.foodDelta} /><DeltaBox label="人口" v={r.popDelta} /><DeltaBox label="稳定度" v={r.stabilityDelta} /><DeltaBox label="合法性" v={r.legitimacyDelta} /></div>
-      {r.events.length > 0 && <><Divider label="事件" /><div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 12 }}>{r.events.map((e, i) => <Tag key={i} text={e} tone="info" />)}</div></>}
+      {r.events.length > 0 && <><Divider label="事件" /><div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 12 }}>{r.events.map((e, i) => <Tag key={i} text={EVENT_BY_ID[e]?.title ?? e} tone="info" />)}</div></>}
       {r.warProgress.length > 0 && <><Divider label="战事进展" /><div className="ia-battle-in" style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 12, padding: 10, background: 'rgba(162,61,40,0.06)', border: '1px solid var(--war)', borderRadius: 6 }}>{r.warProgress.map((w, i) => { const tone = w.outcome === 'advance' ? 'good' : w.outcome === 'repelled' ? 'danger' : 'warn'; const icon = w.outcome === 'advance' ? '▲' : w.outcome === 'repelled' ? '▼' : '◆'; const txt = w.outcome === 'advance' ? `推进 ${w.target}（+${w.progressDelta}%）` : w.outcome === 'repelled' ? `受挫 ${w.target}（${w.progressDelta}%）` : `胶着 ${w.target}（${w.progressDelta >= 0 ? '+' : ''}${w.progressDelta}%）`; return <Tag key={i} text={`${icon} ${txt}`} tone={tone} />; })}</div></>}
       {r.factionDelta.length > 0 && <><Divider label="派系动向" /><div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 12 }}>{r.factionDelta.map((f, i) => { const tone = f.delta > 0 ? 'good' : 'danger'; const label = FACTION_LABEL[f.id] ?? f.id; return <Tag key={i} text={`${label} ${f.delta >= 0 ? '+' : ''}${f.delta}`} tone={tone} />; })}</div></>}
       {r.worldEvents.length > 0 && <><Divider label="天下大势" /><div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginBottom: 12, padding: 10, background: 'rgba(42,90,140,0.06)', border: '1px solid var(--border)', borderRadius: 6 }}>{r.worldEvents.map((w, i) => <div key={i} style={{ fontSize: 13, padding: '2px 0' }}>{w}</div>)}</div></>}
