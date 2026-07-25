@@ -596,6 +596,59 @@ body > div[style*="position:fixed"][style*="right:8px"] {
   }
 }
 
+@media (max-width: 520px) {
+  .ia-ruler-main {
+    display: grid !important;
+    grid-template-columns: minmax(0, 1fr) !important;
+    align-items: stretch !important;
+    gap: 9px !important;
+  }
+
+  .ia-ruler-identity {
+    min-width: 0;
+  }
+
+  .ia-ruler-subline {
+    line-height: 1.45 !important;
+  }
+
+  .ia-header-actions {
+    width: 100%;
+    align-self: stretch !important;
+    flex-wrap: wrap !important;
+    justify-content: space-between !important;
+    gap: 3px !important;
+    padding-top: 7px;
+    border-top: 1px solid color-mix(in srgb, var(--border) 58%, transparent);
+  }
+
+  .ia-header-actions .ia-icon-btn {
+    width: 34px !important;
+    height: 34px !important;
+    flex: 0 0 34px;
+  }
+
+  .ia-header-actions .ia-locale-switch.is-compact {
+    gap: 2px !important;
+    padding: 1px !important;
+  }
+
+  .ia-header-actions .ia-locale-switch.is-compact > button {
+    min-width: 32px !important;
+    min-height: 32px !important;
+    padding: 2px 4px !important;
+  }
+
+  .ia-main-nav {
+    scroll-padding-inline: 12px;
+    scroll-snap-type: x proximity;
+  }
+
+  .ia-tab-btn {
+    scroll-snap-align: center;
+  }
+}
+
 /* ============================================================
    Commercial polish — launch and control surfaces
    目标：减少表格框感，建立可发布的首屏、剧本库和按钮层级。

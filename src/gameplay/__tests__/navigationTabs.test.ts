@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { NAVIGATION_TABS, isNavigationTab } from '../navigationTabs';
+import {
+  NAVIGATION_TABS,
+  centeredTabScrollLeft,
+  isNavigationTab,
+  shouldBlockGlobalShortcut,
+} from '../navigationTabs';
 import { ONBOARDING_STEPS } from '../onboarding';
 
 describe('navigation tab contract', () => {
@@ -32,5 +37,36 @@ describe('navigation tab contract', () => {
 
   it('keeps onboarding route targets valid', () => {
     expect(ONBOARDING_STEPS.every((step) => isNavigationTab(step.tab))).toBe(true);
+  });
+
+  it('blocks background shortcuts while a dialog or editor owns keyboard focus', () => {
+    expect(shouldBlockGlobalShortcut({ hasOpenDialog: true })).toBe(true);
+    expect(shouldBlockGlobalShortcut({ hasOpenDialog: false, targetTagName: 'input' })).toBe(true);
+    expect(shouldBlockGlobalShortcut({ hasOpenDialog: false, targetIsContentEditable: true })).toBe(true);
+    expect(shouldBlockGlobalShortcut({ hasOpenDialog: false, targetTagName: 'button' })).toBe(false);
+  });
+
+  it('centers the active mobile tab without scrolling beyond either edge', () => {
+    expect(centeredTabScrollLeft({
+      currentScrollLeft: 120,
+      activeOffsetLeft: 260,
+      activeWidth: 80,
+      containerWidth: 360,
+      maxScrollLeft: 540,
+    })).toBe(240);
+    expect(centeredTabScrollLeft({
+      currentScrollLeft: 0,
+      activeOffsetLeft: 10,
+      activeWidth: 70,
+      containerWidth: 360,
+      maxScrollLeft: 540,
+    })).toBe(0);
+    expect(centeredTabScrollLeft({
+      currentScrollLeft: 500,
+      activeOffsetLeft: 350,
+      activeWidth: 90,
+      containerWidth: 360,
+      maxScrollLeft: 540,
+    })).toBe(540);
   });
 });

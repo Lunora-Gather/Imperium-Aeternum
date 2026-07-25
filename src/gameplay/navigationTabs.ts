@@ -24,3 +24,25 @@ const TAB_SET = new Set<string>(NAVIGATION_TABS);
 export function isNavigationTab(tab: string | undefined | null): tab is NavigationTab {
   return typeof tab === 'string' && TAB_SET.has(tab);
 }
+
+export function shouldBlockGlobalShortcut(input: {
+  hasOpenDialog: boolean;
+  targetTagName?: string;
+  targetIsContentEditable?: boolean;
+}): boolean {
+  const tag = input.targetTagName?.toUpperCase();
+  return input.hasOpenDialog || tag === 'INPUT' || tag === 'TEXTAREA' || input.targetIsContentEditable === true;
+}
+
+export function centeredTabScrollLeft(input: {
+  currentScrollLeft: number;
+  activeOffsetLeft: number;
+  activeWidth: number;
+  containerWidth: number;
+  maxScrollLeft: number;
+}): number {
+  const centered = input.currentScrollLeft
+    + input.activeOffsetLeft
+    - (input.containerWidth - input.activeWidth) / 2;
+  return Math.max(0, Math.min(input.maxScrollLeft, Math.round(centered)));
+}

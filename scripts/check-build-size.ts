@@ -12,7 +12,8 @@ const budgets = {
   // player discovery/cards add bounded lazy social code while entry/App caps stay unchanged.
   // National missions, crisis chains and diplomatic memory add deterministic gameplay and lazy presentation.
   // Dynamic governance copy closes the English province/economy/technology/military coverage gap.
-  totalJavaScript: 1148 * KIB,
+  // Mobile tab visibility and dialog shortcut isolation add a bounded shell safety layer.
+  totalJavaScript: 1149 * KIB,
   // Purpose/crisis panels extend the measured cross-theme gameplay UI baseline.
   totalCss: 109 * KIB,
   entryJavaScript: 180 * KIB,
