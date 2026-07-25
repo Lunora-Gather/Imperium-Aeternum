@@ -12,7 +12,7 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock('../client', () => ({ getAppwriteServices: () => ({ account: mocks, functions: { createExecution: mocks.createExecution } }) }));
 
-import { completePasswordRecovery, completeVerifiedRegistration, loginWithPassword } from '../authService';
+import { completePasswordRecovery, completeVerifiedRegistration, loginWithPassword, logoutCurrentSession } from '../authService';
 
 describe('verified Appwrite account flow', () => {
   beforeEach(() => {
@@ -58,6 +58,12 @@ describe('verified Appwrite account flow', () => {
     mocks.get.mockResolvedValue({ $id: 'u5', emailVerification: true, passwordUpdate: '' });
     await expect(completePasswordRecovery('u5', '654321', 'NewImperium42')).rejects.toThrow('没有可找回');
     expect(mocks.createExecution).not.toHaveBeenCalled();
+    expect(mocks.deleteSession).toHaveBeenCalledWith({ sessionId: 'current' });
+  });
+
+  it('finishes local logout when the session deletion response is lost', async () => {
+    mocks.deleteSession.mockRejectedValueOnce(new TypeError('Failed to fetch'));
+    await expect(logoutCurrentSession()).resolves.toBeUndefined();
     expect(mocks.deleteSession).toHaveBeenCalledWith({ sessionId: 'current' });
   });
 });
