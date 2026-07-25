@@ -11,6 +11,7 @@ import type { VictoryRouteCard } from '../gameplay/victoryRoutes';
 import NationalPurposePanel from '../components/NationalPurposePanel';
 import { useSharedWorldSessionStore } from '../store/sharedWorldSessionStore';
 import { EVENT_BY_ID } from '../engine/events';
+import { useI18n } from '../i18n';
 
 const FACTION_LABEL: Record<string, string> = { nobles: '贵族', merchants: '商人', military: '军方', commoners: '民众', clergy: '神职' };
 
@@ -20,6 +21,7 @@ function toneBorder(t: string): string { return t === 'danger' ? 'var(--war)' : 
 
 export default function TurnReportScreen({ onContinue }: { onContinue?: () => void }) {
   const { state, jumpToTab } = useGameStore();
+  const { t } = useI18n();
   const sharedSession = useSharedWorldSessionStore((current) => current.session);
   const r = state.lastReport;
   if (!r) return localizeReactTree(<Panel title="回合报告"><p className="dim">尚无报告。点击「下一回合」开始。</p></Panel>);
@@ -41,7 +43,7 @@ export default function TurnReportScreen({ onContinue }: { onContinue?: () => vo
   if (r.events.length > 0) stories.push({ txt: `发生 ${r.events.length} 起事件`, tone: 'info' });
 
   return localizeReactTree(<div>
-    <Panel title={`第 ${r.turn} 年 · 年度报告`} accent actions={<div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>{debrief && <Btn label={`复盘：${debrief.nextFocus.title}`} variant={debrief.nextFocus.tone === 'danger' ? 'warn' : 'primary'} onClick={() => jumpToTab(debrief.nextFocus.tab)} />}{primary && <Btn label={`处理：${primary.title}`} variant={primary.tone === 'danger' ? 'warn' : 'primary'} onClick={() => jumpToTab(primary.tab)} />}{onContinue && <Btn label="← 继续治理" variant="ghost" onClick={onContinue} />}</div>}>
+    <Panel title={t('第 {{year}} 年 · 年度报告', { year: r.turn })} accent actions={<div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>{debrief && <Btn label={`复盘：${debrief.nextFocus.title}`} variant={debrief.nextFocus.tone === 'danger' ? 'warn' : 'primary'} onClick={() => jumpToTab(debrief.nextFocus.tab)} />}{primary && <Btn label={`处理：${primary.title}`} variant={primary.tone === 'danger' ? 'warn' : 'primary'} onClick={() => jumpToTab(primary.tab)} />}{onContinue && <Btn label="← 继续治理" variant="ghost" onClick={onContinue} />}</div>}>
       {debrief && <DebriefPanel debrief={debrief} jumpToTab={jumpToTab} />}
       {!sharedSession && <NationalPurposePanel state={state} compact />}
       {!sharedSession && (r.strategicNotes ?? []).length > 0 && <><Divider label="国运进展" /><div className="ia-purpose-notes">{(r.strategicNotes ?? []).map((note, index) => <div key={`${note}-${index}`}>✦ {note}</div>)}</div></>}

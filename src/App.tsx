@@ -435,7 +435,7 @@ export default function App() {
           <div className="ia-status-row"><span>{t('行政点')}</span><strong>{Math.round(player?.resources.adminPt ?? 0)}</strong></div>
           <div className="ia-status-row"><span>{t('科研点')}</span><strong>{Math.round(player?.resources.sciPt ?? 0)}</strong></div>
           <div className="ia-status-row"><span>{t('影响力')}</span><strong>{Math.round(player?.resources.influence ?? 0)}</strong></div>
-          <div className="ia-status-row"><span>{t('净收入')}</span><strong className={netIncome === null ? '' : netIncome >= 0 ? 'good' : 'danger'}>{netIncome === null ? '—' : `${netIncome >= 0 ? '+' : ''}${Math.round(netIncome)}/年`}</strong></div>
+          <div className="ia-status-row"><span>{t('净收入')}</span><strong className={netIncome === null ? '' : netIncome >= 0 ? 'good' : 'danger'}>{netIncome === null ? '—' : t('{{value}}/年', { value: `${netIncome >= 0 ? '+' : ''}${Math.round(netIncome)}` })}</strong></div>
         </aside>
       </header>
 
