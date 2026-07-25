@@ -551,10 +551,51 @@ body > div[style*="position:fixed"][style*="right:8px"] {
   }
 
   .ia-main-nav {
-    position: sticky !important;
-    top: 0 !important;
+    position: relative !important;
+    top: auto !important;
     min-height: 38px !important;
+    margin-bottom: 0 !important;
+    padding-right: 76px !important;
     scrollbar-width: none;
+  }
+
+  .ia-nav-shell {
+    position: sticky;
+    top: 0;
+    z-index: 55;
+    margin-bottom: 10px;
+  }
+
+  .ia-mobile-nav-trigger {
+    position: absolute;
+    right: 5px;
+    top: 5px;
+    bottom: 5px;
+    z-index: 60;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 5px;
+    min-width: 66px;
+    padding: 0 9px;
+    border: 1px solid var(--border-gold);
+    border-radius: 9px;
+    background: linear-gradient(90deg, color-mix(in srgb, var(--bg-panel) 96%, transparent), var(--bg-raised));
+    color: var(--gold);
+    box-shadow: -12px 0 18px color-mix(in srgb, var(--bg-panel) 90%, transparent);
+    font: 700 10px var(--font-body);
+    cursor: pointer;
+  }
+
+  .ia-mobile-nav-trigger::before {
+    content: '';
+    position: absolute;
+    right: 100%;
+    top: -1px;
+    bottom: -1px;
+    width: 26px;
+    pointer-events: none;
+    background: linear-gradient(90deg, transparent, var(--bg-panel));
   }
 
   .ia-main-nav::-webkit-scrollbar {

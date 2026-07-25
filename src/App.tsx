@@ -86,6 +86,7 @@ const SaveLoadScreen = lazyScreen(() => import('./screens/SaveLoadScreen'));
 const EventModal = lazyScreen(() => import('./screens/EventModal'));
 const NoviceJourneyPanel = lazyScreen(() => import('./components/NoviceJourneyPanel'));
 const NoviceJourneyCompletion = lazyScreen(() => import('./components/NoviceJourneyCompletion'));
+const MobileNavigationSheet = lazyScreen(() => import('./components/MobileNavigationSheet'));
 
 const TAB_GROUPS: { group: string; tabs: { id: Tab; label: string; key: string; icon: string }[] }[] = [
   { group: '治理', tabs: [
@@ -139,6 +140,7 @@ export default function App() {
   const [noviceJourney, setNoviceJourney] = useState<NoviceJourneyProgress>(loadNoviceJourney);
   const [noviceCollapsed, setNoviceCollapsed] = useState(false);
   const [showNoviceCompletion, setShowNoviceCompletion] = useState(false);
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const previousNoviceStatus = useRef(noviceJourney.status);
   const mainNavRef = useRef<HTMLElement>(null);
   const [theme, setTheme] = useState<'night' | 'day' | 'bamboo' | 'ink'>(() => {
@@ -165,10 +167,20 @@ export default function App() {
   const prevVictory = useRef(state.victory.type);
 
   const goToTab = useCallback((next: Tab, remember = true) => {
+    setMobileNavOpen(false);
     if (next === tab) return;
     if (remember) setTabHistory((history) => pushPageHistory(history, tab, next));
     setTab(next);
   }, [tab]);
+
+  useEffect(() => {
+    if (!mobileNavOpen) return;
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setMobileNavOpen(false);
+    };
+    window.addEventListener('keydown', closeOnEscape);
+    return () => window.removeEventListener('keydown', closeOnEscape);
+  }, [mobileNavOpen]);
 
   const goBackPage = useCallback(() => {
     const resolved = resolveBackTarget(tabHistory, tab, 'dashboard');
@@ -439,23 +451,41 @@ export default function App() {
         </aside>
       </header>
 
-      <nav ref={mainNavRef} className="ia-main-nav" aria-label={t('主导航')}>
-        {TAB_GROUPS.map((g) => (
-          <div className="ia-nav-group" key={g.group}>
-            <span className="ia-nav-label ia-up">{t(g.group)}</span>
-            <div className="ia-tab-cluster">
-              {g.tabs.map((tabInfo) => (
-                <button key={tabInfo.id} data-navigation-tab={tabInfo.id} onClick={() => goToTab(tabInfo.id)} title={t('快捷键 {{key}}', { key: tabInfo.key })} className={`ia-tab-btn ${tab === tabInfo.id ? 'is-active' : ''} ${noviceStep?.tab === tabInfo.id && noviceJourney.status === 'active' ? 'is-tutorial-target' : ''}`}>
-                  <span className="ia-tab-icon">{tabInfo.icon}</span>
-                  <span>{t(tabInfo.label)}</span>
-                  <kbd>{tabInfo.key}</kbd>
-                </button>
-              ))}
+      <div className="ia-nav-shell">
+        <nav ref={mainNavRef} className="ia-main-nav" aria-label={t('主导航')}>
+          {TAB_GROUPS.map((g) => (
+            <div className="ia-nav-group" key={g.group}>
+              <span className="ia-nav-label ia-up">{t(g.group)}</span>
+              <div className="ia-tab-cluster">
+                {g.tabs.map((tabInfo) => (
+                  <button key={tabInfo.id} data-navigation-tab={tabInfo.id} onClick={() => goToTab(tabInfo.id)} title={t('快捷键 {{key}}', { key: tabInfo.key })} className={`ia-tab-btn ${tab === tabInfo.id ? 'is-active' : ''} ${noviceStep?.tab === tabInfo.id && noviceJourney.status === 'active' ? 'is-tutorial-target' : ''}`}>
+                    <span className="ia-tab-icon">{tabInfo.icon}</span>
+                    <span>{t(tabInfo.label)}</span>
+                    <kbd>{tabInfo.key}</kbd>
+                  </button>
+                ))}
+              </div>
             </div>
-          </div>
-        ))}
-        <div className="ia-nav-hint">{t('Esc / ↩ 返回上一页 · 空格下一回合 · T 经济 · {{build}}', { build: BUILD_MARK })}</div>
-      </nav>
+          ))}
+          <div className="ia-nav-hint">{t('Esc / ↩ 返回上一页 · 空格下一回合 · T 经济 · {{build}}', { build: BUILD_MARK })}</div>
+        </nav>
+        <button
+          className="ia-mobile-nav-trigger"
+          type="button"
+          aria-expanded={mobileNavOpen}
+          aria-controls="mobile-page-navigation"
+          onClick={() => setMobileNavOpen(true)}
+        >
+          <span aria-hidden="true">☷</span>
+          <span>{t('全部页面')}</span>
+        </button>
+      </div>
+
+      {mobileNavOpen && (
+        <Suspense fallback={null}>
+          <MobileNavigationSheet groups={TAB_GROUPS} activeTab={tab} onSelect={goToTab} onClose={() => setMobileNavOpen(false)} />
+        </Suspense>
+      )}
 
       <main className="ia-content-shell ia-fade">
         <ErrorBoundary onReset={() => goToTab('dashboard', false)}>

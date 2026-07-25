@@ -162,9 +162,16 @@ export function validateData(): ValidateResult {
     if (eIds.has(e.id)) fail(acc, `事件 id 重复 ${e.id}`);
     eIds.add(e.id);
     if (e.options.length < 2) fail(acc, `事件 ${e.id} 选项 < 2`);
-    for (const opt of e.options) {
+    for (const [optionIndex, opt] of e.options.entries()) {
       if (opt.effects.relation && !NATION_BY_ID[opt.effects.relation.target as keyof typeof NATION_BY_ID]) fail(acc, `事件 ${e.id} 选项外交目标 ${opt.effects.relation.target} 不存在`);
-      if (opt.effects.factionSat) for (const fr of opt.effects.factionSat) if (!FACTIONS[fr.faction]) fail(acc, `事件 ${e.id} 派系 ${fr.faction} 不存在`);
+      if (opt.effects.factionSat) {
+        const affectedFactions = new Set<string>();
+        for (const fr of opt.effects.factionSat) {
+          if (!FACTIONS[fr.faction]) fail(acc, `事件 ${e.id} 派系 ${fr.faction} 不存在`);
+          if (affectedFactions.has(fr.faction)) fail(acc, `事件 ${e.id} 选项 ${optionIndex + 1} 重复影响派系 ${fr.faction}`);
+          affectedFactions.add(fr.faction);
+        }
+      }
     }
     if (e.trigger.relationBelow && !NATION_BY_ID[e.trigger.relationBelow.target as keyof typeof NATION_BY_ID]) fail(acc, `事件 ${e.id} 触发外交目标 ${e.trigger.relationBelow.target} 不存在`);
     if (e.trigger.factionSatBelow && !FACTIONS[e.trigger.factionSatBelow.faction]) fail(acc, `事件 ${e.id} 触发派系 ${e.trigger.factionSatBelow.faction} 不存在`);

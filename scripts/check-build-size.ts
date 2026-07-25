@@ -17,9 +17,12 @@ const budgets = {
   // Stale-chunk recovery plus complete lazy advisor/report/event copy add bounded weight;
   // entry/App caps remain fixed, so initial navigation performance cannot regress unnoticed.
   // Offline private-message recovery and direct friend-request actions add a bounded social layer.
-  totalJavaScript: 1164 * KIB,
-  // Purpose/crisis panels and the responsive event decision surface extend the measured UI baseline.
-  totalCss: 115 * KIB,
+  // The mobile page directory is lazy-loaded, keeping the App cap unchanged;
+  // its isolated 1.4 KiB chunk is covered only by this total budget.
+  totalJavaScript: 1166 * KIB,
+  // Purpose/crisis panels, event decisions and the mobile navigation sheet
+  // extend the measured UI baseline without changing entry-script limits.
+  totalCss: 117 * KIB,
   entryJavaScript: 180 * KIB,
   appJavaScript: 25 * KIB,
   accountJavaScript: 140 * KIB,

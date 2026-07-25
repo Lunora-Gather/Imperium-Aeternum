@@ -32,6 +32,8 @@
 .ia-status-row span { color: var(--text-dim); font-size: 10px; letter-spacing: 0.07em; }
 .ia-status-row strong { color: var(--text-soft); font-family: var(--font-mono); font-size: 13px; align-self: flex-end; }
 .ia-main-nav { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 12px; border-radius: 14px; padding: 8px 10px; margin-bottom: 10px; backdrop-filter: var(--panel-blur); position: sticky; top: 104px; z-index: 55; }
+.ia-nav-shell { position: relative; }
+.ia-mobile-nav-trigger { display: none; }
 .ia-nav-group { display: flex; align-items: center; gap: 7px; min-width: 0; }
 .ia-nav-label { color: var(--text-dim); font-size: 9px; padding: 0 2px; white-space: nowrap; }
 .ia-tab-cluster { display: flex; gap: 5px; flex-wrap: wrap; }
@@ -337,6 +339,21 @@
 .ia-card { box-shadow: inset 0 1px 0 rgba(201,164,78,0.045); }
 .ia-card:hover { border-color: color-mix(in srgb, var(--border-bright) 72%, var(--border)); }
 button:focus-visible, .ia-btn:focus-visible, .ia-tab-btn:focus-visible, .ia-icon-btn:focus-visible { outline: 2px solid color-mix(in srgb, var(--border-gold) 85%, transparent); outline-offset: 2px; }
+
+/* Mobile navigation directory: the horizontal rail stays fast, while every
+   screen remains discoverable without knowing that the rail can be swiped. */
+.ia-mobile-nav-backdrop { align-items: end; padding: 8px; z-index: 230; }
+.ia-mobile-nav-sheet { width: min(620px, 100%); max-height: calc(100dvh - 16px); overflow-y: auto; padding: 18px; border: 1px solid var(--border-gold); border-radius: 18px; background: linear-gradient(155deg, color-mix(in srgb, var(--bg-raised) 96%, var(--gold) 3%), var(--bg-panel)); box-shadow: 0 28px 90px rgba(0,0,0,.68); }
+.ia-mobile-nav-sheet > header { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; padding-bottom: 14px; border-bottom: 1px solid var(--border); }
+.ia-mobile-nav-sheet > header h2 { margin: 4px 0 5px; color: var(--text); font-size: 22px; }
+.ia-mobile-nav-sheet > header p { margin: 0; color: var(--text-mute); font-size: 11px; line-height: 1.55; }
+.ia-mobile-nav-groups { display: grid; gap: 15px; padding-top: 15px; }
+.ia-mobile-nav-groups > section > h3 { margin: 0 0 7px; color: var(--gold); font-size: 9px; }
+.ia-mobile-nav-groups > section > div { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 7px; }
+.ia-mobile-nav-groups button { min-width: 0; min-height: 48px; display: grid; grid-template-columns: 24px minmax(0, 1fr) auto; align-items: center; gap: 8px; padding: 9px 11px; border: 1px solid var(--border); border-radius: 11px; background: color-mix(in srgb, var(--bg-raised) 72%, transparent); color: var(--text-soft); text-align: left; cursor: pointer; }
+.ia-mobile-nav-groups button.is-active { border-color: var(--border-gold); background: color-mix(in srgb, var(--gold) 8%, var(--bg-raised)); color: var(--gold); }
+.ia-mobile-nav-groups button strong { min-width: 0; overflow-wrap: anywhere; font-size: 12px; }
+.ia-mobile-nav-groups button em { color: var(--gold); font-size: 8px; font-style: normal; letter-spacing: .05em; }
 
 /* ── Pending event decision ─────────────────────────────── */
 .ia-event-backdrop {
