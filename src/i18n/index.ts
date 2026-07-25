@@ -81,6 +81,11 @@ const en: Record<string, string> = {
 const enLaunch: Record<string, string> = {
   '暂无可继续存档': 'No playable save found',
   '推荐从“地中海黎明”开始，先建立一套稳定玩法循环。': 'Start with Mediterranean Dawn and build a stable play loop first.',
+  '存档健康': 'Saves healthy', '可以直接继续最近进度。': 'Your latest progress is ready to continue.',
+  '健康': 'Healthy', '可修复': 'Repairable', '有风险': 'At risk', '损坏': 'Damaged',
+  '建议进入后覆盖损坏槽位，保留健康/可修复档。': 'Replace damaged slots after entering and preserve healthy or repairable saves.',
+  '可以继续游戏；读取时会迁移、净化并写回。': 'You can continue; the save will be migrated, repaired, and written back when loaded.',
+  '继续后先看总览行动中心和下一回合前检查。': 'After continuing, review the Overview Action Center and pre-turn check.',
   '可读 {{playable}}/{{total}}': 'Playable {{playable}}/{{total}}',
   '可修复 {{count}}': '{{count}} repairable',
   '损坏 {{count}}': '{{count}} damaged',
@@ -305,6 +310,9 @@ const registeredEnPatterns: Array<{ pattern: RegExp; replacement: EnglishReplace
     pattern: /^已选剧本：(.+)，请选择你的邦国$/,
     replacement: (_all, scenario) => `Campaign selected: ${en[scenario] ?? enLaunch[scenario] ?? scenario}. Choose your nation.`,
   },
+  { pattern: /^(\d+) 个槽位损坏$/, replacement: (_all, count) => `${count} damaged ${count === '1' ? 'slot' : 'slots'}` },
+  { pattern: /^(\d+) 个存档可自动修复$/, replacement: (_all, count) => `${count} ${count === '1' ? 'save can' : 'saves can'} be repaired automatically` },
+  { pattern: /^(\d+) 个存档可读但有风险$/, replacement: (_all, count) => `${count} playable ${count === '1' ? 'save has' : 'saves have'} risks` },
 ];
 
 function detectLocale(): Locale {

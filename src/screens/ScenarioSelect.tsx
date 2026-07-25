@@ -201,7 +201,7 @@ function ContinuePanel({ summary, onContinue, onStartRecommended, onRefresh }: {
         {summary.repairable > 0 && <Tag text={t('可修复 {{count}}', { count: summary.repairable })} tone="warn" />}
         {summary.broken > 0 && <Tag text={t('损坏 {{count}}', { count: summary.broken })} tone="danger" />}
       </div>
-      <strong>{best ? t('推荐继续：槽位 {{slot}} · {{nation}} · 第 {{year}} 年', { slot: best.slot, nation: best.nationName ?? t('未知国家'), year: (best.turn ?? 0) + 1 }) : t(summary.headline)}</strong>
+      <strong>{best ? t('推荐继续：槽位 {{slot}} · {{nation}} · 第 {{year}} 年', { slot: best.slot, nation: t(best.nationName ?? '未知国家'), year: (best.turn ?? 0) + 1 }) : t(summary.headline)}</strong>
       <p>{best ? t('{{label}} · 体检 {{score}}/100{{repairs}}', { label: t(best.label), score: best.score ?? 0, repairs: best.repairs.length ? t(' · 将自动：{{items}}', { items: best.repairs.slice(0, 2).map((item) => t(item)).join(t('、')) }) : '' }) : t(summary.advice)}</p>
     </div>
     <div className="ia-continue-actions">
