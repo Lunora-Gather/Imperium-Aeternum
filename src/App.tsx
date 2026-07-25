@@ -6,7 +6,12 @@ import { playSfx, useSfxMute } from './utils/audio';
 import { BUILD_MARK } from './buildInfo';
 import { getOnboardingStep, nextOnboardingIndex, onboardingProgress, prevOnboardingIndex } from './gameplay/onboarding';
 import { pushPageHistory, resetPageHistory, resolveBackTarget } from './gameplay/pageHistory';
-import { isNavigationTab, type NavigationTab } from './gameplay/navigationTabs';
+import {
+  centeredTabScrollLeft,
+  isNavigationTab,
+  shouldBlockGlobalShortcut,
+  type NavigationTab,
+} from './gameplay/navigationTabs';
 import {
   completeNoviceJourneyStep,
   createNoviceJourney,
@@ -99,6 +104,7 @@ export default function App() {
   const [noviceCollapsed, setNoviceCollapsed] = useState(false);
   const [showNoviceCompletion, setShowNoviceCompletion] = useState(false);
   const previousNoviceStatus = useRef(noviceJourney.status);
+  const mainNavRef = useRef<HTMLElement>(null);
   const [theme, setTheme] = useState<'night' | 'day' | 'bamboo' | 'ink'>(() => {
     try {
       const saved = localStorage.getItem('ia-theme');
@@ -247,15 +253,21 @@ export default function App() {
 
   const onKey = useCallback((e: KeyboardEvent) => {
     if (scene !== 'playing') return;
-    const t = e.target as HTMLElement;
-    if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return;
-
-    if (e.key === 'Escape') {
-      if (showHelp) {
+    if (showHelp) {
+      if (e.key === 'Escape') {
         e.preventDefault();
         setShowHelp(false);
-        return;
       }
+      return;
+    }
+    const target = e.target as HTMLElement | null;
+    if (shouldBlockGlobalShortcut({
+      hasOpenDialog: document.querySelector('[role="dialog"][aria-modal="true"]') !== null,
+      targetTagName: target?.tagName,
+      targetIsContentEditable: target?.isContentEditable,
+    })) return;
+
+    if (e.key === 'Escape') {
       e.preventDefault();
       goBackPage();
       return;
@@ -285,6 +297,24 @@ export default function App() {
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, [onKey]);
+
+  useEffect(() => {
+    const nav = mainNavRef.current;
+    const active = nav?.querySelector<HTMLElement>(`[data-navigation-tab="${tab}"]`);
+    if (!nav || !active || nav.scrollWidth <= nav.clientWidth) return;
+    const navRect = nav.getBoundingClientRect();
+    const activeRect = active.getBoundingClientRect();
+    nav.scrollTo({
+      left: centeredTabScrollLeft({
+        currentScrollLeft: nav.scrollLeft,
+        activeOffsetLeft: activeRect.left - navRect.left,
+        activeWidth: activeRect.width,
+        containerWidth: nav.clientWidth,
+        maxScrollLeft: nav.scrollWidth - nav.clientWidth,
+      }),
+      behavior: 'smooth',
+    });
+  }, [tab]);
 
   if (scene === 'menu') return <Suspense fallback={<ScreenFallback />}><ScenarioSelect /></Suspense>;
   if (!player) {
@@ -328,7 +358,7 @@ export default function App() {
         <section className="ia-ruler-card">
           <div className="ia-ruler-kicker ia-up">Imperium Aeternum</div>
           <div className="ia-ruler-main">
-            <div>
+            <div className="ia-ruler-identity">
               <h1 className="ia-ruler-title">{player?.name ? t(player.name) : t('未名之国')}</h1>
               <div className="ia-ruler-subline">
                 <span>Anno · {state.turn + 1}</span>
@@ -373,13 +403,13 @@ export default function App() {
         </aside>
       </header>
 
-      <nav className="ia-main-nav" aria-label={t('主导航')}>
+      <nav ref={mainNavRef} className="ia-main-nav" aria-label={t('主导航')}>
         {TAB_GROUPS.map((g) => (
           <div className="ia-nav-group" key={g.group}>
             <span className="ia-nav-label ia-up">{t(g.group)}</span>
             <div className="ia-tab-cluster">
               {g.tabs.map((tabInfo) => (
-                <button key={tabInfo.id} onClick={() => goToTab(tabInfo.id)} title={t('快捷键 {{key}}', { key: tabInfo.key })} className={`ia-tab-btn ${tab === tabInfo.id ? 'is-active' : ''} ${noviceStep?.tab === tabInfo.id && noviceJourney.status === 'active' ? 'is-tutorial-target' : ''}`}>
+                <button key={tabInfo.id} data-navigation-tab={tabInfo.id} onClick={() => goToTab(tabInfo.id)} title={t('快捷键 {{key}}', { key: tabInfo.key })} className={`ia-tab-btn ${tab === tabInfo.id ? 'is-active' : ''} ${noviceStep?.tab === tabInfo.id && noviceJourney.status === 'active' ? 'is-tutorial-target' : ''}`}>
                   <span className="ia-tab-icon">{tabInfo.icon}</span>
                   <span>{t(tabInfo.label)}</span>
                   <kbd>{tabInfo.key}</kbd>
