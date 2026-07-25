@@ -1,5 +1,5 @@
 // src/types/game.ts
-var SAVE_VERSION = 6;
+var SAVE_VERSION = 7;
 
 // src/data/nations.ts
 var NATIONS = [
@@ -2352,15 +2352,21 @@ function createWorldState(seed, playerNationId, regionFilter) {
   buildRelationMap(state);
   return state;
 }
+var relationMapCache = /* @__PURE__ */ new WeakMap();
 function buildRelationMap(state) {
-  if (!state._relMap) {
-    state._relMap = /* @__PURE__ */ new Map();
-    for (const r of state.relations) state._relMap.set(`${r.from}|${r.to}`, r);
-  }
+  if (state._relMap) return;
+  const map = /* @__PURE__ */ new Map();
+  for (const relation of state.relations) map.set(`${relation.from}|${relation.to}`, relation);
+  relationMapCache.set(state, map);
+  if (Object.isExtensible(state)) state._relMap = map;
 }
 function getRelationObj(from, to, state) {
-  if (!state._relMap) buildRelationMap(state);
-  return state._relMap.get(`${from}|${to}`);
+  let map = state._relMap ?? relationMapCache.get(state);
+  if (!map) {
+    buildRelationMap(state);
+    map = state._relMap ?? relationMapCache.get(state);
+  }
+  return map?.get(`${from}|${to}`);
 }
 function provincesOf(nationId, provinces) {
   return Object.values(provinces).filter((p) => p.ownerId === nationId);
@@ -7798,8 +7804,9 @@ function buildReport(nation, provs, state, prev, econ, pol, pop, cr, events, wor
     exhaustSnapshot: Math.round(nation.warExhaustion),
     worldEvents: worldEvents.slice(-10),
     // A4: 上限 10 条防溢出
-    provinceChanges: []
+    provinceChanges: [],
     // B2: 在 buildReport 外计算（需对比 prev/next 省份归属）
+    strategicNotes: []
   };
 }
 function processTurn(state, options = {}) {
@@ -9216,6 +9223,34 @@ function researchAction(state, techId) {
   });
 }
 
+// src/gameplay/diplomaticMemory.ts
+function recordDiplomaticIncident(state, observerId, actorId, kind, impact, summary) {
+  state.aiMemory = state.aiMemory ?? {};
+  const memory = state.aiMemory[observerId] ?? {
+    rivalScore: 0,
+    partnerScore: 0,
+    watchScore: 0,
+    lastUpdated: state.turn
+  };
+  const incident = {
+    actorId,
+    kind,
+    impact: Math.max(-30, Math.min(30, Math.round(impact))),
+    turn: state.turn,
+    summary
+  };
+  memory.incidents = [...(memory.incidents ?? []).filter((entry) => state.turn - entry.turn <= 30), incident].slice(-8);
+  memory.lastUpdated = state.turn;
+  if (impact < 0) {
+    memory.rivalId = actorId;
+    memory.rivalScore = Math.min(100, Math.max(memory.rivalScore, Math.abs(impact) * 2.5));
+  } else {
+    memory.partnerId = actorId;
+    memory.partnerScore = Math.min(100, Math.max(memory.partnerScore, impact * 2.5));
+  }
+  state.aiMemory[observerId] = memory;
+}
+
 // src/gameplay/actions/diplomacyActions.ts
 function peacefulPair(state, playerId, targetId) {
   const pair = relationPair2(state, playerId, targetId);
@@ -9235,6 +9270,7 @@ function improveRelationAction(state, targetId) {
       relation.relation = clamp5(relation.relation + 5, -100, 100);
       relation.trust = clamp5(relation.trust + 4, 0, 100);
     }
+    recordDiplomaticIncident(working, target.id, player.id, "envoy", 7, "\u6D3E\u9063\u4F7F\u8282\u5E76\u5151\u73B0\u4E86\u6539\u5584\u5173\u7CFB\u7684\u627F\u8BFA");
     return success(`\u6539\u5584\u4E86\u4E0E ${target.name} \u7684\u5173\u7CFB`);
   });
 }
@@ -9253,6 +9289,7 @@ function formTradeAction(state, targetId) {
       relation.treaty = "trade";
       relation.tradeDep = Math.max(relation.tradeDep, 20);
     }
+    recordDiplomaticIncident(working, target.id, player.id, "trade", 12, "\u5EFA\u7ACB\u4E86\u4E92\u5229\u8D38\u6613\u5173\u7CFB");
     return success(`\u4E0E ${target.name} \u5EFA\u7ACB\u8D38\u6613`);
   });
 }
@@ -9266,6 +9303,7 @@ function formAllianceAction(state, targetId) {
     if (apFailure) return apFailure;
     player.resources.influence -= 50;
     for (const relation of pair) relation.treaty = "alliance";
+    recordDiplomaticIncident(working, target.id, player.id, "alliance", 20, "\u7B7E\u8BA2\u4E86\u6B63\u5F0F\u540C\u76DF");
     return success(`\u4E0E ${target.name} \u7ED3\u76DF`);
   });
 }
@@ -9289,6 +9327,7 @@ function espionageAction(state, targetId, kind) {
     }
     if (kind === "spy_military") messages.push(`${target.name} \u519B\u529B\u7EA6 ${target.army.reduce((total, army) => total + army.size, 0)}`);
     for (const relation of pair) relation.trust = clamp5(relation.trust - 5, 0, 100);
+    recordDiplomaticIncident(working, target.id, player.id, "espionage", -18, "\u9488\u5BF9\u672C\u56FD\u5B9E\u65BD\u4E86\u79D8\u5BC6\u884C\u52A8");
     messages.push("\u95F4\u8C0D\u884C\u52A8\u5B8C\u6210");
     return success(...messages);
   });
@@ -9307,6 +9346,7 @@ function dynasticMarriageAction(state, targetId) {
       relation.relation = clamp5(relation.relation + 15, -100, 100);
       relation.trust = clamp5(relation.trust + 10, 0, 100);
     }
+    recordDiplomaticIncident(working, target.id, player.id, "marriage", 18, "\u901A\u8FC7\u738B\u5BA4\u8054\u59FB\u5EFA\u7ACB\u4E86\u957F\u671F\u7EBD\u5E26");
     return success(`\u4E0E ${target.name} \u8054\u59FB\u6210\u529F`);
   });
 }
@@ -9322,6 +9362,7 @@ function culturalExportAction(state, targetId) {
     player.resources.sciPt -= 30;
     player.resources.influence += 5;
     for (const relation of pair) relation.relation = clamp5(relation.relation + 8, -100, 100);
+    recordDiplomaticIncident(working, target.id, player.id, "culture", 8, "\u63A8\u52A8\u4E86\u53D7\u5230\u6B22\u8FCE\u7684\u6587\u5316\u4EA4\u6D41");
     return success(`\u5BF9 ${target.name} \u7684\u6587\u5316\u8F93\u51FA\u5B8C\u6210`);
   });
 }
@@ -9358,6 +9399,7 @@ function declareWarAction(state, targetId, provinceId) {
     if (apFailure) return apFailure;
     const war = declareWar(working, player.id, target.id, targetProvince.id);
     if (!war) return failure("\u5BA3\u6218\u5931\u8D25");
+    recordDiplomaticIncident(working, target.id, player.id, "war", -30, `\u5411 ${targetProvince.name} \u53D1\u52A8\u4E86\u6218\u4E89`);
     return success(`\u5411 ${target.name} \u5BA3\u6218`);
   });
 }
@@ -9379,6 +9421,7 @@ function makePeaceAction(state, warId) {
         relation.relation = Math.min(relation.relation, -35);
       }
     }
+    recordDiplomaticIncident(working, otherId, player.id, "peace", 5, "\u63A5\u53D7\u8BAE\u548C\u5E76\u8FDB\u5165\u505C\u6218\u671F");
     return success(`\u4E0E ${working.nations[otherId]?.name ?? otherId} \u8BAE\u548C\u5B8C\u6210`);
   });
 }
@@ -9553,6 +9596,8 @@ function conveneDiplomaticSummitAction(state, targetId, agenda, stance) {
     if (!preview.eligible) return failure(`\u65E0\u6CD5\u4E3E\u884C\u5143\u9996\u4F1A\u8C08\uFF1A${preview.reasons[0] ?? "\u6761\u4EF6\u4E0D\u8DB3"}`);
     const resolution = calculateDiplomaticSummitResolution(working, player.id, targetId, agenda, stance);
     const record = applyDiplomaticSummitResolution(working, resolution);
+    const summitImpact = record.outcome === "breakthrough" ? 16 : record.outcome === "agreement" ? 10 : record.outcome === "breakdown" ? -12 : record.outcome === "rejected" ? -6 : 2;
+    recordDiplomaticIncident(working, targetId, player.id, "summit", summitImpact, record.summary);
     const commitmentText = record.commitments.length > 0 ? `\u627F\u8BFA\uFF1A${record.commitments.join("\uFF1B")}` : `${SUMMIT_AGENDAS[agenda].label}\u672A\u5F62\u6210\u957F\u671F\u534F\u8BAE`;
     return success(record.summary, commitmentText);
   });

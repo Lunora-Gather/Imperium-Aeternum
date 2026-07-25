@@ -251,6 +251,8 @@ export interface TurnReport {
   worldEvents: string[];
   // B2: 省份归属变化——本回合玩家获得/失去的省份
   provinceChanges: { id: string; name: string; from: string; to: string }[];
+  // 国家使命、危机升级/化解等跨系统反馈。
+  strategicNotes?: string[];
 }
 
 // ── 国家运行时状态 ──
@@ -334,7 +336,41 @@ export interface AIMemoryEntry {
   watchId?: string;
   watchScore: number;
   territory?: AITerritoryMemory;
+  incidents?: DiplomaticMemoryIncident[];
   lastUpdated: number;
+}
+
+export interface DiplomaticMemoryIncident {
+  actorId: string;
+  kind: 'envoy' | 'trade' | 'alliance' | 'marriage' | 'culture' | 'summit' | 'espionage' | 'war' | 'peace';
+  impact: number;
+  turn: number;
+  summary: string;
+}
+
+export type NationalMissionId = 'statecraft' | 'prosperity' | 'imperial' | 'enlightenment' | 'concord';
+
+export interface NationalMissionMeta {
+  id: NationalMissionId;
+  startedTurn: number;
+  startProvinces: number;
+  startGold: number;
+  startTech: number;
+  startArmy: number;
+  completedStages: string[];
+  lastEvaluatedTurn?: number;
+}
+
+export type NationalCrisisKind = 'fiscal' | 'legitimacy' | 'unrest' | 'war';
+
+export interface NationalCrisisState {
+  kind: NationalCrisisKind;
+  pressure: number;
+  stage: 1 | 2 | 3;
+  startedTurn: number;
+  lastUpdatedTurn: number;
+  recoveryTurns: number;
+  resolvedCount: number;
 }
 
 export interface AmbitionMeta {
@@ -379,6 +415,8 @@ export interface GameState {
   aiStrategyMeta?: Record<string, AIStrategyEntry>;
   aiMemory?: Record<string, AIMemoryEntry>;
   ambitionMeta?: PersistedAmbitionMeta;
+  nationalMission?: NationalMissionMeta;
+  nationalCrisis?: NationalCrisisState;
 }
 
 // ── 存档 ──
@@ -389,4 +427,4 @@ export interface SaveGame {
 }
 
 // v6：加入可持久化的元首会谈记录与双边协议。
-export const SAVE_VERSION = 6;
+export const SAVE_VERSION = 7;

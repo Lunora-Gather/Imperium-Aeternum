@@ -11,6 +11,7 @@ Hugging Face 推理的服务端密钥、使用边界和降级策略见 [`AI-INFE
 GameStore.nextTurn
   → advanceTurnPipeline
     → processTurn（自身隔离输入）
+    → applyNationalPurposeAfterTurn（使命奖励 / 危机升级与化解）
     → applyAmbitionsAfterTurn
     → applyPlayerFocus / applyAIStrategy
     → sanitizeState
@@ -32,6 +33,8 @@ GameStore.nextTurn
 | `src/engine/turnIsolation.ts` | 旧调用方兼容入口；不得承载额外规则 |
 | `src/utils/id.ts` | 存档内确定性实体 ID 分配与序列解析 |
 | `src/gameplay/turnPipeline.ts` | 唯一完整回合编排入口 |
+| `src/gameplay/nationalPurpose.ts` | 国家使命分流、阶段奖励、危机预警/升级/化解 |
+| `src/gameplay/diplomaticMemory.ts` | 外交事件记忆、衰减与玩家可读解释 |
 | `src/gameplay/actions/` | 玩家命令事务服务；失败零副作用，成功结构共享 |
 | `src/gameplay/stateHygiene.ts` | 对旧档和运行时状态做可恢复净化 |
 | `src/gameplay/stateInvariants.ts` | 只读审计，不静默修复 |

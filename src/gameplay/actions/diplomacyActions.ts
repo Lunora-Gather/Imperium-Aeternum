@@ -1,4 +1,5 @@
 import type { GameState } from '../../types/game';
+import { recordDiplomaticIncident } from '../diplomaticMemory';
 import { clamp, failure, relationPair, runGameAction, spendAdmin, success, validForeignTarget } from './actionCore';
 
 export type SpyKind = 'steal_tech' | 'foment_rebellion' | 'spy_military';
@@ -21,6 +22,7 @@ export function improveRelationAction(state: GameState, targetId: string) {
       relation.relation = clamp(relation.relation + 5, -100, 100);
       relation.trust = clamp(relation.trust + 4, 0, 100);
     }
+    recordDiplomaticIncident(working, target.id, player.id, 'envoy', 7, '派遣使节并兑现了改善关系的承诺');
     return success(`改善了与 ${target.name} 的关系`);
   });
 }
@@ -40,6 +42,7 @@ export function formTradeAction(state: GameState, targetId: string) {
       relation.treaty = 'trade';
       relation.tradeDep = Math.max(relation.tradeDep, 20);
     }
+    recordDiplomaticIncident(working, target.id, player.id, 'trade', 12, '建立了互利贸易关系');
     return success(`与 ${target.name} 建立贸易`);
   });
 }
@@ -54,6 +57,7 @@ export function formAllianceAction(state: GameState, targetId: string) {
     if (apFailure) return apFailure;
     player.resources.influence -= 50;
     for (const relation of pair) relation.treaty = 'alliance';
+    recordDiplomaticIncident(working, target.id, player.id, 'alliance', 20, '签订了正式同盟');
     return success(`与 ${target.name} 结盟`);
   });
 }
@@ -78,6 +82,7 @@ export function espionageAction(state: GameState, targetId: string, kind: SpyKin
     }
     if (kind === 'spy_military') messages.push(`${target.name} 军力约 ${target.army.reduce((total, army) => total + army.size, 0)}`);
     for (const relation of pair) relation.trust = clamp(relation.trust - 5, 0, 100);
+    recordDiplomaticIncident(working, target.id, player.id, 'espionage', -18, '针对本国实施了秘密行动');
     messages.push('间谍行动完成');
     return success(...messages);
   });
@@ -97,6 +102,7 @@ export function dynasticMarriageAction(state: GameState, targetId: string) {
       relation.relation = clamp(relation.relation + 15, -100, 100);
       relation.trust = clamp(relation.trust + 10, 0, 100);
     }
+    recordDiplomaticIncident(working, target.id, player.id, 'marriage', 18, '通过王室联姻建立了长期纽带');
     return success(`与 ${target.name} 联姻成功`);
   });
 }
@@ -113,6 +119,7 @@ export function culturalExportAction(state: GameState, targetId: string) {
     player.resources.sciPt -= 30;
     player.resources.influence += 5;
     for (const relation of pair) relation.relation = clamp(relation.relation + 8, -100, 100);
+    recordDiplomaticIncident(working, target.id, player.id, 'culture', 8, '推动了受到欢迎的文化交流');
     return success(`对 ${target.name} 的文化输出完成`);
   });
 }

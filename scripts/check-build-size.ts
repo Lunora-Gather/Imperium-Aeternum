@@ -10,9 +10,10 @@ const budgets = {
   // the 64 KiB allowance is raw (about 12 KiB gzip) and does not relax entry/App limits.
   // The authenticated HF summit secretary adds 8 KiB of lazy diplomacy code;
   // player discovery/cards add bounded lazy social code while entry/App caps stay unchanged.
-  totalJavaScript: 1122 * KIB,
-  // World-scoped discovery and the cross-theme identity-card redesign establish the measured social UI baseline.
-  totalCss: 105 * KIB,
+  // National missions, crisis chains and diplomatic memory add deterministic gameplay and lazy presentation.
+  totalJavaScript: 1146 * KIB,
+  // Purpose/crisis panels extend the measured cross-theme gameplay UI baseline.
+  totalCss: 109 * KIB,
   entryJavaScript: 180 * KIB,
   appJavaScript: 25 * KIB,
   accountJavaScript: 140 * KIB,

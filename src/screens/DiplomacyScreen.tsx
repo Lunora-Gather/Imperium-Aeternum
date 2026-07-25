@@ -10,6 +10,7 @@ import type { DiplomaticRelation, Nation } from '../types/game';
 import { getAIStrategyInfo } from '../gameplay/strategyFocus';
 import { buildDiplomaticIntelBrief, buildDiplomaticIntelBoard, buildNationStyleProfile, type DiplomaticIntelBrief, type NationStyleProfile } from '../gameplay/nationIntel';
 import { SummitPanel } from './diplomacy/SummitPanel';
+import { getDiplomaticMemoryBrief, type DiplomaticMemoryBrief } from '../gameplay/diplomaticMemory';
 
 const TREATY_TONE: Record<string, 'danger' | 'warn' | 'info' | 'good'> = { war: 'danger', truce: 'warn', none: 'info', trade: 'good', alliance: 'good' };
 const TREATY_LABEL: Record<string, string> = { none: '无', trade: '贸易', alliance: '同盟', war: '战争', truce: '停战' };
@@ -21,6 +22,7 @@ type Row = {
   ai: ReturnType<typeof getAIStrategyInfo>;
   style: NationStyleProfile;
   intel: DiplomaticIntelBrief;
+  memory: DiplomaticMemoryBrief;
 };
 
 type Tone = 'danger' | 'warn' | 'info' | 'good' | 'gold';
@@ -82,6 +84,7 @@ export default function DiplomacyScreen() {
       ai: getAIStrategyInfo(state, n.id),
       style: buildNationStyleProfile(state, n.id),
       intel: buildDiplomaticIntelBrief(state, n.id),
+      memory: getDiplomaticMemoryBrief(state, n.id, pid),
     }))
     .filter((x): x is Row => !!x.rel);
 
@@ -121,7 +124,7 @@ export default function DiplomacyScreen() {
       {view === 'graph' && <div className="ia-fade-in"><p className="dim" style={{ fontSize: 11, marginBottom: 8, textAlign: 'center' }}>玩家居中，邻国按关系值环形布局。金=同盟 · 绿=贸易 · 红=战争 · 灰=中立。</p><DiplomacyGraph onNodeClick={pick} nodes={graphNodes} />{graphSorted.length > 8 && <div style={{ textAlign: 'center', marginTop: 6 }}><button className="ia-btn ia-btn--ghost" onClick={() => setGraphExpanded((x) => !x)} style={{ fontSize: 11 }}>{graphExpanded ? '收起（仅显前 8）' : `展开全部（${graphSorted.length}）`}</button></div>}</div>}
     </Panel>
 
-    {view === 'list' && <Panel title="各国关系"><div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(340px, 1fr))', gap: 10 }}>{sortedRows.map(({ n, rel, ai, style, intel }) => {
+    {view === 'list' && <Panel title="各国关系"><div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(340px, 1fr))', gap: 10 }}>{sortedRows.map(({ n, rel, ai, style, intel, memory }) => {
       const relTone = rel.relation < -30 ? 'danger' : rel.relation < 30 ? 'warn' : 'good';
       const targetText = ai?.targetName ? ` → ${ai.targetName}` : '';
       return <div key={n.id} id={`diplo-${n.id}`} className="ia-card" style={{ padding: 12, border: focusNation === n.id ? '2px solid var(--gold)' : rel.treaty === 'war' ? '1px solid var(--war)' : undefined, transition: 'border 0.3s' }}>
@@ -129,6 +132,7 @@ export default function DiplomacyScreen() {
         <div style={{ padding: 8, marginBottom: 8, background: 'var(--bg-inset)', borderRadius: 6, border: `1px solid ${toneBorder(intel.tone)}` }}><div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, marginBottom: 4 }}><strong style={{ fontSize: 12 }}>{intel.headline}</strong><Tag text={`风险 ${intel.riskScore} / 机会 ${intel.opportunityScore}`} tone={intel.tone} /></div><div style={{ fontSize: 11, color: 'var(--text-dim)', lineHeight: 1.5 }}>{intel.explanation}</div><div style={{ fontSize: 11, color: 'var(--text-mute)', lineHeight: 1.5, marginTop: 4 }}>应对：{intel.action}</div><div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginTop: 6 }}>{intel.evidence.map((e) => <Tag key={e.text} text={e.text} tone={e.tone} />)}</div></div>
         <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginBottom: 6 }}>{style.tags.map((t) => <Tag key={t.text} text={t.text} tone={t.tone} />)}</div>
         <div style={{ fontSize: 11, color: 'var(--text-dim)', lineHeight: 1.45, marginBottom: 6 }}>{style.summary}</div>
+        <div className={`ia-diplomatic-memory tone-${memory.attitude}`}><div><strong>{memory.label}</strong><span>{memory.score > 0 ? '+' : ''}{memory.score}</span></div><p>{memory.summary}</p>{memory.recent.length > 0 && <em>最近记忆：{memory.recent.slice(-2).map((incident) => `第${incident.turn}年 ${incident.summary}`).join('；')}</em>}</div>
         {ai && <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginBottom: 6 }}><Tag text={`意图 ${ai.label} ${ai.intensity}/6`} tone={intentTone(ai.kind)} />{ai.rivalName && <Tag text={`宿敌 ${ai.rivalName} ${Math.round(ai.rivalScore ?? 0)}`} tone={memoryLevel(ai.rivalScore)} />}{ai.partnerName && <Tag text={`亲近 ${ai.partnerName} ${Math.round(ai.partnerScore ?? 0)}`} tone="good" />}{ai.watchName && <Tag text={`关注 ${ai.watchName} ${Math.round(ai.watchScore ?? 0)}`} tone="warn" />}{ai.coreProvinceName && <Tag text={`核心 ${ai.coreProvinceName}`} tone="info" />}{ai.desiredProvinceName && <Tag text={`觊觎 ${ai.desiredProvinceName} ${Math.round(ai.territorialPressure ?? 0)}`} tone="danger" />}{ai.revengeProvinceName && <Tag text={`复仇 ${ai.revengeProvinceName}`} tone="warn" />}</div>}
         <RelBar label="关系" value={rel.relation} tone={relTone} />
         <RelBar label="信任" value={rel.trust} tone={rel.trust > 50 ? 'good' : rel.trust > 20 ? 'warn' : 'danger'} />

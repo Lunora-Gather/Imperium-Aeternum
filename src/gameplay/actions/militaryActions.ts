@@ -6,6 +6,7 @@ import {
 } from '../../engine/military';
 import type { GameState } from '../../types/game';
 import { hasActiveNonAggressionAccord } from '../../engine/summits';
+import { recordDiplomaticIncident } from '../diplomaticMemory';
 import { failure, relationPair, runGameAction, spendAdmin, success, validForeignTarget } from './actionCore';
 
 export function recruitAction(state: GameState, provinceId: string, count: number) {
@@ -42,6 +43,7 @@ export function declareWarAction(state: GameState, targetId: string, provinceId:
     if (apFailure) return apFailure;
     const war = engineDeclareWar(working, player.id, target.id, targetProvince.id);
     if (!war) return failure('宣战失败');
+    recordDiplomaticIncident(working, target.id, player.id, 'war', -30, `向 ${targetProvince.name} 发动了战争`);
     return success(`向 ${target.name} 宣战`);
   });
 }
@@ -64,6 +66,7 @@ export function makePeaceAction(state: GameState, warId: string) {
         relation.relation = Math.min(relation.relation, -35);
       }
     }
+    recordDiplomaticIncident(working, otherId, player.id, 'peace', 5, '接受议和并进入停战期');
     return success(`与 ${working.nations[otherId]?.name ?? otherId} 议和完成`);
   });
 }

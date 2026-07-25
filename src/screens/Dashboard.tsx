@@ -5,6 +5,7 @@ import { useSharedWorldSessionStore } from '../store/sharedWorldSessionStore';
 import { provincesOf } from '../engine/init';
 import { Panel, Btn, Tag } from '../components/ui';
 import DashboardStrategicHq from '../components/DashboardStrategicHq';
+import NationalPurposePanel from '../components/NationalPurposePanel';
 import type { TurnReport } from '../types/game';
 import type { StrategyFocusId } from '../gameplay/strategyFocus';
 import { buildReadinessReport, type ReadinessReport, type ReadinessItem } from '../gameplay/readiness';
@@ -16,6 +17,7 @@ import { buildTurnPreview, type TurnPreview } from '../gameplay/turnPreview';
 import { buildPreTurnCouncil, type PreTurnCouncil } from '../gameplay/preTurnCouncil';
 import { buildChronicleDigest, type ChronicleDigest, type ChronicleHighlight } from '../gameplay/chronicleDigest';
 import { buildVictoryRouteFocus, type VictoryRouteFocus } from '../gameplay/victoryRoutes';
+import { getNationalCrisisView, getNationalMissionView } from '../gameplay/nationalPurpose';
 import { createScopedTranslator, localizeDeep } from '../i18n/scoped';
 import { dashboardCatalog } from '../i18n/catalogs/dashboard';
 
@@ -157,6 +159,8 @@ export default function Dashboard() {
   const council = localizeDeep(councilRaw, t);
   const chronicle = localizeDeep(useMemo(() => buildChronicleDigest(state), [state]), t);
   const victoryFocus = localizeDeep(useMemo(() => buildVictoryRouteFocus(state), [state]), t);
+  const mission = useMemo(() => getNationalMissionView(state), [state]);
+  const crisis = useMemo(() => getNationalCrisisView(state), [state]);
 
   const lastNet = state.lastReport ? state.lastReport.income.tax + state.lastReport.income.trade + state.lastReport.income.building - state.lastReport.expense.military - state.lastReport.expense.corruption : 0;
   const unrest = provs.filter((p) => p.rebellionRisk > 70 || p.unrest > 50);
@@ -196,6 +200,8 @@ export default function Dashboard() {
           <Tag text={t(`体检 ${readiness.score}/100`)} tone={tagTone(readiness.tone)} />
           <Tag text={t(turnPreview.canAdvance ? '本年可推进' : '先处理风险')} tone={turnPreview.canAdvance ? 'good' : 'danger'} />
           <Tag text={`${t(victoryFocus.primary.label)} ${victoryFocus.primary.progress}%`} tone={tagTone(victoryFocus.tone)} />
+          {!sharedSession && <Tag text={`${t(mission.title)} ${mission.current.progress}%`} tone={mission.completed === 3 ? 'gold' : 'info'} />}
+          {!sharedSession && crisis && <Tag text={`${t(crisis.title)} · ${crisis.stage}阶`} tone={crisis.stage >= 3 ? 'danger' : 'warn'} />}
         </div>
       </div>
       <div className="ia-dash-command-actions">
@@ -225,6 +231,7 @@ export default function Dashboard() {
         <RiskPanel risks={risks} />
       </aside>
       <main className="ia-dash-main">
+        {!sharedSession && <NationalPurposePanel state={state} />}
         <DashboardStrategicHq state={state} commandActions={commandActions} jumpToTab={jumpToTab} />
         <RoadmapPanel roadmap={roadmap} jumpToTab={jumpToTab} />
         <ReadinessPanel report={readiness} jumpToTab={jumpToTab} />

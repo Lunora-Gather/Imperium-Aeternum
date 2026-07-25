@@ -6,6 +6,7 @@ import {
   SUMMIT_AGENDAS,
 } from '../../engine/summits';
 import { failure, runGameAction, success } from './actionCore';
+import { recordDiplomaticIncident } from '../diplomaticMemory';
 
 const VALID_AGENDAS = new Set<SummitAgenda>(['trade', 'security', 'normalization', 'technology']);
 const VALID_STANCES = new Set<SummitStance>(['conciliatory', 'pragmatic', 'firm']);
@@ -23,6 +24,12 @@ export function conveneDiplomaticSummitAction(
 
     const resolution = calculateDiplomaticSummitResolution(working, player.id, targetId, agenda, stance);
     const record = applyDiplomaticSummitResolution(working, resolution);
+    const summitImpact = record.outcome === 'breakthrough' ? 16
+      : record.outcome === 'agreement' ? 10
+        : record.outcome === 'breakdown' ? -12
+          : record.outcome === 'rejected' ? -6
+            : 2;
+    recordDiplomaticIncident(working, targetId, player.id, 'summit', summitImpact, record.summary);
     const commitmentText = record.commitments.length > 0
       ? `承诺：${record.commitments.join('；')}`
       : `${SUMMIT_AGENDAS[agenda].label}未形成长期协议`;

@@ -507,3 +507,17 @@ button:focus-visible, .ia-btn:focus-visible, .ia-tab-btn:focus-visible, .ia-icon
 @media (max-width: 1040px) { .ia-topbar { grid-template-columns: 1fr; position: relative; } .ia-status-panel { grid-template-columns: repeat(4, minmax(0, 1fr)); } .ia-main-nav { top: 0; } }
 @media (max-width: 760px) { .ia-shell { width: 100%; padding: 10px 10px 28px; } .ia-ruler-card, .ia-status-panel, .ia-main-nav, .ia-content-shell { border-radius: 13px; } .ia-ruler-main { flex-direction: column; } .ia-ruler-title { font-size: 28px; } .ia-header-actions { align-self: stretch; } .ia-status-panel { grid-template-columns: repeat(2, minmax(0, 1fr)); } .ia-main-nav { align-items: flex-start; overflow-x: auto; flex-wrap: nowrap; padding-bottom: 12px; } .ia-nav-group { align-items: flex-start; flex-direction: column; min-width: max-content; } .ia-tab-cluster { flex-wrap: nowrap; } .ia-nav-hint { display: none; } .ia-content-shell { padding: 12px; } .ia-menu { width: calc(100vw - 20px); padding-top: 14px; } .ia-menu-toolbar { align-items: flex-start; flex-direction: column-reverse; } .ia-theme-switch { overflow-x: auto; max-width: 100%; } .ia-scenario-grid, .ia-nation-grid { grid-template-columns: 1fr; } .ia-map-head { flex-direction: column; align-items: stretch; } .ia-map-controls { justify-content: flex-start; } .ia-world-svg, .ia-map-atlas { height: 460px; min-height: 460px; } .ia-map-info { display: flex; } }
 @media (max-width: 520px) { .ia-status-panel { grid-template-columns: 1fr 1fr; } .ia-ruler-subline > span:not(:last-child)::after { display: none; } .ia-tab-btn kbd { display: none; } .ia-menu-hero h1 { font-size: 32px; } .ia-theme-switch em { display: none; } .ia-map-stat-grid { grid-template-columns: 1fr 1fr; } .ia-lever-foot { flex-direction: column; gap: 4px; } .ia-lever-foot span:last-child { text-align: left; } }
+.ia-diplomatic-memory {
+  margin: 7px 0;
+  padding: 8px;
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--border-hi);
+  border-radius: 5px;
+  background: var(--bg-inset);
+}
+.ia-diplomatic-memory > div { display: flex; justify-content: space-between; gap: 8px; font-size: 11px; }
+.ia-diplomatic-memory p { margin: 4px 0; color: var(--text-dim); font-size: 10.5px; line-height: 1.45; }
+.ia-diplomatic-memory em { color: var(--text-mute); font-size: 9.5px; font-style: normal; line-height: 1.4; }
+.ia-diplomatic-memory.tone-grateful { border-left-color: var(--good); }
+.ia-diplomatic-memory.tone-guarded { border-left-color: var(--warn); }
+.ia-diplomatic-memory.tone-hostile { border-left-color: var(--war); }
