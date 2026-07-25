@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from 'vitest';
-import type { EventDef, EventEffect } from '../../data/events';
+import { EVENTS, type EventDef, type EventEffect } from '../../data/events';
 import { createInitialState } from '../init';
 import {
   applyEffect,
@@ -24,6 +24,15 @@ afterEach(() => {
 });
 
 describe('event rule integrity', () => {
+  it('keeps each option faction effect unambiguous', () => {
+    for (const event of EVENTS) {
+      for (const [optionIndex, option] of event.options.entries()) {
+        const factions = option.effects.factionSat?.map((entry) => entry.faction) ?? [];
+        expect(new Set(factions).size, `${event.id}.option-${optionIndex + 1}`).toBe(factions.length);
+      }
+    }
+  });
+
   it('enforces player-only and minimum-gold trigger predicates', () => {
     const state = createInitialState();
     const player = state.nations[state.playerNationId];
