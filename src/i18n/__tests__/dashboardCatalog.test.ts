@@ -1,8 +1,11 @@
-import { describe, expect, it } from 'vitest';
+import { beforeAll, describe, expect, it } from 'vitest';
 import { dashboardCatalog } from '../catalogs/dashboard';
+import { registerGovernanceTranslations } from '../catalogs/governance';
 import { translateScoped } from '../scoped';
 
 const en = (source: string) => translateScoped(source, dashboardCatalog, {}, 'en');
+
+beforeAll(() => registerGovernanceTranslations());
 
 describe('dashboard dynamic English copy', () => {
   it('keeps advisor metric help fully translated', () => {
@@ -30,5 +33,16 @@ describe('dashboard dynamic English copy', () => {
     expect(en('当前最优先入口是“发展核心省份”。处理后再看建设项和推进项。')).toBe(
       'The highest-priority entry is “Develop core provinces”. After resolving it, review development and turn actions.',
     );
+  });
+
+  it('keeps shared-world council and advisor copy fully English', () => {
+    expect(en('体检 82/100，常规年度结算。先处理阻断或红色事项，再结束本年。')).toBe(
+      'Check 82/100. Standard annual settlement. Resolve blockers or red items before ending this year.',
+    );
+    expect(en('外部威胁：帕提亚：关系/威胁偏高。外交页确认是否贸易、结盟或备战。')).toBe(
+      'External threat: Parthia — elevated relations risk or threat. Open Diplomacy to decide whether to trade, ally, or prepare for war.',
+    );
+    expect(en('战争机会：可攻 西顿')).toBe('War opportunity: attack Sidon');
+    expect(en('第 1 年')).toBe('Year 1');
   });
 });

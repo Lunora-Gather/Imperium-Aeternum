@@ -20,7 +20,9 @@ import { buildVictoryRouteFocus, type VictoryRouteFocus } from '../gameplay/vict
 import { getNationalCrisisView, getNationalMissionView } from '../gameplay/nationalPurpose';
 import { createScopedTranslator, localizeDeep } from '../i18n/scoped';
 import { dashboardCatalog } from '../i18n/catalogs/dashboard';
+import { registerGovernanceTranslations } from '../i18n/catalogs/governance';
 
+registerGovernanceTranslations();
 const t = createScopedTranslator(dashboardCatalog);
 
 const FOCUSES: { id: StrategyFocusId; label: string; short: string; desc: string; effect: string }[] = [

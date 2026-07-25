@@ -1,6 +1,7 @@
 import { registerEnglishPatterns, registerEnglishTranslations } from '..';
 
 const en: Record<string, string> = {
+  '帕提亚': 'Parthia', '波斯': 'Persia', '西顿': 'Sidon',
   '危机': 'Crisis', '宗教': 'Religion', '机遇': 'Opportunity', '待决事件': 'Pending event',
   '即时影响': 'Immediate effects', '后续影响': 'Long-term impact', '选择': 'Choose',
   '数字键 1–2 可快速选择': 'Press 1–2 to choose quickly', '数字键 1–3 可快速选择': 'Press 1–3 to choose quickly',

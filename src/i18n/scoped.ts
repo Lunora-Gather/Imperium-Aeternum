@@ -1,6 +1,9 @@
 import { getLocale, translate, type Locale } from '.';
 
-export interface TranslationPattern { pattern: RegExp; replacement: string }
+export interface TranslationPattern {
+  pattern: RegExp;
+  replacement: string | ((substring: string, ...args: string[]) => string);
+}
 export interface ScopedLocaleCatalog {
   exact?: Readonly<Record<string, string>>;
   patterns?: readonly TranslationPattern[];
@@ -13,7 +16,11 @@ export interface ScopedCatalog {
 
 export type Translator = (source: string, values?: Record<string, string | number>) => string;
 
-function resolveScoped(source: string, localeCatalog: Readonly<Record<string, string>> | ScopedLocaleCatalog | undefined): string | undefined {
+function resolveScoped(
+  source: string,
+  localeCatalog: Readonly<Record<string, string>> | ScopedLocaleCatalog | undefined,
+  includeFragments = true,
+): string | undefined {
   if (!localeCatalog) return undefined;
   const structured = 'exact' in localeCatalog || 'patterns' in localeCatalog || 'fragments' in localeCatalog;
   const exact = structured ? (localeCatalog as ScopedLocaleCatalog).exact : localeCatalog as Readonly<Record<string, string>>;
@@ -23,10 +30,12 @@ function resolveScoped(source: string, localeCatalog: Readonly<Record<string, st
     rule.pattern.lastIndex = 0;
     if (rule.pattern.test(source)) {
       rule.pattern.lastIndex = 0;
-      return source.replace(rule.pattern, rule.replacement);
+      return typeof rule.replacement === 'string'
+        ? source.replace(rule.pattern, rule.replacement)
+        : source.replace(rule.pattern, rule.replacement);
     }
   }
-  const fragments = (localeCatalog as ScopedLocaleCatalog).fragments;
+  const fragments = includeFragments ? (localeCatalog as ScopedLocaleCatalog).fragments : undefined;
   if (fragments) {
     let translated = source;
     for (const [from, to] of Object.entries(fragments).sort(([a], [b]) => b.length - a.length)) translated = translated.split(from).join(to);
@@ -41,8 +50,16 @@ function interpolate(template: string, values: Record<string, string | number>):
 
 export function translateScoped(source: string, catalog: ScopedCatalog, values: Record<string, string | number> = {}, locale: Locale = getLocale()): string {
   if (locale === 'zh-CN') return interpolate(source, values);
-  const scoped = resolveScoped(source, catalog[locale]);
-  return scoped === undefined ? translate(source, values, locale) : interpolate(scoped, values);
+  // Exact screen copy and complete dynamic patterns are authoritative. Global
+  // patterns come next because they understand whole runtime sentences (and
+  // proper names). Fragment composition is intentionally last: using it first
+  // produced hybrids such as "战争机会：可攻 Sidon" in the English UI.
+  const scoped = resolveScoped(source, catalog[locale], false);
+  if (scoped !== undefined) return interpolate(scoped, values);
+  const global = translate(source, values, locale);
+  if (global !== interpolate(source, values)) return global;
+  const composed = resolveScoped(source, catalog[locale], true);
+  return composed === undefined ? global : interpolate(composed, values);
 }
 
 /**
