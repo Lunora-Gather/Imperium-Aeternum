@@ -97,6 +97,8 @@ jobs:
         run: npm run test
       - name: Data and scenario validation
         run: npm run validate
+      - name: Shared-world engine parity
+        run: npm run check:shared-world-engine
       - name: Pages-compatible production build
         run: npm run pages:build
         env:

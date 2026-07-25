@@ -1,7 +1,7 @@
 import { registerGovernanceTranslations } from '../i18n/catalogs/governance';
 import { localizeReactTree } from '../i18n/reactTree';
 registerGovernanceTranslations();
-// EventModal v4 — 事件后果预览更完整：即时数值 + 长期治理影响 + 快捷键
+// EventModal v5 — 只展示有意义的长期后果，让选项卡片清晰且易比较
 import { useCallback, useEffect, useRef } from 'react';
 import { useGameStore } from '../store/gameStore';
 import { EVENT_BY_ID } from '../engine/events';
@@ -64,7 +64,7 @@ function effectSummary(eff: EventEffect): { txt: string; tone: 'good' | 'warn' |
   return out;
 }
 
-function consequenceText(eff: EventEffect): string {
+function consequenceText(eff: EventEffect): string | null {
   const notes: string[] = [];
   if ((eff.stability ?? 0) <= -8) notes.push('可能诱发不满与叛乱');
   if ((eff.legitimacy ?? 0) <= -8) notes.push('会削弱统治正当性');
@@ -76,7 +76,7 @@ function consequenceText(eff: EventEffect): string {
   if ((eff.taxRate ?? 0) > 0) notes.push('增税会换来收入，但民心承压');
   if ((eff.adminPt ?? 0) > 0 || (eff.sciPt ?? 0) > 0) notes.push('短期行动能力提升');
   if (eff.triggerEvent) notes.push('会开启后续事件链');
-  if (notes.length === 0) return '后果较直接，无明显长期连锁。';
+  if (notes.length === 0) return null;
   return notes.join('；') + '。';
 }
 
@@ -183,10 +183,12 @@ export default function EventModal() {
                     </div>
                   </div>
                 )}
-                <div className="ia-event-consequence">
-                  <span className="ia-event-section-label">后续影响</span>
-                  <span>{note}</span>
-                </div>
+                {note && (
+                  <div className="ia-event-consequence">
+                    <span className="ia-event-section-label">后续影响</span>
+                    <span>{note}</span>
+                  </div>
+                )}
               </button>
             );
           })}

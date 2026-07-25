@@ -209,7 +209,7 @@ body > div[style*="position:fixed"][style*="right:8px"] {
 @media (max-width: 760px) {
   .ia-shell {
     width: calc(100vw - 16px) !important;
-    padding-bottom: 20px !important;
+    padding-bottom: calc(78px + env(safe-area-inset-bottom, 0px)) !important;
   }
   .ia-toast-stack {
     right: 10px;

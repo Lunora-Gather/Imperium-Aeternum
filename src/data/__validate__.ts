@@ -157,10 +157,18 @@ export function validateData(): ValidateResult {
   }
 
   const eIds = new Set<string>();
+  const eventTitles = new Set<string>();
+  const eventDescriptions = new Set<string>();
   if (EVENTS.length < 20) warn(acc, `事件 ${EVENTS.length} 个，建议 ≥20`);
   for (const e of EVENTS) {
     if (eIds.has(e.id)) fail(acc, `事件 id 重复 ${e.id}`);
     eIds.add(e.id);
+    const title = e.title.trim();
+    const description = e.description.trim();
+    if (eventTitles.has(title)) fail(acc, `事件标题重复 ${title}`);
+    if (eventDescriptions.has(description)) fail(acc, `事件描述重复 ${description}`);
+    eventTitles.add(title);
+    eventDescriptions.add(description);
     if (e.options.length < 2) fail(acc, `事件 ${e.id} 选项 < 2`);
     for (const [optionIndex, opt] of e.options.entries()) {
       if (opt.effects.relation && !NATION_BY_ID[opt.effects.relation.target as keyof typeof NATION_BY_ID]) fail(acc, `事件 ${e.id} 选项外交目标 ${opt.effects.relation.target} 不存在`);
