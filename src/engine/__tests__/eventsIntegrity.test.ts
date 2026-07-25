@@ -24,6 +24,14 @@ afterEach(() => {
 });
 
 describe('event rule integrity', () => {
+  it('keeps event identities distinct for players and history records', () => {
+    const titles = EVENTS.map((event) => event.title.trim());
+    const descriptions = EVENTS.map((event) => event.description.trim());
+
+    expect(new Set(titles).size).toBe(titles.length);
+    expect(new Set(descriptions).size).toBe(descriptions.length);
+  });
+
   it('keeps each option faction effect unambiguous', () => {
     for (const event of EVENTS) {
       for (const [optionIndex, option] of event.options.entries()) {

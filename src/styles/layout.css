@@ -475,7 +475,7 @@ button:focus-visible, .ia-btn:focus-visible, .ia-tab-btn:focus-visible, .ia-icon
   color: var(--text-soft);
   background: color-mix(in srgb, var(--bg-raised) 82%, transparent);
   border: 1px solid var(--border);
-  border-radius: 11px;
+  border-radius: 12px;
   cursor: pointer;
   transition: border-color 160ms ease, background 160ms ease, transform 160ms ease, box-shadow 160ms ease;
 }
@@ -626,24 +626,24 @@ button:focus-visible, .ia-btn:focus-visible, .ia-tab-btn:focus-visible, .ia-icon
   }
 
   .ia-event-body {
-    padding: 13px 14px 15px;
+    padding: 15px 14px 18px;
     scrollbar-gutter: auto;
   }
 
   .ia-event-description {
-    margin-bottom: 11px;
-    padding: 10px 11px;
+    margin-bottom: 14px;
+    padding: 11px 12px;
     font-size: 12.5px;
   }
 
   .ia-event-options {
-    gap: 8px;
+    gap: 11px;
   }
 
   .ia-event-option-head {
     grid-template-columns: 28px minmax(0, 1fr) auto;
-    gap: 8px;
-    padding: 10px;
+    gap: 10px;
+    padding: 12px;
   }
 
   .ia-event-option-head strong {
@@ -662,8 +662,8 @@ button:focus-visible, .ia-btn:focus-visible, .ia-tab-btn:focus-visible, .ia-icon
   .ia-event-impact,
   .ia-event-consequence {
     grid-template-columns: 1fr;
-    gap: 5px;
-    padding: 8px 10px;
+    gap: 6px;
+    padding: 10px 12px;
   }
 
   .ia-event-section-label {
@@ -839,7 +839,7 @@ button:focus-visible, .ia-btn:focus-visible, .ia-tab-btn:focus-visible, .ia-icon
   .ia-social-modal { width: calc(100vw - 16px); min-height: calc(100dvh - 16px); max-height: calc(100dvh - 16px); padding: 15px; border-radius: 16px; }
   .ia-player-grid { grid-template-columns: 1fr; }
   .ia-social-content { min-height: 0; }
-  .ia-social-dock { left: 10px; bottom: 10px; width: 50px; min-width: 50px; height: 50px; padding: 0; }
+  .ia-social-dock { left: max(10px, env(safe-area-inset-left, 0px)); bottom: max(10px, env(safe-area-inset-bottom, 0px)); width: 50px; min-width: 50px; height: 50px; padding: 0; }
   .ia-social-dock > em { display: none; }
   .ia-player-card-identity { align-items: center; }
 }
