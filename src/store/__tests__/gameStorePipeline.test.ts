@@ -37,4 +37,20 @@ describe('GameStore explicit pipeline integration', () => {
     expect(useGameStore.getState().state.strategyFocus).toBe('reform');
     expect(useGameStore.getState().state.nations.n01.resources.sciPt).toBeGreaterThanOrEqual(before + 4);
   });
+
+  it('continues a completed victory in legacy mode without allowing defeat bypass', () => {
+    const won = createInitialState();
+    won.turn = 17;
+    won.victory.type = 'win_economy';
+    useGameStore.setState({ state: won, scene: 'playing' });
+
+    expect(useGameStore.getState().continueLegacy()).toBe(true);
+    expect(useGameStore.getState().state.victory.type).toBeNull();
+    expect(useGameStore.getState().state.legacyMode).toBe(true);
+
+    const failed = { ...useGameStore.getState().state, victory: { type: 'fail_collapse' } };
+    useGameStore.setState({ state: failed });
+    expect(useGameStore.getState().continueLegacy()).toBe(false);
+    expect(useGameStore.getState().state.victory.type).toBe('fail_collapse');
+  });
 });

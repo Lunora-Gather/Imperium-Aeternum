@@ -135,7 +135,7 @@ function ChronicleDigestPanel({ digest }: { digest: ChronicleDigest }) {
 }
 
 export default function Dashboard() {
-  const { state, nextTurn, save, load, hasSave, newGame, backToMenu, jumpToTab, setStrategyFocus } = useGameStore();
+  const { state, nextTurn, continueLegacy, save, load, hasSave, newGame, backToMenu, jumpToTab, setStrategyFocus } = useGameStore();
   const sharedSession = useSharedWorldSessionStore((current) => current.session);
   const pid = useGameStore((s) => s.state.playerNationId);
   const player = useGameStore((s) => s.state.nations[pid]);
@@ -191,6 +191,8 @@ export default function Dashboard() {
   const setFocus = (id: StrategyFocusId) => setStrategyFocus(id);
 
   const hasPendingEventBlocker = readiness.blockers.some((item) => item.id === 'pending-events');
+  const ending = state.victory.type;
+  const won = ending?.startsWith('win') ?? false;
 
   return <div className="ia-dashboard">
     <section className="ia-dash-hero" style={{ borderColor: toneBorder(council.tone) }}>
@@ -239,7 +241,7 @@ export default function Dashboard() {
         <DashboardStrategicHq state={state} commandActions={commandActions} jumpToTab={jumpToTab} />
         <RoadmapPanel roadmap={roadmap} jumpToTab={jumpToTab} />
         <ReadinessPanel report={readiness} jumpToTab={jumpToTab} />
-        {state.victory.type && <section className="ia-dash-section ia-dash-victory"><h3>{t(state.victory.type.startsWith('win') ? '万世之业已成' : '社稷倾覆')}</h3><p>{t(`第 ${state.turn} 年`)} · {player.name}</p></section>}
+        {ending && <section className="ia-dash-section ia-dash-victory"><h3>{t(won ? '万世之业已成' : '社稷倾覆')}</h3><p>{t(won ? '核心国运目标已经完成。可继续经营，或查看史册。' : '本局已经结束。查看史册后读档，或重新开局。')}</p><div className="ia-dash-command-actions">{won && !sharedSession && <Btn label={t('继续传世经营')} variant="primary" onClick={continueLegacy} />}<Btn label={t('查看帝国史册')} onClick={() => jumpToTab('chronicle')} />{!won && !sharedSession && <Btn label={t('读取最近存档')} onClick={() => load()} disabled={!hasSave()} />}<Btn label={t(sharedSession ? '退出共享治理' : '返回剧本大厅')} variant="ghost" onClick={backToMenu} /></div></section>}
       </main>
       <aside className="ia-dash-col ia-dash-col--right">
         <FocusPanel focus={focus} onChange={setFocus} />

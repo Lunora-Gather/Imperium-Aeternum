@@ -33,13 +33,13 @@ describe('dashboard command groups', () => {
   it('places governor advice with domestic economy rather than onboarding', () => {
     const groups = buildDashboardCommandGroups(createInitialState());
 
-    expect(groups.find((g) => g.id === 'guide')?.itemIds).toEqual(['release', 'onboarding', 'strategic-hq']);
+    expect(groups.find((g) => g.id === 'guide')?.itemIds).toEqual(['onboarding', 'strategic-hq']);
     expect(groups.find((g) => g.id === 'domestic')?.itemIds).toEqual(['governor', 'economy']);
   });
 
   it('keeps each group connected to render item ids', () => {
     const groups = buildDashboardCommandGroups(createInitialState());
 
-    expect(groups.flatMap((g) => g.itemIds)).toEqual(['release', 'onboarding', 'strategic-hq', 'turn-risk', 'governor', 'economy', 'diplomacy', 'war']);
+    expect(groups.flatMap((g) => g.itemIds)).toEqual(['onboarding', 'strategic-hq', 'turn-risk', 'governor', 'economy', 'diplomacy', 'war']);
   });
 });

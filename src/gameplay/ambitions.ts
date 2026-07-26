@@ -170,7 +170,7 @@ export function applyAmbitionsAfterTurn(state: GameState): { state: GameState; n
     }
   }
 
-  if (!next.victory.type) {
+  if (!next.victory.type && !next.legacyMode) {
     if (provs >= t.conquestTarget && stable) next.victory.type = 'win_conquest';
     else if (meta.economyTurns >= t.economyNeedTurns) next.victory.type = 'win_economy';
     else if (player.resources.influence >= t.influenceTarget && good >= t.goodTarget && !atWar) next.victory.type = 'win_culture';

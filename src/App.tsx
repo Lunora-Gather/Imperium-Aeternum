@@ -419,6 +419,7 @@ export default function App() {
                 {atWar && <span className="danger">⚔ {t('战时')}</span>}
                 {pendingCount > 0 && <span className="warn">✦ {t('待决事件 {{count}}', { count: pendingCount })}</span>}
                 {state.victory.type && <span className={state.victory.type.startsWith('win') ? 'good' : 'danger'}>{state.victory.type.startsWith('win') ? `🏆 ${t('已胜利')}` : `💀 ${t('已陨落')}`}</span>}
+                {state.legacyMode && !state.victory.type && <span className="good">♛ {t('传世经营')}</span>}
               </div>
             </div>
             <div className="ia-header-actions">

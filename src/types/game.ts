@@ -408,6 +408,7 @@ export interface GameState {
   lastReport: TurnReport | null;
   history: TurnReport[];            // E10: 最近 10 回合报告（sparkline 用）
   victory: { type: string | null };
+  legacyMode?: boolean;              // 胜利后继续经营，停止重复判胜
   bankruptTurns: number;            // 国库破产连续回合
   lowStabilityTurns: number;        // 稳定度过低连续回合
   chronicle: ChronicleEntry[];      // E12: 史册（里程碑叙事，上限 50）

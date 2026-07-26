@@ -45,7 +45,7 @@ export function buildDashboardCommandGroups(state: GameState, nationId: string =
       subtitle: coach.nextStep ? `下一步：${coach.nextStep.title} · ${coach.progress}%` : `目标完成 · ${coach.progress}%`,
       tone: coach.tone,
       defaultOpen: guideOpen,
-      itemIds: ['release', 'onboarding', 'strategic-hq'],
+      itemIds: ['onboarding', 'strategic-hq'],
     },
     {
       id: 'risk',

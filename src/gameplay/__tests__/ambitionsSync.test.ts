@@ -111,4 +111,21 @@ describe('ambition progress synchronization', () => {
     expect(getAmbitionSnapshot(final).economy.done).toBe(true);
     expect(final.victory.type).toBe('win_economy');
   });
+
+  it('does not repeat victory awards after the player enters legacy mode', () => {
+    const state = syncAmbitionMeta(createInitialState());
+    const snapshot = getAmbitionSnapshot(state);
+    const meta = state.ambitionMeta;
+    expect(meta).toBeDefined();
+    if (!meta) return;
+    player(state).resources.gold = snapshot.economy.target;
+    player(state).government.stability = 70;
+    meta.economyTurns = snapshot.economy.needTurns;
+    state.legacyMode = true;
+
+    const result = applyAmbitionsAfterTurn({ ...state, turn: state.turn + 1 }).state;
+
+    expect(result.victory.type).toBeNull();
+    expect(result.legacyMode).toBe(true);
+  });
 });
