@@ -12,8 +12,8 @@ export function AccountButton({ compact = false }: { compact?: boolean }) {
   useEffect(() => { void initialize(); }, [initialize]);
 
   return <>
-    <button className={compact ? 'ia-icon-btn' : 'ia-btn ia-btn--ghost'} onClick={() => setOpen(true)} title={t('账号与云存档')} aria-label={t('账号与云存档')}>
-      {compact ? (user ? '☁' : '♙') : (user ? `☁ ${user.name || user.email}` : status === 'loading' ? t('连接账号…') : t('账号 / 云存档'))}
+    <button className={compact ? 'ia-icon-btn' : 'ia-btn ia-btn--ghost'} onClick={() => setOpen(true)} title={t('账号与云存档')} aria-label={t(compact ? '账号 / 云存档' : '账号与云存档')}>
+      {compact ? <span aria-hidden="true">{user ? '☁' : '♙'}</span> : (user ? `☁ ${user.name || user.email}` : status === 'loading' ? t('连接账号…') : t('账号 / 云存档'))}
     </button>
     {open && createPortal(<AccountModal onClose={() => setOpen(false)} />, document.body)}
   </>;

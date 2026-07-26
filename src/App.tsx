@@ -88,6 +88,10 @@ const NoviceJourneyPanel = lazyScreen(() => import('./components/NoviceJourneyPa
 const NoviceJourneyCompletion = lazyScreen(() => import('./components/NoviceJourneyCompletion'));
 const MobileNavigationSheet = lazyScreen(() => import('./components/MobileNavigationSheet'));
 
+function HeaderIconButton({ icon, label, onClick, disabled = false, tone = '' }: { icon: string; label: string; onClick: () => void; disabled?: boolean; tone?: 'gold' | 'back' | '' }) {
+  return <button className={`ia-icon-btn${tone ? ` ia-icon-btn--${tone}` : ''}`} onClick={onClick} disabled={disabled} title={label} aria-label={label}><span aria-hidden="true">{icon}</span></button>;
+}
+
 const TAB_GROUPS: { group: string; tabs: { id: Tab; label: string; key: string; icon: string }[] }[] = [
   { group: '治理', tabs: [
     { id: 'dashboard', label: '总览', key: '1', icon: '◈' },
@@ -418,15 +422,17 @@ export default function App() {
               </div>
             </div>
             <div className="ia-header-actions">
-              <AccountButton compact />
-              <LocaleSwitch compact />
-              <button className="ia-icon-btn ia-icon-btn--gold" onClick={toggleTheme} title={t('切换主题')} aria-label={t('切换主题')}>
-                {theme === 'night' ? '☾' : theme === 'day' ? '☀' : theme === 'bamboo' ? '筠' : '墨'}
-              </button>
-              <button className="ia-icon-btn" onClick={() => { setShowHelp(true); setTutorialStep(0); }} title={t('新手帮助')} aria-label={t('新手帮助')}>?</button>
-              <button className="ia-icon-btn" onClick={sfxMute.toggle} title={t(sfxMute.muted ? '音效已关（点击开启）' : '音效已开（点击静音）')} aria-label={t('音效开关')}>{sfxMute.muted ? '🔇' : '🔊'}</button>
-              <button className="ia-icon-btn ia-icon-btn--back" onClick={goBackPage} disabled={!canGoBack} title={t(canGoBack ? '返回上一个游戏页面' : '当前已在导航起点')} aria-label={t(canGoBack ? '返回上一个游戏页面' : '当前已在导航起点')}>↩</button>
-              <button className="ia-icon-btn ia-icon-btn--back" onClick={safeBackToMenu} title={t('返回标题页')} aria-label={t('返回标题页')}>⌂</button>
+              <div className="ia-header-access-controls">
+                <AccountButton compact />
+                <LocaleSwitch compact />
+              </div>
+              <div className="ia-header-game-controls">
+                <HeaderIconButton icon={theme === 'night' ? '☾' : theme === 'day' ? '☀' : theme === 'bamboo' ? '筠' : '墨'} label={t('切换主题')} onClick={toggleTheme} tone="gold" />
+                <HeaderIconButton icon="?" label={t('新手帮助')} onClick={() => { setShowHelp(true); setTutorialStep(0); }} />
+                <HeaderIconButton icon={sfxMute.muted ? '🔇' : '🔊'} label={t('音效开关')} onClick={sfxMute.toggle} />
+                <HeaderIconButton icon="↩" label={t('返回上一页')} onClick={goBackPage} disabled={!canGoBack} tone="back" />
+                <HeaderIconButton icon="⌂" label={t('返回标题页')} onClick={safeBackToMenu} tone="back" />
+              </div>
             </div>
           </div>
 
