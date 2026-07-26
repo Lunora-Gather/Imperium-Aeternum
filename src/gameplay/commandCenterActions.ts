@@ -48,16 +48,12 @@ function reasonFor(source: CommandCenterAction['source'], level: number, toneVal
   if (source === 'readiness') return toneValue === 'danger' ? '回合前体检发现硬阻断，必须优先处理。' : '回合前体检发现风险项，建议推进前先处理。';
   if (source === 'report') return '年度复盘发现可修正趋势，适合在下一年开始前处理。';
   if (source === 'strategy') return level >= 75 ? '总参谋部将其列为高优先战略事项。' : '总参谋部认为它能改善中长期路线。';
-  return '补充不同页面入口，避免行动建议过窄。';
-}
-
-function withReason(desc: string, reason: string): string {
-  return desc.includes('依据：') ? desc : `${desc} 依据：${reason}`;
+  return '当前局势平稳，适合主动积累长期优势。';
 }
 
 function actionWithReason(item: Omit<CommandCenterAction, 'reason'> & { reason?: string }): CommandCenterAction {
   const reason = item.reason ?? reasonFor(item.source, item.level, item.tone);
-  return { ...item, reason, desc: withReason(item.desc, reason) };
+  return { ...item, reason };
 }
 
 export function explainCommandAction(item: CommandCenterAction): string {
@@ -72,9 +68,9 @@ function fallbackActions(state: GameState, player?: Nation): CommandCenterAction
   if ((player?.resources.sciPt ?? 0) >= 120) actions.push(actionWithReason({ id: 'fallback-tech', label: '规划科技', desc: '科研点已有积累，可以转化为建筑、政策或长期优势。', tab: 'tech', level: 38, tone: 'normal', source: 'fallback', reason: '科研点充足，适合把资源转成长期优势。' }));
   if ((player?.resources.adminPt ?? 0) >= 8) actions.push(actionWithReason({ id: 'fallback-politics', label: '使用行政余量', desc: '行政点充足时，适合检查政策、法律和派系满意度。', tab: 'politics', level: 36, tone: 'normal', source: 'fallback', reason: '行政点充足，适合补充政治页入口。' }));
 
-  actions.push(actionWithReason({ id: 'fallback-province', label: '发展核心省份', desc: '选择核心省份建设经济基础，保障国库和粮储。', tab: 'province', level: 30, tone: 'normal', source: 'fallback' }));
-  actions.push(actionWithReason({ id: 'fallback-diplomacy', label: '经营外交', desc: '改善关系，准备贸易、联盟或下一场战争。', tab: 'diplomacy', level: 25, tone: 'normal', source: 'fallback' }));
-  actions.push(actionWithReason({ id: 'fallback-save', label: '保存分支', desc: '重大决策前保留一个手动档，避免路线不可逆。', tab: 'save', level: 20, tone: 'normal', source: 'fallback' }));
+  actions.push(actionWithReason({ id: 'fallback-province', label: '发展核心省份', desc: '选择核心省份建设经济基础，保障国库和粮储。', tab: 'province', level: 30, tone: 'normal', source: 'fallback', reason: '核心省份建设能同时改善财政与粮储。' }));
+  actions.push(actionWithReason({ id: 'fallback-diplomacy', label: '经营外交', desc: '改善关系，准备贸易、联盟或下一场战争。', tab: 'diplomacy', level: 25, tone: 'normal', source: 'fallback', reason: '改善关系可打开贸易、同盟和停战空间。' }));
+  actions.push(actionWithReason({ id: 'fallback-save', label: '保存分支', desc: '重大决策前保留一个手动档，避免路线不可逆。', tab: 'save', level: 20, tone: 'normal', source: 'fallback', reason: '保留存档能让重大决策安全回退。' }));
   return actions;
 }
 

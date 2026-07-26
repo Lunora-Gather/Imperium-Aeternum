@@ -15,7 +15,7 @@ const ambition: AmbitionSnapshot = {
 };
 
 function action(id: string, tab: CommandCenterAction['tab'], level: number, source: CommandCenterAction['source'] = 'fallback'): CommandCenterAction {
-  return { id, label: `行动${id}`, desc: `处理${id}`, tab, level, tone: level > 88 ? 'danger' : level > 55 ? 'warn' : 'normal', source };
+  return { id, label: `行动${id}`, desc: `处理${id}`, tab, level, tone: level > 88 ? 'danger' : level > 55 ? 'warn' : 'normal', source, reason: `执行${id}的局势依据。` };
 }
 
 describe('empire roadmap', () => {
@@ -47,8 +47,8 @@ describe('empire roadmap', () => {
 
     const roadmap = buildEmpireRoadmap(state, { brief, readiness, commandActions, ambition });
 
-    expect(roadmap.steps[0]).toMatchObject({ id: 'action-a', tab: 'economy', horizon: '现在', reason: '回合前体检 · 优先级 80' });
-    expect(roadmap.steps[1]).toMatchObject({ id: 'action-b', tab: 'province', horizon: '本年', reason: '战略参谋 · 优先级 70' });
+    expect(roadmap.steps[0]).toMatchObject({ id: 'action-a', tab: 'economy', horizon: '现在', reason: '执行a的局势依据。' });
+    expect(roadmap.steps[1]).toMatchObject({ id: 'action-b', tab: 'province', horizon: '本年', reason: '执行b的局势依据。' });
   });
 
   it('keeps route progress clamped to 100 percent', () => {
@@ -77,7 +77,8 @@ describe('empire roadmap', () => {
     expect(roadmap.evidence.length).toBeGreaterThanOrEqual(4);
     expect(roadmap.evidenceLine).toContain('体检');
     expect(roadmap.evidenceLine).toContain('主线');
-    expect(roadmap.steps[0].body).toContain('依据：回合前体检 · 优先级 80');
+    expect(roadmap.steps[0].body).toContain('依据：执行finance的局势依据。');
     expect(roadmap.steps[0].body).toContain('影响：优先保护财政与粮食循环');
+    expect(roadmap.steps[0].body.match(/依据：/g)).toHaveLength(1);
   });
 });

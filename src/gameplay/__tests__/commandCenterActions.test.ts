@@ -173,8 +173,19 @@ describe('command center actions', () => {
 
     const actions = buildCommandCenterActions(state, 4);
 
-    expect(actions.every((a) => a.reason && a.desc.includes('依据：'))).toBe(true);
+    expect(actions.every((a) => a.reason && !a.desc.includes('依据：'))).toBe(true);
     expect(explainCommandAction(actions[0])).toContain('体检');
+  });
+
+  it('keeps fallback descriptions concise and supplies useful reasons separately', () => {
+    const state = createInitialState();
+    const readiness = { ...buildReadinessReport(state), blockers: [], warnings: [], advice: [] };
+
+    const actions = buildCommandCenterActions(state, 5, { readiness, brief: brief([]), reportActions: [] });
+    const province = actions.find((a) => a.id === 'fallback-province')!;
+
+    expect(province.desc).toBe('选择核心省份建设经济基础，保障国库和粮储。');
+    expect(province.reason).toBe('核心省份建设能同时改善财政与粮储。');
   });
 
   it('can explain unannotated actions from source and priority', () => {
