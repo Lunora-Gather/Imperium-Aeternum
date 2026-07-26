@@ -2,6 +2,21 @@
 
 All notable player-facing changes are recorded here. Version numbers follow semantic versioning.
 
+## [1.1.1] - 2026-07-26
+
+### Fixed
+
+- Added context-aware Traditional Chinese correction after the compact character fallback.
+- Corrected diplomacy and event wording such as `關係`, `簽訂`, `乾旱`, `復甦`, and `動盪`.
+- Preserved historic and transliterated names such as `亞得里亞海`, `里昂`, and `亞拉里克`.
+- Protected unrelated words such as `系統`, `發掘`, and `家裡` from overcorrection.
+
+### Validation
+
+- Added focused context, proper-name, and overcorrection regression tests.
+- 499 automated tests across 95 test files.
+- Kept every initial-route bundle limit unchanged; the bounded locale data raises only the total inventory cap from 1169 KiB to 1171 KiB.
+
 ## [1.1.0] - 2026-07-26
 
 ### Added
@@ -37,5 +52,6 @@ All notable player-facing changes are recorded here. Version numbers follow sema
 
 - First public preview of the playable governance, war, diplomacy, event, report, and save/load loop.
 
+[1.1.1]: https://github.com/Lunora-Gather/Imperium-Aeternum/compare/v1.1.0...v1.1.1
 [1.1.0]: https://github.com/Lunora-Gather/Imperium-Aeternum/compare/v1.0.0-preview...v1.1.0
 [1.0.0-preview]: https://github.com/Lunora-Gather/Imperium-Aeternum/releases/tag/v1.0.0-preview

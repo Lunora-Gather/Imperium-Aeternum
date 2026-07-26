@@ -21,7 +21,9 @@ const budgets = {
   // its isolated 1.4 KiB chunk is covered only by this total budget.
   // Campaign exit confirmation is lazy and protects local/shared progress;
   // its isolated copy does not relax entry or App limits.
-  totalJavaScript: 1169 * KIB,
+  // Context-aware Traditional Chinese corrections protect historic names and word meanings;
+  // the bounded data stays in the locale layer and leaves every initial-route cap unchanged.
+  totalJavaScript: 1171 * KIB,
   // Purpose/crisis panels, event decisions and the mobile navigation sheet
   // extend the measured UI baseline without changing entry-script limits.
   totalCss: 117 * KIB,

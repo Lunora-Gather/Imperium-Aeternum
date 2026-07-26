@@ -21,13 +21,15 @@
 ## 发布资料
 
 - `release-checklist.md`
-- `release-qa-v1.1.0.md`
-- `release-notes-v1.1.0.md`
+- `release-qa-v1.1.1.md`
+- `release-notes-v1.1.1.md`
 - `TAGGING_CHECKLIST.md`
 - `FINAL_QA.md`
 
 ## 历史发布资料
 
+- `release-notes-v1.1.0.md`
+- `release-qa-v1.1.0.md`
 - `release-notes-v1.0.0-preview.md`
 - `public-preview-qa.md`
 

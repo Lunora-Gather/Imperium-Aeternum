@@ -19,10 +19,10 @@
   <img alt="TypeScript strict" src="https://img.shields.io/badge/TypeScript-strict-3178c6?style=flat-square">
   <img alt="React 18" src="https://img.shields.io/badge/React-18-61dafb?style=flat-square">
   <img alt="Vite 8" src="https://img.shields.io/badge/Vite-8-646cff?style=flat-square">
-  <img alt="Release" src="https://img.shields.io/badge/release-1.1.0_stable-2f855a?style=flat-square">
+  <img alt="Release" src="https://img.shields.io/badge/release-1.1.1_stable-2f855a?style=flat-square">
 </p>
 
-当前为 **1.1.0 正式版**，支持简体中文、繁體中文和 English。游客可以完整游玩单机模式；登录后可使用私有云存档、共享活版图、好友与实时聊天。
+当前为 **1.1.1 正式版**，支持简体中文、繁體中文和 English。游客可以完整游玩单机模式；登录后可使用私有云存档、共享活版图、好友与实时聊天。
 
 ## 第一次玩
 
@@ -146,9 +146,9 @@ VITE_BASE=/Imperium-Aeternum/ npm run rc:check
 | 项目 | 当前值 |
 | --- | --- |
 | 在线地址 | [lunora-gather.github.io/Imperium-Aeternum](https://lunora-gather.github.io/Imperium-Aeternum/) |
-| 版本 | `1.1.0`（stable） |
+| 版本 | `1.1.1`（stable） |
 | 主分支 | `main` |
 | 部署 | GitHub Actions → GitHub Pages |
 | 线上后端 | Appwrite Cloud |
 
-完整变更见 [1.1.0 发布说明](docs/release-notes-v1.1.0.md) 与 [CHANGELOG](CHANGELOG.md)。`main` 的每次发布都必须通过 `npm run rc:check`。当前风险、验收与后续计划统一收录在 [维护文档](docs/maintenance/README.md)，历史阶段报告不作为当前实现依据。
+完整变更见 [1.1.1 发布说明](docs/release-notes-v1.1.1.md) 与 [CHANGELOG](CHANGELOG.md)。`main` 的每次发布都必须通过 `npm run rc:check`。当前风险、验收与后续计划统一收录在 [维护文档](docs/maintenance/README.md)，历史阶段报告不作为当前实现依据。
