@@ -46,12 +46,12 @@ describe('dashboard stability smoke', () => {
     expect(release.items.length).toBe(6);
   });
 
-  it('surfaces release and governor items in the first dashboard group', () => {
+  it('keeps player guidance first and governor advice under domestic affairs', () => {
     const groups = buildDashboardCommandGroups(createInitialState());
     const guide = groups[0];
 
     expect(guide.id).toBe('guide');
-    expect(guide.itemIds.slice(0, 2)).toEqual(['release', 'onboarding']);
+    expect(guide.itemIds).toEqual(['onboarding', 'strategic-hq']);
     expect(groups.find((g) => g.id === 'domestic')?.itemIds).toContain('governor');
   });
 });
