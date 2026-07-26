@@ -25,4 +25,15 @@ describe('pending event resolution', () => {
     expect(second.state.nations[pid].resources.food).toBe(foodBefore - 100);
     expect(second.state.triggeredEvents.filter((entry) => entry.eventId === 'evt_famine')).toHaveLength(1);
   });
+
+  it('does not leak the transient relation index after a diplomatic choice', () => {
+    const state = createInitialState();
+    const pid = state.playerNationId;
+    state.pendingEvents.push({ nationId: pid, eventId: 'evt_border_clash' });
+
+    const result = resolvePendingEventChoice(state, pid, 'evt_border_clash', 0);
+
+    expect(result.resolved).toBe(true);
+    expect(result.state._relMap).toBeUndefined();
+  });
 });

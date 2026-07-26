@@ -2,6 +2,7 @@
 
 import type { GameState } from '../types/game';
 import { applyEffect, EVENT_BY_ID, recordEvent } from '../engine/events';
+import { invalidateRelationMap } from '../engine/init';
 import { cloneGameStateForTurn } from '../engine/turnIsolation';
 
 export interface PendingEventResolution {
@@ -34,6 +35,7 @@ export function resolvePendingEventChoice(
   applyEffect(next.nations[nationId], option.effects, next);
   recordEvent(next, nationId, eventId, optionIndex);
   next.pendingEvents.splice(index, 1);
+  invalidateRelationMap(next);
 
   return {
     state: next,
