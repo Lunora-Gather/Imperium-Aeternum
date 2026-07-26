@@ -31,7 +31,7 @@ export function DirectChatPanel({ friendUserId, friendName, onBack }: { friendUs
   };
 
   return <section className="ia-direct-chat">
-    <header><button className="ia-btn ia-btn--ghost" onClick={onBack}>← {t('好友列表')}</button><div><span>PRIVATE CHANNEL</span><strong>{friendName}</strong><small>{t('仅你与对方可见 · 实时文字与图片')}</small></div></header>
+    <header><button className="ia-btn ia-btn--ghost" onClick={onBack}>← {t('好友列表')}</button><div><span>PRIVATE CHANNEL</span><strong>{friendName}</strong><small>{t('跨版图好友私聊 · 仅双方可见 · 支持文字与图片')}</small></div></header>
     <div ref={logRef} className="ia-world-chat-log ia-direct-chat-log ia-scroll">{messages.length ? messages.map((item) => {
       const mine = item.delivery === 'pending' || item.senderId === userId;
       return <article key={item.id} className={mine ? 'is-mine' : ''}><div><header><strong>{mine ? t('我') : item.senderName}</strong>{item.delivery === 'pending' && <em>{t('发送中…')}</em>}<time>{new Date(item.createdAt).toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit' })}</time></header>{item.kind === 'image' && item.mediaFileId && <a className="ia-chat-image" href={worldMessageMediaUrl(item.mediaFileId)} target="_blank" rel="noreferrer"><img src={worldMessageMediaUrl(item.mediaFileId)} alt={item.body === '图片' ? t('好友分享的图片') : item.body} loading="lazy" /></a>}{(item.kind !== 'image' || item.body !== '图片') && <p>{item.body}</p>}</div></article>;
