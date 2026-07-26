@@ -1,25 +1,13 @@
 import { useI18n } from '../i18n';
-import type { NavigationTab } from '../gameplay/navigationTabs';
-
-interface MobileNavigationItem {
-  id: NavigationTab;
-  label: string;
-  icon: string;
-}
-
-interface MobileNavigationGroup {
-  group: string;
-  tabs: readonly MobileNavigationItem[];
-}
+import { NAVIGATION_GROUPS, type NavigationTab } from '../gameplay/navigationTabs';
 
 interface MobileNavigationSheetProps {
-  groups: readonly MobileNavigationGroup[];
   activeTab: NavigationTab;
   onSelect: (tab: NavigationTab) => void;
   onClose: () => void;
 }
 
-export default function MobileNavigationSheet({ groups, activeTab, onSelect, onClose }: MobileNavigationSheetProps) {
+export default function MobileNavigationSheet({ activeTab, onSelect, onClose }: MobileNavigationSheetProps) {
   const { t } = useI18n();
   return (
     <div className="ia-modal-backdrop ia-mobile-nav-backdrop" onClick={onClose}>
@@ -33,7 +21,7 @@ export default function MobileNavigationSheet({ groups, activeTab, onSelect, onC
           <button className="ia-icon-btn" type="button" aria-label={t('关闭页面导航')} onClick={onClose}>×</button>
         </header>
         <div className="ia-mobile-nav-groups">
-          {groups.map((group) => (
+          {NAVIGATION_GROUPS.map((group) => (
             <section key={group.group}>
               <h3 className="ia-up">{t(group.group)}</h3>
               <div>

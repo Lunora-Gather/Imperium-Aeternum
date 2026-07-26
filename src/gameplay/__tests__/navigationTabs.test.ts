@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
+  ALL_NAVIGATION_ITEMS,
+  NAVIGATION_GROUPS,
   NAVIGATION_TABS,
   centeredTabScrollLeft,
   isNavigationTab,
@@ -25,6 +27,14 @@ describe('navigation tab contract', () => {
       'chronicle',
       'save',
     ]);
+  });
+
+  it('keeps desktop, mobile and shortcut navigation on the same metadata registry', () => {
+    expect(new Set(ALL_NAVIGATION_ITEMS.map((item) => item.id))).toEqual(new Set(NAVIGATION_TABS));
+    expect(ALL_NAVIGATION_ITEMS).toHaveLength(NAVIGATION_TABS.length);
+    expect(NAVIGATION_GROUPS.every((group) => group.group && group.tabs.length > 0)).toBe(true);
+    expect(new Set(ALL_NAVIGATION_ITEMS.map((item) => item.key)).size).toBe(ALL_NAVIGATION_ITEMS.length);
+    expect(ALL_NAVIGATION_ITEMS.every((item) => item.label && item.icon)).toBe(true);
   });
 
   it('accepts known tabs and rejects invalid route strings', () => {
