@@ -18,6 +18,7 @@ import { buildTurnPreview, type TurnPreview } from '../gameplay/turnPreview';
 import { buildPreTurnCouncil, type PreTurnCouncil } from '../gameplay/preTurnCouncil';
 import { buildChronicleDigest, type ChronicleDigest, type ChronicleHighlight } from '../gameplay/chronicleDigest';
 import { buildVictoryRouteFocus, type VictoryRouteFocus } from '../gameplay/victoryRoutes';
+import { buildReleaseReadinessPlan, type ReleaseReadinessPlan } from '../gameplay/releaseReadiness';
 import { getNationalCrisisView, getNationalMissionView } from '../gameplay/nationalPurpose';
 import { governmentDisplayName } from '../data/governments';
 import { nationalCharacterDisplayName } from '../data/national-characters';
@@ -112,14 +113,17 @@ function ReadinessButton({ item, jumpToTab }: { item: ReadinessItem; jumpToTab: 
   return <button className={`tone-${item.tone === 'danger' ? 'danger' : item.tone === 'warn' ? 'warn' : 'normal'}`} onClick={() => item.tab && jumpToTab(item.tab)} disabled={!item.tab}><b>{t(item.title)}</b><span>{t(item.detail)}</span></button>;
 }
 
-function ReadinessPanel({ report, jumpToTab }: { report: ReadinessReport; jumpToTab: (tab: string) => void }) {
+function ReadinessPanel({ report, system, jumpToTab }: { report: ReadinessReport; system: ReleaseReadinessPlan; jumpToTab: (tab: string) => void }) {
   const visible = report.advice.length > 0 ? report.advice.slice(0, 4) : [];
   const devWarn = report.devChecks.length;
   return <section className="ia-dash-section" style={{ borderColor: report.tone === 'danger' ? 'var(--war)' : report.tone === 'warn' ? 'var(--warn)' : 'var(--border)' }}>
     <header><div><small>Pre-turn</small><h3>{t('下一回合前检查')}</h3></div><Tag text={`${t(report.label)} ${report.score}`} tone={tagTone(report.tone)} /></header>
     <div className="ia-goal-line" style={{ marginBottom: 8 }}><div><span>{t('综合健康度')}</span><strong>{report.score}/100</strong></div><i><b style={{ width: `${report.score}%` }} /></i><em>{t(report.canAdvance ? '没有硬性阻断，仍建议先处理红黄项' : '存在高危项，推进前请先处理')}</em></div>
     <div className="ia-action-list">{visible.length === 0 ? <div className="ia-risk-empty">{t('暂无阻断项，可以稳步推进。')}</div> : visible.map((item) => <ReadinessButton key={item.id} item={item} jumpToTab={jumpToTab} />)}</div>
-    {devWarn > 0 && <div className="ia-dash-note" style={{ marginTop: 8 }}><span className={report.devChecks.some((x) => x.tone === 'danger') ? 'danger' : 'warn'}>{t('开发体检：')}{t(`${devWarn} 项`)}</span> · {report.devChecks.slice(0, 2).map((x) => t(x.title)).join(' / ')}</div>}
+    <div className="ia-dash-note" style={{ marginTop: 8 }}>
+      <span className={system.tone}>{t('系统体检')} {system.buildMark}</span>
+      {' · '}{devWarn > 0 ? <>{t(`${devWarn} 项`)} · {report.devChecks.slice(0, 2).map((x) => t(x.title)).join(' / ')}</> : t('状态一致')}
+    </div>
   </section>;
 }
 
@@ -153,12 +157,14 @@ export default function Dashboard() {
   const readinessRaw = useMemo(() => buildReadinessReport(state), [state]);
   const reportActions = useMemo(() => buildTurnReportActions(state, { brief: briefRaw }), [state, briefRaw]);
   const commandActionsRaw = useMemo(() => buildCommandCenterActions(state, 5, { brief: briefRaw, readiness: readinessRaw, reportActions }), [state, briefRaw, readinessRaw, reportActions]);
+  const systemRaw = useMemo(() => buildReleaseReadinessPlan(readinessRaw), [readinessRaw]);
   const roadmapRaw = useMemo(() => buildEmpireRoadmap(state, { brief: briefRaw, readiness: readinessRaw, reportActions, commandActions: commandActionsRaw }), [state, briefRaw, readinessRaw, reportActions, commandActionsRaw]);
   const turnPreviewRaw = useMemo(() => buildTurnPreview(state, { readiness: readinessRaw, roadmap: roadmapRaw, commandActions: commandActionsRaw }), [state, readinessRaw, roadmapRaw, commandActionsRaw]);
   const councilRaw = useMemo(() => buildPreTurnCouncil(state, { readiness: readinessRaw, roadmap: roadmapRaw, preview: turnPreviewRaw, commandActions: commandActionsRaw }), [state, readinessRaw, roadmapRaw, turnPreviewRaw, commandActionsRaw]);
   const brief = localizeDeep(briefRaw, t);
   const readiness = localizeDeep(readinessRaw, t);
   const commandActions = localizeDeep(commandActionsRaw, t);
+  const system = localizeDeep(systemRaw, t);
   const roadmap = localizeDeep(roadmapRaw, t);
   const turnPreview = localizeDeep(turnPreviewRaw, t);
   const council = localizeDeep(councilRaw, t);
@@ -241,7 +247,7 @@ export default function Dashboard() {
         {!sharedSession && <NationalPurposePanel state={state} />}
         <DashboardStrategicHq state={state} commandActions={commandActions} jumpToTab={jumpToTab} />
         <RoadmapPanel roadmap={roadmap} jumpToTab={jumpToTab} />
-        <ReadinessPanel report={readiness} jumpToTab={jumpToTab} />
+        <ReadinessPanel report={readiness} system={system} jumpToTab={jumpToTab} />
         {ending && <section className="ia-dash-section ia-dash-victory"><h3>{t(won ? '万世之业已成' : '社稷倾覆')}</h3><p>{t(won ? '核心国运目标已经完成。可继续经营，或查看史册。' : '本局已经结束。查看史册后读档，或重新开局。')}</p><div className="ia-dash-command-actions">{won && !sharedSession && <Btn label={t('继续传世经营')} variant="primary" onClick={continueLegacy} />}<Btn label={t('查看帝国史册')} onClick={() => jumpToTab('chronicle')} />{!won && !sharedSession && <Btn label={t('读取最近存档')} onClick={() => load()} disabled={!hasSave()} />}<Btn label={t(sharedSession ? '退出共享治理' : '返回剧本大厅')} variant="ghost" onClick={backToMenu} /></div></section>}
       </main>
       <aside className="ia-dash-col ia-dash-col--right">

@@ -1,6 +1,6 @@
 # Release checklist
 
-Use this checklist whenever a new preview or release candidate build is prepared.
+Use this checklist whenever a stable release or release candidate is prepared.
 
 ## 1. Build source
 
@@ -25,6 +25,7 @@ Before release, all required checks should be green:
 - Data/scenario validation.
 - Pages-compatible production build.
 - GitHub Pages deployment.
+- The package version, build marker, README badge, release notes, tag, and GitHub Release all agree.
 
 Only `main` should be treated as the canonical public release line. Old optimization branches may be used for audit only and should not be merged wholesale.
 
@@ -91,6 +92,10 @@ Do not tag a release if any of these are true:
 - Governor Advisor is missing from the domestic command group.
 - Save/load fails.
 - Ending a turn crashes.
+- A queued event can be applied more than once or blocks the game after resolution.
+- Operation feedback stops after a long session or repeated messages disappear.
+- Returning to the title screen can discard an active local campaign without confirmation.
+- The 390 px layout has horizontal page overflow or hides the “All pages” entry.
 - War declaration or war preview crashes.
 - Any required workflow is red.
 - Old branch audit PRs still contain unreviewed release-critical changes.
