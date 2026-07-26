@@ -215,6 +215,8 @@ Object.assign(en, {
 });
 
 Object.assign(en, {
+  '跨版图好友私聊 · 仅双方可见 · 支持文字与图片': 'Cross-world friend chat · private to both of you · text and images',
+  '好友关系不受当前版图限制，可随时继续私聊。': 'Friendships are not limited to the current world. You can continue chatting anytime.',
   '初来乍到的统治者': 'Newly arrived ruler',
   '这位统治者还没有写下自己的宣言。': 'This ruler has not written a public declaration yet.',
   '{{name}} 的玩家名片': '{{name}}’s player card',
@@ -282,6 +284,8 @@ Object.assign(en, {
 });
 
 Object.assign(zhTW, {
+  '跨版图好友私聊 · 仅双方可见 · 支持文字与图片': '跨版圖好友私聊 · 僅雙方可見 · 支援文字與圖片',
+  '好友关系不受当前版图限制，可随时继续私聊。': '好友關係不受目前版圖限制，可隨時繼續私聊。',
   '治国路线说明': '治國路線說明', '✦ 治国路线 · 第 {{current}} / {{total}} 步': '✦ 治國路線 · 第 {{current}} / {{total}} 步',
   '推荐页面：{{page}}': '推薦頁面：{{page}}', ' · 快捷键 {{shortcut}}': ' · 快捷鍵 {{shortcut}}', '不再提示': '不再提示',
   '上一步': '上一步', '下一步': '下一步', '开始实战引导': '開始實戰引導',

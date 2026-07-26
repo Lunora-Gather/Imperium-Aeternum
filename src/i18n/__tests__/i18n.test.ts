@@ -37,4 +37,10 @@ describe('i18n catalog', () => {
     expect(translate('1 个存档可读但有风险', {}, 'en')).toBe('1 playable save has risks');
     expect(translate('1 个槽位损坏', {}, 'en')).toBe('1 damaged slot');
   });
+
+  it('explains the boundary between cross-world friend chat and world chat', () => {
+    expect(translate('好友关系不受当前版图限制，可随时继续私聊。', {}, 'en')).toContain('not limited to the current world');
+    expect(translate('跨版图好友私聊 · 仅双方可见 · 支持文字与图片', {}, 'zh-TW')).toContain('跨版圖好友私聊');
+    expect(translate('文字与图片仅本版图成员可见', {}, 'en')).toBe('Text and images are visible only to world members');
+  });
 });
