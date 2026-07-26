@@ -5,7 +5,7 @@ import { useGameStore } from '../gameStore';
 
 describe('GameStore explicit pipeline integration', () => {
   beforeEach(() => {
-    useGameStore.setState({ state: createInitialState(), scene: 'menu', log: [], justProcessedTurn: false });
+    useGameStore.setState({ state: createInitialState(), scene: 'menu', log: [], logSeq: 0, justProcessedTurn: false });
   });
 
   it('prepares and advances a classic game without runtime installers', () => {
@@ -52,5 +52,18 @@ describe('GameStore explicit pipeline integration', () => {
     useGameStore.setState({ state: failed });
     expect(useGameStore.getState().continueLegacy()).toBe(false);
     expect(useGameStore.getState().state.victory.type).toBe('fail_collapse');
+  });
+
+  it('keeps a monotonic feedback sequence while the visible log rolls and messages repeat', () => {
+    for (let index = 1; index <= 35; index += 1) {
+      useGameStore.getState().logMsg(`消息 ${index}`);
+    }
+    useGameStore.getState().logMsg('请先处理待决事件');
+    useGameStore.getState().logMsg('请先处理待决事件');
+
+    const current = useGameStore.getState();
+    expect(current.log).toHaveLength(31);
+    expect(current.log.slice(-2)).toEqual(['请先处理待决事件', '请先处理待决事件']);
+    expect(current.logSeq).toBe(37);
   });
 });

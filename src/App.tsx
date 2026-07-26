@@ -9,8 +9,10 @@ import { canAttemptLazyRecovery, isRecoverableLazyImportError } from './utils/la
 import { getOnboardingStep, nextOnboardingIndex, onboardingProgress, prevOnboardingIndex } from './gameplay/onboarding';
 import { pushPageHistory, resolveBackTarget } from './gameplay/pageHistory';
 import {
+  ALL_NAVIGATION_ITEMS,
   centeredTabScrollLeft,
   isNavigationTab,
+  NAVIGATION_GROUPS,
   shouldBlockGlobalShortcut,
   type NavigationTab,
 } from './gameplay/navigationTabs';
@@ -93,28 +95,6 @@ function HeaderIconButton({ icon, label, onClick, disabled = false, tone = '' }:
   return <button className={`ia-icon-btn${tone ? ` ia-icon-btn--${tone}` : ''}`} onClick={onClick} disabled={disabled} title={label} aria-label={label}><span aria-hidden="true">{icon}</span></button>;
 }
 
-const TAB_GROUPS: { group: string; tabs: { id: Tab; label: string; key: string; icon: string }[] }[] = [
-  { group: '治理', tabs: [
-    { id: 'dashboard', label: '总览', key: '1', icon: '◈' },
-    { id: 'map', label: '舆图', key: 'm', icon: '⬡' },
-    { id: 'province', label: '省份', key: '2', icon: '▣' },
-    { id: 'economy', label: '经济', key: '3', icon: '◉' },
-    { id: 'population', label: '人口', key: '4', icon: '◯' },
-    { id: 'politics', label: '政治', key: '5', icon: '⚖' },
-    { id: 'tech', label: '科技', key: '6', icon: '✦' },
-    { id: 'stats', label: '统计', key: 's', icon: '◇' },
-  ]},
-  { group: '征伐', tabs: [
-    { id: 'military', label: '军事', key: '7', icon: '⚔' },
-    { id: 'diplomacy', label: '外交', key: '8', icon: '✉' },
-  ]},
-  { group: '纪事', tabs: [
-    { id: 'report', label: '年报', key: '9', icon: '✶' },
-    { id: 'chronicle', label: '史册', key: 'c', icon: '✧' },
-    { id: 'save', label: '存档', key: '0', icon: '⌶' },
-  ]},
-];
-const ALL_TABS = TAB_GROUPS.flatMap((g) => g.tabs);
 const NOVICE_JOURNEY_KEY = 'ia-novice-journey-v1';
 
 function loadNoviceJourney(): NoviceJourneyProgress {
@@ -334,7 +314,7 @@ export default function App() {
       goToTab('economy');
       return;
     }
-    const hit = ALL_TABS.find((x) => x.key === e.key);
+    const hit = ALL_NAVIGATION_ITEMS.find((x) => x.key === e.key);
     if (hit) {
       e.preventDefault();
       goToTab(hit.id);
@@ -456,7 +436,7 @@ export default function App() {
 
       <div className="ia-nav-shell">
         <nav ref={mainNavRef} className="ia-main-nav" aria-label={t('主导航')}>
-          {TAB_GROUPS.map((g) => (
+          {NAVIGATION_GROUPS.map((g) => (
             <div className="ia-nav-group" key={g.group}>
               <span className="ia-nav-label ia-up">{t(g.group)}</span>
               <div className="ia-tab-cluster">
@@ -486,7 +466,7 @@ export default function App() {
 
       {mobileNavOpen && (
         <Suspense fallback={null}>
-          <MobileNavigationSheet groups={TAB_GROUPS} activeTab={tab} onSelect={goToTab} onClose={() => setMobileNavOpen(false)} />
+          <MobileNavigationSheet activeTab={tab} onSelect={goToTab} onClose={() => setMobileNavOpen(false)} />
         </Suspense>
       )}
 
@@ -554,7 +534,7 @@ export default function App() {
             <div className="ia-help-step-title">{t(helpStep.title)}</div>
             <div className="ia-help-step-body">{t(helpStep.body)}</div>
             <div className="ia-dash-note" style={{ marginTop: 10 }}>
-              {t('推荐页面：{{page}}', { page: t(ALL_TABS.find((x) => x.id === helpStep.tab)?.label ?? helpStep.tab) })}{helpStep.shortcut ? t(' · 快捷键 {{shortcut}}', { shortcut: helpStep.shortcut }) : ''}
+              {t('推荐页面：{{page}}', { page: t(ALL_NAVIGATION_ITEMS.find((x) => x.id === helpStep.tab)?.label ?? helpStep.tab) })}{helpStep.shortcut ? t(' · 快捷键 {{shortcut}}', { shortcut: helpStep.shortcut }) : ''}
             </div>
             <div className="ia-help-actions">
               <button className="ia-btn ia-btn--ghost" onClick={dismissGuidance}>{t('不再提示')}</button>
