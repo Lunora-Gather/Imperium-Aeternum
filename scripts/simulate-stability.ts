@@ -1,5 +1,5 @@
 import { createInitialState, createWorldState } from '../src/engine/init';
-import { invariantErrors } from '../src/gameplay/stateInvariants';
+import { auditStateInvariants } from '../src/gameplay/stateInvariants';
 import { resolvePendingEventChoice } from '../src/gameplay/pendingEventResolution';
 import { advanceTurnPipeline, prepareGameState } from '../src/gameplay/turnPipeline';
 import type { GameState } from '../src/types/game';
@@ -48,11 +48,21 @@ for (const simulation of cases) {
     let state = prepareGameState(simulation.create(sample));
     const startedAt = performance.now();
     let completedTurns = 0;
-    for (; completedTurns < simulation.turns && !state.victory.type; completedTurns += 1) {
+    let firstVictory: { type: string; turn: number } | null = null;
+    for (; completedTurns < simulation.turns; completedTurns += 1) {
+      // A stability run must cover the requested horizon. Record the first real
+      // ending, then clear it only inside this synthetic stress harness.
+      if (state.victory.type) {
+        firstVictory ??= { type: state.victory.type, turn: state.turn };
+        state = { ...state, victory: { type: null } };
+      }
       state = resolvePlayerQueue(advanceTurnPipeline(state).state);
-      const errors = invariantErrors(state);
-      if (errors.length > 0) throw new Error(`${simulation.id} 样本 ${sample + 1} 第 ${state.turn} 回合：${errors.map((issue) => issue.detail).join('; ')}`);
+      const issues = auditStateInvariants(state);
+      if (issues.length > 0) {
+        throw new Error(`${simulation.id} 样本 ${sample + 1} 第 ${state.turn} 回合：${issues.map((issue) => `${issue.severity}/${issue.id} ${issue.detail}`).join('; ')}`);
+      }
     }
+    if (state.victory.type && !firstVictory) firstVictory = { type: state.victory.type, turn: state.turn };
     const elapsedMs = performance.now() - startedAt;
     const perTurnMs = elapsedMs / Math.max(1, completedTurns);
     measurements.push(perTurnMs);
@@ -63,7 +73,8 @@ for (const simulation of cases) {
       perTurnMs: Math.round(perTurnMs),
       nations: Object.keys(state.nations).length,
       provinces: Object.keys(state.provinces).length,
-      victory: state.victory.type,
+      firstVictory,
+      finalStateKiB: Math.round(JSON.stringify(state).length / 102.4) / 10,
     };
   }
 

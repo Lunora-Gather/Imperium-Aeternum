@@ -8,8 +8,8 @@ describe('GameState invariants', () => {
     const classic = prepareGameState(createInitialState());
     const world = prepareGameState(createWorldState(7777, 'n_ea_qin'));
 
-    expect(invariantErrors(classic)).toEqual([]);
-    expect(invariantErrors(world)).toEqual([]);
+    expect(auditStateInvariants(classic)).toEqual([]);
+    expect(auditStateInvariants(world)).toEqual([]);
   });
 
   it('keeps invariants across several complete classic turns', () => {
@@ -36,5 +36,17 @@ describe('GameState invariants', () => {
     state.entityIdCounter = 2;
 
     expect(auditStateInvariants(state).map((issue) => issue.id)).toContain('entity-id-counter-stale');
+  });
+
+  it('allows one-way coast access but reports asymmetric land borders', () => {
+    const state = prepareGameState(createInitialState());
+
+    expect(state.provinces.p12.terrain).toBe('ocean');
+    expect(state.provinces.p12.adjacent).toContain('p07');
+    expect(state.provinces.p07.adjacent).not.toContain('p12');
+    expect(auditStateInvariants(state).map((issue) => issue.id)).not.toContain('province-adjacency-asymmetric');
+
+    state.provinces.p01.adjacent.push('p05');
+    expect(auditStateInvariants(state).map((issue) => issue.id)).toContain('province-adjacency-asymmetric');
   });
 });

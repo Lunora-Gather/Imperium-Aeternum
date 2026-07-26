@@ -49,7 +49,11 @@ export function auditStateInvariants(state: GameState): StateInvariantIssue[] {
     }
     for (const adjacentId of province.adjacent) {
       if (!state.provinces[adjacentId] || adjacentId === province.id) add('province-adjacency-invalid', 'error', `${province.id} 含无效邻接 ${adjacentId}。`);
-      else if (!state.provinces[adjacentId].adjacent.includes(province.id)) add('province-adjacency-asymmetric', 'warning', `${province.id}→${adjacentId} 缺少反向邻接。`);
+      else if (
+        province.terrain !== 'ocean'
+        && state.provinces[adjacentId].terrain !== 'ocean'
+        && !state.provinces[adjacentId].adjacent.includes(province.id)
+      ) add('province-adjacency-asymmetric', 'warning', `${province.id}→${adjacentId} 缺少反向邻接。`);
     }
     for (const building of province.buildings) {
       inspectEntityId(building.id);

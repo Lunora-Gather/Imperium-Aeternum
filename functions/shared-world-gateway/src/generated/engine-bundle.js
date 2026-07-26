@@ -2368,6 +2368,10 @@ function getRelationObj(from, to, state) {
   }
   return map?.get(`${from}|${to}`);
 }
+function invalidateRelationMap(state) {
+  relationMapCache.delete(state);
+  if (Object.isExtensible(state)) state._relMap = void 0;
+}
 function provincesOf(nationId, provinces) {
   return Object.values(provinces).filter((p) => p.ownerId === nationId);
 }
@@ -8952,7 +8956,7 @@ function auditStateInvariants(state) {
     }
     for (const adjacentId of province.adjacent) {
       if (!state.provinces[adjacentId] || adjacentId === province.id) add("province-adjacency-invalid", "error", `${province.id} \u542B\u65E0\u6548\u90BB\u63A5 ${adjacentId}\u3002`);
-      else if (!state.provinces[adjacentId].adjacent.includes(province.id)) add("province-adjacency-asymmetric", "warning", `${province.id}\u2192${adjacentId} \u7F3A\u5C11\u53CD\u5411\u90BB\u63A5\u3002`);
+      else if (province.terrain !== "ocean" && state.provinces[adjacentId].terrain !== "ocean" && !state.provinces[adjacentId].adjacent.includes(province.id)) add("province-adjacency-asymmetric", "warning", `${province.id}\u2192${adjacentId} \u7F3A\u5C11\u53CD\u5411\u90BB\u63A5\u3002`);
     }
     for (const building of province.buildings) {
       inspectEntityId(building.id);
@@ -9618,6 +9622,7 @@ function resolvePendingEventChoice(state, nationId, eventId, optionIndex) {
   applyEffect(next.nations[nationId], option.effects, next);
   recordEvent(next, nationId, eventId, optionIndex);
   next.pendingEvents.splice(index, 1);
+  invalidateRelationMap(next);
   return {
     state: next,
     resolved: true,
