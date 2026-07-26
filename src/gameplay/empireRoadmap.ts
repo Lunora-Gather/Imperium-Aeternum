@@ -111,12 +111,12 @@ function impactFromAction(a: CommandCenterAction): string {
 }
 
 function stepFromAction(a: CommandCenterAction, index: number): RoadmapStep {
-  const reason = `${sourceLabel(a.source)} · 优先级 ${a.level}`;
+  const reason = a.reason ?? `${sourceLabel(a.source)}将其列为优先事项。`;
   const impact = impactFromAction(a);
   return {
     id: `action-${a.id}`,
     title: index === 0 ? `先做：${a.label}` : a.label,
-    body: `${a.desc} 依据：${reason}。影响：${impact}`,
+    body: `${a.desc} 依据：${reason} 影响：${impact}`,
     tab: a.tab,
     tone: a.tone === 'danger' ? 'danger' : a.tone === 'warn' ? 'warn' : 'info',
     horizon: index === 0 ? '现在' : '本年',
