@@ -71,6 +71,41 @@ export function applyIncomingUnread(current: Record<string, number>, friendUserI
   return { ...current, [friendUserId]: (current[friendUserId] ?? 0) + 1 };
 }
 
+export function acceptedFriendUserIds(friendships: Friendship[], selfId?: string): Set<string> {
+  if (!selfId) return new Set();
+  return new Set(friendships
+    .filter((entry) => entry.status === 'accepted' && (entry.requesterId === selfId || entry.addresseeId === selfId))
+    .map((entry) => entry.requesterId === selfId ? entry.addresseeId : entry.requesterId)
+    .filter((friendId) => friendId && friendId !== selfId));
+}
+
+export function reconcileFriendConversationState(
+  friendships: Friendship[],
+  selfId: string | undefined,
+  directMessages: Record<string, DirectMessage[]>,
+  unreadDirect: Record<string, number>,
+  activeConversation: string | null,
+): Pick<SocialStore, 'directMessages' | 'unreadDirect' | 'activeConversation'> {
+  const acceptedIds = acceptedFriendUserIds(friendships, selfId);
+  return {
+    directMessages: Object.fromEntries(Object.entries(directMessages).filter(([friendId]) => acceptedIds.has(friendId))),
+    unreadDirect: Object.fromEntries(Object.entries(unreadDirect).filter(([friendId]) => acceptedIds.has(friendId))),
+    activeConversation: activeConversation && acceptedIds.has(activeConversation) ? activeConversation : null,
+  };
+}
+
+export function latestUnreadDirectMessage(
+  directMessages: Record<string, DirectMessage[]>,
+  unreadDirect: Record<string, number>,
+  selfId: string,
+): DirectMessage | undefined {
+  return Object.entries(directMessages)
+    .filter(([friendId]) => (unreadDirect[friendId] ?? 0) > 0)
+    .flatMap(([, entries]) => entries)
+    .filter((entry) => entry.senderId !== selfId)
+    .sort((a, b) => compareMessages(b, a))[0];
+}
+
 type DirectReadReceipts = Record<string, string>;
 
 const readReceiptKey = (userId: string) => `imperium-aeternum:direct-read:v1:${userId}`;
@@ -126,20 +161,32 @@ export const useSocialStore = create<SocialStore>((set, get) => ({
     try {
       const [profile, friendships] = await Promise.all([ensureGameProfile(), listFriendships()]);
       const inbox = await listDirectInbox();
-      const acceptedFriendIds = new Set(friendships.filter((entry) => entry.status === 'accepted').map((entry) => entry.requesterId === profile.userId ? entry.addresseeId : entry.requesterId));
+      const acceptedFriendIds = acceptedFriendUserIds(friendships, profile.userId);
       const recovered = recoverDirectInbox(inbox, profile.userId, acceptedFriendIds, loadReadReceipts(profile.userId));
-      set((state) => ({
-        profile,
-        friendships,
-        profileCache: { ...state.profileCache, [profile.userId]: profile },
-        directMessages: { ...state.directMessages, ...Object.fromEntries(Object.entries(recovered.messages).map(([friendId, entries]) => [friendId, mergeChatMessages(state.directMessages[friendId] ?? [], entries)])) },
-        unreadDirect: recovered.unread,
-      }));
+      set((state) => {
+        const retained = reconcileFriendConversationState(friendships, profile.userId, state.directMessages, state.unreadDirect, state.activeConversation);
+        return {
+          profile,
+          friendships,
+          profileCache: { ...state.profileCache, [profile.userId]: profile },
+          directMessages: Object.fromEntries([...acceptedFriendIds].map((friendId) => [
+            friendId,
+            mergeChatMessages(retained.directMessages[friendId] ?? [], recovered.messages[friendId] ?? []),
+          ])),
+          unreadDirect: Object.fromEntries([...acceptedFriendIds]
+            .map<[string, number]>((friendId) => [friendId, Math.max(retained.unreadDirect[friendId] ?? 0, recovered.unread[friendId] ?? 0)])
+            .filter(([, count]) => count > 0)),
+          activeConversation: retained.activeConversation,
+        };
+      });
     } catch (error) { set({ message: error instanceof Error ? error.message : '社交资料加载失败' }); }
     finally { set({ loading: false }); }
   },
   refreshFriendships: async () => {
-    try { set({ friendships: await listFriendships() }); }
+    try {
+      const friendships = await listFriendships();
+      set((state) => ({ friendships, ...reconcileFriendConversationState(friendships, state.profile?.userId, state.directMessages, state.unreadDirect, state.activeConversation) }));
+    }
     catch (error) { set({ message: error instanceof Error ? error.message : '好友列表刷新失败' }); }
   },
   discover: async (worldId) => {
@@ -179,7 +226,8 @@ export const useSocialStore = create<SocialStore>((set, get) => ({
       if (!target) throw new Error('没有找到该好友码');
       if (target.userId === get().profile?.userId) throw new Error('不能添加自己为好友');
       await sendFriendRequest(target.userId);
-      set({ friendships: await listFriendships(), message: `已向 ${target.displayName} 发送好友申请` });
+      const friendships = await listFriendships();
+      set((state) => ({ friendships, ...reconcileFriendConversationState(friendships, state.profile?.userId, state.directMessages, state.unreadDirect, state.activeConversation), message: `已向 ${target.displayName} 发送好友申请` }));
       return true;
     } catch (error) { set({ message: error instanceof Error ? error.message : '好友申请失败' }); return false; }
     finally { set({ loading: false }); }
@@ -189,17 +237,26 @@ export const useSocialStore = create<SocialStore>((set, get) => ({
     try {
       if (target.userId === get().profile?.userId) throw new Error('不能添加自己为好友');
       await sendFriendRequest(target.userId);
-      set({ friendships: await listFriendships(), message: `已向 ${target.displayName} 发送好友申请` });
+      const friendships = await listFriendships();
+      set((state) => ({ friendships, ...reconcileFriendConversationState(friendships, state.profile?.userId, state.directMessages, state.unreadDirect, state.activeConversation), message: `已向 ${target.displayName} 发送好友申请` }));
       return true;
     } catch (error) { set({ message: error instanceof Error ? error.message : '好友申请失败' }); return false; }
     finally { set({ loading: false }); }
   },
   respond: async (friendshipId, accept) => {
-    try { await respondFriendRequest(friendshipId, accept); set({ friendships: await listFriendships(), message: accept ? '已成为好友' : '已拒绝好友申请' }); }
+    try {
+      await respondFriendRequest(friendshipId, accept);
+      const friendships = await listFriendships();
+      set((state) => ({ friendships, ...reconcileFriendConversationState(friendships, state.profile?.userId, state.directMessages, state.unreadDirect, state.activeConversation), message: accept ? '已成为好友' : '已拒绝好友申请' }));
+    }
     catch (error) { set({ message: error instanceof Error ? error.message : '好友申请处理失败' }); }
   },
   remove: async (friendshipId) => {
-    try { await removeFriend(friendshipId); set({ friendships: await listFriendships(), message: '已移除好友' }); }
+    try {
+      await removeFriend(friendshipId);
+      const friendships = await listFriendships();
+      set((state) => ({ friendships, ...reconcileFriendConversationState(friendships, state.profile?.userId, state.directMessages, state.unreadDirect, state.activeConversation), message: '已移除好友' }));
+    }
     catch (error) { set({ message: error instanceof Error ? error.message : '移除好友失败' }); }
   },
   refreshMessages: async (worldId) => {
@@ -269,6 +326,7 @@ export const useSocialStore = create<SocialStore>((set, get) => ({
   receiveDirectMessage: (entry) => {
     const selfId = get().profile?.userId;
     const friendUserId = entry.senderId === selfId ? entry.recipientId : entry.senderId;
+    if (!acceptedFriendUserIds(get().friendships, selfId).has(friendUserId)) return;
     const existing = (get().directMessages[friendUserId] ?? []).some((message) => message.id === entry.id);
     const incoming = entry.senderId !== selfId && !existing;
     if (incoming && get().activeConversation === friendUserId) saveReadReceipt(selfId ?? '', friendUserId, directMessageCursor(entry));
