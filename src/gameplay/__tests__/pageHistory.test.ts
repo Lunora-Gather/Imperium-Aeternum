@@ -27,6 +27,10 @@ describe('page history navigation', () => {
     expect(resolved).toEqual({ target: 'dashboard', history: [], usedFallback: true });
   });
 
+  it('keeps back available on a non-dashboard page even without history', () => {
+    expect(resolveBackTarget([], 'report', 'dashboard')).toEqual({ target: 'dashboard', history: [], usedFallback: true });
+  });
+
   it('caps long navigation history', () => {
     const history = pushPageHistory(['a', 'b', 'c'], 'd', 'e', 3);
     expect(history).toEqual(['b', 'c', 'd']);

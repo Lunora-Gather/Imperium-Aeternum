@@ -191,7 +191,7 @@ export default function App() {
     setTabHistory(resolved.history);
     setTab(resolved.target);
   }, [tab, tabHistory]);
-  const canGoBack = !resolveBackTarget(tabHistory, tab, 'dashboard').usedFallback;
+  const canGoBack = resolveBackTarget(tabHistory, tab, 'dashboard').target !== tab;
 
   const dismissGuidance = useCallback(() => {
     setShowHelp(false);
@@ -252,11 +252,8 @@ export default function App() {
 
   useEffect(() => {
     if (!justProcessedTurn) return;
-    if (state.turn <= 1) goToTab('report', false);
-    else {
-      setPreReportTab(tab);
-      goToTab('report', false);
-    }
+    setPreReportTab(tab);
+    goToTab('report');
     clearTurnFlag();
   }, [justProcessedTurn, clearTurnFlag, state.turn, tab, goToTab]);
 
