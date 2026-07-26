@@ -173,7 +173,7 @@ export const dashboardCatalog: ScopedCatalog = {
       '制度整顿': 'Institutional reform', '先修国家机器。': 'Repair the state apparatus first. ', '主线 ': 'Route ', '首要行动 ': 'Primary action ',
       '胜利路线：': 'Victory route: ', '且安定需': ' and stability must be ', '当前进度约': 'Current progress is about ',
       '（': ' (', '）': ')', '。': '. ', '，': ', ', '；': '; ', '约': 'about ',
-      '当前版本 ': 'Version ', ' 已具备完整预览验收入口': ' now has a complete preview acceptance path',
+      '系统体检': 'System check', '状态一致': 'state consistent',
       '当前准备度 ': 'Current readiness is ', '状态 ': 'status ', '目标教练：': 'Objective coach: ',
       '投入影响力降低未来战争和外交孤立风险': 'Invest influence to reduce future war and diplomatic isolation risk',
       '先读帝国总参': 'Read Strategic Headquarters first', '总参会告诉你今年最重要的一个方向': 'Headquarters identifies the single most important direction this year',

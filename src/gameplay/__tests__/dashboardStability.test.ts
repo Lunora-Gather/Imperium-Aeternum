@@ -1,14 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { BUILD_MARK } from '../../buildInfo';
 import { createInitialState } from '../../engine/init';
 import { processTurn } from '../../engine/turn';
 import { buildCommandCenterActions } from '../commandCenterActions';
 import { buildDashboardCommandGroups } from '../dashboardCommandGroups';
 import { buildGovernorAdvisorPlan } from '../governorAdvisor';
-import { buildReleaseReadinessPlan } from '../releaseReadiness';
 import { buildStrategicHqPlan } from '../strategicHq';
 
-const SUPPORTED_DASHBOARD_ITEMS = ['release', 'governor', 'onboarding', 'strategic-hq', 'turn-risk', 'economy', 'diplomacy', 'war'];
+const SUPPORTED_DASHBOARD_ITEMS = ['governor', 'onboarding', 'strategic-hq', 'turn-risk', 'economy', 'diplomacy', 'war'];
 
 describe('dashboard stability smoke', () => {
   it('builds the full dashboard command stack from a fresh state', () => {
@@ -17,16 +15,12 @@ describe('dashboard stability smoke', () => {
     const hq = buildStrategicHqPlan(state, actions);
     const groups = buildDashboardCommandGroups(state);
     const governor = buildGovernorAdvisorPlan(state, actions);
-    const release = buildReleaseReadinessPlan(state, actions);
 
     expect(actions.length).toBeGreaterThan(0);
     expect(hq.title.length).toBeGreaterThan(0);
     expect(groups.map((g) => g.id)).toEqual(['guide', 'risk', 'domestic', 'external']);
     expect(groups.flatMap((g) => g.itemIds).every((id) => SUPPORTED_DASHBOARD_ITEMS.includes(id))).toBe(true);
     expect(governor.queue.length).toBeGreaterThan(0);
-    expect(release.buildMark).toBe(BUILD_MARK);
-    expect(release.buildMark).toMatch(/^(V\d+|\d+\.\d+\.\d+)/);
-    expect(release.score).toBeGreaterThanOrEqual(0);
   });
 
   it('keeps dashboard advisors stable after several processed turns', () => {
@@ -36,14 +30,12 @@ describe('dashboard stability smoke', () => {
     const actions = buildCommandCenterActions(state, 6);
     const groups = buildDashboardCommandGroups(state);
     const governor = buildGovernorAdvisorPlan(state, actions);
-    const release = buildReleaseReadinessPlan(state, actions);
 
     expect(state.turn).toBe(3);
     expect(actions.every((a) => a.label.length > 0 && a.desc.length > 0)).toBe(true);
     expect(groups.every((g) => g.title.length > 0 && g.subtitle.length > 0)).toBe(true);
     expect(governor.confidence).toBeGreaterThanOrEqual(0);
     expect(governor.confidence).toBeLessThanOrEqual(100);
-    expect(release.items.length).toBe(6);
   });
 
   it('keeps player guidance first and governor advice under domestic affairs', () => {

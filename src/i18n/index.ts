@@ -1,5 +1,5 @@
 import { useSyncExternalStore } from 'react';
-import generatedZhTWCharacters from './generated/zh-TW.json';
+import { toGeneratedTraditionalCharacter } from './generated/zh-TW';
 
 export type Locale = 'zh-CN' | 'zh-TW' | 'en';
 
@@ -363,7 +363,7 @@ export function registerEnglishPatterns(patterns: ReadonlyArray<{ pattern: RegEx
 }
 
 function toTraditional(source: string): string {
-  return [...source].map((character) => generatedZhTWCharacters[character as keyof typeof generatedZhTWCharacters] ?? character).join('');
+  return [...source].map(toGeneratedTraditionalCharacter).join('');
 }
 
 export function translate(source: string, values: Record<string, string | number> = {}, locale = currentLocale): string {

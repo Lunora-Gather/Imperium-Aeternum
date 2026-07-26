@@ -5,4 +5,8 @@ describe('Traditional Chinese generated fallback', () => {
   it('covers Chinese text embedded in interpolated template literals', () => {
     expect(translate('农业科技树 · 当前 Lv1', {}, 'zh-TW')).toBe('農業科技樹 · 當前 Lv1');
   });
+
+  it('covers player-facing text stored in game data', () => {
+    expect(translate('静观其变', {}, 'zh-TW')).toBe('靜觀其變');
+  });
 });

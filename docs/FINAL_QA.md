@@ -1,6 +1,6 @@
 # Final QA Checklist
 
-This checklist is the final verification path for the 1.0 public preview.
+This checklist is the final verification path for the 1.1.0 stable release.
 
 ## Automated gate
 
@@ -23,7 +23,7 @@ The gate currently includes:
 Use the deployed Pages build or a local preview build.
 
 1. Open the game.
-2. Confirm the footer/build marker shows `1.0.0-public-preview`.
+2. Confirm the footer/build marker shows `1.1.0`.
 3. Start the classic scenario.
 4. Confirm Dashboard opens without a blank page.
 5. Expand/collapse each command group.
@@ -38,7 +38,7 @@ Use the deployed Pages build or a local preview build.
 
 ## Release blockers
 
-Do not tag 1.0 if any of these are true:
+Do not tag 1.1.0 if any of these are true:
 
 - `rc:check` fails
 - Pages build fails
@@ -70,9 +70,9 @@ Do not tag 1.0 if any of these are true:
 
 Before publishing or refreshing a release:
 
-1. Confirm `BUILD_MARK` is `1.0.0-public-preview`.
-2. Confirm package version is `1.0.0-preview`.
-3. Confirm `docs/release-notes-v1.0.0-preview.md` matches the current build.
+1. Confirm `BUILD_MARK` is `1.1.0`.
+2. Confirm package version is `1.1.0`.
+3. Confirm `docs/release-notes-v1.1.0.md` matches the current build.
 4. Confirm README links are correct.
 5. Confirm Pages deploy is visible.
-6. Confirm the GitHub Release points at `main` and tag `v1.0.0-preview`.
+6. Confirm the GitHub Release points at the immutable tag `v1.1.0` and is not marked as a prerelease.

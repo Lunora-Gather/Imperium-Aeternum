@@ -17,7 +17,7 @@ concurrency:
 
 jobs:
   build:
-    name: Build public preview
+    name: Build stable release
     runs-on: ubuntu-latest
     steps:
       - name: Checkout current ref

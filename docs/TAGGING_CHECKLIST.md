@@ -1,6 +1,6 @@
 # Tagging and GitHub Release Checklist
 
-Use this checklist only after `docs/FINAL_QA.md` and `docs/public-preview-qa.md` pass.
+Use this checklist only after `docs/FINAL_QA.md` and the current versioned release QA pass.
 
 ## 1. Confirm the release source
 
@@ -23,7 +23,7 @@ git rev-parse origin/main
 Release tags are immutable records. Never move or overwrite an already-published tag. If a
 published tag points to an older commit, create the next version tag instead.
 
-For a new preview tag:
+For a new immutable release tag:
 
 ```bash
 git tag -a <tag> -m "<release title>" origin/main
@@ -33,8 +33,8 @@ git push origin <tag>
 ## 3. Publish the GitHub release
 
 - Target the newly created tag.
-- Mark preview builds as prereleases.
-- Use `docs/release-notes-v1.0.0-preview.md` or the corresponding versioned notes.
+- Mark only preview builds as prereleases; stable releases must not use the prerelease flag.
+- Use the corresponding versioned notes, such as `docs/release-notes-v1.1.0.md`.
 - Include the public Pages URL.
 - Do not attach local saves, credentials, `.env` files, or generated secrets.
 
