@@ -52,3 +52,7 @@ export const FACTIONS: Record<FactionId, FactionDef> = {
 };
 
 export const FACTION_LIST: FactionDef[] = Object.values(FACTIONS);
+
+export function factionDisplayName(id: FactionId | string): string {
+  return FACTIONS[id as FactionId]?.name ?? '未知派系';
+}

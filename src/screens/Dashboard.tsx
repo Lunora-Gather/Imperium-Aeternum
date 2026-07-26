@@ -18,6 +18,8 @@ import { buildPreTurnCouncil, type PreTurnCouncil } from '../gameplay/preTurnCou
 import { buildChronicleDigest, type ChronicleDigest, type ChronicleHighlight } from '../gameplay/chronicleDigest';
 import { buildVictoryRouteFocus, type VictoryRouteFocus } from '../gameplay/victoryRoutes';
 import { getNationalCrisisView, getNationalMissionView } from '../gameplay/nationalPurpose';
+import { governmentDisplayName } from '../data/governments';
+import { nationalCharacterDisplayName } from '../data/national-characters';
 import { createScopedTranslator, localizeDeep } from '../i18n/scoped';
 import { dashboardCatalog } from '../i18n/catalogs/dashboard';
 import { registerGovernanceTranslations } from '../i18n/catalogs/governance';
@@ -228,7 +230,7 @@ export default function Dashboard() {
     </section>
     <div className="ia-dash-grid">
       <aside className="ia-dash-col ia-dash-col--left">
-        <Panel title={t('国家摘要')} icon="◈"><div className="ia-dash-kv"><span>{t('政体')}</span><strong>{t(player.government.type)}</strong></div><div className="ia-dash-kv"><span>{t('国性')}</span><strong>{t(player.character)}</strong></div><div className="ia-dash-kv"><span>{t('统治者')}</span><strong>{t(player.ruler.name)} · {t(`${player.ruler.age}岁`)}</strong></div><div className="ia-dash-kv"><span>{t('盟友倾向')}</span><strong>{t(`${allies} 个高关系对象`)}</strong></div></Panel>
+        <Panel title={t('国家摘要')} icon="◈"><div className="ia-dash-kv"><span>{t('政体')}</span><strong>{t(governmentDisplayName(player.government.type))}</strong></div><div className="ia-dash-kv"><span>{t('国性')}</span><strong>{t(nationalCharacterDisplayName(player.character))}</strong></div><div className="ia-dash-kv"><span>{t('统治者')}</span><strong>{t(player.ruler.name)} · {t(`${player.ruler.age}岁`)}</strong></div><div className="ia-dash-kv"><span>{t('盟友倾向')}</span><strong>{t(`${allies} 个高关系对象`)}</strong></div></Panel>
         <VictoryRoutePanel focus={victoryFocus} jumpToTab={jumpToTab} />
         <RiskPanel risks={risks} />
       </aside>

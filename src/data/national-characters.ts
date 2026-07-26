@@ -186,3 +186,7 @@ export const BEHAVIOR_MAPPINGS: BehaviorMapping[] = [
 export const BEHAVIOR_MAP_BY_ACTION: Record<string, BehaviorMapping> = Object.fromEntries(
   BEHAVIOR_MAPPINGS.map((b) => [b.actionId, b]),
 );
+
+export function nationalCharacterDisplayName(id: NationalCharacterId | string): string {
+  return NATIONAL_CHARACTERS[id as NationalCharacterId]?.name ?? '未知国性';
+}
