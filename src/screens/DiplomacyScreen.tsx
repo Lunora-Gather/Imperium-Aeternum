@@ -9,6 +9,7 @@ import { Panel, Stat, Btn, Tag } from '../components/ui';
 import type { DiplomaticRelation, Nation } from '../types/game';
 import { getAIStrategyInfo } from '../gameplay/strategyFocus';
 import { buildDiplomaticIntelBrief, buildDiplomaticIntelBoard, buildNationStyleProfile, type DiplomaticIntelBrief, type NationStyleProfile } from '../gameplay/nationIntel';
+import { governmentDisplayName } from '../data/governments';
 import { SummitPanel } from './diplomacy/SummitPanel';
 import { getDiplomaticMemoryBrief, type DiplomaticMemoryBrief } from '../gameplay/diplomaticMemory';
 
@@ -128,7 +129,7 @@ export default function DiplomacyScreen() {
       const relTone = rel.relation < -30 ? 'danger' : rel.relation < 30 ? 'warn' : 'good';
       const targetText = ai?.targetName ? ` → ${ai.targetName}` : '';
       return <div key={n.id} id={`diplo-${n.id}`} className="ia-card" style={{ padding: 12, border: focusNation === n.id ? '2px solid var(--gold)' : rel.treaty === 'war' ? '1px solid var(--war)' : undefined, transition: 'border 0.3s' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 }}><div><strong style={{ fontSize: 14 }}>{n.name}</strong><div style={{ fontSize: 11, color: 'var(--text-mute)' }}>{n.government.type} · {style.archetype} · {n.tier}级</div></div><div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', justifyContent: 'flex-end' }}>{ai && <Tag text={`${ai.label}${targetText}`} tone={intentTone(ai.kind)} />}<Tag text={treatyText(rel)} tone={TREATY_TONE[rel.treaty] ?? 'info'} /></div></div>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 }}><div><strong style={{ fontSize: 14 }}>{n.name}</strong><div style={{ fontSize: 11, color: 'var(--text-mute)' }}>{governmentDisplayName(n.government.type)} · {style.archetype} · {n.tier}级</div></div><div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', justifyContent: 'flex-end' }}>{ai && <Tag text={`${ai.label}${targetText}`} tone={intentTone(ai.kind)} />}<Tag text={treatyText(rel)} tone={TREATY_TONE[rel.treaty] ?? 'info'} /></div></div>
         <div style={{ padding: 8, marginBottom: 8, background: 'var(--bg-inset)', borderRadius: 6, border: `1px solid ${toneBorder(intel.tone)}` }}><div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, marginBottom: 4 }}><strong style={{ fontSize: 12 }}>{intel.headline}</strong><Tag text={`风险 ${intel.riskScore} / 机会 ${intel.opportunityScore}`} tone={intel.tone} /></div><div style={{ fontSize: 11, color: 'var(--text-dim)', lineHeight: 1.5 }}>{intel.explanation}</div><div style={{ fontSize: 11, color: 'var(--text-mute)', lineHeight: 1.5, marginTop: 4 }}>应对：{intel.action}</div><div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginTop: 6 }}>{intel.evidence.map((e) => <Tag key={e.text} text={e.text} tone={e.tone} />)}</div></div>
         <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginBottom: 6 }}>{style.tags.map((t) => <Tag key={t.text} text={t.text} tone={t.tone} />)}</div>
         <div style={{ fontSize: 11, color: 'var(--text-dim)', lineHeight: 1.45, marginBottom: 6 }}>{style.summary}</div>

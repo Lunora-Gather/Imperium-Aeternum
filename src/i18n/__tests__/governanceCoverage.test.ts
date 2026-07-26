@@ -2,6 +2,8 @@ import { beforeAll, describe, expect, it } from 'vitest';
 import { translate } from '..';
 import { registerGovernanceTranslations } from '../catalogs/governance';
 import { registerNationalPurposeTranslations } from '../catalogs/nationalPurpose';
+import { GOVERNMENTS } from '../../data/governments';
+import { NATIONAL_CHARACTERS } from '../../data/national-characters';
 
 beforeAll(() => {
   registerGovernanceTranslations();
@@ -41,5 +43,13 @@ describe('governance English coverage', () => {
     expect(translate('留下国祚', {}, 'en')).toBe('Secure the Legacy');
     expect(translate('🌾 农业科技树 · 当前 Lv1', {}, 'en')).toBe('🌾 Agriculture Technology · Current Lv.1');
     expect(translate('贸易站', {}, 'en')).toBe('Trade Post');
+  });
+
+  it('translates player-facing government and national character names', () => {
+    for (const definition of [...Object.values(GOVERNMENTS), ...Object.values(NATIONAL_CHARACTERS)]) {
+      expect(translate(definition.name, {}, 'en'), definition.id).not.toBe(definition.name);
+    }
+    expect(translate('未知政体', {}, 'en')).toBe('Unknown government');
+    expect(translate('未知国性', {}, 'en')).toBe('Unknown national character');
   });
 });

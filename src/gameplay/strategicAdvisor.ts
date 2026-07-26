@@ -4,6 +4,7 @@
 import type { GameState, Nation, Province, TurnReport } from '../types/game';
 import type { NavigationTab } from './navigationTabs';
 import { getAIStrategyInfo } from './strategyFocus';
+import { factionDisplayName } from '../data/factions';
 
 type AdvisorTab = NavigationTab;
 export type AdvisorTone = 'danger' | 'warn' | 'good' | 'info' | 'gold';
@@ -136,7 +137,7 @@ export function buildStrategicBrief(state: GameState): StrategicBrief {
     risks.push('政治结构脆弱');
   }
   if (lowFaction && lowFaction.satisfaction < 35) {
-    add(urgent, { title: '派系不满', body: `${lowFaction.id} 满意 ${n(lowFaction.satisfaction)}、权力 ${n(lowFaction.power)}。先安抚或用政策改派系温度。`, tab: 'population', level: 78, tone: 'warn', reason: 'faction' });
+    add(urgent, { title: '派系不满', body: `${factionDisplayName(lowFaction.id)} 满意 ${n(lowFaction.satisfaction)}、权力 ${n(lowFaction.power)}。先安抚或用政策改派系温度。`, tab: 'population', level: 78, tone: 'warn', reason: 'faction' });
     risks.push('派系反弹');
   }
   if (atWars.length > 0 || player.warExhaustion > 55) {

@@ -182,3 +182,7 @@ export const GOVERNMENTS: Record<GovernmentId, GovernmentDef> = {
 };
 
 export const GOVERNMENT_LIST: GovernmentDef[] = Object.values(GOVERNMENTS);
+
+export function governmentDisplayName(id: GovernmentId | string): string {
+  return GOVERNMENTS[id as GovernmentId]?.name ?? '未知政体';
+}
