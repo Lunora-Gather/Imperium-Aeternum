@@ -4,7 +4,7 @@ import { subscribeToDirectMessages, subscribeToFriendships } from '../../service
 import type { Friendship, GameProfile } from '../../social/types';
 import { useAccountStore } from '../../store/accountStore';
 import { useSharedWorldSessionStore } from '../../store/sharedWorldSessionStore';
-import { useSocialStore } from '../../store/socialStore';
+import { acceptedFriendUserIds, latestUnreadDirectMessage, useSocialStore } from '../../store/socialStore';
 import { Btn, Tag } from '../ui';
 import { DirectChatPanel } from './DirectChatPanel';
 import { PlayerProfileCard, PROFILE_COLORS, ProfileAvatar } from './PlayerProfileCard';
@@ -38,7 +38,8 @@ function relationFor(friendships: Friendship[], selfId: string, targetId: string
 
 function totalUnread(store: { friendships: Friendship[]; unreadDirect: Record<string, number> }, userId?: string) {
   const requests = store.friendships.filter((item) => item.status === 'pending' && item.addresseeId === userId).length;
-  return requests + Object.values(store.unreadDirect).reduce((sum, value) => sum + value, 0);
+  const acceptedIds = acceptedFriendUserIds(store.friendships, userId);
+  return requests + Object.entries(store.unreadDirect).reduce((sum, [friendId, value]) => sum + (acceptedIds.has(friendId) ? value : 0), 0);
 }
 
 export function SocialButton() {
@@ -59,7 +60,7 @@ export function SocialDock() {
   useSocialConnection(user?.$id);
   if (!user) return null;
   const unread = totalUnread(store, user.$id);
-  const newest = Object.values(store.directMessages).flat().filter((item) => item.senderId !== user.$id).sort((a, b) => b.createdAt.localeCompare(a.createdAt))[0];
+  const newest = latestUnreadDirectMessage(store.directMessages, store.unreadDirect, user.$id);
   return <>
     <button className={`ia-social-dock ${unread ? 'has-unread' : ''}`} onClick={() => setOpen(true)} aria-label={unread ? t('打开消息中心，{{count}} 条未读', { count: unread }) : t('打开消息中心')}>
       <span>♧</span>{unread > 0 && <b>{unread > 99 ? '99+' : unread}</b>}
@@ -74,7 +75,7 @@ export function SocialPanel({ onClose }: { onClose: () => void }) {
   const user = useAccountStore((state) => state.user);
   const worldSession = useSharedWorldSessionStore((state) => state.session);
   const store = useSocialStore();
-  const [tab, setTab] = useState<SocialTab>('discover');
+  const [tab, setTab] = useState<SocialTab>(() => !worldSession || totalUnread(store, user?.$id) > 0 ? 'friends' : 'discover');
   const [friendCode, setFriendCode] = useState('');
   const [chatFriend, setChatFriend] = useState<{ id: string; name: string } | null>(null);
   const [viewProfile, setViewProfile] = useState<GameProfile | null>(null);
