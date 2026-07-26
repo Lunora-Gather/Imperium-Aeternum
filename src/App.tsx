@@ -7,7 +7,7 @@ import { playSfx, useSfxMute } from './utils/audio';
 import { BUILD_MARK } from './buildInfo';
 import { canAttemptLazyRecovery, isRecoverableLazyImportError } from './utils/lazyRecovery';
 import { getOnboardingStep, nextOnboardingIndex, onboardingProgress, prevOnboardingIndex } from './gameplay/onboarding';
-import { pushPageHistory, resetPageHistory, resolveBackTarget } from './gameplay/pageHistory';
+import { pushPageHistory, resolveBackTarget } from './gameplay/pageHistory';
 import {
   centeredTabScrollLeft,
   isNavigationTab,
@@ -87,6 +87,7 @@ const EventModal = lazyScreen(() => import('./screens/EventModal'));
 const NoviceJourneyPanel = lazyScreen(() => import('./components/NoviceJourneyPanel'));
 const NoviceJourneyCompletion = lazyScreen(() => import('./components/NoviceJourneyCompletion'));
 const MobileNavigationSheet = lazyScreen(() => import('./components/MobileNavigationSheet'));
+const CampaignExitControl = lazyScreen(() => import('./components/CampaignExitControl'));
 
 function HeaderIconButton({ icon, label, onClick, disabled = false, tone = '' }: { icon: string; label: string; onClick: () => void; disabled?: boolean; tone?: 'gold' | 'back' | '' }) {
   return <button className={`ia-icon-btn${tone ? ` ia-icon-btn--${tone}` : ''}`} onClick={onClick} disabled={disabled} title={label} aria-label={label}><span aria-hidden="true">{icon}</span></button>;
@@ -155,7 +156,7 @@ export default function App() {
     return 'night';
   });
 
-  const { state, nextTurn, scene, justProcessedTurn, clearTurnFlag, pendingTab, consumePendingTab, backToMenu, hasSave } = useGameStore();
+  const { state, nextTurn, scene, justProcessedTurn, clearTurnFlag, pendingTab, consumePendingTab, hasSave } = useGameStore();
   const pid = state.playerNationId;
   const player = state.nations[pid];
   const provs = player ? provincesOf(pid, state.provinces) : [];
@@ -169,6 +170,12 @@ export default function App() {
   const sfxMute = useSfxMute();
   const prevPendingCount = useRef(state.pendingEvents.length);
   const prevVictory = useRef(state.victory.type);
+
+  useEffect(() => {
+    if (scene !== 'menu') return;
+    setTabHistory([]);
+    setTab('dashboard');
+  }, [scene]);
 
   const goToTab = useCallback((next: Tab, remember = true) => {
     setMobileNavOpen(false);
@@ -291,14 +298,6 @@ export default function App() {
       return next;
     });
   }, []);
-
-  const safeBackToMenu = useCallback(() => {
-    const ok = window.confirm(t('返回标题页？当前进度不会自动保存。建议先到“存档”页保存。'));
-    if (!ok) return;
-    setTabHistory(resetPageHistory<Tab>());
-    setTab('dashboard');
-    backToMenu();
-  }, [backToMenu, t]);
 
   const onKey = useCallback((e: KeyboardEvent) => {
     if (scene !== 'playing') return;
@@ -429,7 +428,7 @@ export default function App() {
                 <HeaderIconButton icon="?" label={t('新手帮助')} onClick={() => { setShowHelp(true); setTutorialStep(0); }} />
                 <HeaderIconButton icon={sfxMute.muted ? '🔇' : '🔊'} label={t('音效开关')} onClick={sfxMute.toggle} />
                 <HeaderIconButton icon="↩" label={t('返回上一页')} onClick={goBackPage} disabled={!canGoBack} tone="back" />
-                <HeaderIconButton icon="⌂" label={t('返回标题页')} onClick={safeBackToMenu} tone="back" />
+                <Suspense fallback={null}><CampaignExitControl presentation="icon" /></Suspense>
               </div>
             </div>
           </div>

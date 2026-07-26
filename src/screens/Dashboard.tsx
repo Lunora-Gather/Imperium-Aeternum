@@ -4,6 +4,7 @@ import { useGameStore } from '../store/gameStore';
 import { useSharedWorldSessionStore } from '../store/sharedWorldSessionStore';
 import { provincesOf } from '../engine/init';
 import { Panel, Btn, Tag } from '../components/ui';
+import CampaignExitControl from '../components/CampaignExitControl';
 import DashboardStrategicHq from '../components/DashboardStrategicHq';
 import NationalPurposePanel from '../components/NationalPurposePanel';
 import type { TurnReport } from '../types/game';
@@ -135,7 +136,7 @@ function ChronicleDigestPanel({ digest }: { digest: ChronicleDigest }) {
 }
 
 export default function Dashboard() {
-  const { state, nextTurn, continueLegacy, save, load, hasSave, newGame, backToMenu, jumpToTab, setStrategyFocus } = useGameStore();
+  const { state, nextTurn, continueLegacy, save, load, hasSave, backToMenu, jumpToTab, setStrategyFocus } = useGameStore();
   const sharedSession = useSharedWorldSessionStore((current) => current.session);
   const pid = useGameStore((s) => s.state.playerNationId);
   const player = useGameStore((s) => s.state.nations[pid]);
@@ -211,7 +212,7 @@ export default function Dashboard() {
         </div>
       </div>
       <div className="ia-dash-command-actions">
-        <Btn label={t(sharedSession ? '退出共享治理' : '新局')} variant="ghost" onClick={sharedSession ? backToMenu : newGame} />
+        <CampaignExitControl presentation="dashboard" />
         {!sharedSession && <Btn label={t('读档')} variant="ghost" onClick={() => load()} disabled={!hasSave()} />}
         {!sharedSession && <Btn label={t('存档')} variant="ghost" onClick={() => save()} />}
         <Btn label={t(sharedSession ? '本年准备完毕 →' : '下一回合 →')} variant="primary" onClick={() => nextTurn()} disabled={!!state.victory.type || hasPendingEventBlocker} title={t(hasPendingEventBlocker ? '先处理待决事件' : sharedSession ? '提交后等待同版图统治者统一结算' : council.title)} />

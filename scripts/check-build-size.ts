@@ -19,7 +19,9 @@ const budgets = {
   // Offline private-message recovery and direct friend-request actions add a bounded social layer.
   // The mobile page directory is lazy-loaded, keeping the App cap unchanged;
   // its isolated 1.4 KiB chunk is covered only by this total budget.
-  totalJavaScript: 1166 * KIB,
+  // Campaign exit confirmation is lazy and protects local/shared progress;
+  // its isolated copy does not relax entry or App limits.
+  totalJavaScript: 1169 * KIB,
   // Purpose/crisis panels, event decisions and the mobile navigation sheet
   // extend the measured UI baseline without changing entry-script limits.
   totalCss: 117 * KIB,
