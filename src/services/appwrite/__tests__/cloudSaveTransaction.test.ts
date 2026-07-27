@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { commitUploadedSave } from '../../../../functions/cloud-save-gateway/src/main.js';
+import { commitUploadedSave } from '../../../../functions/cloud-save-gateway/src/transaction.js';
 
 const metadata = {
   saveVersion: 7,
@@ -20,7 +20,7 @@ describe('cloud save transactional replacement', () => {
     const db = { createTransaction: vi.fn().mockRejectedValue(failure) };
     const storage = storageMock();
 
-    await expect(commitUploadedSave(db, storage, 'user-a', 1, { $id: 'new-file' }, metadata, {})).rejects.toThrow('unavailable');
+    await expect(commitUploadedSave(db, storage, 'user-a', 1, { $id: 'new-file' }, metadata, {}, [])).rejects.toThrow('unavailable');
     expect(storage.deleteFile).toHaveBeenCalledWith({ bucketId: 'cloud_saves', fileId: 'new-file' });
   });
 
@@ -33,7 +33,7 @@ describe('cloud save transactional replacement', () => {
     };
     const storage = storageMock();
 
-    const row = await commitUploadedSave(db, storage, 'user-a', 1, { $id: 'new-file' }, metadata, {});
+    const row = await commitUploadedSave(db, storage, 'user-a', 1, { $id: 'new-file' }, metadata, {}, []);
     expect(row).toEqual(expect.objectContaining({ fileId: 'current-file' }));
     expect(db.upsertRow).not.toHaveBeenCalled();
     expect(storage.deleteFile).toHaveBeenCalledWith({ bucketId: 'cloud_saves', fileId: 'new-file' });
@@ -55,7 +55,7 @@ describe('cloud save transactional replacement', () => {
     };
     const storage = storageMock();
 
-    const row = await commitUploadedSave(db, storage, 'user-a', 1, { $id: 'new-file' }, metadata, {});
+    const row = await commitUploadedSave(db, storage, 'user-a', 1, { $id: 'new-file' }, metadata, {}, []);
     expect(row).toEqual(expect.objectContaining({ fileId: 'winner-file' }));
     expect(db.createTransaction).toHaveBeenCalledTimes(2);
     expect(storage.deleteFile).toHaveBeenCalledWith({ bucketId: 'cloud_saves', fileId: 'new-file' });
