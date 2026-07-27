@@ -1,6 +1,6 @@
 # 文档导航
 
-本目录同时保留当前维护资料和历史阶段记录。后续工作应先看“当前事实”，历史报告只用于追溯，不应直接作为实施依据。
+本目录按用途分区保留当前维护资料、设计参考、规划、审查和发布记录。后续工作应先看“当前事实”，历史资料只用于追溯，不应直接作为实施依据。
 
 ## 当前事实源
 
@@ -13,33 +13,33 @@
 | [`maintenance/AUTH-AND-SOCIAL.md`](maintenance/AUTH-AND-SOCIAL.md) | 邮箱验证注册、账号反馈、好友与版图聊天体验 |
 | [`maintenance/BUG-AUDIT-CHECKLIST.md`](maintenance/BUG-AUDIT-CHECKLIST.md) | 漏洞复现、检查、修复和回归清单 |
 | [`maintenance/PROJECT-STRUCTURE.md`](maintenance/PROJECT-STRUCTURE.md) | 当前目录职责、命名规则和依赖方向 |
-| [`04-architecture.md`](04-architecture.md) | 引擎与模块的详细历史架构说明 |
-| [`formulas.md`](formulas.md) | 数值公式 |
-| [`decisions.md`](decisions.md) | 架构与玩法决策记录 |
-| [`POST_1_0_BACKLOG.md`](POST_1_0_BACKLOG.md) | 1.0 之后的原始需求池 |
+| [`reference/04-architecture.md`](reference/04-architecture.md) | 引擎与模块的详细历史架构说明 |
+| [`reference/formulas.md`](reference/formulas.md) | 数值公式 |
+| [`reference/decisions.md`](reference/decisions.md) | 架构与玩法决策记录 |
+| [`planning/POST_1_0_BACKLOG.md`](planning/POST_1_0_BACKLOG.md) | 1.0 之后的原始需求池 |
 
-## 发布资料
+## 目录分区
 
-- `release-checklist.md`
-- `release-qa-v1.1.1.md`
-- `release-notes-v1.1.1.md`
-- `TAGGING_CHECKLIST.md`
-- `FINAL_QA.md`
+| 目录 | 内容 | 使用规则 |
+| --- | --- | --- |
+| [`maintenance/`](maintenance/README.md) | 当前架构、操作边界、路线图和审查清单 | 实施前优先阅读 |
+| [`reference/`](reference/README.md) | 规则、公式、数据、架构决策与 UI 设计资产 | 与当前代码交叉核对 |
+| [`planning/`](planning/README.md) | 阶段计划、扩展构想、迁移研究和需求池 | 先经路线图重新确认 |
+| [`audits/`](audits/README.md) | 历史玩法、体验与架构审查 | 用于追溯问题与验证方法 |
+| [`releases/`](releases/README.md) | 发布说明、QA、交付报告和打标记录 | 用于版本追溯 |
 
-## 历史发布资料
+## 当前发布资料
 
-- `release-notes-v1.1.0.md`
-- `release-qa-v1.1.0.md`
-- `release-notes-v1.0.0-preview.md`
-- `public-preview-qa.md`
+- [`releases/release-checklist.md`](releases/release-checklist.md)
+- [`releases/release-qa-v1.1.1.md`](releases/release-qa-v1.1.1.md)
+- [`releases/release-notes-v1.1.1.md`](releases/release-notes-v1.1.1.md)
+- [`releases/TAGGING_CHECKLIST.md`](releases/TAGGING_CHECKLIST.md)
+- [`releases/FINAL_QA.md`](releases/FINAL_QA.md)
 
-## 历史资料
+## 维护原则
 
-以下文档记录过去阶段，内容可能已被当前代码取代：
-
-- `00-project-plan*.md`、`01-design-bible.md`、`02-system-rules.md`
-- `05-mvp-notes.md` 至 `13-engine-ui-separation-audit.md`
-- `C1-completion-report.md`、`MVP-delivery-report.md`、`handoff.md`
-- `V11_EXECUTION_REVIEW.md`、`V12_TURN_PURITY_PHASE1.md`
-
-新增维护结论时，优先更新 `maintenance/`；只有需要解释“为什么做出某项永久决策”时，才追加 `decisions.md`。
+- 新增维护结论优先更新 `maintenance/`。
+- 需要解释永久架构或玩法决策时，追加 `reference/decisions.md`。
+- 尚未排期的构想放入 `planning/`，不要提前创建空源码模块。
+- 版本完成后，将 QA 与发布说明放入 `releases/`。
+- 不删除仍有玩法、规则或决策价值的历史资料；通过目录和 README 明确其时效性。

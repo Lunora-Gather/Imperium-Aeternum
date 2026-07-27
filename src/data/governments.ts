@@ -1,5 +1,5 @@
 // Imperium Aeternum — 政体表
-// 数据源：docs/02-system-rules.md §8 / docs/formulas.md §3
+// 数据源：docs/reference/02-system-rules.md §8 / docs/reference/formulas.md §3
 // FROZEN v1（阶段 3a）
 
 export type GovernmentId =

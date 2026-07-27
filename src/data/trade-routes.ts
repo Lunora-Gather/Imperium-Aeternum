@@ -1,6 +1,6 @@
 // Imperium Aeternum — 贸易路线表（C3 贸易路线 v1）
 // 8 条预设贸易路线，连接关键省份。玩家花金建立后每回合产金/影响。
-// 数据源：docs/02-system-rules.md §9 经济系统 + v2 §4 轨道 C3
+// 数据源：docs/reference/02-system-rules.md §9 经济系统 + v2 §4 轨道 C3
 
 export interface TradeRouteDef {
   id: string;

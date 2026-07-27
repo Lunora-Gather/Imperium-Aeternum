@@ -1,7 +1,7 @@
 # Imperium Aeternum — GLM-5.2 能力适配规划 v2
 
 > **FROZEN v2** — 本文件为针对 GLM-5.2 能力特征、面向当前代码实际状态的迭代规划基线。
-> 它**取代** `docs/00-project-plan.md`(v1) 的"后续阶段指导"作用，但不删除 v1（v1 仍是历史决策记录，走 DEC 撤销）。
+> 它**取代** `docs/planning/00-project-plan.md`(v1) 的"后续阶段指导"作用，但不删除 v1（v1 仍是历史决策记录，走 DEC 撤销）。
 > v1 的 §11 红线（"AI≤4 国 / 省份≤12 / 固定 10 省"）已被项目实际进展**突破**，本文件在 §3 正式登记该偏离。
 
 ---
@@ -25,7 +25,7 @@
 
 **v1 做对的（v2 继承）**：
 - 阶段产出契约化（A 交付物 / B 决策 / C 验证清单）→ 保留
-- 冻结点 + ADR（`docs/decisions.md`）→ 保留
+- 冻结点 + ADR（`docs/reference/decisions.md`）→ 保留
 - 公式集中到 `engine/formulas.ts` + 单测手算对照 → 已落地，保留
 - seeded RNG（`utils/random.ts` mulberry32）→ 已落地，保留
 - 存档 version + migration 思路 → 保留（已实现 `SAVE_VERSION`）
@@ -37,7 +37,7 @@
 - v1 假设"从零开始按 1→6 阶段推进"，但代码已到"5c 之后 + 世界扩展"阶段 → v2 改为**增量修复 + 扩展**路线
 - v1 没规划"世界生成器 / 多剧本 / 动态玩家 ID"这些已存在的大模块 → v2 §4 纳入
 - v1 没给 GLM-5.2 的**长上下文漂移**针对性 mitigation（只靠冻结点）→ v2 §5 加强
-- v1 没给"会话交接"格式 → 实际已演化出 `docs/handoff.md`，v2 §7 正式化
+- v1 没给"会话交接"格式 → 实际已演化出 `docs/releases/handoff.md`，v2 §7 正式化
 
 ### 0.3 v2 的核心定位
 
@@ -110,7 +110,7 @@ NaN: 0 | 问题国: 0
 | ID | 类型 | 描述 | 阻塞 |
 |----|------|------|------|
 | P0 | 正确性 | `PLAYER_ID='n01'` 硬编码散布在 store + 13 screen + ai/init/turn，选非 n01 剧本即崩 | 多剧本选国 |
-| P1 | 完整性 | `docs/03-data-tables.md`、`04-architecture.md`、`05-mvp-notes.md` 缺失 | 文档闭环 |
+| P1 | 完整性 | `docs/reference/03-data-tables.md`、`04-architecture.md`、`05-mvp-notes.md` 缺失 | 文档闭环 |
 | P2 | 玩法 | A 级稳定度仍偏低 ~41；9 国负粮；D 级 1 国负粮边界 | 长期对局 |
 | P3 | 内容 | 事件 60（目标 80+ 含事件链）；法律树 / 贸易路线 / 更多剧本缺 | 内容厚度 |
 | P4 | UI | 5 国剧本无世界地图（硬编码省份可能缺 x/y） | 小剧本体验 |
@@ -170,10 +170,10 @@ v1 的"1→6 阶段"已不适用。v2 把剩余工作拆成**三条独立轨道*
 
 | 步骤 | 产出 | 验收 |
 |------|------|------|
-| B1 | `docs/03-data-tables.md`：从现有 `src/data/*.ts` 反向生成数据圣经（国家/省份/建筑/科技/政体/政策/派系/事件/国家性格） | 文档与代码字段一一对应 |
-| B2 | `docs/04-architecture.md`：从现有 `src/engine/*.ts` 反向生成架构文档（每个 engine 文件职责 + 关键函数签名 + 调用关系） | 含调用关系图 |
-| B3 | `docs/05-mvp-notes.md`：从 git 历史和 handoff 反向生成开发日志（关键修复 + DEC 索引） | 含 DEC-001 ~ DEC-NNN 索引 |
-| B4 | 更新 `docs/decisions.md`：补登记"v1 红线突破"相关 DEC（世界扩展、三档 AI、动态玩家 ID 等） | 每个偏离 v1 §11 的决策有 ADR |
+| B1 | `docs/reference/03-data-tables.md`：从现有 `src/data/*.ts` 反向生成数据圣经（国家/省份/建筑/科技/政体/政策/派系/事件/国家性格） | 文档与代码字段一一对应 |
+| B2 | `docs/reference/04-architecture.md`：从现有 `src/engine/*.ts` 反向生成架构文档（每个 engine 文件职责 + 关键函数签名 + 调用关系） | 含调用关系图 |
+| B3 | `docs/planning/05-mvp-notes.md`：从 git 历史和 handoff 反向生成开发日志（关键修复 + DEC 索引） | 含 DEC-001 ~ DEC-NNN 索引 |
+| B4 | 更新 `docs/reference/decisions.md`：补登记"v1 红线突破"相关 DEC（世界扩展、三档 AI、动态玩家 ID 等） | 每个偏离 v1 §11 的决策有 ADR |
 
 **thinking effort**: medium（偏机械，重在准确）
 **不做**: 不重写已存的 01/02/06；不写新设计，只记录现状
@@ -214,7 +214,7 @@ GLM-5.2 在 1M context 下仍可能漂移。v1 只靠冻结点，v2 加三层：
 
 ### 5.1 会话分段契约
 
-每个会话**只做一轨的一步**（如 A1）。会话结束时**必须**产出 `docs/handoff.md` 更新（见 §7）。下个会话从 handoff 启动，不靠模型回忆。
+每个会话**只做一轨的一步**（如 A1）。会话结束时**必须**产出 `docs/releases/handoff.md` 更新（见 §7）。下个会话从 handoff 启动，不靠模型回忆。
 
 ### 5.2 引用而非重述
 
@@ -248,7 +248,7 @@ GLM-5.2 在 1M context 下仍可能漂移。v1 只靠冻结点，v2 加三层：
 
 ---
 
-## 7. 会话交接文档格式（`docs/handoff.md` 正式化）
+## 7. 会话交接文档格式（`docs/releases/handoff.md` 正式化）
 
 `handoff.md` 已事实存在，v2 把它的格式冻结。每个会话结束**必须**更新它，结构：
 
@@ -347,11 +347,11 @@ A2 加测试后再跑一次 `npm test`，预期 45/45 或更多。
 ### 9.1 轨道 A1 启动 prompt
 
 ```
-你是 Imperium Aeternum 的开发者。请阅读并严格遵守 docs/00-project-plan-v2.md（FROZEN v2）。
+你是 Imperium Aeternum 的开发者。请阅读并严格遵守 docs/planning/00-project-plan-v2.md（FROZEN v2）。
 
 冻结基线：
-- docs/00-project-plan-v2.md §8（轨道 A 精确改动契约）
-- docs/handoff.md（最新会话状态）
+- docs/planning/00-project-plan-v2.md §8（轨道 A 精确改动契约）
+- docs/releases/handoff.md（最新会话状态）
 
 本会话任务：【轨道 A1 — 完成 PLAYER_ID 全量替换】
 
@@ -390,20 +390,20 @@ A2 加测试后再跑一次 `npm test`，预期 45/45 或更多。
   npm run typecheck
   npm test
   npm run validate
-三项全绿才算完成。最后更新 docs/handoff.md。
+三项全绿才算完成。最后更新 docs/releases/handoff.md。
 ```
 
 ### 9.2 轨道 B1 启动 prompt
 
 ```
-你是 Imperium Aeternum 的文档作者。请阅读 docs/00-project-plan-v2.md §4 轨道 B。
+你是 Imperium Aeternum 的文档作者。请阅读 docs/planning/00-project-plan-v2.md §4 轨道 B。
 
-任务：【B1 — 生成 docs/03-data-tables.md】
+任务：【B1 — 生成 docs/reference/03-data-tables.md】
 
 方法：从 src/data/*.ts 的实际导出反向生成数据圣经，不得凭记忆。
 每张表列出：字段名 / 类型 / 含义 / 取值范围 / 示例。
 
-可改文件：仅 docs/03-data-tables.md（新建）+ docs/handoff.md
+可改文件：仅 docs/reference/03-data-tables.md（新建）+ docs/releases/handoff.md
 其他只读。thinking effort: medium。
 完成后更新 handoff。
 ```
@@ -411,18 +411,18 @@ A2 加测试后再跑一次 `npm test`，预期 45/45 或更多。
 ### 9.3 轨道 C1 启动 prompt
 
 ```
-你是 Imperium Aeternum 的内容作者。请阅读 docs/00-project-plan-v2.md §4 轨道 C1。
+你是 Imperium Aeternum 的内容作者。请阅读 docs/planning/00-project-plan-v2.md §4 轨道 C1。
 
 任务：【C1 — 事件扩到 80 + 3 条事件链】
 
 冻结基线：
 - src/data/events.ts 现有 60 事件 schema
-- docs/02-system-rules.md §15 事件系统设计
+- docs/reference/02-system-rules.md §15 事件系统设计
 
 新增 20 事件 + 3 条事件链（瘟疫链 / 王位继承链 / 边境冲突链）。
 事件链：用 nextEventId 字段串联，按 turn 间隔触发。
 
-可改文件：src/data/events.ts、src/__tests__/（加事件链触发测试）、docs/handoff.md
+可改文件：src/data/events.ts、src/__tests__/（加事件链触发测试）、docs/releases/handoff.md
 其他只读。不得改 events engine 逻辑（如需改先走 DEC）。
 thinking effort: high。完成后 npm test 全绿 + 更新 handoff。
 ```
@@ -441,7 +441,7 @@ thinking effort: high。完成后 npm test 全绿 + 更新 handoff。
 | B1 | 数据圣经 | 人工对照 | 字段一一对应 |
 | B2 | 架构文档 | 人工对照 | 含调用图 |
 | B3 | 开发日志 | 人工对照 | DEC 索引全 |
-| B4 | ADR 补登 | docs/decisions.md | 每偏离有 ADR |
+| B4 | ADR 补登 | docs/reference/decisions.md | 每偏离有 ADR |
 | C1 | 事件扩容 | npm test | 全绿 + 事件链测试通过 |
 | C2 | 法律树 | typecheck + PoliticsScreen 可用 | ✅ |
 | C3 | 贸易路线 | typecheck + EconomyScreen 可用 | ✅ |
@@ -488,4 +488,4 @@ thinking effort: high。完成后 npm test 全绿 + 更新 handoff。
 
 ---
 
-> **FROZEN v2** — 本文件为项目迭代规划基线。后续会话引用本文不得修改；如需调整规划本身，走 `docs/decisions.md` DEC-NNN。v1 (`docs/00-project-plan.md`) 保留为历史决策记录，其 §11 红线被本文件 §3.2 取代。
+> **FROZEN v2** — 本文件为项目迭代规划基线。后续会话引用本文不得修改；如需调整规划本身，走 `docs/reference/decisions.md` DEC-NNN。v1 (`docs/planning/00-project-plan.md`) 保留为历史决策记录，其 §11 红线被本文件 §3.2 取代。

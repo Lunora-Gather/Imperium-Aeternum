@@ -1,5 +1,5 @@
 // Imperium Aeternum — 公式集中实现
-// 数据源：docs/formulas.md（FROZEN v1）
+// 数据源：docs/reference/formulas.md（FROZEN v1）
 // 每函数对应 formulas.md §X.Y，函数名严格对应。
 // 所有公式为纯函数，无副作用，便于单测。
 

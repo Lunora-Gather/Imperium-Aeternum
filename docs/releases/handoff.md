@@ -38,8 +38,8 @@ npm run validate   → ✅ 103 事件 / 0 错误
 | **A3** A 级稳定度调参 v3 | politics.ts | A 级 46→74.3 |
 | **A4** AI 缺粮建农场提前 | ai.ts | 负粮国 9→1 |
 | **A5** D 级 Static 档食物兜底 | ai.ts | 专项测试 ✅ |
-| **B1** 数据圣经 | docs/03-data-tables.md（新建，242行） | ✅ |
-| **B2** 架构文档 | docs/04-architecture.md（新建，272行） | ✅ |
+| **B1** 数据圣经 | docs/reference/03-data-tables.md（新建，242行） | ✅ |
+| **B2** 架构文档 | docs/reference/04-architecture.md（新建，272行） | ✅ |
 | **B4** DEC-021~025 补登记 | decisions.md | ✅ |
 | **遗留** validate 科技级数 + 3 重复事件 id | __validate__.ts/events.ts | validate ✅ |
 | **C1 事件链**（3 链 9 事件 + triggerEvent 引擎激活） | events.ts engine + events.ts data + test | 48/48 ✅ |
@@ -61,7 +61,7 @@ npm run validate   → ✅ 103 事件 / 0 错误
 
 按 v2 §4 依赖图剩余：
 1. **C4 更多剧本**（W3/W5/W6，A1 已解锁）
-2. **B3 开发日志** `docs/05-mvp-notes.md`（从 git 历史反向生成）
+2. **B3 开发日志** `docs/planning/05-mvp-notes.md`（从 git 历史反向生成）
 3. 性能优化（50 回合 4s，可进一步优化 AI 分层）
 4. UI 打磨（5 国剧本世界地图、更多反馈）
 
@@ -111,8 +111,8 @@ npx tsx scripts/world-audit.ts → ✅ 0 问题国
 
 按 v2 §4 依赖图剩余：
 1. **C1 事件链**（瘟疫链/王位继承链/边境冲突链，当前 94 事件可加链条）
-2. **B1 数据圣经** `docs/03-data-tables.md`（从 src/data 反向生成，含 laws/trade-routes）
-3. **B2 架构文档** `docs/04-architecture.md`
+2. **B1 数据圣经** `docs/reference/03-data-tables.md`（从 src/data 反向生成，含 laws/trade-routes）
+3. **B2 架构文档** `docs/reference/04-architecture.md`
 4. **C4 更多剧本**（W3/W5/W6）
 
 剩余 todo（优先级低）：超庞大扩展 B/C/D/E/F/G、整合验证 J、贸易条约频率调整
@@ -136,10 +136,10 @@ npx tsx scripts/world-audit.ts → ✅ 0 问题国
 | **A3** A 级稳定度调参 v3 | engine/politics.ts (分段回归力 4/2.5/1→5/3/1.5，阈值 55/70→60/75) | A 级 46→74.3 ✅ |
 | **A4** AI 缺粮建农场提前触发 | engine/ai.ts (planAITurn 门槛 food<0 → food<consume*2) | 负粮国 9→1 ✅ |
 | **A5** D 级 Static 档食物兜底 | engine/ai.ts (processAITurnStatic 加被动建农场，免金模拟自给) | 专项测试 ✅ |
-| **B4** 补登记 v1 红线突破 ADR | docs/decisions.md (DEC-021~DEC-025) | ✅ |
-| **v2 规划文档** | docs/00-project-plan-v2.md (491 行，FROZEN v2) | ✅ |
+| **B4** 补登记 v1 红线突破 ADR | docs/reference/decisions.md (DEC-021~DEC-025) | ✅ |
+| **v2 规划文档** | docs/planning/00-project-plan-v2.md (491 行，FROZEN v2) | ✅ |
 
-## v2 规划文档要点（docs/00-project-plan-v2.md）
+## v2 规划文档要点（docs/planning/00-project-plan-v2.md）
 
 - **定位**：取代 v1 的"后续阶段指导"，针对 GLM-5.2 能力 + 当前代码状态
 - **三轨**：A 修复（已完成）/ B 文档闭环（B4 已完成，B1/B2/B3 待做）/ C 内容扩展（待做）
@@ -152,8 +152,8 @@ npx tsx scripts/world-audit.ts → ✅ 0 问题国
 
 | 文件 | 作用 |
 |------|------|
-| `docs/00-project-plan-v2.md` | v2 规划基线（新增） |
-| `docs/decisions.md` | DEC-021~025 新增 |
+| `docs/planning/00-project-plan-v2.md` | v2 规划基线（新增） |
+| `docs/reference/decisions.md` | DEC-021~025 新增 |
 | `src/engine/politics.ts` | stabilityDelta v3 调参 |
 | `src/engine/ai.ts` | A4 缺粮建农场 + A5 D级兜底 |
 | `src/engine/init.ts` | buildProvinces 接 playerId 参数 |
@@ -166,8 +166,8 @@ npx tsx scripts/world-audit.ts → ✅ 0 问题国
 按 v2 §4 依赖图，A 轨完成后下一步优先级：
 
 1. **C4 更多剧本**（A1 已解锁，但 classic/world/eastasia 三剧本已存，可补 W3/W5/W6 剧本或优化现有）
-2. **B1 数据圣经** `docs/03-data-tables.md`（从 src/data/*.ts 反向生成）
-3. **B2 架构文档** `docs/04-architecture.md`（从 src/engine/*.ts 反向生成）
+2. **B1 数据圣经** `docs/reference/03-data-tables.md`（从 src/data/*.ts 反向生成）
+3. **B2 架构文档** `docs/reference/04-architecture.md`（从 src/engine/*.ts 反向生成）
 4. **C1 事件扩到 80 + 3 条事件链**（当前 ~60 事件，high effort）
 5. **C2 法律树**（新机制，high effort）
 6. **C3 贸易路线**（新机制）

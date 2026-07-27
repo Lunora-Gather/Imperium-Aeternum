@@ -1,6 +1,6 @@
 # Imperium Aeternum — 杆组细讲（Lever Group Deep Dive）
 
-> 配套文件：`docs/09-lever-groups.svg`（可视化总图）
+> 配套文件：`docs/reference/09-lever-groups.svg`（可视化总图）
 > 设计圣经原话：**"国家扩张越大，治理越困难。短期强权可以快速成功，但长期可能崩溃。"**
 > 杆组就是把这句话变成数学的载体。
 

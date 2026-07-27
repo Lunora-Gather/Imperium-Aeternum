@@ -1,6 +1,6 @@
 # Tagging and GitHub Release Checklist
 
-Use this checklist only after `docs/FINAL_QA.md` and the current versioned release QA pass.
+Use this checklist only after `docs/releases/FINAL_QA.md` and the current versioned release QA pass.
 
 ## 1. Confirm the release source
 
@@ -34,7 +34,7 @@ git push origin <tag>
 
 - Target the newly created tag.
 - Mark only preview builds as prereleases; stable releases must not use the prerelease flag.
-- Use the corresponding versioned notes, such as `docs/release-notes-v1.1.1.md`.
+- Use the corresponding versioned notes, such as `docs/releases/release-notes-v1.1.1.md`.
 - Include the public Pages URL.
 - Do not attach local saves, credentials, `.env` files, or generated secrets.
 

@@ -43,7 +43,7 @@ if (version && !readme.includes(`版本 | \`${version}\`（stable）`)) {
   failures.push(`README release table does not identify ${version} as stable`);
 }
 
-const releaseNotesPath = version ? `docs/release-notes-v${version}.md` : '';
+const releaseNotesPath = version ? `docs/releases/release-notes-v${version}.md` : '';
 if (releaseNotesPath && !existsSync(resolve(root, releaseNotesPath))) {
   failures.push(`${releaseNotesPath} does not exist`);
 } else if (releaseNotesPath) {

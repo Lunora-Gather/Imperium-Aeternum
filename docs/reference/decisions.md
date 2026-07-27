@@ -99,7 +99,7 @@
 - **阶段**：世界级扩展 W0（规划冻结）
 - **背景**：用户要求"和当今世界类似的大有小、多元并存"，现有 5 国 50 省远不够。
 - **决策**：扩至 192 国（类比 UN 成员国）、600 省（均 3 省/国，大国 30-50 省）、12 大洲。体量分 5 级（S/A/B/C/D = 4/12/30/60/86 国）。
-- **影响**：见 `docs/world-expansion-plan.md`；6 阶段（W1-W6）递进；性能目标 <800ms/回合。
+- **影响**：见 `docs/planning/world-expansion-plan.md`；6 阶段（W1-W6）递进；性能目标 <800ms/回合。
 - **替代**：100 国（否决：不够"当今世界"感）；300 国（否决：AI 与 UI 扛不住）。
 
 ## DEC-012：`NationId` 从 union literal 改为 branded string
@@ -177,8 +177,8 @@
 ## DEC-021：v1 规划红线正式突破，v2 规划基线取代
 
 - **阶段**：v2 规划（2026-06-24）
-- **背景**：v1 `docs/00-project-plan.md` §11 红线写死"AI≤4 国 / 省份≤12 / 固定 10 省 / 不做随机地图"，但项目已实际扩到 205 国 / 597 省 / 12 洲 / seeded 随机世界（DEC-011/018）。v1 与现实严重脱节，硬保留会矛盾。
-- **决策**：新建 `docs/00-project-plan-v2.md`（FROZEN v2）取代 v1 的"后续阶段指导"作用。v1 保留为历史决策记录不删。v2 §3 重立红线：永久 6 条（即时战斗/联机/美术/多语言/自定义国家/移植）+ 当前阶段 8 条（可 DEC 解锁）。
+- **背景**：v1 `docs/planning/00-project-plan.md` §11 红线写死"AI≤4 国 / 省份≤12 / 固定 10 省 / 不做随机地图"，但项目已实际扩到 205 国 / 597 省 / 12 洲 / seeded 随机世界（DEC-011/018）。v1 与现实严重脱节，硬保留会矛盾。
+- **决策**：新建 `docs/planning/00-project-plan-v2.md`（FROZEN v2）取代 v1 的"后续阶段指导"作用。v1 保留为历史决策记录不删。v2 §3 重立红线：永久 6 条（即时战斗/联机/美术/多语言/自定义国家/移植）+ 当前阶段 8 条（可 DEC 解锁）。
 - **影响**：后续会话引用 v2 而非 v1；v1 §11 红线被 v2 §3.2 取代。v2 把剩余工作拆成三轨：A 修复 / B 文档闭环 / C 内容扩展。
 - **替代**：强行回退到 5 国 10 省（否决：废弃大量已验证代码）；保留 v1 红线装作没突破（否决：文档撒谎）。
 
@@ -345,7 +345,7 @@
 ## DEC-041：F3 Godot 移植可行性报告
 
 - **阶段**：v2 Phase F3（2026-06-25）
-- **背景**：玩法成熟后需 Godot 移植做 2D 美术/动画/复杂 UI，F3 验收要求评估移植路径输出 `docs/12-godot-migration.md`。
+- **背景**：玩法成熟后需 Godot 移植做 2D 美术/动画/复杂 UI，F3 验收要求评估移植路径输出 `docs/planning/12-godot-migration.md`。
 - **决策**：输出 F3 报告基于 v2.2 架构实读评估——引擎层 6700 行（engine+data+types+utils）移植友好纯函数可转 GDScript，UI 层 3300 行需重写。4 阶段路径：A 数据中立化 8h → B 引擎转 GDScript 24h → C UI 重写 40h → D 增强导出 16h，总 ~88h。移植硬依赖 F2+C1，建议 2026 Q4 Phase D/E 完成后启动。
 - **影响**：移植路径明确，避免盲目启动。移植门槛 5 项仅 1 项满足（M1 门已过），需 F2/C1/M4 门 + 本报告评审。
 - **替代**：继续 React 加 PixiJS（否决：上限显现）；Unity 移植（否决：2D 不如 Godot 轻量 + 授权成本）；Web Godot（否决：已是 Web 无优势）。
@@ -355,7 +355,7 @@
 
 - **阶段**：v2 Phase F1（2026-06-25）
 - **背景**：F1 验收要求引擎零 React 依赖、零 DOM 依赖、可独立打包为 `imperium-engine` npm 包。需穷尽实读确认。
-- **决策**：输出 `docs/13-engine-ui-separation-audit.md`——穷尽实读 15 引擎文件 + 13 数据文件搜索 `react`/`react-dom`/`document`/`window`/`localStorage`/`store`/`components`/`screens`/`App`/`console` 依赖标志。结果：引擎层 3578 行零 React/DOM/UI 反向依赖，导出完整（processTurn/settleEconomy 等 25+ 核心函数全 export），可独立打包。数据/类型/工具层同样独立（utils/audio.ts 用 React hook 但非 engine 不影响）。
+- **决策**：输出 `docs/audits/13-engine-ui-separation-audit.md`——穷尽实读 15 引擎文件 + 13 数据文件搜索 `react`/`react-dom`/`document`/`window`/`localStorage`/`store`/`components`/`screens`/`App`/`console` 依赖标志。结果：引擎层 3578 行零 React/DOM/UI 反向依赖，导出完整（processTurn/settleEconomy 等 25+ 核心函数全 export），可独立打包。数据/类型/工具层同样独立（utils/audio.ts 用 React hook 但非 engine 不影响）。
 - **影响**：F1 验收通过，引擎可独立打包为 npm 包。唯一非 F1 范畴缺口是 C1 mutate 模式（引擎 mutate 入参 nation 引用），不影响独立打包，是 C1 独立优化目标。
 - **教训**：穷尽实读搜索依赖标志而非凭印象——15 文件逐一 grep 确认零反向依赖，比抽样可靠。
 - **替代**：仅抽样几文件（否决：穷尽实读才可靠）；改 mutate 模式为纯函数（否决：那是 C1 范畴非 F1）。

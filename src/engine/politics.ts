@@ -1,5 +1,5 @@
 // Imperium Aeternum — 政治系统 engine
-// 阶段 5b：完整实现 docs/02-system-rules.md §8
+// 阶段 5b：完整实现 docs/reference/02-system-rules.md §8
 
 import type { Nation, Province, GameState } from '../types/game';
 import { stabilityDelta, legitimacyDelta, factionWeightedSat, reformSuccessRate, maxProvinces } from './formulas';

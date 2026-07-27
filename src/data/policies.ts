@@ -1,5 +1,5 @@
 // Imperium Aeternum — 政策表
-// 数据源：docs/02-system-rules.md §8 / §14
+// 数据源：docs/reference/02-system-rules.md §8 / §14
 // FROZEN v1（阶段 3a）
 
 import type { GovernmentId } from './governments';

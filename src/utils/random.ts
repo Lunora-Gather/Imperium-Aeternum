@@ -1,5 +1,5 @@
 // Imperium Aeternum — 确定性随机
-// 数据源：docs/00-project-plan.md §7
+// 数据源：docs/planning/00-project-plan.md §7
 // mulberry32 seeded RNG
 
 export function mulberry32(seed: number): () => number {

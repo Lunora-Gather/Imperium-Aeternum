@@ -1,5 +1,5 @@
 // Imperium Aeternum — 文化与宗教系统 engine
-// 阶段 5b：完整实现 docs/02-system-rules.md §14
+// 阶段 5b：完整实现 docs/reference/02-system-rules.md §14
 
 import type { Nation, GameState } from '../types/game';
 import { assimilationDelta, loyaltyDelta, computeRebellion } from './formulas';

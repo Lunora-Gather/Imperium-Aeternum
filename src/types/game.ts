@@ -1,5 +1,5 @@
 // Imperium Aeternum — 全局类型定义
-// 数据源：docs/02-system-rules.md / docs/formulas.md
+// 数据源：docs/reference/02-system-rules.md / docs/reference/formulas.md
 // FROZEN v1（阶段 4）
 
 import type { NationId, NationTier } from '../data/nations';

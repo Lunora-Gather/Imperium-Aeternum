@@ -1,6 +1,6 @@
 // Imperium Aeternum — 省份表（超庞大扩展版 v2）
 // 50 个省份：含陆地、海洋、要塞、贸易节点
-// 数据源：docs/01-design-bible.md §5 / 扩展决策 DEC-009
+// 数据源：docs/reference/01-design-bible.md §5 / 扩展决策 DEC-009
 // FROZEN v2（扩展 A）
 
 export type Terrain =

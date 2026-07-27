@@ -10,7 +10,7 @@ These can be handled shortly after the public preview if needed:
 - Fix any failing release-gate test.
 - Update `package-lock.json` top-level package version if a local `npm install --package-lock-only` is run.
 - Add screenshots to README.
-- Keep `docs/release-notes-v1.0.0-preview.md` aligned with the published GitHub Release.
+- Keep `docs/releases/release-notes-v1.0.0-preview.md` aligned with the published GitHub Release.
 
 ## Quality and stability
 

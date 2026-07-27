@@ -1,5 +1,5 @@
 // Imperium Aeternum — 国家表
-// 数据源：docs/01-design-bible.md §5 / docs/02-system-rules.md §17
+// 数据源：docs/reference/01-design-bible.md §5 / docs/reference/02-system-rules.md §17
 // FROZEN v1（阶段 3a）
 // 5 国：玩家 n01（罗马小国）+ 4 AI n02..n05
 

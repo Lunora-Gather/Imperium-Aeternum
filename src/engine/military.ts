@@ -1,5 +1,5 @@
 // Imperium Aeternum — 军事系统 engine
-// 阶段 5b：完整实现 docs/02-system-rules.md §11
+// 阶段 5b：完整实现 docs/reference/02-system-rules.md §11
 
 import type { GameState, Nation, War, Province, BattleReport, ChronicleEntry } from '../types/game';
 import { computeCombat, resolveBattle, warCostPerTurn, milTechModifier } from './formulas';

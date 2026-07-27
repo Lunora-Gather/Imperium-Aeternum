@@ -1,5 +1,5 @@
 // Imperium Aeternum — 派系表
-// 数据源：docs/02-system-rules.md §8.3
+// 数据源：docs/reference/02-system-rules.md §8.3
 // FROZEN v1（阶段 3b）
 
 export type FactionId = 'nobles' | 'merchants' | 'military' | 'commoners' | 'clergy';

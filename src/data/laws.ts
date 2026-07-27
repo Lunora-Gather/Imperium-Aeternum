@@ -1,6 +1,6 @@
 // Imperium Aeternum — 法律表（C2 法律树 v1）
 // 3 大类 × 4 条 = 12 条法律。每条含政体限制、前置科技、效果、派系反应。
-// 数据源：docs/02-system-rules.md §8 政治系统 + v2 §4 轨道 C2
+// 数据源：docs/reference/02-system-rules.md §8 政治系统 + v2 §4 轨道 C2
 
 export type LawCategory = 'civil' | 'criminal' | 'administrative';
 

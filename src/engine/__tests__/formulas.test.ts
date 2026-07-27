@@ -1,5 +1,5 @@
 // Imperium Aeternum — 公式单测
-// 对应 docs/formulas.md §11 手算示例
+// 对应 docs/reference/formulas.md §11 手算示例
 
 import { describe, it, expect } from 'vitest';
 import type { Army } from '../../types/game';

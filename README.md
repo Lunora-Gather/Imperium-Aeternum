@@ -151,4 +151,4 @@ VITE_BASE=/Imperium-Aeternum/ npm run rc:check
 | 部署 | GitHub Actions → GitHub Pages |
 | 线上后端 | Appwrite Cloud |
 
-完整变更见 [1.1.1 发布说明](docs/release-notes-v1.1.1.md) 与 [CHANGELOG](CHANGELOG.md)。`main` 的每次发布都必须通过 `npm run rc:check`。当前风险、验收与后续计划统一收录在 [维护文档](docs/maintenance/README.md)，历史阶段报告不作为当前实现依据。
+完整变更见 [1.1.1 发布说明](docs/releases/release-notes-v1.1.1.md) 与 [CHANGELOG](CHANGELOG.md)。`main` 的每次发布都必须通过 `npm run rc:check`。当前风险、验收与后续计划统一收录在 [维护文档](docs/maintenance/README.md)，历史阶段报告不作为当前实现依据。

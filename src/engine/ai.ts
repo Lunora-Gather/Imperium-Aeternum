@@ -1,5 +1,5 @@
 // Imperium Aeternum — AI 国家决策 engine
-// 阶段 5b：完整实现 docs/02-system-rules.md §17
+// 阶段 5b：完整实现 docs/reference/02-system-rules.md §17
 // W1.4: AI 三档结算（DEC-014）— full / lite / static
 
 import type { GameState, Nation, Province } from '../types/game';

@@ -1,5 +1,5 @@
 // Imperium Aeternum — 国家性格倾向表
-// 数据源：docs/02-system-rules.md §16
+// 数据源：docs/reference/02-system-rules.md §16
 // FROZEN v1（阶段 3a）
 
 export type NationalCharacterId =

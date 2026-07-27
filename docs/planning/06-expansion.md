@@ -215,7 +215,7 @@
 
 ## 红线解锁清单
 
-若要实施 E2/E3/E6，需在 `docs/decisions.md` 登记 DEC：
+若要实施 E2/E3/E6，需在 `docs/reference/decisions.md` 登记 DEC：
 - E2：解锁"复杂外交链不扩"红线，加 vassalage/guarantee 条约
 - E3：解锁"科技不超 3×8"红线，加第 4 路线或 specialization
 - E6：解锁"事件≤100"红线，提到 120

@@ -1,5 +1,5 @@
 // Imperium Aeternum — 建筑表
-// 数据源：docs/02-system-rules.md §9 / docs/formulas.md §2.5
+// 数据源：docs/reference/02-system-rules.md §9 / docs/reference/formulas.md §2.5
 // FROZEN v1（阶段 3a）
 
 export type BuildingId =

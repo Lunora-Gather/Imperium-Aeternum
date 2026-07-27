@@ -1,5 +1,5 @@
 // Imperium Aeternum — 事件系统 engine
-// 阶段 5b：完整实现 docs/02-system-rules.md §15
+// 阶段 5b：完整实现 docs/reference/02-system-rules.md §15
 
 import type { GameState, Nation } from '../types/game';
 import type { EventDef, EventEffect, EventTrigger, FactionReaction } from '../data/events';

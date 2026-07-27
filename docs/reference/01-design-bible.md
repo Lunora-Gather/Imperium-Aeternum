@@ -1,6 +1,6 @@
 # Imperium Aeternum 设计圣经 v0.1
 
-> **FROZEN v1** — 此文档已冻结，后续阶段引用本文不得修改，改动需走 DEC-NNN（见 `docs/decisions.md`）。
+> **FROZEN v1** — 此文档已冻结，后续阶段引用本文不得修改，改动需走 DEC-NNN（见 `docs/reference/decisions.md`）。
 
 ---
 
@@ -177,7 +177,7 @@ MVP 验证玩法后，完整版方向（不在本 MVP 实现）：
 | 9 | 国家性格 | 玩家行为塑造国家倾向，达阈值获特性 | 中 |
 | 10 | AI 国家 | 权重决策，4 个 AI 各有性格 | 中 |
 
-每个系统的详细规则、公式、事件触发见 `docs/02-system-rules.md` 与 `docs/formulas.md`（阶段 2 产出）。
+每个系统的详细规则、公式、事件触发见 `docs/reference/02-system-rules.md` 与 `docs/reference/formulas.md`（阶段 2 产出）。
 
 ---
 

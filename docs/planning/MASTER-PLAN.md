@@ -164,9 +164,9 @@
 
 | WP | 标题 | 依赖钩子 | 验收 | 预估 |
 |----|------|---------|------|------|
-| ~~F1~~ | ~~引擎/UI 完全分离审计~~ | ~~`engine/*` + `screens/*` → C1~~ | ~~**完成：`docs/13-engine-ui-separation-audit.md` 输出，引擎 15 文件 3578 行零 React/DOM/UI 反向依赖，导出完整可独立打包**~~ | L→完成 |
+| ~~F1~~ | ~~引擎/UI 完全分离审计~~ | ~~`engine/*` + `screens/*` → C1~~ | ~~**完成：`docs/audits/13-engine-ui-separation-audit.md` 输出，引擎 15 文件 3578 行零 React/DOM/UI 反向依赖，导出完整可独立打包**~~ | L→完成 |
 | ~~F2~~ | ~~数据格式中立化~~ | ~~`data/*.ts` → JSON~~ | ~~**完成：`scripts/export-data.ts` 导出 12 数据表为 JSON 到 `dist/data/`，`npm run export-data` 可重复运行**~~ | M→完成 |
-| ~~F3~~ | ~~Godot 移植可行性报告~~ | ~~—~~ | ~~**完成：`docs/12-godot-migration.md` 输出，4 阶段 ~88h 路径，引擎层 58% 友好，硬依赖 F2+C1**~~ | S→完成 |
+| ~~F3~~ | ~~Godot 移植可行性报告~~ | ~~—~~ | ~~**完成：`docs/planning/12-godot-migration.md` 输出，4 阶段 ~88h 路径，引擎层 58% 友好，硬依赖 F2+C1**~~ | S→完成 |
 
 **Phase F 验收门槛**：引擎可独立打包、数据可导出 JSON、有明确的 Godot 移植路径。
 
@@ -352,7 +352,7 @@ npm run build       # vite build（CI 部署 Pages）
 |---|------|------|
 | 1 | 引擎独立打包 | `imperium-engine` npm 包可 build（F1） |
 | 2 | 数据导出 JSON | 所有 data/*.ts 可导出为 JSON（F2） |
-| 3 | Godot 报告 | `docs/12-godot-migration.md` 输出（F3） |
+| 3 | Godot 报告 | `docs/planning/12-godot-migration.md` 输出（F3） |
 
 ---
 
@@ -379,7 +379,7 @@ npm run build       # vite build（CI 部署 Pages）
 4. **遇红线立即停**——不擅自解锁，先登记 DEC 等用户确认
 5. **不引入未规划依赖**——新 npm 包需 DEC
 6. **代码改动必绑 WP**——commit message 含 WP ID（如 `A1: 叛乱实际执行`）
-7. **每 Phase 结束写 handoff**——更新 `docs/handoff.md` 状态快照
+7. **每 Phase 结束写 handoff**——更新 `docs/releases/handoff.md` 状态快照
 8. **真人测试不可跳**——每里程碑门由用户确认才进下阶段
 
 ---
@@ -434,8 +434,8 @@ npm run build       # vite build（CI 部署 Pages）
 > - v1.9→v2.0：**本回合完成 E4 一个 Phase E WP**。E4 音效系统 Web Audio API 合成 7 音效（bell 钛/scroll 竹简/drum 战鼓/hammer 锤/alarm 警报/victory 胜利/defeat 失败），无音频文件零依赖，App 接入 3 触发点（回合结算/事件/胜负）+ 静音按钮。Phase E 仅剩 E1/E2/E5。**教训：Web Audio API 合成是零依赖音效最佳方案——oscillator + gain envelope 即可合成钟/鼓/警报，无需音频文件。**
 > - v2.0→v2.1：**本回合完成 E2 一个 Phase E WP**。E2 统计图表页纯 SVG 零依赖——6 折线（国库净收入/粮食/人口/稳定/不满/厌战）+ 派系满意度雷达 + 军力对比条形 + 科技进度甘特，从 history 10 回合取数，'s' 快捷键切入。Phase E 仅剩 E1/E5。**教训：Faction interface 无 name 只有 id，需 `FACTIONS[f.id].name` 转 label——先穷尽读类型再写代码。**
 > - v2.1→v2.2：**本回合完成 E1 一个 Phase E WP**。E1 新手教程 5 步分步（总览警报/调税率/建设省份/派系科技/推回合），首次自动弹出（localStorage 标记），可跳过可重看，改造现有引导卡加 step state。Phase E 仅剩 E5（SVG 地形地图 XL）。**教训：改造现有组件优于新建——showHelp 引导卡已有遮罩+弹窗，只需加 step state 即可变分步教程，零新文件。**
-> - v2.2→v2.3：**完成 F2+F3 两个 Phase F WP**。F2 数据格式中立化 `scripts/export-data.ts` 导出 12 数据表 JSON 到 `dist/data/`；F3 `docs/12-godot-migration.md` Godot 移植报告 4 阶段 ~88h。
-> - v2.3→v2.4：**完成 F1 一个 Phase F WP**。`docs/13-engine-ui-separation-audit.md` 引擎/UI 分离审计，引擎 15 文件 3578 行零 React/DOM 反向依赖。Phase F 全部 archived。
+> - v2.2→v2.3：**完成 F2+F3 两个 Phase F WP**。F2 数据格式中立化 `scripts/export-data.ts` 导出 12 数据表 JSON 到 `dist/data/`；F3 `docs/planning/12-godot-migration.md` Godot 移植报告 4 阶段 ~88h。
+> - v2.3→v2.4：**完成 F1 一个 Phase F WP**。`docs/audits/13-engine-ui-separation-audit.md` 引擎/UI 分离审计，引擎 15 文件 3578 行零 React/DOM 反向依赖。Phase F 全部 archived。
 > - v2.4→v2.5：**完成 D2 一个 Phase D WP**。D2 科技质变效果 32 科技 4 路线×8 级 + Lv5/Lv8 解锁能力绑定（agri_lv5 轮作政策/mil_lv8 总动员/admin_lv5 科举法/culture_lv5 文化外交等），通过 prereqTech 字段复用现有机制无需新代码。
 > - v2.5→v2.6：**完成 D3+D4+D5+D6 四个 Phase D WP**。D3 建筑 24→42；D4 法律 12→20；D5 剧本 7→10；D6 国家性格 11→15。
 > - v2.6→v2.7：**完成 D1 一个 Phase D WP**。D1 事件扩充 203→315（+112 单事件 10 类各 ~10 + 5 链 15 链事件），总链 10→15（链事件 29→44），链头 weight>0 链中/尾 weight=0。修复 4 处 factionSat 重复字段（fra() helper）+ 10 处链中尾 weight=0 + world-smoke chainHeads 加 5 新链头。Phase D 全部 archived。**教训：新加事件链的中/尾事件 weight 必须设 0（只靠 triggerEvent 触发），否则会自然触发违链语义；测试 chainHeads 列表也要同步加新链头否则误判。**

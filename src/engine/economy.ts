@@ -1,5 +1,5 @@
 // Imperium Aeternum — 经济系统 engine
-// 阶段 5b：完整实现 docs/02-system-rules.md §9
+// 阶段 5b：完整实现 docs/reference/02-system-rules.md §9
 
 import type { GameState, Nation, Province } from '../types/game';
 import {

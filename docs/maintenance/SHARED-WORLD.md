@@ -1,6 +1,6 @@
 # 共享活版图：当前设计与实施边界
 
-> 本文是共享版图、国家控制权与自动推进的当前事实源。账号验证和社交交互以 `AUTH-AND-SOCIAL.md` 为准；永久性取舍另记入 `docs/decisions.md`。
+> 本文是共享版图、国家控制权与自动推进的当前事实源。账号验证和社交交互以 `AUTH-AND-SOCIAL.md` 为准；永久性取舍另记入 `docs/reference/decisions.md`。
 
 ## 1. 产品目标
 

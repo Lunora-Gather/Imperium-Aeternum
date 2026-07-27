@@ -62,8 +62,8 @@ npm run rc:check
 
 Manual QA:
 
-- Follow `docs/public-preview-qa.md`.
-- Confirm `docs/release-checklist.md` has no open blocker.
+- Follow `docs/releases/public-preview-qa.md`.
+- Confirm `docs/releases/release-checklist.md` has no open blocker.
 
 ## Known limitations
 

@@ -1,5 +1,5 @@
 // Imperium Aeternum — 事件表
-// 数据源：docs/02-system-rules.md §15 / docs/formulas.md
+// 数据源：docs/reference/02-system-rules.md §15 / docs/reference/formulas.md
 // FROZEN v1（阶段 3b）
 // 25 个 MVP 事件，每事件含触发条件、≥2 选项、AI 权重。
 

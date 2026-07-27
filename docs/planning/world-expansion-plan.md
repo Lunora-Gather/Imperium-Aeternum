@@ -1,9 +1,9 @@
 # Imperium Aeternum — 世界级扩展规划 v3.0
 
 > **本文件是「制霸市场级」世界扩展的总冻结基线。**
-> 创建于 2026-06-23, supersede `docs/06-expansion.md` 的省级扩展部分。
+> 创建于 2026-06-23, supersede `docs/planning/06-expansion.md` 的省级扩展部分。
 > 目标:把世界从「地中海 5 国 50 省」扩成「当今世界级 192 国 600 省 12 大洲」, 同时保证引擎、AI、UI、性能全部能扛。
-> 决策机制:遵循 `docs/decisions.md` ADR 机制, 本扩展从 DEC-011 续。
+> 决策机制:遵循 `docs/reference/decisions.md` ADR 机制, 本扩展从 DEC-011 续。
 
 ---
 
@@ -395,7 +395,7 @@ export const SCENARIOS: Scenario[] = [
 ```
 继续 Imperium Aeternum 世界级扩展 v3.0。
 
-先阅读 docs/world-expansion-plan.md 了解总规划。
+先阅读 docs/planning/world-expansion-plan.md 了解总规划。
 当前状态:5 国 50 省, 架构基于 union NationId, 无法扩到 192 国。
 
 立即执行阶段 W1 架构重构(无新内容, 篡底层):
@@ -405,7 +405,7 @@ export const SCENARIOS: Scenario[] = [
 4. utils/perf.ts + 性能断言
 
 每改完一个文件跑 npm test 确认不破坏现有 32 测试。
-所有改动记入 docs/decisions.md 从 DEC-011 续。
+所有改动记入 docs/reference/decisions.md 从 DEC-011 续。
 W1 完成后才进 W2 区域模板数据。
 ```
 

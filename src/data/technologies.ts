@@ -1,5 +1,5 @@
 // Imperium Aeternum — 科技表
-// 数据源：docs/02-system-rules.md §13 / docs/formulas.md §7
+// 数据源：docs/reference/02-system-rules.md §13 / docs/reference/formulas.md §7
 // FROZEN v1（阶段 3a）
 
 export type TechBranch = 'agri' | 'mil' | 'admin' | 'culture';

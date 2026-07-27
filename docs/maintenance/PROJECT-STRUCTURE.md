@@ -18,6 +18,10 @@
 | `src/styles/` | 按加载顺序组织的全局样式层 | 业务逻辑 |
 | `functions/*/src/generated/` | 可重新生成的服务端 bundle | 手写网关代码 |
 | `docs/maintenance/` | 当前可执行的维护事实 | 已过期阶段总结 |
+| `docs/reference/` | 仍有价值的规则、公式和架构决策 | 当前运行状态声明 |
+| `docs/planning/` | 尚待确认的路线与需求池 | 已承诺的发布事实 |
+| `docs/audits/` | 历史审查证据与结论 | 未经复现的新缺陷 |
+| `docs/releases/` | 发布说明、QA 和交付记录 | 日常开发草稿 |
 
 ## 命名规则
 
@@ -40,6 +44,8 @@
 4. 它是否由脚本生成？放 `generated/`，并在 `package.json` 提供可重复的生成命令。
 5. 它是否只是阶段报告？归入历史文档，不得冒充当前维护事实。
 
+源码目录的快速索引见 `src/README.md`，Gameplay 文件职责见 `src/gameplay/README.md`，Function 与脚本入口分别见 `functions/README.md`、`scripts/README.md`。
+
 ## 依赖方向
 
 ```text
@@ -57,8 +63,11 @@ components / screens / App
 ## 清理与变更检查
 
 - 删除文件前先用 `rg` 确认没有 import、动态 import、脚本或文档引用。
+- 运行 `npm run check:structure` 检查孤立源码、文档分区和失效本地链接。
+- 运行 `npm run clean` 清理构建产物与日志；需要释放 Function 依赖缓存时运行 `npm run clean:function-deps`。
 - 生成文件通过生成命令更新，不直接在生成 bundle 中维护业务逻辑。
 - 重命名后运行 `npm run typecheck`，防止大小写与路径引用在 Linux CI 才失败。
 - 新增导出前先确认至少有一个生产调用方或明确的公共 API 用途。
 - 不保留“也许以后会用”的组件和样式；需要时可以从 Git 历史恢复。
+- `src/utils/perf.ts` 是 DEC-015 对应的待接入性能观测工具，仍服务于大地图性能路线，不能作为普通孤立模块删除；接入或正式废弃时同步更新结构检查白名单与决策记录。
 - 所有合并和发布最终运行 `npm run rc:check`。

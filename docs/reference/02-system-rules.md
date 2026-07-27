@@ -1,7 +1,7 @@
 # Imperium Aeternum 系统规则 v0.1
 
 > **FROZEN v1** — 此文档已冻结，后续阶段引用本文不得修改，改动需走 DEC-NNN。
-> 公式编号引用 `docs/formulas.md`（§X.Y）。本文只写规则与触发，公式本体见 formulas.md。
+> 公式编号引用 `docs/reference/formulas.md`（§X.Y）。本文只写规则与触发，公式本体见 formulas.md。
 
 ---
 

@@ -1,5 +1,5 @@
 // Imperium Aeternum — 人口系统 engine
-// 阶段 5b：完整实现 docs/02-system-rules.md §10
+// 阶段 5b：完整实现 docs/reference/02-system-rules.md §10
 
 import type { Nation, Province, ClassId } from '../types/game';
 import { popGrowth, classRebellionRisk } from './formulas';

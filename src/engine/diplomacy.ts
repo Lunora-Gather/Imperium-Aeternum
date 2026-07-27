@@ -1,5 +1,5 @@
 // Imperium Aeternum — 外交系统 engine
-// 阶段 5b：完整实现 docs/02-system-rules.md §12
+// 阶段 5b：完整实现 docs/reference/02-system-rules.md §12
 // W1.3: 外交稀疏化 + getDefaultRelation API（DEC-013）
 
 import type { GameState, Nation, DiplomaticRelation } from '../types/game';

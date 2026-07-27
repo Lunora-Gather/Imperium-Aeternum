@@ -72,7 +72,7 @@ Before publishing or refreshing a release:
 
 1. Confirm `BUILD_MARK` is `1.1.1`.
 2. Confirm package version is `1.1.1`.
-3. Confirm `docs/release-notes-v1.1.1.md` matches the current build.
+3. Confirm `docs/releases/release-notes-v1.1.1.md` matches the current build.
 4. Confirm README links are correct.
 5. Confirm Pages deploy is visible.
 6. Confirm the GitHub Release points at the immutable tag `v1.1.1` and is not marked as a prerelease.
