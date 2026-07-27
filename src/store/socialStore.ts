@@ -225,7 +225,7 @@ export const useSocialStore = create<SocialStore>((set, get) => ({
       const target = await findProfileByFriendCode(friendCode);
       if (!target) throw new Error('没有找到该好友码');
       if (target.userId === get().profile?.userId) throw new Error('不能添加自己为好友');
-      await sendFriendRequest(target.userId);
+      await sendFriendRequest(target.userId, friendCode.trim().toUpperCase());
       const friendships = await listFriendships();
       set((state) => ({ friendships, ...reconcileFriendConversationState(friendships, state.profile?.userId, state.directMessages, state.unreadDirect, state.activeConversation), message: `已向 ${target.displayName} 发送好友申请` }));
       return true;

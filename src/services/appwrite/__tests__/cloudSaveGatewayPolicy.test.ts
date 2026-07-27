@@ -17,4 +17,21 @@ describe('cloud save gateway infrastructure policy', () => {
     expect(gateway?.execute).toEqual(['users']);
     expect(gateway?.scopes).toEqual(expect.arrayContaining(['rows.read', 'rows.write', 'files.read', 'files.write']));
   });
+
+  it('keeps every authoritative table and bucket free of browser write grants', () => {
+    const resources = [...config.tables, ...config.buckets];
+    const unsafe = resources.flatMap((resource) =>
+      (resource.$permissions ?? [])
+        .filter((permission) => /^(create|update|delete|write)\(/.test(permission))
+        .map((permission) => `${resource.$id}:${permission}`),
+    );
+    expect(unsafe).toEqual([]);
+    expect(config.buckets.every((bucket) => (bucket.$permissions ?? []).length === 0)).toBe(true);
+  });
+
+  it('keeps privileged functions user-gated and limits account writes to the recovery gateway', () => {
+    expect(config.functions.every((entry) => entry.execute?.includes('users'))).toBe(true);
+    const userWriters = config.functions.filter((entry) => entry.scopes?.includes('users.write')).map((entry) => entry.$id);
+    expect(userWriters).toEqual(['account-gateway']);
+  });
 });

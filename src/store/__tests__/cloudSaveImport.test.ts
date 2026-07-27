@@ -43,6 +43,18 @@ describe('cloud save import boundary', () => {
     expect(after).toEqual(before);
   });
 
+  it('rejects future-version and prototype-key payloads without writing a slot', () => {
+    const base = { version: SAVE_VERSION, createdAt: '2026-01-01T00:00:00.000Z', gameState: createInitialState() };
+    expect(importSaveGameToSlot(1, JSON.stringify({ ...base, version: 999 }))).toEqual(expect.objectContaining({ ok: false }));
+
+    const unsafe = JSON.stringify(base).replace(
+      '"nations":{',
+      '"nations":{"__proto__":{"isPlayer":true},',
+    );
+    expect(importSaveGameToSlot(1, unsafe)).toEqual(expect.objectContaining({ ok: false }));
+    expect(localStorage.length).toBe(0);
+  });
+
   it('rejects out-of-range slots without writing data', () => {
     const payload = JSON.stringify({ version: SAVE_VERSION, createdAt: 'now', gameState: createInitialState() });
 

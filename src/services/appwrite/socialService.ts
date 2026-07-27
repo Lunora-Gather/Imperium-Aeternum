@@ -64,7 +64,7 @@ export async function listFriendships(): Promise<Friendship[]> {
   return result.rows.map(friendship);
 }
 
-export const sendFriendRequest = (targetUserId: string) => executeSocial('send_friend_request', { targetUserId });
+export const sendFriendRequest = (targetUserId: string, friendCode?: string) => executeSocial('send_friend_request', { targetUserId, friendCode });
 export const respondFriendRequest = (friendshipId: string, accept: boolean) => executeSocial('respond_friend_request', { friendshipId, accept });
 export const removeFriend = (friendshipId: string) => executeSocial('remove_friend', { friendshipId });
 

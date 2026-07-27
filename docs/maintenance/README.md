@@ -60,6 +60,7 @@ GameStore.nextTurn
 - `_relMap` 是运行时缓存，不能进入存档和跨层状态。
 - 事件唯一性与冷却按国家隔离；旧档无作用域历史归属玩家，损坏或重复的待决事件在净化阶段移除。
 - 待决事件只能结算一次，事件链不得在同回合形成无限循环，UI 必须以调用时的最新 store 状态为准。
+- 存档载荷不得包含 `__proto__`、`prototype` 或 `constructor` 对象键，不得超过 5 MB 或当前支持的存档版本。
 
 这些规则由 `stateInvariants.test.ts` 和 `turnPipeline.test.ts` 锁定。
 

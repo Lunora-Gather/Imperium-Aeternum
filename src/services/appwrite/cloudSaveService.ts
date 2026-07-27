@@ -87,24 +87,9 @@ export async function listCloudSaves(userId: string): Promise<CloudSaveRow[]> {
   return result.rows.filter((row) => row.userId === userId).sort((a, b) => a.slot - b.slot);
 }
 
-export async function uploadLocalSave(userId: string, slot: number, force = false): Promise<CloudSaveRow> {
+export async function uploadLocalSave(_userId: string, slot: number, force = false): Promise<CloudSaveRow> {
   const local = readSaveGameFromSlot(slot);
   if (!local.ok) throw new Error(local.error);
-  const localMeta = getSlotMeta(slot);
-  if (!localMeta) throw new Error('本地存档元数据不可用');
-
-  const hash = await contentHash(local.raw);
-  const previous = await getCloudRow(userId, slot);
-  if (
-    previous
-    && previous.contentHash !== hash
-    && previous.clientUpdatedAt > localMeta.createdAt
-    && previous.deviceId !== getDeviceId()
-    && !force
-  ) {
-    throw new CloudSaveConflictError(slot, '云端存在另一设备更新的存档，请先下载比较，或确认覆盖云端');
-  }
-  if (previous?.contentHash === hash) return previous;
 
   const execution = await getAppwriteServices().functions.createExecution({
     functionId: APPWRITE_CONFIG.cloudSaveGatewayFunctionId,

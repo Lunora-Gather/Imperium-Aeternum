@@ -4,6 +4,8 @@ const integer = (value, min, max, label) => {
   return parsed;
 };
 
+const MAX_SUPPORTED_SAVE_VERSION = 7;
+
 export function normalizeCloudSavePayload(raw, nowMs = Date.now()) {
   let parsed;
   try {
@@ -13,7 +15,7 @@ export function normalizeCloudSavePayload(raw, nowMs = Date.now()) {
   }
   if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) throw new Error('云存档内容不是有效 JSON');
 
-  const saveVersion = integer(parsed.version, 1, Number.MAX_SAFE_INTEGER, '存档版本');
+  const saveVersion = integer(parsed.version, 1, MAX_SUPPORTED_SAVE_VERSION, '存档版本');
   const gameState = parsed.gameState;
   if (!gameState || typeof gameState !== 'object' || Array.isArray(gameState)) throw new Error('云存档缺少游戏状态');
   const turn = integer(gameState.turn, 0, Number.MAX_SAFE_INTEGER, '存档回合');

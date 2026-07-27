@@ -32,9 +32,8 @@ describe('private cloud save access', () => {
     Object.defineProperty(globalThis, 'localStorage', { value: new MemoryStorage(), configurable: true });
   });
 
-  it('checks an empty slot through the readable-row listing before calling the trusted gateway', async () => {
+  it('delegates upload conflict checks to the trusted gateway without direct table access', async () => {
     expect(saveGameToSlot(createInitialState(), 1).ok).toBe(true);
-    mocks.listRows.mockResolvedValue({ rows: [] });
     mocks.createExecution.mockResolvedValue({
       responseStatusCode: 200,
       responseBody: JSON.stringify({
@@ -55,7 +54,7 @@ describe('private cloud save access', () => {
     });
 
     await expect(uploadLocalSave('user-a', 1)).resolves.toMatchObject({ slot: 1 });
-    expect(mocks.listRows).toHaveBeenCalledOnce();
+    expect(mocks.listRows).not.toHaveBeenCalled();
     expect(mocks.createExecution).toHaveBeenCalledOnce();
   });
 });

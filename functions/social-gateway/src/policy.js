@@ -50,3 +50,14 @@ export function assertFriendshipParticipants(friendship, userId, friendUserId) {
   return friendship;
 }
 
+export function canViewProfile(userId, targetUserId, friendship, sharesWorld) {
+  if (userId === targetUserId) return true;
+  const participants = [friendship?.requesterId, friendship?.addresseeId];
+  return (
+    (['pending', 'accepted'].includes(friendship?.status)
+      && participants.includes(userId)
+      && participants.includes(targetUserId))
+    || sharesWorld === true
+  );
+}
+

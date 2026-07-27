@@ -1,6 +1,15 @@
 import { Client, ID, Permission, Query, Role, Storage, TablesDB, Users } from 'node-appwrite';
 import { InputFile } from 'node-appwrite/file';
-import { assertFriendshipParticipants, assertMembershipOwner, discoverableMemberIds, friendshipPairKey, friendshipRowId, messageRateRowId, verifiedNationIdentity } from './policy.js';
+import {
+  assertFriendshipParticipants,
+  assertMembershipOwner,
+  canViewProfile,
+  discoverableMemberIds,
+  friendshipPairKey,
+  friendshipRowId,
+  messageRateRowId,
+  verifiedNationIdentity,
+} from './policy.js';
 
 const DATABASE_ID = 'imperium_game';
 const PROFILE_TABLE = 'game_profiles';
@@ -132,6 +141,50 @@ async function requireFriendship(db, userId, friendUserId) {
   return assertFriendshipParticipants(relation, userId, friendUserId);
 }
 
+async function relationshipBetween(db, userId, targetUserId) {
+  const result = await db.listRows({
+    databaseId: DATABASE_ID,
+    tableId: FRIENDSHIP_TABLE,
+    queries: [Query.equal('pairKey', friendshipPairKey(userId, targetUserId)), Query.limit(1)],
+    total: false,
+  });
+  return result.rows[0] ?? null;
+}
+
+async function membershipWorldIds(db, userId) {
+  const worldIds = new Set();
+  let cursor;
+  do {
+    const queries = [Query.equal('userId', userId), Query.orderAsc('$id'), Query.limit(100)];
+    if (cursor) queries.push(Query.cursorAfter(cursor));
+    const page = await db.listRows({
+      databaseId: DATABASE_ID,
+      tableId: MEMBERSHIP_TABLE,
+      queries,
+      total: false,
+    });
+    for (const row of page.rows) worldIds.add(row.worldId);
+    cursor = page.rows.length === 100 ? page.rows.at(-1)?.$id : undefined;
+  } while (cursor && worldIds.size < 1000);
+  return worldIds;
+}
+
+async function sharesWorld(db, userId, targetUserId) {
+  const [left, right] = await Promise.all([
+    membershipWorldIds(db, userId),
+    membershipWorldIds(db, targetUserId),
+  ]);
+  return [...left].some((worldId) => right.has(worldId));
+}
+
+async function requireProfileVisibility(db, userId, targetUserId) {
+  if (userId === targetUserId) return;
+  const friendship = await relationshipBetween(db, userId, targetUserId);
+  if (canViewProfile(userId, targetUserId, friendship, false)) return;
+  const visible = canViewProfile(userId, targetUserId, friendship, await sharesWorld(db, userId, targetUserId));
+  if (!visible) throw new Error('只能查看自己、好友或同一版图成员的名片');
+}
+
 async function enforceDirectRate(db, key, userId) {
   const recent = await db.listRows({ databaseId: DATABASE_ID, tableId: DIRECT_MESSAGE_TABLE, queries: [Query.equal('conversationKey', key), Query.equal('senderId', userId), Query.orderDesc('createdAt'), Query.limit(1)], total: false });
   if (recent.rows[0] && Date.now() - Date.parse(recent.rows[0].createdAt) < 1200) throw new Error('发送太快，请稍后再试');
@@ -206,6 +259,7 @@ export default async ({ req, res, error }) => {
     }
     if (action === 'get_profile') {
       const targetUserId = identifier(body.targetUserId, 36, '玩家目标');
+      await requireProfileVisibility(db, userId, targetUserId);
       const found = await db.listRows({ databaseId: DATABASE_ID, tableId: PROFILE_TABLE, queries: [Query.equal('userId', targetUserId), Query.limit(1)], total: false });
       return res.json({ ok: true, profile: found.rows[0] ? publicProfile(found.rows[0]) : null });
     }
@@ -219,6 +273,11 @@ export default async ({ req, res, error }) => {
       const targetUserId = identifier(body.targetUserId, 36, '好友目标');
       if (!targetUserId || targetUserId === userId) throw new Error('好友目标无效');
       const target = await ensureProfile(db, users, targetUserId);
+      const suppliedCode = String(body.friendCode ?? '').trim().toUpperCase();
+      const authorizedByCode = suppliedCode && suppliedCode === target.friendCode;
+      if (!authorizedByCode && !(await sharesWorld(db, userId, targetUserId))) {
+        throw new Error('只能通过好友码或共同版图发送好友申请');
+      }
       const id = friendshipRowId(userId, targetUserId);
       const key = friendshipPairKey(userId, targetUserId);
       const existing = await db.listRows({

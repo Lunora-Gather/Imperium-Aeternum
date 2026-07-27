@@ -2,7 +2,17 @@ import { Client, ID, Permission, Query, Role, Storage, TablesDB } from 'node-app
 import { InputFile } from 'node-appwrite/file';
 import { gzipSync } from 'node:zlib';
 import { advanceSharedWorld, applySharedWorldCommand, createSharedWorldSnapshot } from './generated/engine-bundle.js';
-import { assertCommandOwnership, decodeSnapshotPayload, isControlActive, isWorldDue, readyCommandKey, wasWorldActiveDuringWindow } from './policy.js';
+import {
+  assertCommandCategory,
+  assertCommandOwnership,
+  assertReadyCommandIdentity,
+  assertRenewableControl,
+  decodeSnapshotPayload,
+  isControlActive,
+  isWorldDue,
+  readyCommandKey,
+  wasWorldActiveDuringWindow,
+} from './policy.js';
 
 const DATABASE_ID = 'imperium_game';
 const WORLD_TABLE = 'shared_worlds';
@@ -45,15 +55,50 @@ async function ensureMembership(db, worldId, userId, now) {
     return db.updateRow({ databaseId: DATABASE_ID, tableId: MEMBERSHIP_TABLE, rowId, data: { lastSeenAt: now.toISOString() } });
   } catch (error) {
     if (error?.code !== 404) throw error;
-    const members = await db.listRows({ databaseId: DATABASE_ID, tableId: MEMBERSHIP_TABLE, queries: [Query.equal('worldId', worldId), Query.limit(MAX_WORLD_MEMBERS)], total: true });
-    if (Number(members.total ?? members.rows.length) >= MAX_WORLD_MEMBERS) throw new Error(`当前版图成员已达 ${MAX_WORLD_MEMBERS} 人上限`);
+  }
+
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    const tx = await db.createTransaction();
     try {
-      return await db.createRow({ databaseId: DATABASE_ID, tableId: MEMBERSHIP_TABLE, rowId, data, permissions: userPermissions(userId) });
+      const world = await db.getRow({ databaseId: DATABASE_ID, tableId: WORLD_TABLE, rowId: worldId, transactionId: tx.$id });
+      let current;
+      try {
+        current = await db.getRow({ databaseId: DATABASE_ID, tableId: MEMBERSHIP_TABLE, rowId, transactionId: tx.$id });
+      } catch (error) {
+        if (error?.code !== 404) throw error;
+      }
+      if (current) {
+        if (current.worldId !== worldId || current.userId !== userId) throw new Error('版图成员标识冲突');
+        const updated = await db.updateRow({ databaseId: DATABASE_ID, tableId: MEMBERSHIP_TABLE, rowId, transactionId: tx.$id, data: { lastSeenAt: now.toISOString() } });
+        await db.updateTransaction({ transactionId: tx.$id, commit: true });
+        return updated;
+      }
+      const members = await db.listRows({
+        databaseId: DATABASE_ID,
+        tableId: MEMBERSHIP_TABLE,
+        queries: [Query.equal('worldId', worldId), Query.limit(MAX_WORLD_MEMBERS)],
+        transactionId: tx.$id,
+        total: true,
+      });
+      if (Number(members.total ?? members.rows.length) >= MAX_WORLD_MEMBERS) throw new Error(`当前版图成员已达 ${MAX_WORLD_MEMBERS} 人上限`);
+      // Touch the shared world row in the same transaction so concurrent joins
+      // serialize on one authoritative record instead of both observing slot 100.
+      await db.updateRow({ databaseId: DATABASE_ID, tableId: WORLD_TABLE, rowId: worldId, transactionId: tx.$id, data: { status: world.status } });
+      const created = await db.createRow({ databaseId: DATABASE_ID, tableId: MEMBERSHIP_TABLE, rowId, transactionId: tx.$id, data, permissions: userPermissions(userId) });
+      await db.updateTransaction({ transactionId: tx.$id, commit: true });
+      return created;
     } catch (createError) {
-      if (createError?.code !== 409) throw createError;
-      return db.updateRow({ databaseId: DATABASE_ID, tableId: MEMBERSHIP_TABLE, rowId, data: { lastSeenAt: now.toISOString() } });
+      await db.updateTransaction({ transactionId: tx.$id, rollback: true }).catch(() => undefined);
+      if (createError?.code === 409 && attempt < 2) continue;
+      if (createError?.code === 409) {
+        const current = await db.getRow({ databaseId: DATABASE_ID, tableId: MEMBERSHIP_TABLE, rowId }).catch(() => null);
+        if (current && (current.worldId !== worldId || current.userId !== userId)) throw new Error('版图成员标识冲突');
+        if (current) return db.updateRow({ databaseId: DATABASE_ID, tableId: MEMBERSHIP_TABLE, rowId, data: { lastSeenAt: now.toISOString() } });
+      }
+      throw createError;
     }
   }
+  throw new Error('版图成员并发登记失败，请稍后重试');
 }
 
 async function listControls(db, worldId) {
@@ -109,12 +154,32 @@ async function listTurnCommands(db, worldId, turn, extraQueries = []) {
 }
 
 async function requireControl(db, worldId, nationId, userId) {
-  const found = await db.listRows({ databaseId: DATABASE_ID, tableId: CONTROL_TABLE, queries: [Query.equal('worldId', worldId), Query.equal('nationId', nationId), Query.limit(1)], total: false });
-  const control = found.rows[0];
-  if (!control || control.controllerUserId !== userId || control.status !== 'controlled') throw new Error('你没有该国家的有效控制权');
-  if (control.leaseExpiresAt && Date.parse(control.leaseExpiresAt) <= Date.now()) throw new Error('国家控制租约已过期，请重新认领');
-  const now = new Date();
-  return db.updateRow({ databaseId: DATABASE_ID, tableId: CONTROL_TABLE, rowId: control.$id, data: { leaseExpiresAt: isoAfterDays(now, LEASE_DAYS), lastActiveAt: now.toISOString() } });
+  const tx = await db.createTransaction();
+  try {
+    const found = await db.listRows({
+      databaseId: DATABASE_ID,
+      tableId: CONTROL_TABLE,
+      queries: [Query.equal('worldId', worldId), Query.equal('nationId', nationId), Query.limit(1)],
+      transactionId: tx.$id,
+      total: false,
+    });
+    const control = found.rows[0];
+    if (!control || control.controllerUserId !== userId || control.status !== 'controlled') throw new Error('你没有该国家的有效控制权');
+    if (control.leaseExpiresAt && Date.parse(control.leaseExpiresAt) <= Date.now()) throw new Error('国家控制租约已过期，请重新认领');
+    const now = new Date();
+    const updated = await db.updateRow({
+      databaseId: DATABASE_ID,
+      tableId: CONTROL_TABLE,
+      rowId: control.$id,
+      transactionId: tx.$id,
+      data: { leaseExpiresAt: isoAfterDays(now, LEASE_DAYS), lastActiveAt: now.toISOString() },
+    });
+    await db.updateTransaction({ transactionId: tx.$id, commit: true });
+    return updated;
+  } catch (error) {
+    await db.updateTransaction({ transactionId: tx.$id, rollback: true }).catch(() => undefined);
+    throw error;
+  }
 }
 
 async function mutateControl(db, action, worldId, nationId, userId, now) {
@@ -129,9 +194,12 @@ async function mutateControl(db, action, worldId, nationId, userId, now) {
     if (action === 'release_nation') {
       if (control.controllerUserId !== userId) throw new Error('只有当前控制者可以释放该国家');
       await db.updateRow({ databaseId: DATABASE_ID, tableId: CONTROL_TABLE, rowId: control.$id, transactionId: tx.$id, data: { controllerUserId: null, status: 'available', releasedAt: now.toISOString(), leaseExpiresAt: null, lastActiveAt: null, version: control.version + 1 } });
+    } else if (action === 'renew_control') {
+      assertRenewableControl(control, userId, now.getTime());
+      await db.updateRow({ databaseId: DATABASE_ID, tableId: CONTROL_TABLE, rowId: control.$id, transactionId: tx.$id, data: { leaseExpiresAt: isoAfterDays(now, LEASE_DAYS), lastActiveAt: now.toISOString(), version: control.version + 1 } });
     } else {
       if (control.controllerUserId && control.controllerUserId !== userId && !leaseExpired) throw new Error('该国家已由其他玩家控制');
-      if (action === 'claim_nation' && control.controllerUserId !== userId) {
+      if (control.controllerUserId !== userId) {
         const owned = await db.listRows({ databaseId: DATABASE_ID, tableId: CONTROL_TABLE, queries: [Query.equal('worldId', worldId), Query.equal('controllerUserId', userId), Query.equal('status', 'controlled'), Query.limit(100)], transactionId: tx.$id, total: false });
         if (owned.rows.length >= world.maxNationsPerUser) throw new Error(`此版图最多控制 ${world.maxNationsPerUser} 个国家`);
       }
@@ -213,6 +281,8 @@ async function submitCommand(db, storage, worldId, nationId, userId, body) {
   if (key.length < 8 || key.length > 64) throw new Error('行动幂等标识无效');
   const commandType = String(body.commandType ?? '');
   if (!['domestic_action', 'diplomatic_action', 'military_action'].includes(commandType)) throw new Error('共享行动类型无效');
+  const action = String(body.payload?.action ?? '');
+  assertCommandCategory(commandType, action);
   const serializedPayload = JSON.stringify(body.payload ?? {});
   if (serializedPayload.length > 8192) throw new Error('共享行动参数过大');
   try {
@@ -286,11 +356,27 @@ async function resolveDueWorlds(db, storage, nowMs = Date.now()) {
 async function setReady(db, storage, worldId, nationId, userId, body) {
   await requireControl(db, worldId, nationId, userId);
   const world = await db.getRow({ databaseId: DATABASE_ID, tableId: WORLD_TABLE, rowId: worldId });
+  if (world.status !== 'active' || world.phase !== 'planning' || !world.snapshotFileId) {
+    throw new Error('共享版图当前不能确认准备');
+  }
   if (Number(body.baseRevision) !== world.revision) throw new Error('版图已更新，请刷新后重试');
   const key = readyCommandKey(worldId, world.turn, nationId);
   try {
     await db.createRow({ databaseId: DATABASE_ID, tableId: COMMAND_TABLE, rowId: commandId(key), data: { worldId, nationId, userId, turn: world.turn, baseRevision: world.revision, commandType: 'set_ready', idempotencyKey: key, payload: '{}', status: 'pending', createdAt: new Date().toISOString() }, permissions: userPermissions(userId) });
-  } catch (error) { if (error?.code !== 409) throw error; }
+  } catch (error) {
+    if (error?.code !== 409) throw error;
+    const existing = await db.getRow({ databaseId: DATABASE_ID, tableId: COMMAND_TABLE, rowId: commandId(key) });
+    assertReadyCommandIdentity(existing, { worldId, nationId, turn: world.turn, idempotencyKey: key });
+    if (existing.userId !== userId || existing.status !== 'pending' || existing.baseRevision !== world.revision) {
+      await db.updateRow({
+        databaseId: DATABASE_ID,
+        tableId: COMMAND_TABLE,
+        rowId: existing.$id,
+        data: { userId, baseRevision: world.revision, status: 'pending', createdAt: new Date().toISOString() },
+        permissions: userPermissions(userId),
+      });
+    }
+  }
   const controls = (await listControls(db, worldId)).filter((row) => isControlActive(row));
   const ready = await listTurnCommands(db, worldId, world.turn, [Query.equal('commandType', 'set_ready'), Query.equal('status', 'pending')]);
   const readyNations = new Set(ready.map((row) => row.nationId));

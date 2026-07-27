@@ -11,6 +11,14 @@ export interface CommandPolicyRow {
   userId: string;
 }
 
+export interface ReadyCommandPolicyRow {
+  worldId: string;
+  nationId: string;
+  turn: number;
+  commandType: string;
+  idempotencyKey: string;
+}
+
 export interface WorldSchedulePolicyRow {
   status?: string;
   phase?: string;
@@ -22,6 +30,9 @@ export interface WorldSchedulePolicyRow {
 
 export function isControlActive(control: ControlPolicyRow | null | undefined, nowMs?: number): boolean;
 export function assertCommandOwnership<T extends CommandPolicyRow>(command: T, expected: CommandPolicyRow): T;
+export function assertCommandCategory(commandType: string, action: string): string;
+export function assertRenewableControl<T extends ControlPolicyRow>(control: T | null | undefined, userId: string, nowMs?: number): T;
+export function assertReadyCommandIdentity<T extends ReadyCommandPolicyRow>(command: T, expected: ReadyCommandPolicyRow): T;
 export function wasWorldActiveDuringWindow(world: WorldSchedulePolicyRow, memberships: { lastSeenAt: string }[]): boolean;
 export function isWorldDue(world: WorldSchedulePolicyRow | null | undefined, nowMs?: number): boolean;
 export function readyCommandKey(worldId: string, turn: number, nationId: string): string;

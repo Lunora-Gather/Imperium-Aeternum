@@ -13,8 +13,41 @@ const STORAGE_KEY_BASE = 'imperium-aeternum-save';
 const SLOT_KEY = (slot: number) => `${STORAGE_KEY_BASE}-${slot}`;
 const AUTO_SLOT = 0;
 export const SLOT_COUNT = 5;
+const MAX_SAVE_BYTES = 5 * 1024 * 1024;
 
 type MutableGameState = GameState & Record<string, unknown>;
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return !!value && typeof value === 'object' && !Array.isArray(value);
+}
+
+function assertSafeSaveGame(value: unknown): asserts value is SaveGame {
+  if (
+    !isRecord(value)
+    || !isRecord(value.gameState)
+    || !isRecord(value.gameState.nations)
+    || !isRecord(value.gameState.provinces)
+  ) throw new Error('存档结构无效');
+  const version = value.version == null ? 1 : Number(value.version);
+  if (!Number.isSafeInteger(version) || version < 0 || version > SAVE_VERSION) throw new Error('存档版本无效');
+}
+
+function parseSaveGame(raw: string): SaveGame {
+  const parsed = JSON.parse(raw, (key, value) => {
+    if (['__proto__', 'prototype', 'constructor'].includes(key)) throw new Error('存档包含不安全字段');
+    return value;
+  }) as unknown;
+  assertSafeSaveGame(parsed);
+  return parsed;
+}
+
+function saveBytes(raw: string): number {
+  return new Blob([raw]).size;
+}
+
+function validSlot(slot: number): boolean {
+  return Number.isInteger(slot) && slot >= 0 && slot < SLOT_COUNT;
+}
 
 function num(v: unknown, fallback = 0): number {
   return typeof v === 'number' && Number.isFinite(v) ? v : fallback;
@@ -233,7 +266,11 @@ const migrations: { from: number; to: number; apply: (s: SaveGame) => SaveGame }
 
 export function migrate(save: SaveGame): SaveGame {
   // 迁移是工具链/预检也会调用的公共入口，不能污染调用方持有的旧存档对象。
-  let cur: SaveGame = { ...save, gameState: cloneGameState(save.gameState) };
+  assertSafeSaveGame(save);
+  const createdAt = Number.isFinite(Date.parse(String(save.createdAt ?? '')))
+    ? save.createdAt
+    : new Date().toISOString();
+  let cur: SaveGame = { ...save, createdAt, gameState: cloneGameState(save.gameState) };
   if (!cur.version || cur.version < 1) cur = { ...cur, version: 1 };
   while (cur.version < SAVE_VERSION) {
     const m = migrations.find((x) => x.from === cur.version);
@@ -244,10 +281,13 @@ export function migrate(save: SaveGame): SaveGame {
 }
 
 export function saveGameToSlot(state: GameState, slot: number): { ok: boolean; sizeKB?: number; error?: string } {
+  if (!validSlot(slot)) return { ok: false, error: '无效存档槽位' };
   const data: SaveGame = { version: SAVE_VERSION, createdAt: new Date().toISOString(), gameState: compactGameStateForSave(state) };
   try {
     const raw = JSON.stringify(data);
-    const sizeKB = Math.round(raw.length / 1024);
+    const bytes = saveBytes(raw);
+    if (bytes > MAX_SAVE_BYTES) return { ok: false, error: '存档超过 5MB 安全上限，无法保存' };
+    const sizeKB = Math.round(bytes / 1024);
     if (sizeKB > 4500) console.warn(`存档 ${sizeKB}KB 接近 localStorage 上限，建议删档或精简`);
     localStorage.setItem(SLOT_KEY(slot), raw);
     return { ok: true, sizeKB };
@@ -264,10 +304,14 @@ export type SlotReadResult =
 
 export function readSaveGameFromSlot(slot: number): SlotReadResult {
   try {
+    if (!validSlot(slot)) return { ok: false, error: '无效存档槽位' };
     if (typeof localStorage === 'undefined') return { ok: false, empty: true, error: 'localStorage 不可用' };
     const raw = localStorage.getItem(SLOT_KEY(slot));
     if (!raw) return { ok: false, empty: true, error: '空槽位' };
-    return { ok: true, raw, save: JSON.parse(raw) as SaveGame, sizeKB: Math.round(raw.length / 1024) };
+    const bytes = saveBytes(raw);
+    if (bytes > MAX_SAVE_BYTES) return { ok: false, error: '存档超过 5MB 安全上限' };
+    const parsed = parseSaveGame(raw);
+    return { ok: true, raw, save: parsed, sizeKB: Math.round(bytes / 1024) };
   } catch (e) {
     return { ok: false, error: `存档解析失败：${(e as Error).message}` };
   }
@@ -275,9 +319,10 @@ export function readSaveGameFromSlot(slot: number): SlotReadResult {
 
 export function importSaveGameToSlot(slot: number, raw: string): { ok: true; state: GameState } | { ok: false; error: string } {
   try {
-    if (!Number.isInteger(slot) || slot < 0 || slot >= SLOT_COUNT) return { ok: false, error: '无效存档槽位' };
+    if (!validSlot(slot)) return { ok: false, error: '无效存档槽位' };
     if (typeof localStorage === 'undefined') return { ok: false, error: 'localStorage 不可用' };
-    const parsed = JSON.parse(raw) as SaveGame;
+    if (saveBytes(raw) > MAX_SAVE_BYTES) return { ok: false, error: '云存档超过 5MB 安全上限' };
+    const parsed = parseSaveGame(raw);
     const migrated = migrate(parsed);
     const normalized: SaveGame = {
       version: SAVE_VERSION,
@@ -325,7 +370,7 @@ export function listAllSlots(): ({ slot: number; meta: NonNullable<ReturnType<ty
 
 export function deleteSlot(slot: number): void {
   try {
-    if (typeof localStorage !== 'undefined') localStorage.removeItem(SLOT_KEY(slot));
+    if (validSlot(slot) && typeof localStorage !== 'undefined') localStorage.removeItem(SLOT_KEY(slot));
   } catch { /* ignore */ }
 }
 

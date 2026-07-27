@@ -17,4 +17,9 @@ export function messageRateRowId(kind: 'world' | 'direct', channelId: string, us
 export function assertMembershipOwner<T>(membership: T, worldId: string, userId: string): T;
 export function discoverableMemberIds(memberships: Array<{ userId?: string | null }>, userId: string, limit?: number): string[];
 export function assertFriendshipParticipants<T>(friendship: T, userId: string, friendUserId: string): T;
-
+export function canViewProfile(
+  userId: string,
+  targetUserId: string,
+  friendship: { requesterId?: string; addresseeId?: string; status?: string } | null | undefined,
+  sharesWorld: boolean,
+): boolean;

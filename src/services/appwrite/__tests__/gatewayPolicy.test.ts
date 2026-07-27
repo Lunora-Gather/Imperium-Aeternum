@@ -1,6 +1,25 @@
 import { describe, expect, it } from 'vitest';
-import { assertCommandOwnership, decodeSnapshotPayload, isControlActive, isWorldDue, readyCommandKey, wasWorldActiveDuringWindow } from '../../../../functions/shared-world-gateway/src/policy.js';
-import { assertFriendshipParticipants, assertMembershipOwner, discoverableMemberIds, friendshipPairKey, friendshipRowId, messageRateRowId, verifiedNationIdentity } from '../../../../functions/social-gateway/src/policy.js';
+import {
+  assertCommandCategory,
+  assertCommandOwnership,
+  assertReadyCommandIdentity,
+  assertRenewableControl,
+  decodeSnapshotPayload,
+  isControlActive,
+  isWorldDue,
+  readyCommandKey,
+  wasWorldActiveDuringWindow,
+} from '../../../../functions/shared-world-gateway/src/policy.js';
+import {
+  assertFriendshipParticipants,
+  assertMembershipOwner,
+  canViewProfile,
+  discoverableMemberIds,
+  friendshipPairKey,
+  friendshipRowId,
+  messageRateRowId,
+  verifiedNationIdentity,
+} from '../../../../functions/social-gateway/src/policy.js';
 import { normalizeCloudSavePayload } from '../../../../functions/cloud-save-gateway/src/policy.js';
 import { assertFreshEmailOtpSession, assertRecoverablePasswordUser } from '../../../../functions/account-gateway/src/policy.js';
 
@@ -53,6 +72,33 @@ describe('shared world gateway policy', () => {
     expect(readyCommandKey('world-1', 7, 'rome')).toBe('ready:world-1:7:rome');
     expect(readyCommandKey('world-1', 8, 'rome')).not.toBe(readyCommandKey('world-1', 7, 'rome'));
   });
+
+  it('does not let renew_control claim or revive another ruler’s nation', () => {
+    const active = { controllerUserId: 'u1', status: 'controlled', leaseExpiresAt: '2026-07-24T00:00:00.000Z' };
+    expect(assertRenewableControl(active, 'u1', now)).toBe(active);
+    expect(() => assertRenewableControl(active, 'u2', now)).toThrow('续期');
+    expect(() => assertRenewableControl({ ...active, controllerUserId: null, status: 'available' }, 'u1', now)).toThrow('续期');
+    expect(() => assertRenewableControl({ ...active, leaseExpiresAt: '2026-07-22T00:00:00.000Z' }, 'u1', now)).toThrow('续期');
+  });
+
+  it('rejects command metadata that lies about the action category', () => {
+    expect(assertCommandCategory('military_action', 'declare_war')).toBe('declare_war');
+    expect(() => assertCommandCategory('domestic_action', 'declare_war')).toThrow('类别');
+    expect(() => assertCommandCategory('military_action', '__proto__')).toThrow('类别');
+  });
+
+  it('detects ready-row collisions while permitting an explicit new controller confirmation', () => {
+    const command = {
+      worldId: 'world-1',
+      nationId: 'rome',
+      turn: 7,
+      commandType: 'set_ready',
+      idempotencyKey: readyCommandKey('world-1', 7, 'rome'),
+      userId: 'former-controller',
+    };
+    expect(assertReadyCommandIdentity(command, command)).toBe(command);
+    expect(() => assertReadyCommandIdentity(command, { ...command, nationId: 'gaul' })).toThrow('准备状态');
+  });
 });
 
 describe('social gateway nation identity', () => {
@@ -91,6 +137,15 @@ describe('social gateway nation identity', () => {
     expect(discoverableMemberIds(memberships, 'self')).toEqual(['friend-a', 'friend-b']);
     expect(discoverableMemberIds(memberships, 'self', 1)).toEqual(['friend-a']);
   });
+
+  it('exposes profiles only to self, friendship participants, or shared-world members', () => {
+    const pending = { requesterId: 'user-a', addresseeId: 'user-b', status: 'pending' };
+    expect(canViewProfile('user-a', 'user-a', null, false)).toBe(true);
+    expect(canViewProfile('user-a', 'user-b', pending, false)).toBe(true);
+    expect(canViewProfile('user-a', 'user-b', null, true)).toBe(true);
+    expect(canViewProfile('user-a', 'user-b', null, false)).toBe(false);
+    expect(canViewProfile('user-a', 'user-c', pending, false)).toBe(false);
+  });
 });
 
 describe('cloud save gateway payload policy', () => {
@@ -112,6 +167,8 @@ describe('cloud save gateway payload policy', () => {
     expect(() => normalizeCloudSavePayload('{"version":6}', Date.now())).toThrow('游戏状态');
     const future = JSON.stringify({ version: 6, createdAt: '2099-01-01T00:00:00.000Z', gameState: { turn: 1 } });
     expect(() => normalizeCloudSavePayload(future, Date.parse('2026-07-23T00:00:00.000Z'))).toThrow('更新时间');
+    const unsupported = JSON.stringify({ version: 999, createdAt: '2026-07-23T00:00:00.000Z', gameState: { turn: 1 } });
+    expect(() => normalizeCloudSavePayload(unsupported, Date.parse('2026-07-23T00:01:00.000Z'))).toThrow('存档版本');
   });
 });
 
