@@ -215,7 +215,7 @@ export default function MilitaryScreen() {
         const attacking = w.attackerId === pid;
         return <div key={w.id} className="ia-card" style={{ marginBottom: 8, padding: 10 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}><div><Tag text={attacking ? '进攻' : '防守'} tone={attacking ? 'danger' : 'warn'} /><strong style={{ marginLeft: 6, fontSize: 13 }}>{prov?.name ?? w.targetProvinceId}</strong></div><span className="dim" style={{ fontSize: 11 }}>第 {w.turns} 回合</span></div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}><span style={{ fontSize: 11, color: 'var(--text-mute)', width: 36 }}>进度</span><div style={{ flex: 1 }}><Bar value={w.progress} kind="high" /></div><strong style={{ fontSize: 13, color: 'var(--border-hi)', width: 40, textAlign: 'right' }}>{Math.round(w.progress)}%</strong><Btn label="战报" variant="ghost" onClick={() => setReportWar(w)} /><PeaceTermsBtn war={w} state={state} pid={pid} makePeace={makePeace} /></div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}><span style={{ fontSize: 11, color: 'var(--text-mute)', width: 36 }}>进度</span><div style={{ flex: 1 }}><Bar value={w.progress} kind="high" label="战争进度" /></div><strong style={{ fontSize: 13, color: 'var(--border-hi)', width: 40, textAlign: 'right' }}>{Math.round(w.progress)}%</strong><Btn label="战报" variant="ghost" onClick={() => setReportWar(w)} /><PeaceTermsBtn war={w} state={state} pid={pid} makePeace={makePeace} /></div>
         </div>;
       })}
     </Panel>
@@ -248,5 +248,5 @@ export default function MilitaryScreen() {
 }
 
 function StatRowMini({ label, value, kind }: { label: string; value: number; kind: 'high' | 'low' }) {
-  return <div style={{ display: 'grid', gridTemplateColumns: '48px 1fr 32px', gap: 6, alignItems: 'center', marginBottom: 3 }}><span style={{ fontSize: 11, color: 'var(--text-mute)' }}>{label}</span><Bar value={value} kind={kind} /><span style={{ fontSize: 11, textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{Math.round(value)}</span></div>;
+  return <div style={{ display: 'grid', gridTemplateColumns: '48px 1fr 32px', gap: 6, alignItems: 'center', marginBottom: 3 }}><span style={{ fontSize: 11, color: 'var(--text-mute)' }}>{label}</span><Bar value={value} kind={kind} label={label} /><span style={{ fontSize: 11, textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{Math.round(value)}</span></div>;
 }

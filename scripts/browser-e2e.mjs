@@ -194,9 +194,13 @@ function accessibilityAudit() {
         return !item.closest('label');
       })
       .map((item) => item.outerHTML.slice(0, 120));
+    const unnamedProgress = [...document.querySelectorAll('[role="progressbar"]')]
+      .filter(visible)
+      .filter((item) => !(item.getAttribute('aria-label') || item.getAttribute('aria-labelledby')))
+      .map((item) => item.outerHTML.slice(0, 120));
     const ids = [...document.querySelectorAll('[id]')].map((item) => item.id);
     const duplicateIds = [...new Set(ids.filter((id, index) => ids.indexOf(id) !== index))];
-    return { unnamedButtons, unnamedFields, duplicateIds };
+    return { unnamedButtons, unnamedFields, unnamedProgress, duplicateIds, nestedMain: document.querySelectorAll('main main').length };
   })()`;
 }
 
@@ -230,10 +234,20 @@ try {
   await cdp.send('Page.navigate', { url: APP_URL });
   await cdp.waitFor('document.readyState === "complete"', 'App did not finish loading');
   await cdp.evaluate(`localStorage.clear(); localStorage.setItem('ia-tutorial-done', '1'); localStorage.setItem('ia-locale', 'zh-CN')`);
-  // Keep navigation outside Runtime.evaluate. Linux Chrome may reject an
-  // in-flight evaluation as soon as location.reload() replaces its target.
-  await cdp.send('Page.reload', { ignoreCache: true });
+  // Keep navigation outside Runtime.evaluate. A fresh top-level navigation is
+  // more reliable than Page.reload across Chrome/Edge CDP implementations.
+  await cdp.send('Page.navigate', { url: `${APP_URL}?e2e=fresh` });
   await cdp.waitFor(`document.body?.innerText.includes('开始推荐剧本')`, 'Campaign lobby did not load');
+  const launchAccessibility = await cdp.evaluate(accessibilityAudit());
+  assert(launchAccessibility.unnamedButtons.length === 0, `Campaign lobby has unnamed controls: ${JSON.stringify(launchAccessibility.unnamedButtons)}`);
+  assert(launchAccessibility.unnamedFields.length === 0, `Campaign lobby has unnamed fields: ${JSON.stringify(launchAccessibility.unnamedFields)}`);
+  assert(launchAccessibility.duplicateIds.length === 0, `Campaign lobby has duplicate IDs: ${JSON.stringify(launchAccessibility.duplicateIds)}`);
+  assert(await cdp.evaluate(`document.querySelector('#scenario-library')?.hidden === true`), 'Full campaign library should be collapsed on initial entry');
+  assert(await cdp.evaluate(clickButton('查看全部剧本')), 'Campaign library toggle was not found');
+  await cdp.waitFor(`document.querySelector('#scenario-library')?.hidden === false`, 'Campaign library did not expand');
+  assert(await cdp.evaluate(`document.querySelectorAll('#scenario-library .ia-scenario-card').length === 10`), 'Campaign library does not expose all ten campaigns');
+  assert(await cdp.evaluate(clickButton('收起剧本列表')), 'Campaign library collapse control was not found');
+  await cdp.waitFor(`document.querySelector('#scenario-library')?.hidden === true`, 'Campaign library did not collapse');
 
   assert(await cdp.evaluate(clickButton('开始推荐剧本')), 'Recommended campaign button was not found');
   await cdp.waitFor(`document.body?.innerText.includes('国政总览')`, 'Dashboard did not load after starting a campaign');
@@ -252,7 +266,9 @@ try {
     const accessibility = await cdp.evaluate(accessibilityAudit());
     assert(accessibility.unnamedButtons.length === 0, `Screen ${tabId} has unnamed controls: ${JSON.stringify(accessibility.unnamedButtons)}`);
     assert(accessibility.unnamedFields.length === 0, `Screen ${tabId} has unnamed fields: ${JSON.stringify(accessibility.unnamedFields)}`);
+    assert(accessibility.unnamedProgress.length === 0, `Screen ${tabId} has unnamed progress indicators: ${JSON.stringify(accessibility.unnamedProgress)}`);
     assert(accessibility.duplicateIds.length === 0, `Screen ${tabId} has duplicate IDs: ${JSON.stringify(accessibility.duplicateIds)}`);
+    assert(accessibility.nestedMain === 0, `Screen ${tabId} contains nested main landmarks`);
   }
 
   assert(await cdp.evaluate(clickNavigationTab('dashboard')), 'Overview navigation button was not found after layout audit');
@@ -274,7 +290,7 @@ try {
   await cdp.waitFor(`document.querySelector('.ia-ruler-subline')?.innerText.includes('Anno · 1')`, 'Loading the saved turn did not restore year one');
 
   await cdp.send('Emulation.setDeviceMetricsOverride', { width: 390, height: 844, deviceScaleFactor: 1, mobile: true });
-  await cdp.send('Page.reload', { ignoreCache: true });
+  await cdp.send('Page.navigate', { url: `${APP_URL}?e2e=mobile` });
   await cdp.waitFor(`document.body?.innerText.includes('地中海黎明')`, 'Mobile campaign lobby did not load');
   const continuedMobileSave = await cdp.evaluate(clickButton('继续槽位 0'));
   if (!continuedMobileSave) assert(await cdp.evaluate(clickButton('开始推荐剧本')), 'Mobile campaign start button was not found');
@@ -286,6 +302,11 @@ try {
   }))()`);
   assert(mobile.statusHidden, 'Secondary status cards should be hidden on a 390px viewport');
   assert(mobile.briefTop < mobile.viewportHeight, `Turn brief begins below the mobile fold (${mobile.briefTop}px)`);
+  assert(await cdp.evaluate(clickButton('全部页面')), 'Mobile page directory trigger was not found');
+  await cdp.waitFor(`!!document.querySelector('#mobile-page-navigation')`, 'Mobile page directory did not open');
+  assert(await cdp.evaluate(`document.querySelector('#mobile-page-navigation')?.contains(document.activeElement) === true`), 'Mobile page directory did not receive keyboard focus');
+  await cdp.evaluate(`document.activeElement?.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))`);
+  await cdp.waitFor(`!document.querySelector('#mobile-page-navigation')`, 'Escape did not close the mobile page directory');
 
   assert(await cdp.evaluate(clickNavigationTab('map')), 'Mobile map navigation button was not found');
   await cdp.waitFor(`!!document.querySelector('.ia-map-page')`, 'Mobile map did not load');
@@ -299,7 +320,7 @@ try {
   assert(mobileMilitary.minGap >= 8, `Mobile military cards have collapsed spacing (${mobileMilitary.minGap}px)`);
   assert(mobileMilitary.scrollWidth <= mobileMilitary.clientWidth + 1, `Mobile military screen overflows horizontally (${mobileMilitary.scrollWidth}px > ${mobileMilitary.clientWidth}px)`);
 
-  console.log('Browser E2E passed: start, turn advance, save/load, campaign health, search, accessibility, screen spacing, horizontal fit, single brief, mobile fold.');
+  console.log('Browser E2E passed: launch disclosure, start, turn advance, save/load, campaign health, search, modal focus, accessibility, screen spacing, horizontal fit, single brief, mobile fold.');
 } finally {
   cdp?.close();
   await stopChild(chrome);

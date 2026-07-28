@@ -1,5 +1,6 @@
 import { useI18n } from '../i18n';
 import { NAVIGATION_GROUPS, type NavigationTab } from '../gameplay/navigationTabs';
+import { useDialogFocus } from './useDialogFocus';
 
 interface MobileNavigationSheetProps {
   activeTab: NavigationTab;
@@ -9,9 +10,10 @@ interface MobileNavigationSheetProps {
 
 export default function MobileNavigationSheet({ activeTab, onSelect, onClose }: MobileNavigationSheetProps) {
   const { t } = useI18n();
+  const dialogRef = useDialogFocus<HTMLElement>(onClose);
   return (
     <div className="ia-modal-backdrop ia-mobile-nav-backdrop" onClick={onClose}>
-      <section id="mobile-page-navigation" className="ia-mobile-nav-sheet ia-fade-in" role="dialog" aria-modal="true" aria-labelledby="mobile-page-navigation-title" onClick={(event) => event.stopPropagation()}>
+      <section ref={dialogRef} tabIndex={-1} id="mobile-page-navigation" className="ia-mobile-nav-sheet ia-fade-in" role="dialog" aria-modal="true" aria-labelledby="mobile-page-navigation-title" onClick={(event) => event.stopPropagation()}>
         <header>
           <div>
             <span className="ia-up">{t('快速导航')}</span>

@@ -29,6 +29,7 @@ for (let attempt = 1; attempt <= attempts; attempt += 1) {
     const html = await fetchText(baseUrl.href);
     assert(html.includes('<div id="root"></div>'), 'Production HTML is missing the React root');
     assert(html.includes('Imperium Aeternum'), 'Production HTML has the wrong title');
+    assert(html.includes('Content-Security-Policy'), 'Production HTML is missing the content security policy');
     const cssUrls = assetUrls(html, 'css');
     const jsUrls = assetUrls(html, 'js');
     assert(cssUrls.length > 0, 'Production HTML references no CSS asset');
@@ -43,6 +44,7 @@ for (let attempt = 1; attempt <= attempts; attempt += 1) {
     assert(css.includes('.ia-screen-stack'), 'Production CSS is missing the screen rhythm contract');
     assert(css.includes('.ia-map-search'), 'Production CSS is missing the strategic map search layout');
     assert(js.includes(expectedVersion), `Production entry JavaScript is missing build marker ${expectedVersion}`);
+    assert(js.includes('刷新并恢复'), 'Production entry JavaScript is missing stale-deployment recovery');
 
     console.log(JSON.stringify({
       ok: true,

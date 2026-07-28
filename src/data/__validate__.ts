@@ -12,6 +12,7 @@ import { FACTIONS } from './factions';
 import { EVENTS } from './events';
 import { NATIONAL_CHARACTERS, BEHAVIOR_MAPPINGS } from './national-characters';
 import { createInitialState, createWorldState } from '../engine/init';
+import { SCENARIOS } from '../store/scenarioCatalog';
 
 interface ValidateResult {
   ok: boolean;
@@ -35,11 +36,12 @@ const SCENARIO_CHECKS: ScenarioCheck[] = [
   { id: 'classic', seed: 12345, expectedMinNations: 5, expectedMinProvinces: 30, build: () => createInitialState() },
   { id: 'world', seed: 20260626, playerNationId: 'n_med_rome', expectedMinNations: 120, expectedMinProvinces: 300, build: () => createWorldState(20260626, 'n_med_rome') },
   { id: 'eastasia', seed: 20260626, playerNationId: 'n_ea_qin', regionFilter: ['asia_east', 'asia_central', 'asia_south'], expectedMinNations: 10, expectedMinProvinces: 30, build: () => createWorldState(20260626, 'n_ea_qin', ['asia_east', 'asia_central', 'asia_south']) },
+  { id: 'w3_eastasia', seed: 20260626, playerNationId: 'n_ea_qin', regionFilter: ['asia_east', 'asia_central', 'asia_south'], expectedMinNations: 10, expectedMinProvinces: 30, build: () => createWorldState(20260626, 'n_ea_qin', ['asia_east', 'asia_central', 'asia_south']) },
   { id: 'w5_mediterranean', seed: 20260626, playerNationId: 'n_med_rome', regionFilter: ['mediterranean', 'europe_w', 'middle_east', 'africa_n'], expectedMinNations: 10, expectedMinProvinces: 30, build: () => createWorldState(20260626, 'n_med_rome', ['mediterranean', 'europe_w', 'middle_east', 'africa_n']) },
   { id: 'w6_americas', seed: 20260626, playerNationId: 'n_am_inca', regionFilter: ['americas'], expectedMinNations: 5, expectedMinProvinces: 10, build: () => createWorldState(20260626, 'n_am_inca', ['americas']) },
   { id: 'w4_europe', seed: 20260626, playerNationId: 'n_we_frank', regionFilter: ['europe_w', 'europe_e', 'europe_n', 'mediterranean'], expectedMinNations: 10, expectedMinProvinces: 30, build: () => createWorldState(20260626, 'n_we_frank', ['europe_w', 'europe_e', 'europe_n', 'mediterranean']) },
   { id: 'w8_indianocean', seed: 20260626, playerNationId: 'n_sa_maurya', regionFilter: ['asia_south', 'africa_e', 'middle_east'], expectedMinNations: 8, expectedMinProvinces: 24, build: () => createWorldState(20260626, 'n_sa_maurya', ['asia_south', 'africa_e', 'middle_east']) },
-  { id: 'w7_random_seed_1', seed: 20260627, regionFilter: ['asia_east'], expectedMinNations: 5, expectedMinProvinces: 10, build: () => createWorldState(20260627, undefined, ['asia_east']) },
+  { id: 'w7_random', seed: 20260627, regionFilter: ['asia_east'], expectedMinNations: 5, expectedMinProvinces: 10, build: () => createWorldState(20260627, undefined, ['asia_east']) },
   { id: 'challenge_survival', seed: 12345, expectedMinNations: 5, expectedMinProvinces: 30, build: () => createInitialState() },
 ];
 
@@ -99,6 +101,14 @@ function validateGameStateShape(acc: ValidateResult, scenario: ScenarioCheck, st
 
 export function validateData(): ValidateResult {
   const acc: ValidateResult = { ok: true, errors: [], warnings: [] };
+  const scenarioCheckIds = new Set(SCENARIO_CHECKS.map((scenario) => scenario.id));
+  for (const scenario of SCENARIOS) {
+    if (!scenarioCheckIds.has(scenario.id)) fail(acc, `可选剧本 ${scenario.id} 缺少生成校验`);
+  }
+  for (const scenario of SCENARIO_CHECKS) {
+    if (!SCENARIOS.some((entry) => entry.id === scenario.id)) fail(acc, `生成校验 ${scenario.id} 没有对应的可选剧本`);
+  }
+  if (scenarioCheckIds.size !== SCENARIO_CHECKS.length) fail(acc, '剧本生成校验存在重复 id');
   if (NATIONS.length !== 5) fail(acc, `经典国家数应为 5，实际 ${NATIONS.length}`);
   const players = NATIONS.filter((n) => n.isPlayer);
   if (players.length !== 1) fail(acc, `经典玩家国家应 1，实际 ${players.length}`);
@@ -202,7 +212,7 @@ if (isMain) {
   const r = validateData();
   if (r.warnings.length) { console.warn('WARNINGS:'); r.warnings.forEach((w) => console.warn('  - ' + w)); }
   if (r.errors.length) { console.error('ERRORS:'); r.errors.forEach((e) => console.error('  - ' + e)); process.exit(1); }
-  console.log(`✅ 数据自检通过（${NATIONS.length} 经典国 / ${PROVINCES.length} 经典省 / ${BUILDING_LIST.length} 建筑 / ${TECHNOLOGIES.length} 科技 / ${POLICIES.length} 政策 / ${EVENTS.length} 事件 / ${SCENARIO_CHECKS.length} 剧本）`);
+  console.log(`✅ 数据自检通过（${NATIONS.length} 经典国 / ${PROVINCES.length} 经典省 / ${BUILDING_LIST.length} 建筑 / ${TECHNOLOGIES.length} 科技 / ${POLICIES.length} 政策 / ${EVENTS.length} 事件 / ${SCENARIOS.length} 可选剧本，全部通过生成校验）`);
 }
 
 export { NATIONS, PROVINCES, BUILDINGS, TECHNOLOGIES, POLICIES, GOVERNMENTS, FACTIONS, EVENTS };

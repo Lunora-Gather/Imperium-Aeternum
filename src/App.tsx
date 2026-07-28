@@ -31,6 +31,7 @@ import { ResourceStrip } from './components/ui';
 import LogToast from './components/LogToast';
 import ErrorBoundary from './components/ErrorBoundary';
 import { AccountButton } from './components/account/AccountPanel';
+import CampaignExitControl from './components/CampaignExitControl';
 import { LocaleSwitch } from './components/LocaleSwitch';
 import { SocialDock } from './components/social/SocialPanel';
 import { useI18n } from './i18n';
@@ -45,12 +46,16 @@ function attemptLazyImportRecovery(): boolean {
   try {
     if (!canAttemptLazyRecovery(sessionStorage.getItem(LAZY_RECOVERY_ATTEMPT_KEY), now)) return false;
     sessionStorage.setItem(LAZY_RECOVERY_ATTEMPT_KEY, String(now));
-
+  } catch {
+    return false;
+  }
+  try {
     const store = useGameStore.getState();
     const isLocalCampaign = store.scene === 'playing' && !useSharedWorldSessionStore.getState().session;
     if (isLocalCampaign) store.saveToSlot(0);
   } catch {
-    return false;
+    // A blocked or full storage area must not prevent the newer application
+    // shell from loading. The existing save remains untouched on failure.
   }
   window.location.reload();
   return true;
@@ -89,7 +94,6 @@ const EventModal = lazyScreen(() => import('./screens/EventModal'));
 const NoviceJourneyPanel = lazyScreen(() => import('./components/NoviceJourneyPanel'));
 const NoviceJourneyCompletion = lazyScreen(() => import('./components/NoviceJourneyCompletion'));
 const MobileNavigationSheet = lazyScreen(() => import('./components/MobileNavigationSheet'));
-const CampaignExitControl = lazyScreen(() => import('./components/CampaignExitControl'));
 
 function HeaderIconButton({ icon, label, onClick, disabled = false, tone = '' }: { icon: string; label: string; onClick: () => void; disabled?: boolean; tone?: 'gold' | 'back' | '' }) {
   return <button className={`ia-icon-btn${tone ? ` ia-icon-btn--${tone}` : ''}`} onClick={onClick} disabled={disabled} title={label} aria-label={label}><span aria-hidden="true">{icon}</span></button>;
@@ -408,7 +412,7 @@ export default function App() {
                 <HeaderIconButton icon="?" label={t('新手帮助')} onClick={() => { setShowHelp(true); setTutorialStep(0); }} />
                 <HeaderIconButton icon={sfxMute.muted ? '🔇' : '🔊'} label={t('音效开关')} onClick={sfxMute.toggle} />
                 <HeaderIconButton icon="↩" label={t('返回上一页')} onClick={goBackPage} disabled={!canGoBack} tone="back" />
-                <Suspense fallback={null}><CampaignExitControl presentation="icon" /></Suspense>
+                <CampaignExitControl presentation="icon" />
               </div>
             </div>
           </div>
@@ -471,7 +475,7 @@ export default function App() {
       )}
 
       <main className="ia-content-shell ia-fade">
-        <ErrorBoundary onReset={() => goToTab('dashboard', false)}>
+        <ErrorBoundary onReset={() => goToTab('dashboard', false)} onReload={() => window.location.reload()}>
           <Suspense fallback={<ScreenFallback />}>
             {tab === 'dashboard' && <Dashboard />}
             {tab === 'map' && <WorldMap />}

@@ -8,6 +8,7 @@ import { Btn, Tag } from '../ui';
 import { WorldChatPanel } from '../social/WorldChatPanel';
 import { useGameStore } from '../../store/gameStore';
 import { useI18n } from '../../i18n';
+import { useDialogFocus } from '../useDialogFocus';
 
 export function SharedWorldButton() {
   const { t } = useI18n();
@@ -27,6 +28,7 @@ function SharedWorldLobby({ onClose }: { onClose: () => void }) {
   const selectedWorld = store.worlds.find((world) => world.id === selectedWorldId) ?? null;
   const controls = selectedWorldId ? store.controls[selectedWorldId] ?? [] : [];
   const mine = useMemo(() => controls.filter((control) => control.controllerUserId === user?.$id), [controls, user?.$id]);
+  const dialogRef = useDialogFocus<HTMLElement>(onClose);
 
   useEffect(() => {
     if (user) void store.refreshWorlds();
@@ -43,14 +45,8 @@ function SharedWorldLobby({ onClose }: { onClose: () => void }) {
     return () => { cancelled = true; if (dispose) void dispose(); };
   }, [selectedWorldId, user]);
 
-  useEffect(() => {
-    const closeOnEscape = (event: KeyboardEvent) => { if (event.key === 'Escape') onClose(); };
-    window.addEventListener('keydown', closeOnEscape);
-    return () => window.removeEventListener('keydown', closeOnEscape);
-  }, [onClose]);
-
   return <div className="ia-modal-backdrop" onClick={onClose}>
-    <section className="ia-shared-world-modal ia-fade-in" role="dialog" aria-modal="true" aria-labelledby="shared-world-title" onClick={(event) => event.stopPropagation()}>
+    <section ref={dialogRef} tabIndex={-1} className="ia-shared-world-modal ia-fade-in" role="dialog" aria-modal="true" aria-labelledby="shared-world-title" onClick={(event) => event.stopPropagation()}>
       <header className="ia-shared-world-head">
         <div><span className="ia-up">Living Worlds</span><h2 id="shared-world-title" className="ia-display">{t('共享活版图')}</h2><p>{t('玩家控制部分国家，其余国家由 AI 持续治理；整个版图使用统一年份。')}</p></div>
         <Btn label={t('关闭')} variant="ghost" onClick={onClose} />

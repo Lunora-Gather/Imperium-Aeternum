@@ -23,7 +23,7 @@ export default function NationalPurposePanel({ state, compact = false }: { state
       <article className="ia-purpose-mission">
         <div className="ia-purpose-title"><div><span>使命路线</span><strong>{mission.title}</strong></div><em>{current.progress}%</em></div>
         <p>{mission.motto}</p>
-        <div className="ia-purpose-progress"><i><b style={{ width: `${current.progress}%` }} /></i></div>
+        <div className="ia-purpose-progress"><i role="progressbar" aria-label={`${current.title}进度`} aria-valuemin={0} aria-valuemax={100} aria-valuenow={current.progress}><b style={{ width: `${current.progress}%` }} /></i></div>
         <div className="ia-purpose-current">
           <span>{current.done ? '使命完成' : current.title}</span>
           <strong>{current.body}</strong>

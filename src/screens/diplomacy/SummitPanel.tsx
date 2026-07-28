@@ -10,6 +10,7 @@ import {
   previewDiplomaticSummit,
 } from '../../engine/summits';
 import type { GameState, Nation, SummitAgenda, SummitStance } from '../../types/game';
+import { useDialogFocus } from '../../components/useDialogFocus';
 
 const AGENDAS = Object.keys(SUMMIT_AGENDAS) as SummitAgenda[];
 const STANCES = Object.keys(SUMMIT_STANCES) as SummitStance[];
@@ -52,6 +53,7 @@ export function SummitPanel({ state, target, onClose, onConvene }: Props) {
     .find((entry) => (entry.initiatorId === state.playerNationId && entry.targetId === target.id)
       || (entry.targetId === state.playerNationId && entry.initiatorId === target.id));
   const likelihood = LIKELIHOOD[preview.likelihood];
+  const dialogRef = useDialogFocus<HTMLElement>(onClose);
   const positive = preview.factors.filter((entry) => entry.value > 0).sort((a, b) => b.value - a.value).slice(0, 4);
   const negative = preview.factors.filter((entry) => entry.value < 0).sort((a, b) => a.value - b.value).slice(0, 4);
 
@@ -64,16 +66,8 @@ export function SummitPanel({ state, target, onClose, onConvene }: Props) {
     finally { setAiBusy(false); }
   };
 
-  useEffect(() => {
-    const closeOnEscape = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') onClose();
-    };
-    window.addEventListener('keydown', closeOnEscape);
-    return () => window.removeEventListener('keydown', closeOnEscape);
-  }, [onClose]);
-
   return <div className="ia-modal-backdrop" onClick={onClose}>
-    <section className="ia-help-card ia-fade-in" role="dialog" aria-modal="true" aria-labelledby="ia-summit-title" onClick={(event) => event.stopPropagation()} style={{ width: 'min(860px, calc(100vw - 24px))', maxHeight: 'min(820px, calc(100vh - 24px))', overflowY: 'auto' }}>
+    <section ref={dialogRef} tabIndex={-1} className="ia-help-card ia-fade-in" role="dialog" aria-modal="true" aria-labelledby="ia-summit-title" onClick={(event) => event.stopPropagation()} style={{ width: 'min(860px, calc(100vw - 24px))', maxHeight: 'min(820px, calc(100vh - 24px))', overflowY: 'auto' }}>
     <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'flex-start', marginBottom: 10 }}>
       <div>
         <div style={{ color: 'var(--gold)', fontSize: 11, fontWeight: 700 }}>元首会谈筹备</div>

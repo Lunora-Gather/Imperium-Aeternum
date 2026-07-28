@@ -4,6 +4,7 @@ import { useAccountStore } from '../../store/accountStore';
 import { Btn, Tag } from '../ui';
 import { AccountAccessForm } from './AccountAccessForm';
 import { useI18n } from '../../i18n';
+import { useDialogFocus } from '../useDialogFocus';
 
 export function AccountButton({ compact = false }: { compact?: boolean }) {
   const { t } = useI18n();
@@ -22,17 +23,10 @@ export function AccountButton({ compact = false }: { compact?: boolean }) {
 function AccountModal({ onClose }: { onClose: () => void }) {
   const { t } = useI18n();
   const store = useAccountStore();
-
-  useEffect(() => {
-    const closeOnEscape = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') onClose();
-    };
-    window.addEventListener('keydown', closeOnEscape);
-    return () => window.removeEventListener('keydown', closeOnEscape);
-  }, [onClose]);
+  const dialogRef = useDialogFocus<HTMLElement>(onClose);
 
   return <div className="ia-modal-backdrop" onClick={onClose}>
-    <section className="ia-account-modal ia-fade-in" role="dialog" aria-modal="true" aria-labelledby="ia-account-title" onClick={(event) => event.stopPropagation()}>
+    <section ref={dialogRef} tabIndex={-1} className="ia-account-modal ia-fade-in" role="dialog" aria-modal="true" aria-labelledby="ia-account-title" onClick={(event) => event.stopPropagation()}>
       <div className="ia-account-head">
         <div>
           <div className="ia-up">Imperium Identity</div>

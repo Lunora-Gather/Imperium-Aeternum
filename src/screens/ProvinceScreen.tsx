@@ -222,7 +222,7 @@ export default function ProvinceScreen() {
           </div>
           <div>
             <strong style={{ fontSize: 13 }}>阶层</strong>
-            <div style={{ marginTop: 6 }}>{prov.classes.length === 0 ? <span className="dim">暂无阶层数据</span> : prov.classes.map((c) => <div key={c.classId} style={{ display: 'grid', gridTemplateColumns: '48px 1fr 40px', gap: 6, alignItems: 'center', marginBottom: 4 }}><span style={{ fontSize: 12, color: 'var(--text-mute)' }}>{CLASS_LABEL[c.classId] ?? c.classId}</span><Bar value={c.satisfaction} kind="high" /><span style={{ fontSize: 11, textAlign: 'right' }}>{Math.round(c.satisfaction)}</span></div>)}</div>
+            <div style={{ marginTop: 6 }}>{prov.classes.length === 0 ? <span className="dim">暂无阶层数据</span> : prov.classes.map((c) => <div key={c.classId} style={{ display: 'grid', gridTemplateColumns: '48px 1fr 40px', gap: 6, alignItems: 'center', marginBottom: 4 }}><span style={{ fontSize: 12, color: 'var(--text-mute)' }}>{CLASS_LABEL[c.classId] ?? c.classId}</span><Bar value={c.satisfaction} kind="high" label={`${CLASS_LABEL[c.classId] ?? c.classId}满意度`} /><span style={{ fontSize: 11, textAlign: 'right' }}>{Math.round(c.satisfaction)}</span></div>)}</div>
             <Divider />
             <strong style={{ fontSize: 13 }}>建筑</strong>
             <div style={{ marginTop: 6, display: 'flex', gap: 5, flexWrap: 'wrap' }}>
@@ -251,10 +251,10 @@ export default function ProvinceScreen() {
   );
 }
 
-function Bar({ value, max = 100, kind = 'neutral' }: { value: number; max?: number; kind?: 'high' | 'low' | 'neutral' }) {
+function Bar({ value, max = 100, kind = 'neutral', label = '进度' }: { value: number; max?: number; kind?: 'high' | 'low' | 'neutral'; label?: string }) {
   const pct = Math.max(0, Math.min(100, (value / max) * 100));
   let c = 'var(--bar-ok)';
   if (kind === 'high') c = pct >= 60 ? 'var(--bar-good)' : pct >= 30 ? 'var(--bar-warn)' : 'var(--bar-bad)';
   else if (kind === 'low') c = pct <= 30 ? 'var(--bar-good)' : pct <= 60 ? 'var(--bar-warn)' : 'var(--bar-bad)';
-  return <div style={{ background: 'var(--bg-inset)', borderRadius: 3, height: 7, overflow: 'hidden' }}><div style={{ width: `${pct}%`, height: '100%', background: c, transition: 'width 0.25s' }} /></div>;
+  return <div role="progressbar" aria-label={label} aria-valuemin={0} aria-valuemax={max} aria-valuenow={Math.max(0, Math.min(max, value))} style={{ background: 'var(--bg-inset)', borderRadius: 3, height: 7, overflow: 'hidden' }}><div style={{ width: `${pct}%`, height: '100%', background: c, transition: 'width 0.25s' }} /></div>;
 }

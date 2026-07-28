@@ -66,7 +66,7 @@ export default function TechnologyScreen() {
         {researching && researchingTech ? (
           <div className="ia-card" style={{ marginBottom: 0 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}><strong style={{ fontSize: 13 }}>研发中：{BRANCH_ICON[researchingTech.branch]} {researchingTech.name}</strong><Tag text={`${researching.sciPtInvested}/${researchingTech.costSci}科`} tone="warn" /></div>
-            <Bar value={researchingPct} kind="high" />
+            <Bar value={researchingPct} kind="high" label="研究进度" />
             <p className="dim" style={{ fontSize: 10, marginTop: 6, marginBottom: 0 }}>AI 渐进研发中 · 玩家点下方“研发”即时完成</p>
           </div>
         ) : <p className="dim" style={{ fontSize: 12 }}>点下方科技即时研发完成（扣科研点+金）。优先按上方路线判断选择关键突破。</p>}

@@ -1,5 +1,5 @@
 // 剧本选择页 v35 — 开局大厅：玩法速查手册 + 难度挑战阶梯 + 存档健康继续
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useGameStore } from '../store/gameStore';
 import { SCENARIOS, type ScenarioId } from '../store/scenarioCatalog';
 import { clearAllSaves, SAVE_VERSION } from '../store/persistence';
@@ -29,6 +29,7 @@ export default function ScenarioSelect() {
   const { startScenario, startWithNation, loadFromSlot, hasSave, log } = useGameStore();
   const [selected, setSelected] = useState<ScenarioId | null>(null);
   const [pickedNation, setPickedNation] = useState<string | null>(null);
+  const [libraryOpen, setLibraryOpen] = useState(false);
   const [theme, setTheme] = useState<string>(() => { try { return localStorage.getItem('ia-theme') || 'night'; } catch { return 'night'; } });
   const [previews, setPreviews] = useState<SaveRecoveryPreview[]>(() => inspectAllSaveSlots());
   const scenario = SCENARIOS.find((s) => s.id === selected);
@@ -37,6 +38,11 @@ export default function ScenarioSelect() {
   const recommended = useMemo(() => new Set(recommendedScenarioIds()), []);
   const challengePath = useMemo(() => summarizeChallengePath(), []);
   const handbook = useMemo(() => buildLaunchHandbook(), []);
+  useEffect(() => {
+    if (!libraryOpen) return;
+    const frame = window.requestAnimationFrame(() => document.getElementById('scenario-library')?.scrollIntoView({ behavior: 'smooth', block: 'start' }));
+    return () => window.cancelAnimationFrame(frame);
+  }, [libraryOpen]);
 
   const applyTheme = (next: string) => { setTheme(next); document.documentElement.setAttribute('data-theme', next === 'night' ? '' : next); try { localStorage.setItem('ia-theme', next); } catch { /* ignore */ } };
   const refreshSaves = () => setPreviews(inspectAllSaveSlots());
@@ -90,7 +96,7 @@ export default function ScenarioSelect() {
         <div className="ia-launch-actions">
           <Btn label={saveSummary.best ? t('继续槽位 {{slot}}', { slot: saveSummary.best.slot }) : t('开始推荐剧本')} variant="primary" onClick={saveSummary.best ? continueBest : () => startPickedScenario(featuredScenario.id)} />
           <SharedWorldButton />
-          <Btn label={t('查看全部剧本')} variant="ghost" onClick={() => document.getElementById('scenario-library')?.scrollIntoView({ behavior: 'smooth', block: 'start' })} />
+          <button type="button" className="ia-btn ia-btn--ghost" aria-expanded={libraryOpen} aria-controls="scenario-library" onClick={() => setLibraryOpen((open) => !open)}>{t(libraryOpen ? '收起剧本列表' : '查看全部剧本')}</button>
         </div>
       </div>
       <button className="ia-featured-scenario" onClick={() => startPickedScenario(featuredScenario.id)}>
@@ -114,9 +120,11 @@ export default function ScenarioSelect() {
       <DifficultyTrack path={challengePath.ids} headline={challengePath.headline} advice={challengePath.advice} onPick={startPickedScenario} />
     </section>
     <HandbookPanel handbook={handbook} />
-    <div id="scenario-library" className="ia-scenario-library-head"><div><span className="ia-up">Campaign Library</span><h2 className="ia-display">{t('选择剧本')}</h2></div><p>{t('按压力和玩法定位选择，不同剧本对应不同学习曲线。')}</p></div>
-    <div className="ia-scenario-grid">{SCENARIOS.map((s) => { const hint = getScenarioProfile(s.id); const challenge = buildScenarioChallengeGuide(s.id); const isRecommended = recommended.has(s.id); return <button key={s.id} className={`ia-scenario-card ${isRecommended ? 'is-recommended' : ''}`} onClick={() => startPickedScenario(s.id)} style={{ borderColor: isRecommended ? `var(--${toneVar(hint.tone)})` : undefined }}><div className="ia-scenario-card__top"><h3 className="ia-display">{t(s.name)}</h3><Tag text={t(s.nationCount)} tone="gold" /></div><div className="ia-scenario-sub">{t(s.subtitle)}</div><p>{t(s.description)}</p><div className="ia-scenario-tags"><Tag text={t(hint.marketTag)} tone={hint.tone} /><Tag text={t(challenge.label)} tone={challenge.tone} /><Tag text={`${t('压力')} ${challenge.pressure}`} tone={challenge.tone} />{isRecommended && <Tag text={t('推荐')} tone="gold" />}</div><div className="ia-scenario-advice">{t(challenge.headline)} · {t(challenge.recommendedAfter)}</div><div className="ia-scenario-foot">{t(s.needsNationPick ? '选择邦国' : '开始剧本')}<span>→</span></div></button>; })}</div>
-    <div className="ia-menu-actions">{saveExists && <Btn label={t('读取自动存档')} variant="ghost" onClick={() => loadFromSlot(0)} />}{saveSummary.best && <Btn label={t('继续槽位 {{slot}}', { slot: saveSummary.best.slot })} variant="primary" onClick={continueBest} />}{previews.some((p) => p.status !== 'empty') && <Btn label={t('刷新存档体检')} variant="ghost" onClick={refreshSaves} />}{previews.some((p) => p.status !== 'empty') && <Btn label={t('清理本地存档')} warn onClick={clearLocal} />}</div>
+    <section id="scenario-library" aria-label={t('选择剧本')} hidden={!libraryOpen}>
+      <div className="ia-scenario-library-head"><div><span className="ia-up">Campaign Library</span><h2 className="ia-display">{t('选择剧本')}</h2></div><p>{t('按压力和玩法定位选择，不同剧本对应不同学习曲线。')}</p></div>
+      <div className="ia-scenario-grid">{SCENARIOS.map((s) => { const hint = getScenarioProfile(s.id); const challenge = buildScenarioChallengeGuide(s.id); const isRecommended = recommended.has(s.id); return <button key={s.id} className={`ia-scenario-card ${isRecommended ? 'is-recommended' : ''}`} onClick={() => startPickedScenario(s.id)} style={{ borderColor: isRecommended ? `var(--${toneVar(hint.tone)})` : undefined }}><div className="ia-scenario-card__top"><h3 className="ia-display">{t(s.name)}</h3><Tag text={t(s.nationCount)} tone="gold" /></div><div className="ia-scenario-sub">{t(s.subtitle)}</div><p>{t(s.description)}</p><div className="ia-scenario-tags"><Tag text={t(hint.marketTag)} tone={hint.tone} /><Tag text={t(challenge.label)} tone={challenge.tone} /><Tag text={`${t('压力')} ${challenge.pressure}`} tone={challenge.tone} />{isRecommended && <Tag text={t('推荐')} tone="gold" />}</div><div className="ia-scenario-advice">{t(challenge.headline)} · {t(challenge.recommendedAfter)}</div><div className="ia-scenario-foot">{t(s.needsNationPick ? '选择邦国' : '开始剧本')}<span>→</span></div></button>; })}</div>
+      <div className="ia-menu-actions">{saveExists && <Btn label={t('读取自动存档')} variant="ghost" onClick={() => loadFromSlot(0)} />}{saveSummary.best && <Btn label={t('继续槽位 {{slot}}', { slot: saveSummary.best.slot })} variant="primary" onClick={continueBest} />}{previews.some((p) => p.status !== 'empty') && <Btn label={t('刷新存档体检')} variant="ghost" onClick={refreshSaves} />}{previews.some((p) => p.status !== 'empty') && <Btn label={t('清理本地存档')} warn onClick={clearLocal} />}</div>
+    </section>
     {log.length > 0 && <p className="dim ia-menu-log">{t(log[log.length - 1])}</p>}
   </div>;
 }
@@ -214,5 +222,5 @@ function ContinuePanel({ summary, onContinue, onStartRecommended, onRefresh }: {
 
 function ThemeSwitch({ theme, applyTheme }: { theme: string; applyTheme: (theme: string) => void }) {
   const { t } = useI18n();
-  return <div className="ia-theme-switch" aria-label={t('主题模式')}>{THEMES.map((item) => <button key={item.id} onClick={() => applyTheme(item.id)} className={theme === item.id || (theme === '' && item.id === 'night') ? 'is-active' : ''} title={t('{{theme}}主题', { theme: t(item.label) })}><span>{item.icon}</span><em>{t(item.label)}</em></button>)}</div>;
+  return <div className="ia-theme-switch" role="group" aria-label={t('主题模式')}>{THEMES.map((item) => { const active = theme === item.id || (theme === '' && item.id === 'night'); return <button key={item.id} type="button" aria-pressed={active} onClick={() => applyTheme(item.id)} className={active ? 'is-active' : ''} title={t('{{theme}}主题', { theme: t(item.label) })}><span>{item.icon}</span><em>{t(item.label)}</em></button>; })}</div>;
 }

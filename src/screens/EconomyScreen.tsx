@@ -95,7 +95,7 @@ export default function EconomyScreen() {
           <Tag text={taxAdvice.txt} tone={taxAdvice.tone} />
           <span className="dim" style={{ fontSize: 11 }}>键盘 ←/→ 微调 ±2%</span>
         </div>
-        <Bar value={taxPct} max={50} kind="low" />
+        <Bar value={taxPct} max={50} kind="low" label="税率" />
         <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, color: 'var(--text-dim)', marginTop: 2, marginBottom: 8 }}><span>0%</span><span>25%</span><span>50%</span></div>
         <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 8 }}>
           <Btn label="-5%" variant="ghost" onClick={() => setTaxRate(Math.max(0, player.taxRate - 0.05))} />
@@ -150,10 +150,10 @@ function Row({ k, v, negative }: { k: string; v: number; negative?: boolean }) {
   return <div style={{ display: 'flex', justifyContent: 'space-between', padding: '2px 0', borderBottom: '1px solid rgba(42,58,90,0.3)' }}><span style={{ color: 'var(--text-mute)' }}>{k}</span><span style={{ fontVariantNumeric: 'tabular-nums', color: negative ? 'var(--war)' : 'var(--good)', fontWeight: 600 }}>{v >= 0 ? '+' : ''}{Math.round(v)}</span></div>;
 }
 
-function Bar({ value, max = 100, kind = 'neutral' }: { value: number; max?: number; kind?: 'high' | 'low' | 'neutral' }) {
+function Bar({ value, max = 100, kind = 'neutral', label = '进度' }: { value: number; max?: number; kind?: 'high' | 'low' | 'neutral'; label?: string }) {
   const pct = Math.max(0, Math.min(100, (value / max) * 100));
   let c = 'var(--bar-ok)';
   if (kind === 'low') c = pct <= 40 ? 'var(--bar-good)' : pct <= 70 ? 'var(--bar-warn)' : 'var(--bar-bad)';
   if (kind === 'high') c = pct >= 60 ? 'var(--bar-good)' : pct >= 30 ? 'var(--bar-warn)' : 'var(--bar-bad)';
-  return <div style={{ background: 'var(--bg-inset)', borderRadius: 3, height: 10, overflow: 'hidden' }}><div style={{ width: `${pct}%`, height: '100%', background: c, transition: 'width 0.25s' }} /></div>;
+  return <div role="progressbar" aria-label={label} aria-valuemin={0} aria-valuemax={max} aria-valuenow={Math.max(0, Math.min(max, value))} style={{ background: 'var(--bg-inset)', borderRadius: 3, height: 10, overflow: 'hidden' }}><div style={{ width: `${pct}%`, height: '100%', background: c, transition: 'width 0.25s' }} /></div>;
 }

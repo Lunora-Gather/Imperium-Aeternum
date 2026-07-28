@@ -44,12 +44,13 @@ export function Panel({ title, children, actions, accent, icon }: {
 }
 
 // ── Bar：进度条，青铜质感，阈值分档 ──
-export function Bar({ value, max = 100, color, kind = 'neutral', height = 8 }: {
+export function Bar({ value, max = 100, color, kind = 'neutral', height = 8, label = '进度' }: {
   value: number;
   max?: number;
   color?: string;
   kind?: 'high' | 'low' | 'neutral';
   height?: number;
+  label?: string;
 }) {
   const pct = Math.max(0, Math.min(100, (value / max) * 100));
   let c = color ?? 'var(--bar-mid)';
@@ -63,7 +64,7 @@ export function Bar({ value, max = 100, color, kind = 'neutral', height = 8 }: {
     else c = 'var(--bar-bad)';
   }
   return (
-    <div style={{
+    <div role="progressbar" aria-label={translate(label)} aria-valuemin={0} aria-valuemax={max} aria-valuenow={Math.max(0, Math.min(max, value))} style={{
       background: 'var(--bg-inset)', borderRadius: height / 2, height, overflow: 'hidden',
       width: '100%', border: '1px solid rgba(61,51,36,0.5)',
       boxShadow: 'inset 0 1px 2px rgba(0,0,0,0.4)',
@@ -85,7 +86,7 @@ export function StatRow({ label, value, max = 100, color, kind, warn }: {
   return (
     <div style={{ display: 'grid', gridTemplateColumns: '84px 1fr 54px', gap: 'var(--space-3)', alignItems: 'center', marginBottom: 'var(--space-2)' }}>
       <span style={{ color: 'var(--text-mute)', fontSize: 11.5 }}>{translate(label)}</span>
-      <Bar value={value} max={max} color={color} kind={kind} />
+      <Bar value={value} max={max} color={color} kind={kind} label={label} />
       <span className="ia-num" style={{
         fontSize: 13, color: warn ? 'var(--warn)' : 'var(--text)', textAlign: 'right', fontWeight: 600,
       }}>{Math.round(value)}</span>

@@ -51,11 +51,11 @@ function Meter({ label, value, lowBad = false }: { label: string; value: number;
   const pct = clamp(value);
   const danger = lowBad ? pct < 30 : pct > 70;
   const warn = lowBad ? pct < 50 : pct > 50;
-  return <div className="ia-dash-meter"><div><span>{label}</span><strong className={danger ? 'danger' : warn ? 'warn' : ''}>{n(pct)}</strong></div><i><b style={{ width: `${pct}%` }} /></i></div>;
+  return <div className="ia-dash-meter"><div><span>{label}</span><strong className={danger ? 'danger' : warn ? 'warn' : ''}>{n(pct)}</strong></div><i role="progressbar" aria-label={label} aria-valuemin={0} aria-valuemax={100} aria-valuenow={pct}><b style={{ width: `${pct}%` }} /></i></div>;
 }
 
 function VictoryRoutePanel({ focus, jumpToTab }: { focus: VictoryRouteFocus; jumpToTab: (tab: string) => void }) {
-  return <section className="ia-dash-section ia-ambitions" style={{ borderColor: toneBorder(focus.tone) }}><header><div><small>Victory</small><h3>{t('胜利路线')}</h3></div><div style={{ display: 'flex', gap: 5, flexWrap: 'wrap', justifyContent: 'flex-end' }}><Tag text={t(focus.actionLabel)} tone={tagTone(focus.tone)} /><Tag text={`${focus.primary.progress}%`} tone={tagTone(focus.tone)} /></div></header><div className="ia-card" style={{ padding: 10, marginBottom: 8, borderLeft: `3px solid ${toneBorder(focus.tone)}` }}><strong style={{ fontSize: 13 }}>{t(focus.headline)}</strong><div style={{ fontSize: 11, color: 'var(--text-dim)', lineHeight: 1.55, marginTop: 5 }}>{t(focus.summary)}</div></div><div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 6, marginBottom: 8 }}>{focus.routes.map((route) => <button key={route.id} className="ia-card" onClick={() => jumpToTab(route.tab)} style={{ padding: 8, textAlign: 'left', cursor: 'pointer', border: `1px solid ${toneBorder(route.tone)}` }}><div style={{ display: 'flex', justifyContent: 'space-between', gap: 5, marginBottom: 4 }}><strong style={{ fontSize: 12 }}>{t(route.label).replace(t('路线'), '')}</strong><Tag text={`${route.progress}%`} tone={tagTone(route.tone)} /></div><div className="ia-goal-line" style={{ marginBottom: 4 }}><i><b style={{ width: `${route.done ? 100 : route.progress}%` }} /></i></div><div style={{ fontSize: 10, color: 'var(--text-dim)', lineHeight: 1.35 }}>{t(route.warning ?? route.next)}</div></button>)}</div><div className="ia-dash-note">{t('路线对比：')}{t(focus.routeLine)}</div></section>;
+  return <section className="ia-dash-section ia-ambitions" style={{ borderColor: toneBorder(focus.tone) }}><header><div><small>Victory</small><h3>{t('胜利路线')}</h3></div><div style={{ display: 'flex', gap: 5, flexWrap: 'wrap', justifyContent: 'flex-end' }}><Tag text={t(focus.actionLabel)} tone={tagTone(focus.tone)} /><Tag text={`${focus.primary.progress}%`} tone={tagTone(focus.tone)} /></div></header><div className="ia-card" style={{ padding: 10, marginBottom: 8, borderLeft: `3px solid ${toneBorder(focus.tone)}` }}><strong style={{ fontSize: 13 }}>{t(focus.headline)}</strong><div style={{ fontSize: 11, color: 'var(--text-dim)', lineHeight: 1.55, marginTop: 5 }}>{t(focus.summary)}</div></div><div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 6, marginBottom: 8 }}>{focus.routes.map((route) => <button key={route.id} className="ia-card" onClick={() => jumpToTab(route.tab)} style={{ padding: 8, textAlign: 'left', cursor: 'pointer', border: `1px solid ${toneBorder(route.tone)}` }}><div style={{ display: 'flex', justifyContent: 'space-between', gap: 5, marginBottom: 4 }}><strong style={{ fontSize: 12 }}>{t(route.label).replace(t('路线'), '')}</strong><Tag text={`${route.progress}%`} tone={tagTone(route.tone)} /></div><div className="ia-goal-line" style={{ marginBottom: 4 }}><i role="progressbar" aria-label={`${t(route.label)} ${t('进度')}`} aria-valuemin={0} aria-valuemax={100} aria-valuenow={route.done ? 100 : route.progress}><b style={{ width: `${route.done ? 100 : route.progress}%` }} /></i></div><div style={{ fontSize: 10, color: 'var(--text-dim)', lineHeight: 1.35 }}>{t(route.warning ?? route.next)}</div></button>)}</div><div className="ia-dash-note">{t('路线对比：')}{t(focus.routeLine)}</div></section>;
 }
 
 function Sparkline({ data, label }: { data: number[]; label: string }) {
@@ -63,12 +63,12 @@ function Sparkline({ data, label }: { data: number[]; label: string }) {
   const min = Math.min(...data), max = Math.max(...data), range = max - min || 1;
   const points = data.map((v, i) => `${(i / (data.length - 1)) * 92},${24 - ((v - min) / range) * 22}`).join(' ');
   const last = data[data.length - 1], first = data[0];
-  return <div className="ia-dash-spark"><span>{t(label)}</span><svg viewBox="0 0 92 24" preserveAspectRatio="none"><polyline points={points} /></svg><strong className={last >= first ? 'good' : 'danger'}>{last >= first ? '↑' : '↓'}{n(last)}</strong></div>;
+  return <div className="ia-dash-spark"><span>{t(label)}</span><svg viewBox="0 0 92 24" preserveAspectRatio="none" role="img" aria-label={`${t(label)} ${last >= first ? '上升' : '下降'} ${n(last)}`}><polyline points={points} /></svg><strong className={last >= first ? 'good' : 'danger'}>{last >= first ? '↑' : '↓'}{n(last)}</strong></div>;
 }
 
 function FocusPanel({ focus, onChange }: { focus: StrategyFocusId; onChange: (id: StrategyFocusId) => void }) {
   const current = FOCUSES.find((f) => f.id === focus) ?? FOCUSES[0];
-  return <section className="ia-dash-section"><header><div><small>Strategy</small><h3>{t('国策焦点')}</h3></div><Tag text={t(current.label)} tone="gold" /></header><p className="ia-dash-muted">{t(current.desc)}</p><div className="ia-focus-inline">{FOCUSES.map((f) => <button key={f.id} className={f.id === focus ? 'is-active' : ''} onClick={() => onChange(f.id)} title={`${t(f.desc)}\n${t(f.effect)}`}><span>{t(f.short)}</span><em>{t(f.label)}</em></button>)}</div><div className="ia-dash-note">{t('本回合倾向：')}{t(current.effect)}</div></section>;
+  return <section className="ia-dash-section"><header><div><small>Strategy</small><h3>{t('国策焦点')}</h3></div><Tag text={t(current.label)} tone="gold" /></header><p className="ia-dash-muted">{t(current.desc)}</p><div className="ia-focus-inline">{FOCUSES.map((f) => <button key={f.id} aria-pressed={f.id === focus} className={f.id === focus ? 'is-active' : ''} onClick={() => onChange(f.id)} title={`${t(f.desc)}\n${t(f.effect)}`}><span>{t(f.short)}</span><em>{t(f.label)}</em></button>)}</div><div className="ia-dash-note">{t('本回合倾向：')}{t(current.effect)}</div></section>;
 }
 
 function RoadmapPanel({ roadmap, jumpToTab }: { roadmap: EmpireRoadmap; jumpToTab: (tab: string) => void }) {
@@ -86,7 +86,7 @@ function TurnBriefPanel({ council, preview, items, jumpToTab }: { council: PreTu
     : items.slice(0, 3);
   return <section className="ia-dash-section" style={{ borderColor: toneBorder(council.tone) }}>
     <header><div><small>Turn Brief</small><h3>{t('本回合简报')}</h3></div><div style={{ display: 'flex', gap: 5, flexWrap: 'wrap', justifyContent: 'flex-end' }}><Tag text={t(council.title)} tone={tagTone(council.tone)} /><Tag text={t(`把握 ${council.confidence}`)} tone={tagTone(council.tone)} /></div></header>
-    <div className="ia-goal-line" style={{ marginBottom: 8 }}><div><span>{t(council.title)}</span><strong>{council.progress}/100</strong></div><i><b style={{ width: `${council.progress}%` }} /></i><em>{t(council.verdict)}</em></div>
+    <div className="ia-goal-line" style={{ marginBottom: 8 }}><div><span>{t(council.title)}</span><strong>{council.progress}/100</strong></div><i role="progressbar" aria-label={t('回合准备度')} aria-valuemin={0} aria-valuemax={100} aria-valuenow={council.progress}><b style={{ width: `${council.progress}%` }} /></i><em>{t(council.verdict)}</em></div>
     <div className="ia-action-list">{visible.length === 0 ? <div className="ia-risk-empty">{t('没有待处理事项，可以结束本年。')}</div> : visible.map((item, index) => <button key={item.id} className={`tone-${item.tone === 'danger' ? 'danger' : item.tone === 'warn' ? 'warn' : 'normal'}`} onClick={() => jumpToTab(item.tab)}><b>{t(index === 0 ? `首要：${item.label}` : `可选：${item.label}`)}</b><span>{t(item.desc)}</span></button>)}</div>
     <div className="ia-turn-brief-signals">{preview.signals.map((signal) => <Tag key={signal.id} text={`${t(signal.label)} ${t(signal.value)}`} tone={tagTone(signal.tone)} />)}</div>
     <div className="ia-dash-note" style={{ marginTop: 8 }}>{t('预演：')}{t(preview.summary)} · {t(preview.saveAdvice.title)}</div>
@@ -228,13 +228,13 @@ export default function Dashboard() {
         <VictoryRoutePanel focus={victoryFocus} jumpToTab={jumpToTab} />
         <RiskPanel risks={risks} />
       </aside>
-      <main className="ia-dash-main">
+      <div className="ia-dash-main">
         {!sharedSession && <NationalPurposePanel state={state} />}
         <DashboardStrategicHq state={state} commandActions={commandActions} jumpToTab={jumpToTab} />
         <RoadmapPanel roadmap={roadmap} jumpToTab={jumpToTab} />
         <ReadinessPanel report={readiness} system={system} jumpToTab={jumpToTab} />
         {ending && <section className="ia-dash-section ia-dash-victory"><h3>{t(won ? '万世之业已成' : '社稷倾覆')}</h3><p>{t(won ? '核心国运目标已经完成。可继续经营，或查看史册。' : '本局已经结束。查看史册后读档，或重新开局。')}</p><div className="ia-dash-command-actions">{won && !sharedSession && <Btn label={t('继续传世经营')} variant="primary" onClick={continueLegacy} />}<Btn label={t('查看帝国史册')} onClick={() => jumpToTab('chronicle')} />{!won && !sharedSession && <Btn label={t('读取最近存档')} onClick={() => load()} disabled={!hasSave()} />}<Btn label={t(sharedSession ? '退出共享治理' : '返回剧本大厅')} variant="ghost" onClick={backToMenu} /></div></section>}
-      </main>
+      </div>
       <aside className="ia-dash-col ia-dash-col--right">
         <FocusPanel focus={focus} onChange={setFocus} />
         <section className="ia-dash-section"><header><div><small>State</small><h3>{t('治理指标')}</h3></div></header><div className="ia-dash-meter-grid ia-dash-meter-grid--compact"><Meter label={t('安定')} value={g.stability} lowBad /><Meter label={t('法统')} value={g.legitimacy} lowBad /><Meter label={t('治能')} value={g.efficiency} lowBad /><Meter label={t('腐败')} value={g.corruption} /><Meter label={t('厌战')} value={player.warExhaustion} /><Meter label={t('补给')} value={player.resources.supply} lowBad /></div></section>

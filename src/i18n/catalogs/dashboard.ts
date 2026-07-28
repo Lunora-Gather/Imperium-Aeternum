@@ -2,6 +2,7 @@ import type { ScopedCatalog } from '../scoped';
 
 const en = {
   '国政总览': 'State Overview', '玩家国家缺失，请读档或开始新局。': 'The player nation is missing. Load a save or begin a new campaign.',
+  '进度': 'progress', '回合准备度': 'Turn readiness', '上升': 'rising', '下降': 'falling',
   '胜利路线': 'Victory Routes', '路线对比：': 'Route comparison: ', '暂无趋势': 'No trend yet',
   '国策焦点': 'Strategic Focus', '本回合倾向：': 'This year: ', '帝国路线图': 'Imperial Roadmap',
   '胜利主线：': 'Primary victory route: ', '风险：': 'Risk: ', '机会：': 'Opportunity: ', '情境式提示': 'Context Guide',
