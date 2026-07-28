@@ -390,6 +390,7 @@ export type PersistedAmbitionMeta = Partial<AmbitionMeta> & Pick<AmbitionMeta, '
 // ── 全局游戏状态 ──
 export interface GameState {
   version: number;                  // 存档 schema 版本
+  scenarioId?: string;             // 剧本身份；旧存档缺失时按世界规模回退
   turn: number;                     // 当前回合（0 起，回合末 +1）
   seed: number;                     // seeded RNG 种子
   entityIdCounter: number;          // 存档内实体 id 序列，保证确定性回放

@@ -6,6 +6,7 @@ const en = {
   '国策焦点': 'Strategic Focus', '本回合倾向：': 'This year: ', '帝国路线图': 'Imperial Roadmap',
   '胜利主线：': 'Primary victory route: ', '风险：': 'Risk: ', '机会：': 'Opportunity: ', '情境式提示': 'Context Guide',
   '回合前作战会议': 'Pre-turn Council', '会议无额外事项，可以按预演推进。': 'No additional council items. You may advance according to the forecast.',
+  '本回合简报': 'Turn Brief', '没有待处理事项，可以结束本年。': 'Nothing needs attention. You may end the year.', '预演：': 'Forecast: ',
   '下一回合预演': 'Next-turn Forecast', '可推进': 'Ready', '先处理': 'Resolve first', '可能': 'Possible',
   '行动中心': 'Action Center', '体检': 'Check', '年报': 'Report', '参谋': 'Advisor', '规划': 'Plan',
   '风险状态': 'Risk Status', '暂无迫切风险': 'No urgent risks', '下一回合前检查': 'Pre-turn Check',
@@ -109,7 +110,8 @@ const en = {
 
 const zhTW = {
   '国政总览': '國政總覽', '胜利路线': '勝利路線', '国策焦点': '國策焦點', '帝国路线图': '帝國路線圖', '情境式提示': '情境式提示',
-  '回合前作战会议': '回合前作戰會議', '下一回合预演': '下一回合預演', '行动中心': '行動中心', '风险状态': '風險狀態',
+  '回合前作战会议': '回合前作戰會議', '本回合简报': '本回合簡報', '没有待处理事项，可以结束本年。': '沒有待處理事項，可以結束本年。', '预演：': '預演：',
+  '下一回合预演': '下一回合預演', '行动中心': '行動中心', '风险状态': '風險狀態',
   '下一回合前检查': '下一回合前檢查', '综合健康度': '綜合健康度', '帝国总参谋部': '帝國總參謀部', '帝国史册': '帝國史冊',
   '国库': '國庫', '粮储': '糧儲', '人口': '人口', '疆土': '疆土', '军力': '軍力', '国家摘要': '國家摘要', '政体': '政體', '国性': '國性',
   '统治者': '統治者', '盟友倾向': '盟友傾向', '治理指标': '治理指標', '安定': '安定', '法统': '法統', '治能': '治能', '腐败': '腐敗', '厌战': '厭戰',
@@ -120,6 +122,8 @@ export const dashboardCatalog: ScopedCatalog = {
   en: {
     exact: en,
     patterns: [
+      { pattern: /^首要：(.+)$/, replacement: 'Primary: $1' },
+      { pattern: /^可选：(.+)$/, replacement: 'Optional: $1' },
       { pattern: /^体检 (\d+)\/100$/, replacement: 'Check $1/100' },
       { pattern: /^(\d+) 省$/, replacement: '$1 provinces' },
       { pattern: /^(\d+) 卒$/, replacement: '$1 troops' },

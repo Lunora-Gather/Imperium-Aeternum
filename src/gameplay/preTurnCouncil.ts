@@ -101,9 +101,11 @@ function dedupeAgenda(items: CouncilAgendaItem[]): CouncilAgendaItem[] {
   return out.slice(0, 6);
 }
 
-function decide(readiness: ReadinessReport, preview: TurnPreview, agenda: CouncilAgendaItem[], roadmap: EmpireRoadmap): CouncilDecision {
-  if (!readiness.canAdvance || !preview.canAdvance || agenda.some((item) => item.priority === 'must')) return 'hold';
-  if (preview.saveAdvice.tone === 'gold' || preview.saveAdvice.tone === 'warn' || roadmap.route.progress >= 70) return 'save-first';
+function decide(readiness: ReadinessReport, preview: TurnPreview, _agenda: CouncilAgendaItem[], roadmap: EmpireRoadmap): CouncilDecision {
+  // Only explicit readiness/preview blockers may stop the turn. A dangerous
+  // forecast is a strong recommendation, not a contradictory hard blocker.
+  if (!readiness.canAdvance || !preview.canAdvance) return 'hold';
+  if (preview.status === 'danger' || preview.saveAdvice.tone === 'gold' || preview.saveAdvice.tone === 'warn' || roadmap.route.progress >= 70) return 'save-first';
   if (preview.status === 'caution' || readiness.tone === 'warn' || roadmap.tier === 'strained') return 'advance-carefully';
   return 'advance';
 }
@@ -142,8 +144,8 @@ export function buildPreTurnCouncil(state: GameState, context: PreTurnCouncilCon
   const agenda = dedupeAgenda([...agendaFromPreview(preview), ...agendaFromRoadmap(roadmap)]);
   const decision = decide(readiness, preview, agenda, roadmap);
   const conf = confidence(readiness, preview, roadmap);
-  const blockers = agenda.filter((item) => item.priority === 'must');
-  const recommendations = agenda.filter((item) => item.priority !== 'must').slice(0, 4);
+  const blockers = decision === 'hold' ? agenda.filter((item) => item.priority === 'must') : [];
+  const recommendations = (decision === 'hold' ? agenda.filter((item) => item.priority !== 'must') : agenda).slice(0, 4);
   const progress = decision === 'hold' ? Math.min(conf, 45) : decision === 'save-first' ? Math.max(55, conf) : conf;
 
   return {

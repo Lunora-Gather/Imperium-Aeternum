@@ -2,6 +2,7 @@
 
 Hugging Face 推理的服务端密钥、使用边界和降级策略见 [`AI-INFERENCE.md`](AI-INFERENCE.md)。
 目录职责、文件命名和新增模块规则见 [`PROJECT-STRUCTURE.md`](PROJECT-STRUCTURE.md)。
+真人长局验收协议与记录模板见 [`../playtesting/20-TURN-PROTOCOL.md`](../playtesting/20-TURN-PROTOCOL.md)。
 
 ## 1. 当前架构基线
 
@@ -40,6 +41,7 @@ GameStore.nextTurn
 | `src/gameplay/stateInvariants.ts` | 只读审计，不静默修复 |
 | `src/gameplay/stateOwnership.ts` | 国家与中立省份所有权合约 |
 | `src/gameplay/pendingEventResolution.ts` | 待决事件原子化结算 |
+| `src/gameplay/turnCausality.ts` | 年报财政、社会、国策、事件与 AI 变化因果链 |
 | `src/store/gameStore.ts` | Zustand 薄适配层、场景切换、存读档和管线调用 |
 | `src/store/scenarioCatalog.ts` | 剧本类型、目录和随机区域配置 |
 | `src/store/persistence.ts` | 存档迁移、规范化和瘦身 |
@@ -78,6 +80,7 @@ npm run rc:check
 ```
 
 `rc:check` 是合并与发布前的最终门禁，包含完整测试而非测试子集。
+`test:e2e` 使用系统 Chrome/Edge 执行真实开局、首回合、存读档、移动端首屏与单一回合简报检查。
 `simulate:benchmark` 使用 5 个样本输出 min/p50/p95/max/avg，适合判断性能趋势；CI 门禁仍使用较快的单样本稳定性检查。
 `check:bundle` 对入口块、App 块、最大 JS、JS 总量和 CSS 总量设置预算；`rc:check` 会在生产构建后自动执行。
 

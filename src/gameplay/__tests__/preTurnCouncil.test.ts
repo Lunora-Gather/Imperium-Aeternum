@@ -95,6 +95,26 @@ describe('pre-turn council', () => {
     expect(council.footer).toContain('预演');
   });
 
+  it('does not turn a dangerous recommendation into a hard blocker', () => {
+    const state = createInitialState();
+    const council = buildPreTurnCouncil(state, {
+      readiness: readiness({ tone: 'warn', score: 68 }),
+      roadmap: roadmap(),
+      preview: preview({
+        status: 'danger',
+        tone: 'danger',
+        canAdvance: true,
+        likelyChanges: [{ id: 'threat', title: '外部威胁', body: '建议先整备。', tone: 'danger', tab: 'diplomacy' }],
+        saveAdvice: { id: 'save-danger', title: '推进前建议手动存档', body: '先保存。', tone: 'warn', tab: 'save' },
+      }),
+      commandActions: [action('threat', 'danger', 'diplomacy')],
+    });
+
+    expect(council.blockers).toEqual([]);
+    expect(council.decision).toBe('save-first');
+    expect(council.title).not.toContain('暂停推进');
+  });
+
   it('deduplicates agenda entries and preserves priorities', () => {
     const state = createInitialState();
     const council = buildPreTurnCouncil(state, {

@@ -6,7 +6,7 @@ import { allocateEntityId } from '../../utils/id';
 import type { GameState } from '../../types/game';
 import { clamp, failure, runGameAction, spendAdmin, success } from './actionCore';
 
-export type ProvinceDevelopmentKind = 'reclaim' | 'garrison_deploy' | 'garrison_recall';
+export type ProvinceDevelopmentKind = 'reclaim' | 'garrison_deploy' | 'garrison_recall' | 'neutral_negotiate' | 'neutral_colonize' | 'neutral_occupy';
 
 export function establishTradeRouteAction(state: GameState, routeId: string) {
   return runGameAction(state, (working, player) => {
@@ -34,7 +34,47 @@ export function embargoTradeRouteAction(state: GameState, routeId: string) {
 export function developProvinceAction(state: GameState, provinceId: string, kind: ProvinceDevelopmentKind) {
   return runGameAction(state, (working, player) => {
     const province = working.provinces[provinceId];
-    if (!province || province.ownerId !== player.id) return failure('只能开发本国省份');
+    if (!province) return failure('省份不存在');
+    const neutralAction = kind === 'neutral_negotiate' || kind === 'neutral_colonize' || kind === 'neutral_occupy';
+    if (neutralAction) {
+      if (working.nations[province.ownerId]) return failure('该省份已有国家统治，应通过外交或战争处理');
+      if (!province.adjacent.some((id) => working.provinces[id]?.ownerId === player.id)) return failure('只能拓展与本国接壤的中立省份');
+      if (kind === 'neutral_negotiate' && (player.resources.gold < 80 || player.resources.influence < 40)) return failure('交涉需要 80 金与 40 影响力');
+      if (kind === 'neutral_colonize' && (player.resources.gold < 120 || player.resources.food < 150)) return failure('移民开拓需要 120 金与 150 粮');
+      const armySize = player.army.reduce((total, army) => total + army.size, 0);
+      if (kind === 'neutral_occupy' && (player.resources.supply < 60 || armySize < Math.max(100, province.garrison + 50))) return failure('军事占领需要 60 补给与足够军力');
+      const apFailure = spendAdmin(player, kind === 'neutral_occupy' ? 1 : 2);
+      if (apFailure) return apFailure;
+
+      if (kind === 'neutral_negotiate') {
+        player.resources.gold -= 80;
+        player.resources.influence -= 40;
+        province.loyalty = 55;
+        province.assimilation = Math.max(35, province.assimilation);
+        province.unrest = Math.min(25, province.unrest);
+        province.rebellionRisk = Math.min(25, province.rebellionRisk);
+      } else if (kind === 'neutral_colonize') {
+        player.resources.gold -= 120;
+        player.resources.food -= 150;
+        province.loyalty = 42;
+        province.assimilation = Math.max(25, province.assimilation);
+        province.unrest = Math.max(25, province.unrest);
+        province.rebellionRisk = Math.max(20, province.rebellionRisk);
+      } else {
+        player.resources.supply -= 60;
+        province.loyalty = 20;
+        province.assimilation = Math.min(20, province.assimilation);
+        province.unrest = Math.max(60, province.unrest);
+        province.rebellionRisk = Math.max(55, province.rebellionRisk);
+        province.garrison = Math.max(50, province.garrison);
+        player.warExhaustion = Math.min(100, player.warExhaustion + 4);
+      }
+      province.ownerId = player.id;
+      addChronicle(working, { turn: working.turn, kind: 'expansion', title: '边疆纳入版图', desc: `${province.name}通过${kind === 'neutral_negotiate' ? '交涉归附' : kind === 'neutral_colonize' ? '移民开拓' : '军事占领'}纳入国家。`, actorId: player.id });
+      return success(`${province.name}已纳入版图`);
+    }
+
+    if (province.ownerId !== player.id) return failure('只能开发本国省份');
     if (!['reclaim', 'garrison_deploy', 'garrison_recall'].includes(kind)) return failure('未知省份操作');
     if (kind === 'reclaim') {
       if (province.agriBase >= 12) return failure('农业基础已达上限');

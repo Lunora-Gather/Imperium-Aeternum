@@ -1,0 +1,216 @@
+import { spawn } from 'node:child_process';
+import { existsSync } from 'node:fs';
+import { mkdtemp, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import net from 'node:net';
+
+const HOST = '127.0.0.1';
+const APP_PORT = 4179;
+const APP_URL = `http://${HOST}:${APP_PORT}/`;
+const isWindows = process.platform === 'win32';
+
+function assert(value, message) {
+  if (!value) throw new Error(message);
+}
+
+async function stopChild(child) {
+  if (child.exitCode !== null || child.signalCode !== null) return;
+  const exited = new Promise((resolve) => child.once('exit', resolve));
+  child.kill();
+  await Promise.race([exited, new Promise((resolve) => setTimeout(resolve, 2_000))]);
+}
+
+async function removeTempDir(path) {
+  for (let attempt = 0; attempt < 5; attempt += 1) {
+    try {
+      await rm(path, { recursive: true, force: true, maxRetries: 2, retryDelay: 100 });
+      return;
+    } catch (error) {
+      if (attempt === 4) throw error;
+      await new Promise((resolve) => setTimeout(resolve, 250));
+    }
+  }
+}
+
+function freePort() {
+  return new Promise((resolve, reject) => {
+    const server = net.createServer();
+    server.once('error', reject);
+    server.listen(0, HOST, () => {
+      const address = server.address();
+      const port = typeof address === 'object' && address ? address.port : 0;
+      server.close(() => resolve(port));
+    });
+  });
+}
+
+function chromeExecutable() {
+  const candidates = [
+    process.env.CHROME_BIN,
+    isWindows ? join(process.env.ProgramFiles ?? '', 'Google/Chrome/Application/chrome.exe') : undefined,
+    isWindows ? join(process.env['ProgramFiles(x86)'] ?? '', 'Microsoft/Edge/Application/msedge.exe') : undefined,
+    isWindows ? join(process.env.ProgramFiles ?? '', 'Microsoft/Edge/Application/msedge.exe') : undefined,
+    '/usr/bin/google-chrome',
+    '/usr/bin/google-chrome-stable',
+    '/usr/bin/chromium',
+    '/usr/bin/chromium-browser',
+  ].filter(Boolean);
+  return candidates.find((candidate) => existsSync(candidate));
+}
+
+async function waitForHttp(url, timeoutMs = 30_000) {
+  const until = Date.now() + timeoutMs;
+  while (Date.now() < until) {
+    try {
+      const response = await fetch(url);
+      if (response.ok) return;
+    } catch {
+      // Server is still starting.
+    }
+    await new Promise((resolve) => setTimeout(resolve, 150));
+  }
+  throw new Error(`Timed out waiting for ${url}`);
+}
+
+async function waitForJson(url, timeoutMs = 15_000) {
+  const until = Date.now() + timeoutMs;
+  while (Date.now() < until) {
+    try {
+      const response = await fetch(url);
+      if (response.ok) return response.json();
+    } catch {
+      // Browser is still starting.
+    }
+    await new Promise((resolve) => setTimeout(resolve, 100));
+  }
+  throw new Error(`Timed out waiting for browser endpoint ${url}`);
+}
+
+function createCdp(webSocketUrl) {
+  const socket = new WebSocket(webSocketUrl);
+  const pending = new Map();
+  let nextId = 0;
+
+  socket.addEventListener('message', (event) => {
+    const message = JSON.parse(String(event.data));
+    if (!message.id) return;
+    const request = pending.get(message.id);
+    if (!request) return;
+    pending.delete(message.id);
+    if (message.error) request.reject(new Error(message.error.message));
+    else request.resolve(message.result);
+  });
+
+  const ready = new Promise((resolve, reject) => {
+    socket.addEventListener('open', resolve, { once: true });
+    socket.addEventListener('error', () => reject(new Error('Chrome DevTools WebSocket failed')), { once: true });
+  });
+
+  async function send(method, params = {}) {
+    await ready;
+    const id = ++nextId;
+    const response = new Promise((resolve, reject) => pending.set(id, { resolve, reject }));
+    socket.send(JSON.stringify({ id, method, params }));
+    return response;
+  }
+
+  async function evaluate(expression) {
+    const result = await send('Runtime.evaluate', { expression, awaitPromise: true, returnByValue: true });
+    if (result.exceptionDetails) throw new Error(result.exceptionDetails.text);
+    return result.result?.value;
+  }
+
+  async function waitFor(expression, message, timeoutMs = 15_000) {
+    const until = Date.now() + timeoutMs;
+    while (Date.now() < until) {
+      if (await evaluate(expression)) return;
+      await new Promise((resolve) => setTimeout(resolve, 100));
+    }
+    const body = await evaluate(`document.body?.innerText?.slice(0, 500) ?? ''`);
+    throw new Error(`${message}\nVisible page text: ${body}`);
+  }
+
+  return { send, evaluate, waitFor, close: () => socket.close() };
+}
+
+function clickButton(text) {
+  return `(() => {
+    const buttons = [...document.querySelectorAll('button')];
+    const button = buttons.find((item) => item.textContent?.trim() === ${JSON.stringify(text)})
+      ?? buttons.find((item) => item.textContent?.trim().includes(${JSON.stringify(text)}));
+    if (!button) return false;
+    button.click();
+    return true;
+  })()`;
+}
+
+const chromePath = chromeExecutable();
+assert(chromePath, 'Chrome or Edge is required for browser E2E');
+
+const userDataDir = await mkdtemp(join(tmpdir(), 'imperium-e2e-'));
+const debugPort = await freePort();
+const viteEntry = join(process.cwd(), 'node_modules/vite/bin/vite.js');
+const server = spawn(process.execPath, [viteEntry, '--host', HOST, '--port', String(APP_PORT), '--strictPort'], { stdio: ['ignore', 'pipe', 'pipe'] });
+const chrome = spawn(chromePath, [
+  '--headless=new',
+  `--remote-debugging-port=${debugPort}`,
+  `--user-data-dir=${userDataDir}`,
+  '--no-first-run',
+  '--no-default-browser-check',
+  '--disable-gpu',
+  '--no-sandbox',
+  'about:blank',
+], { stdio: 'ignore' });
+
+let cdp;
+try {
+  await waitForHttp(APP_URL);
+  const pages = await waitForJson(`http://${HOST}:${debugPort}/json/list`);
+  const page = pages.find((item) => item.type === 'page');
+  assert(page?.webSocketDebuggerUrl, 'No debuggable browser page was created');
+  cdp = createCdp(page.webSocketDebuggerUrl);
+  await cdp.send('Page.enable');
+  await cdp.send('Runtime.enable');
+  await cdp.send('Page.navigate', { url: APP_URL });
+  await cdp.waitFor('document.readyState === "complete"', 'App did not finish loading');
+  await cdp.evaluate(`localStorage.clear(); localStorage.setItem('ia-tutorial-done', '1'); localStorage.setItem('ia-locale', 'zh-CN'); location.reload()`);
+  await cdp.waitFor(`document.body?.innerText.includes('开始推荐剧本')`, 'Campaign lobby did not load');
+
+  assert(await cdp.evaluate(clickButton('开始推荐剧本')), 'Recommended campaign button was not found');
+  await cdp.waitFor(`document.body?.innerText.includes('国政总览')`, 'Dashboard did not load after starting a campaign');
+  const briefCount = await cdp.evaluate(`document.querySelectorAll('.ia-dash-priority-grid .ia-dash-section').length`);
+  assert(briefCount === 1, `Expected one authoritative turn brief, found ${briefCount}`);
+  assert(await cdp.evaluate(`document.body.innerText.includes('本回合简报')`), 'Turn brief heading is missing');
+
+  assert(await cdp.evaluate(clickButton('存档')), 'Save button was not found');
+  assert(await cdp.evaluate(`JSON.parse(localStorage.getItem('imperium-aeternum-save-0')).gameState.turn === 0`), 'Manual save did not preserve the opening turn');
+  assert(await cdp.evaluate(clickButton('下一回合')), 'Next-turn button was not found');
+  await cdp.waitFor(`document.querySelector('.ia-ruler-subline')?.innerText.includes('Anno · 2')`, 'The first turn did not advance');
+  assert(await cdp.evaluate(`JSON.parse(localStorage.getItem('imperium-aeternum-save-0')).gameState.turn === 0`), 'Turn advance unexpectedly overwrote the manual save');
+  assert(await cdp.evaluate(`(() => { const button = document.querySelector('[data-navigation-tab="dashboard"]'); button?.click(); return !!button; })()`), 'Overview navigation button was not found');
+  await cdp.waitFor(`document.body?.innerText.includes('本回合简报')`, 'Dashboard did not return after the first turn');
+  assert(await cdp.evaluate(clickButton('读档')), 'Load button was not found');
+  await cdp.waitFor(`document.querySelector('.ia-ruler-subline')?.innerText.includes('Anno · 1')`, 'Loading the saved turn did not restore year one');
+
+  await cdp.send('Emulation.setDeviceMetricsOverride', { width: 390, height: 844, deviceScaleFactor: 1, mobile: true });
+  await cdp.send('Page.reload', { ignoreCache: true });
+  await cdp.waitFor(`document.body?.innerText.includes('地中海黎明')`, 'Mobile campaign lobby did not load');
+  const continuedMobileSave = await cdp.evaluate(clickButton('继续槽位 0'));
+  if (!continuedMobileSave) assert(await cdp.evaluate(clickButton('开始推荐剧本')), 'Mobile campaign start button was not found');
+  await cdp.waitFor(`document.body?.innerText.includes('本回合简报')`, 'Mobile dashboard did not load');
+  const mobile = await cdp.evaluate(`(() => ({
+    statusHidden: getComputedStyle(document.querySelector('.ia-status-panel')).display === 'none',
+    briefTop: document.querySelector('.ia-dash-priority-grid').getBoundingClientRect().top,
+    viewportHeight: innerHeight,
+  }))()`);
+  assert(mobile.statusHidden, 'Secondary status cards should be hidden on a 390px viewport');
+  assert(mobile.briefTop < mobile.viewportHeight, `Turn brief begins below the mobile fold (${mobile.briefTop}px)`);
+
+  console.log('Browser E2E passed: start, turn advance, save/load, single brief, mobile fold.');
+} finally {
+  cdp?.close();
+  await stopChild(chrome);
+  await stopChild(server);
+  await removeTempDir(userDataDir);
+}

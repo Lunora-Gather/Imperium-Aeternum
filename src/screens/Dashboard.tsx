@@ -41,7 +41,6 @@ const FOCUSES: { id: StrategyFocusId; label: string; short: string; desc: string
 function n(v: number) { return Math.round(v); }
 function clamp(v: number, min = 0, max = 100) { return Math.max(min, Math.min(max, v)); }
 function tagTone(t: string): 'danger' | 'warn' | 'good' | 'info' | 'gold' { return t === 'danger' ? 'danger' : t === 'warn' ? 'warn' : t === 'good' ? 'good' : t === 'gold' ? 'gold' : 'info'; }
-function actionSourceLabel(source: CommandCenterAction['source']) { return t(source === 'readiness' ? '体检' : source === 'report' ? '年报' : source === 'strategy' ? '参谋' : '规划'); }
 function toneBorder(tone: string) { return tone === 'danger' ? 'var(--war)' : tone === 'warn' ? 'var(--warn)' : tone === 'gold' ? 'var(--gold)' : tone === 'good' ? 'var(--good)' : 'var(--border)'; }
 
 function Metric({ label, value, tone = 'normal', hint }: { label: string; value: string | number; tone?: 'normal' | 'good' | 'warn' | 'danger' | 'gold'; hint?: string }) {
@@ -81,28 +80,17 @@ function RoadmapPanel({ roadmap, jumpToTab }: { roadmap: EmpireRoadmap; jumpToTa
   </section>;
 }
 
-function CouncilPanel({ council, jumpToTab }: { council: PreTurnCouncil; jumpToTab: (tab: string) => void }) {
-  const visible = council.blockers.length > 0 ? council.blockers : council.recommendations;
+function TurnBriefPanel({ council, preview, items, jumpToTab }: { council: PreTurnCouncil; preview: TurnPreview; items: CommandCenterAction[]; jumpToTab: (tab: string) => void }) {
+  const visible = council.blockers.length > 0
+    ? council.blockers.map((item) => ({ id: item.id, label: item.title, desc: item.body, tab: item.tab, tone: item.tone }))
+    : items.slice(0, 3);
   return <section className="ia-dash-section" style={{ borderColor: toneBorder(council.tone) }}>
-    <header><div><small>Council</small><h3>{t('回合前作战会议')}</h3></div><div style={{ display: 'flex', gap: 5, flexWrap: 'wrap', justifyContent: 'flex-end' }}><Tag text={t(council.title)} tone={tagTone(council.tone)} /><Tag text={t(`把握 ${council.confidence}`)} tone={tagTone(council.tone)} /></div></header>
+    <header><div><small>Turn Brief</small><h3>{t('本回合简报')}</h3></div><div style={{ display: 'flex', gap: 5, flexWrap: 'wrap', justifyContent: 'flex-end' }}><Tag text={t(council.title)} tone={tagTone(council.tone)} /><Tag text={t(`把握 ${council.confidence}`)} tone={tagTone(council.tone)} /></div></header>
     <div className="ia-goal-line" style={{ marginBottom: 8 }}><div><span>{t(council.title)}</span><strong>{council.progress}/100</strong></div><i><b style={{ width: `${council.progress}%` }} /></i><em>{t(council.verdict)}</em></div>
-    <div className="ia-action-list">{visible.length === 0 ? <div className="ia-risk-empty">{t('会议无额外事项，可以按预演推进。')}</div> : visible.slice(0, 3).map((item) => <button key={item.id} className={`tone-${item.tone === 'danger' ? 'danger' : item.tone === 'warn' ? 'warn' : 'normal'}`} onClick={() => jumpToTab(item.tab)}><b>{t(item.priority === 'must' ? `必须：${item.title}` : item.priority === 'should' ? `建议：${item.title}` : item.title)}</b><span>{t(item.body)}</span></button>)}</div>
-    <div className="ia-dash-note" style={{ marginTop: 8 }}>{t(council.footer)}</div>
+    <div className="ia-action-list">{visible.length === 0 ? <div className="ia-risk-empty">{t('没有待处理事项，可以结束本年。')}</div> : visible.map((item, index) => <button key={item.id} className={`tone-${item.tone === 'danger' ? 'danger' : item.tone === 'warn' ? 'warn' : 'normal'}`} onClick={() => jumpToTab(item.tab)}><b>{t(index === 0 ? `首要：${item.label}` : `可选：${item.label}`)}</b><span>{t(item.desc)}</span></button>)}</div>
+    <div className="ia-turn-brief-signals">{preview.signals.map((signal) => <Tag key={signal.id} text={`${t(signal.label)} ${t(signal.value)}`} tone={tagTone(signal.tone)} />)}</div>
+    <div className="ia-dash-note" style={{ marginTop: 8 }}>{t('预演：')}{t(preview.summary)} · {t(preview.saveAdvice.title)}</div>
   </section>;
-}
-
-function TurnPreviewPanel({ preview, jumpToTab }: { preview: TurnPreview; jumpToTab: (tab: string) => void }) {
-  return <section className="ia-dash-section" style={{ borderColor: toneBorder(preview.tone) }}>
-    <header><div><small>Forecast</small><h3>{t('下一回合预演')}</h3></div><div style={{ display: 'flex', gap: 5, flexWrap: 'wrap', justifyContent: 'flex-end' }}><Tag text={t(preview.title)} tone={tagTone(preview.tone)} /><Tag text={t(preview.canAdvance ? '可推进' : '先处理')} tone={preview.canAdvance ? 'good' : 'danger'} /></div></header>
-    <div className="ia-card" style={{ padding: 10, marginBottom: 8, borderLeft: `3px solid ${toneBorder(preview.tone)}` }}><strong style={{ fontSize: 13 }}>{t(preview.summary)}</strong><div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginTop: 8 }}>{preview.signals.map((s) => <Tag key={s.id} text={`${t(s.label)} ${t(s.value)}`} tone={tagTone(s.tone)} />)}</div></div>
-    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 8, marginBottom: 8 }}>{preview.likelyChanges.slice(0, 3).map((x) => <button key={x.id} className="ia-card" onClick={() => jumpToTab(x.tab)} style={{ padding: 10, textAlign: 'left', cursor: 'pointer', border: `1px solid ${toneBorder(x.tone)}` }}><div style={{ display: 'flex', justifyContent: 'space-between', gap: 6, marginBottom: 4 }}><strong style={{ fontSize: 13 }}>{t(x.title)}</strong><Tag text={t('可能')} tone={tagTone(x.tone)} /></div><div style={{ fontSize: 11, color: 'var(--text-dim)', lineHeight: 1.5 }}>{t(x.body)}</div></button>)}</div>
-    <div className="ia-dash-note"><span className={preview.saveAdvice.tone === 'danger' ? 'danger' : preview.saveAdvice.tone === 'warn' ? 'warn' : 'good'}>{t(preview.saveAdvice.title)}</span> · {t(preview.saveAdvice.body)}</div>
-  </section>;
-}
-
-function CommandCenterPanel({ items, jumpToTab }: { items: CommandCenterAction[]; jumpToTab: (tab: string) => void }) {
-  const primary = items[0];
-  return <section className="ia-dash-section ia-dash-actions" style={{ borderColor: primary?.tone === 'danger' ? 'var(--war)' : primary?.tone === 'warn' ? 'var(--warn)' : 'var(--border)' }}><header><div><small>Command</small><h3>{t('行动中心')}</h3></div>{primary && <Tag text={actionSourceLabel(primary.source)} tone={primary.tone === 'danger' ? 'danger' : primary.tone === 'warn' ? 'warn' : 'info'} />}</header><div className="ia-action-list">{items.slice(0, 3).map((a, i) => <button key={`${a.id}-${i}`} className={`tone-${a.tone}`} onClick={() => jumpToTab(a.tab)}><b>{t(i === 0 ? `优先：${a.label}` : a.label)}</b><span>{t(a.desc)}</span></button>)}</div></section>;
 }
 
 function RiskPanel({ risks }: { risks: { label: string; value: string; tone: 'warn' | 'danger' | 'good' }[] }) {
@@ -211,7 +199,6 @@ export default function Dashboard() {
           {sharedSession && <Tag text={t(`共享 · ${sharedSession.worldName}`)} tone="good" />}
           <Tag text={t(council.title)} tone={tagTone(council.tone)} />
           <Tag text={t(`体检 ${readiness.score}/100`)} tone={tagTone(readiness.tone)} />
-          <Tag text={t(turnPreview.canAdvance ? '本年可推进' : '先处理风险')} tone={turnPreview.canAdvance ? 'good' : 'danger'} />
           <Tag text={`${t(victoryFocus.primary.label)} ${victoryFocus.primary.progress}%`} tone={tagTone(victoryFocus.tone)} />
           {!sharedSession && <Tag text={`${t(mission.title)} ${mission.current.progress}%`} tone={mission.completed === 3 ? 'gold' : 'info'} />}
           {!sharedSession && crisis && <Tag text={`${t(crisis.title)} · ${crisis.stage}阶`} tone={crisis.stage >= 3 ? 'danger' : 'warn'} />}
@@ -233,9 +220,7 @@ export default function Dashboard() {
       <Metric label={t('体检')} value={`${readiness.score}/100`} tone={readiness.tone === 'danger' ? 'danger' : readiness.tone === 'warn' ? 'warn' : 'good'} />
     </div>
     <section className="ia-dash-priority-grid" aria-label={t('总览优先决策')}>
-      <CommandCenterPanel items={commandActions} jumpToTab={jumpToTab} />
-      <CouncilPanel council={council} jumpToTab={jumpToTab} />
-      <TurnPreviewPanel preview={turnPreview} jumpToTab={jumpToTab} />
+      <TurnBriefPanel council={council} preview={turnPreview} items={commandActions} jumpToTab={jumpToTab} />
     </section>
     <div className="ia-dash-grid">
       <aside className="ia-dash-col ia-dash-col--left">

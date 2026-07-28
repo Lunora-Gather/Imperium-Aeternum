@@ -159,6 +159,7 @@ function buildNations(): Record<string, Nation> {
 export function createInitialState(): GameState {
   const state: GameState = {
     version: SAVE_VERSION,
+    scenarioId: 'classic',
     turn: 0,
     seed: 12345,
     entityIdCounter: 0,
@@ -259,6 +260,7 @@ export function createWorldState(seed: number, playerNationId?: string, regionFi
 
   const state: GameState = {
     version: SAVE_VERSION,
+    scenarioId: 'world',
     turn: 0,
     seed,
     entityIdCounter: 0,

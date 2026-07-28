@@ -64,6 +64,9 @@ export default function ProvinceScreen() {
   const pid = useGameStore((s) => s.state.playerNationId);
   const player = useGameStore((s) => s.state.nations[pid]);
   const provs = provincesOf(pid, state.provinces);
+  const neutralFrontier = [...new Set(provs.flatMap((province) => province.adjacent))]
+    .map((id) => state.provinces[id])
+    .filter((province): province is Province => !!province && !state.nations[province.ownerId]);
   const pendingId = useGameStore((s) => s.pendingProvinceId);
   const setPendingProvince = useGameStore((s) => s.setPendingProvince);
   const [selected, setSelected] = useState(provs[0]?.id ?? '');
@@ -172,6 +175,17 @@ export default function ProvinceScreen() {
         </div>
         <div style={{ marginTop: 8, fontSize: 11, color: 'var(--text-dim)' }}><StatusDot status="good" />稳定 <StatusDot status="warn" />不满 <StatusDot status="danger" />叛乱风险</div>
       </Panel>
+
+      {neutralFrontier.length > 0 && <Panel title={`边疆拓展（${neutralFrontier.length}）`}>
+        <p className="dim" style={{ fontSize: 11, marginBottom: 8 }}>中立省份可交涉归附、移民开拓或军事占领；速度越快，后续治理压力越高。</p>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(230px, 1fr))', gap: 8 }}>
+          {neutralFrontier.map((frontier) => <div key={frontier.id} className="ia-card" style={{ padding: 10 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 6 }}><strong>{frontier.name}</strong><Tag text={`驻军 ${frontier.garrison}`} tone={frontier.garrison > 50 ? 'warn' : 'info'} /></div>
+            <div className="dim" style={{ fontSize: 10, margin: '5px 0 8px' }}>{`${frontier.terrain} · 人口 ${frontier.population} · 农业 ${frontier.agriBase}`}</div>
+            <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap' }}><Btn label="交涉 80金·40影响·2政" variant="ghost" onClick={() => developProvince(frontier.id, 'neutral_negotiate' as never)} disabled={player.resources.gold < 80 || player.resources.influence < 40 || player.resources.adminPt < 2} /><Btn label="开拓 120金·150粮·2政" variant="ghost" onClick={() => developProvince(frontier.id, 'neutral_colonize' as never)} disabled={player.resources.gold < 120 || player.resources.food < 150 || player.resources.adminPt < 2} /><Btn label="占领 60补给·1政" variant="ghost" warn onClick={() => developProvince(frontier.id, 'neutral_occupy' as never)} disabled={player.resources.supply < 60 || player.resources.adminPt < 1} /></div>
+          </div>)}
+        </div>
+      </Panel>}
 
       <Panel title={`${prov.name} ${prov.isCapital ? '★ 首都' : ''}`} accent>
         <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr)', gap: 16 }}>

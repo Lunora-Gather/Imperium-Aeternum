@@ -33,6 +33,20 @@ describe('ambition progress synchronization', () => {
     expect(world.economy.needTurns).toBeGreaterThan(classic.economy.needTurns);
   });
 
+  it('uses scenario-specific targets for campaigns with the same regional map scale', () => {
+    const mediterranean = createWorldState(8101, 'n_med_rome', ['mediterranean', 'europe_w', 'middle_east', 'africa_n']);
+    mediterranean.scenarioId = 'w5_mediterranean';
+    const trade = createWorldState(8102, 'n_sa_maurya', ['asia_south', 'africa_e', 'middle_east']);
+    trade.scenarioId = 'w8_indianocean';
+
+    const conquest = getAmbitionSnapshot(syncAmbitionMeta(mediterranean));
+    const commerce = getAmbitionSnapshot(syncAmbitionMeta(trade));
+
+    expect(conquest.conquest.target).toBeGreaterThan(conquest.conquest.current);
+    expect(commerce.economy.target).toBeLessThanOrEqual(conquest.economy.target);
+    expect(commerce.economy.needTurns).toBeLessThan(conquest.economy.needTurns);
+  });
+
   it('advances economy and eternal counters once per turn and is idempotent for repeated syncs', () => {
     const base = syncAmbitionMeta(createInitialState()) as GameState & { ambitionMeta: { economyTurns: number; peaceTurns: number; lastProgressTurn?: number } };
     player(base).resources.gold = 5000;

@@ -643,9 +643,9 @@ body > div[style*="position:fixed"][style*="right:8px"] {
 @media (max-width: 520px) {
   .ia-ruler-main {
     display: grid !important;
-    grid-template-columns: minmax(0, 1fr) !important;
-    align-items: stretch !important;
-    gap: 9px !important;
+    grid-template-columns: minmax(0, 1fr) auto !important;
+    align-items: center !important;
+    gap: 6px !important;
   }
 
   .ia-ruler-identity {
@@ -657,48 +657,42 @@ body > div[style*="position:fixed"][style*="right:8px"] {
   }
 
   .ia-header-actions {
-    display: grid !important;
-    gap: 7px !important;
-    padding-top: 7px;
-    border-top: 1px solid color-mix(in srgb, var(--border) 58%, transparent);
+    display: flex !important;
+    gap: 4px !important;
+    padding-top: 0;
+    border-top: 0;
   }
 
   .ia-header-actions > .ia-header-access-controls {
     display: flex;
   }
 
-  .ia-header-access-controls > .ia-icon-btn {
-    flex: 1;
+  .ia-header-access-controls .ia-locale-switch {
+    display: none !important;
   }
 
   .ia-header-actions > .ia-header-game-controls {
-    display: grid;
-    grid-template-columns: repeat(5, 1fr);
-    gap: 5px;
+    display: flex;
+    gap: 4px;
   }
 
   .ia-header-actions .ia-icon-btn {
-    min-width: 44px;
-    height: 50px !important;
-    flex-direction: column;
-    gap: 1px;
-    padding: 3px !important;
+    min-width: 36px;
+    width: 36px !important;
+    height: 36px !important;
+    padding: 2px !important;
   }
 
   .ia-header-actions .ia-icon-btn::after {
-    content: attr(aria-label);
-    color: var(--text-mute);
-    font-size: 9px;
-    text-align: center;
+    content: none;
   }
 
   .ia-header-game-controls .ia-icon-btn {
-    width: 100% !important;
+    width: 36px !important;
   }
 
   .ia-header-actions .ia-locale-switch.is-compact {
-    gap: 2px !important;
-    padding: 1px !important;
+    display: none !important;
   }
 
   .ia-header-actions .ia-locale-switch.is-compact > button {
@@ -710,6 +704,10 @@ body > div[style*="position:fixed"][style*="right:8px"] {
   .ia-main-nav {
     scroll-padding-inline: 12px;
     scroll-snap-type: x proximity;
+  }
+
+  .ia-status-panel {
+    display: none !important;
   }
 
   .ia-tab-btn {

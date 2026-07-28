@@ -7,6 +7,7 @@ import { Panel, Tag, Btn, Divider } from '../components/ui';
 import { buildStrategicBrief, type StrategicItem } from '../gameplay/strategicAdvisor';
 import { buildTurnReportActions, type TurnReportAction } from '../gameplay/turnReportActions';
 import { buildTurnDebrief, type DebriefPoint } from '../gameplay/turnDebrief';
+import { buildTurnCausality, type TurnCausality } from '../gameplay/turnCausality';
 import type { VictoryRouteCard } from '../gameplay/victoryRoutes';
 import NationalPurposePanel from '../components/NationalPurposePanel';
 import { useSharedWorldSessionStore } from '../store/sharedWorldSessionStore';
@@ -32,6 +33,7 @@ export default function TurnReportScreen({ onContinue }: { onContinue?: () => vo
   const brief = buildStrategicBrief(state);
   const actions = buildTurnReportActions(state);
   const debrief = buildTurnDebrief(state);
+  const causality = buildTurnCausality(state);
   const primary = actions[0];
 
   const stories: { txt: string; tone: 'good' | 'warn' | 'danger' | 'info' }[] = [];
@@ -45,6 +47,7 @@ export default function TurnReportScreen({ onContinue }: { onContinue?: () => vo
   return localizeReactTree(<div>
     <Panel title={t('第 {{year}} 年 · 年度报告', { year: r.turn })} accent actions={<div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>{debrief && <Btn label={`复盘：${debrief.nextFocus.title}`} variant={debrief.nextFocus.tone === 'danger' ? 'warn' : 'primary'} onClick={() => jumpToTab(debrief.nextFocus.tab)} />}{primary && <Btn label={`处理：${primary.title}`} variant={primary.tone === 'danger' ? 'warn' : 'primary'} onClick={() => jumpToTab(primary.tab)} />}{onContinue && <Btn label="← 继续治理" variant="ghost" onClick={onContinue} />}</div>}>
       {debrief && <DebriefPanel debrief={debrief} jumpToTab={jumpToTab} />}
+      {causality && <TurnCausalityPanel causality={causality} />}
       {!sharedSession && <NationalPurposePanel state={state} compact />}
       {!sharedSession && (r.strategicNotes ?? []).length > 0 && <><Divider label="国运进展" /><div className="ia-purpose-notes">{(r.strategicNotes ?? []).map((note, index) => <div key={`${note}-${index}`}>✦ {note}</div>)}</div></>}
 
@@ -75,6 +78,15 @@ export default function TurnReportScreen({ onContinue }: { onContinue?: () => vo
       {r.provinceChanges.length > 0 && <><Divider label="疆域变动" /><div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginBottom: 12 }}>{r.provinceChanges.map((pc, i) => { const gained = pc.to === state.playerNationId; return <div key={i} style={{ fontSize: 13, color: gained ? 'var(--good)' : 'var(--war)' }}>{gained ? '获得' : '失去'} {pc.name}</div>; })}</div></>}
       {r.warnings.length > 0 && <><Divider label="警告" /><div className="ia-pulse" style={{ background: 'rgba(245,166,35,0.08)', border: '1px solid var(--warn)', borderRadius: 6, padding: 10 }}>{r.warnings.map((w, i) => <div key={i} className="warn" style={{ fontSize: 13, padding: '2px 0' }}>⚠ {w}</div>)}</div></>}
     </Panel>
+  </div>);
+}
+
+function TurnCausalityPanel({ causality }: { causality: TurnCausality }) {
+  return localizeReactTree(<div style={{ marginBottom: 12 }}>
+    <Divider label="变化因果" />
+    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(230px, 1fr))', gap: 8 }}>
+      {causality.lines.map((line) => <div key={line.id} className="ia-card" style={{ padding: 10, borderLeft: `3px solid ${toneBorder(line.tone)}` }}><strong style={{ fontSize: 12 }}>{line.title}</strong><div style={{ fontSize: 11, color: 'var(--text-dim)', lineHeight: 1.55, marginTop: 4 }}>{line.detail}</div></div>)}
+    </div>
   </div>);
 }
 

@@ -23,7 +23,9 @@ const budgets = {
   // its isolated copy does not relax entry or App limits.
   // Context-aware Traditional Chinese corrections protect historic names and word meanings;
   // the bounded data stays in the locale layer and leaves every initial-route cap unchanged.
-  totalJavaScript: 1171 * KIB,
+  // Scenario-specific victory goals, causal annual reports and neutral-frontier actions add
+  // 3.2 KiB after compaction; entry/App and every route-specific cap remain unchanged.
+  totalJavaScript: 1176 * KIB,
   // Purpose/crisis panels, event decisions and the mobile navigation sheet
   // extend the measured UI baseline without changing entry-script limits.
   totalCss: 117 * KIB,

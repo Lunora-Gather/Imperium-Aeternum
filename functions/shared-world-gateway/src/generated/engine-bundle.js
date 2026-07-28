@@ -2328,6 +2328,7 @@ function createWorldState(seed, playerNationId, regionFilter) {
   }
   const state = {
     version: SAVE_VERSION,
+    scenarioId: "world",
     turn: 0,
     seed,
     entityIdCounter: 0,
@@ -9484,7 +9485,45 @@ function embargoTradeRouteAction(state, routeId) {
 function developProvinceAction(state, provinceId, kind) {
   return runGameAction(state, (working, player) => {
     const province = working.provinces[provinceId];
-    if (!province || province.ownerId !== player.id) return failure("\u53EA\u80FD\u5F00\u53D1\u672C\u56FD\u7701\u4EFD");
+    if (!province) return failure("\u7701\u4EFD\u4E0D\u5B58\u5728");
+    const neutralAction = kind === "neutral_negotiate" || kind === "neutral_colonize" || kind === "neutral_occupy";
+    if (neutralAction) {
+      if (working.nations[province.ownerId]) return failure("\u8BE5\u7701\u4EFD\u5DF2\u6709\u56FD\u5BB6\u7EDF\u6CBB\uFF0C\u5E94\u901A\u8FC7\u5916\u4EA4\u6216\u6218\u4E89\u5904\u7406");
+      if (!province.adjacent.some((id) => working.provinces[id]?.ownerId === player.id)) return failure("\u53EA\u80FD\u62D3\u5C55\u4E0E\u672C\u56FD\u63A5\u58E4\u7684\u4E2D\u7ACB\u7701\u4EFD");
+      if (kind === "neutral_negotiate" && (player.resources.gold < 80 || player.resources.influence < 40)) return failure("\u4EA4\u6D89\u9700\u8981 80 \u91D1\u4E0E 40 \u5F71\u54CD\u529B");
+      if (kind === "neutral_colonize" && (player.resources.gold < 120 || player.resources.food < 150)) return failure("\u79FB\u6C11\u5F00\u62D3\u9700\u8981 120 \u91D1\u4E0E 150 \u7CAE");
+      const armySize2 = player.army.reduce((total, army) => total + army.size, 0);
+      if (kind === "neutral_occupy" && (player.resources.supply < 60 || armySize2 < Math.max(100, province.garrison + 50))) return failure("\u519B\u4E8B\u5360\u9886\u9700\u8981 60 \u8865\u7ED9\u4E0E\u8DB3\u591F\u519B\u529B");
+      const apFailure2 = spendAdmin(player, kind === "neutral_occupy" ? 1 : 2);
+      if (apFailure2) return apFailure2;
+      if (kind === "neutral_negotiate") {
+        player.resources.gold -= 80;
+        player.resources.influence -= 40;
+        province.loyalty = 55;
+        province.assimilation = Math.max(35, province.assimilation);
+        province.unrest = Math.min(25, province.unrest);
+        province.rebellionRisk = Math.min(25, province.rebellionRisk);
+      } else if (kind === "neutral_colonize") {
+        player.resources.gold -= 120;
+        player.resources.food -= 150;
+        province.loyalty = 42;
+        province.assimilation = Math.max(25, province.assimilation);
+        province.unrest = Math.max(25, province.unrest);
+        province.rebellionRisk = Math.max(20, province.rebellionRisk);
+      } else {
+        player.resources.supply -= 60;
+        province.loyalty = 20;
+        province.assimilation = Math.min(20, province.assimilation);
+        province.unrest = Math.max(60, province.unrest);
+        province.rebellionRisk = Math.max(55, province.rebellionRisk);
+        province.garrison = Math.max(50, province.garrison);
+        player.warExhaustion = Math.min(100, player.warExhaustion + 4);
+      }
+      province.ownerId = player.id;
+      addChronicle(working, { turn: working.turn, kind: "expansion", title: "\u8FB9\u7586\u7EB3\u5165\u7248\u56FE", desc: `${province.name}\u901A\u8FC7${kind === "neutral_negotiate" ? "\u4EA4\u6D89\u5F52\u9644" : kind === "neutral_colonize" ? "\u79FB\u6C11\u5F00\u62D3" : "\u519B\u4E8B\u5360\u9886"}\u7EB3\u5165\u56FD\u5BB6\u3002`, actorId: player.id });
+      return success(`${province.name}\u5DF2\u7EB3\u5165\u7248\u56FE`);
+    }
+    if (province.ownerId !== player.id) return failure("\u53EA\u80FD\u5F00\u53D1\u672C\u56FD\u7701\u4EFD");
     if (!["reclaim", "garrison_deploy", "garrison_recall"].includes(kind)) return failure("\u672A\u77E5\u7701\u4EFD\u64CD\u4F5C");
     if (kind === "reclaim") {
       if (province.agriBase >= 12) return failure("\u519C\u4E1A\u57FA\u7840\u5DF2\u8FBE\u4E0A\u9650");

@@ -37,6 +37,9 @@ jobs:
           VITE_BASE: /Imperium-Aeternum/
         run: npm run rc:check
 
+      - name: Browser gameplay smoke test
+        run: npm run test:e2e
+
       - name: Copy SPA fallback
         run: cp dist/index.html dist/404.html
 

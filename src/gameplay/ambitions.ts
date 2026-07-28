@@ -85,24 +85,42 @@ function ensureMetaForWrite(state: StateWithAmbition): AmbitionMeta {
   return state.ambitionMeta as AmbitionMeta;
 }
 
-function targets(meta: AmbitionMeta) {
+// extra, share, province multiplier, gold floor, gold delta, gold multiplier,
+// influence, friendly nations, economy years, peace years.
+type VictoryTargetProfile = readonly [number, number, number, number, number, number, number, number, number, number];
+const SCENARIO_TARGETS: Record<string, VictoryTargetProfile> = {
+  classic: [3, 0, 1, 5000, 4000, 8, 150, 3, 8, 80],
+  challenge_survival: [4, 0, 1.35, 6500, 5500, 9, 180, 4, 10, 100],
+  eastasia: [7, .18, 1.9, 11500, 8500, 8, 190, 5, 10, 100],
+  w3_eastasia: [8, .18, 1.9, 13000, 9500, 8, 200, 5, 11, 105],
+  w5_mediterranean: [8, .2, 2, 13000, 9500, 8, 190, 5, 10, 100],
+  w6_americas: [6, .2, 1.85, 9500, 7000, 7, 170, 4, 9, 90],
+  w7_random: [7, .18, 1.9, 11500, 8500, 8, 190, 5, 10, 100],
+  w4_europe: [7, .17, 1.85, 12000, 9000, 8, 210, 6, 10, 105],
+  w8_indianocean: [6, .16, 1.75, 10500, 7500, 7, 185, 5, 9, 95],
+  world: [10, .12, 1.7, 25000, 20000, 10, 240, 8, 12, 120],
+};
+
+function fallbackProfile(worldScale: AmbitionSnapshot['worldScale']): VictoryTargetProfile {
+  if (worldScale === 'local') return SCENARIO_TARGETS.classic;
+  if (worldScale === 'world') return SCENARIO_TARGETS.world;
+  return [6, .16, 1.8, 12000, 9000, 8, 190, 5, 10, 100];
+}
+
+function targets(meta: AmbitionMeta, scenarioId?: string) {
   const worldScale = scaleOf(meta.worldProvinces);
-  const conquestTarget = worldScale === 'local'
-    ? Math.max(7, meta.startProvinces + 3)
-    : worldScale === 'regional'
-      ? Math.min(meta.worldProvinces, Math.max(meta.startProvinces + 6, Math.ceil(meta.worldProvinces * 0.16), Math.ceil(meta.startProvinces * 1.8)))
-      : Math.min(meta.worldProvinces, Math.max(meta.startProvinces + 10, Math.ceil(meta.worldProvinces * 0.12), Math.ceil(meta.startProvinces * 1.7)));
-
-  const economyTarget = worldScale === 'local'
-    ? Math.max(5000, meta.startGold + 4000, meta.startGold * 8)
-    : worldScale === 'regional'
-      ? Math.max(12000, meta.startGold + 9000, meta.startGold * 8)
-      : Math.max(25000, meta.startGold + 20000, meta.startGold * 10);
-
-  const influenceTarget = worldScale === 'local' ? 150 : worldScale === 'regional' ? 190 : 240;
-  const goodTarget = worldScale === 'local' ? 3 : worldScale === 'regional' ? 5 : 8;
-  const economyNeedTurns = worldScale === 'local' ? 8 : worldScale === 'regional' ? 10 : 12;
-  const eternalTarget = worldScale === 'local' ? 80 : worldScale === 'regional' ? 100 : 120;
+  const profile = (scenarioId && SCENARIO_TARGETS[scenarioId]) || fallbackProfile(worldScale);
+  const conquestTarget = Math.min(meta.worldProvinces, Math.max(
+    7,
+    meta.startProvinces + profile[0],
+    Math.ceil(meta.worldProvinces * profile[1]),
+    Math.ceil(meta.startProvinces * profile[2]),
+  ));
+  const economyTarget = Math.max(profile[3], meta.startGold + profile[4], meta.startGold * profile[5]);
+  const influenceTarget = profile[6];
+  const goodTarget = profile[7];
+  const economyNeedTurns = profile[8];
+  const eternalTarget = profile[9];
   return { conquestTarget, economyTarget, influenceTarget, goodTarget, economyNeedTurns, eternalTarget, worldScale };
 }
 
@@ -111,7 +129,7 @@ export function getAmbitionSnapshot(state: GameState): AmbitionSnapshot {
   const meta = getMetaForRead(s);
   const pid = playerId(s);
   const player = s.nations[pid];
-  const t = targets(meta);
+  const t = targets(meta, s.scenarioId);
   const currentProvs = provinceCount(s, pid);
   const good = goodRelationCount(s, pid);
   return {
@@ -136,7 +154,7 @@ export function applyAmbitionsAfterTurn(state: GameState): { state: GameState; n
   const player = next.nations[pid];
   if (!player) return { state: next };
 
-  const t = targets(meta);
+  const t = targets(meta, next.scenarioId);
   const provs = provinceCount(next, pid);
   const atWar = next.wars.some((w) => w.attackerId === pid || w.defenderId === pid);
   const stable = player.government.stability >= 40;

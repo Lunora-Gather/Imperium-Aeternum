@@ -28,7 +28,14 @@ export function advanceTurnPipeline(state: GameState): TurnPipelineResult {
   if (!next.victory.type) {
     const focus = applyPlayerFocus(next, next.strategyFocus ?? 'balance');
     next = applyAIStrategy(focus.state);
-    if (focus.note) notes.push(focus.note);
+    if (focus.note) {
+      notes.push(focus.note);
+      if (next.lastReport) {
+        const strategicNotes = [...(next.lastReport.strategicNotes ?? []), focus.note].slice(-8);
+        next.lastReport = { ...next.lastReport, strategicNotes };
+        next.history = next.history.map((report) => report.turn === next.lastReport?.turn ? next.lastReport : report) as TurnReport[];
+      }
+    }
   }
 
   const finalState = sanitizeState(next);
