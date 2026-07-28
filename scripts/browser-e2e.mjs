@@ -229,7 +229,10 @@ try {
   await cdp.send('Runtime.enable');
   await cdp.send('Page.navigate', { url: APP_URL });
   await cdp.waitFor('document.readyState === "complete"', 'App did not finish loading');
-  await cdp.evaluate(`localStorage.clear(); localStorage.setItem('ia-tutorial-done', '1'); localStorage.setItem('ia-locale', 'zh-CN'); location.reload()`);
+  await cdp.evaluate(`localStorage.clear(); localStorage.setItem('ia-tutorial-done', '1'); localStorage.setItem('ia-locale', 'zh-CN')`);
+  // Keep navigation outside Runtime.evaluate. Linux Chrome may reject an
+  // in-flight evaluation as soon as location.reload() replaces its target.
+  await cdp.send('Page.reload', { ignoreCache: true });
   await cdp.waitFor(`document.body?.innerText.includes('开始推荐剧本')`, 'Campaign lobby did not load');
 
   assert(await cdp.evaluate(clickButton('开始推荐剧本')), 'Recommended campaign button was not found');
