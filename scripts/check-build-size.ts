@@ -28,7 +28,9 @@ const budgets = {
   totalJavaScript: 1176 * KIB,
   // Purpose/crisis panels, event decisions and the mobile navigation sheet
   // extend the measured UI baseline without changing entry-script limits.
-  totalCss: 117 * KIB,
+  // Shared screen rhythm and the responsive military action grid add 1.1 KiB
+  // while preventing collapsed cards and narrow-screen horizontal clipping.
+  totalCss: 119 * KIB,
   entryJavaScript: 180 * KIB,
   appJavaScript: 25 * KIB,
   accountJavaScript: 140 * KIB,

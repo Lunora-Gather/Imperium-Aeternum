@@ -11,7 +11,7 @@ export function Panel({ title, children, actions, accent, icon }: {
   icon?: string;
 }) {
   return (
-    <section style={{
+    <section className="ia-panel" style={{
       background: accent
         ? 'linear-gradient(180deg, var(--bg-raised) 0%, var(--bg-panel) 100%)'
         : 'var(--bg-panel)',

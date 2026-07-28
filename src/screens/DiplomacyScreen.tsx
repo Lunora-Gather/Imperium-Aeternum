@@ -107,7 +107,7 @@ export default function DiplomacyScreen() {
   const strategicAdvice = intelBoard[0]?.intel.explanation ?? '当前外交格局较平稳，可积累影响力等待机会。';
   const pick = (id: string) => { setView('list'); setFocusNation(id); };
 
-  return localizeReactTree(<div>
+  return localizeReactTree(<div className="ia-screen-stack">
     <Panel title="外交判断" accent>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))', gap: 8, marginBottom: 10 }}>
         <div className="ia-card" style={{ padding: 10, borderLeft: `3px solid ${toneBorder(intelBoard[0]?.intel.tone ?? 'info')}` }}><Tag text="建议" tone={intelBoard[0]?.intel.tone ?? 'info'} /><div style={{ fontSize: 12, lineHeight: 1.55, marginTop: 6 }}>{strategicAdvice}</div></div>

@@ -148,7 +148,7 @@ export default function ProvinceScreen() {
   );
 
   return localizeReactTree(
-    <div>
+    <div className="ia-screen-stack">
       <Panel title="省政判断" accent>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 10, marginBottom: 10 }}>
           <div className="ia-card" style={{ padding: 10 }}><Tag text="疆土" tone="info" /><div style={{ fontSize: 18, marginTop: 6 }}>{`${provs.length} 省`}</div><div className="dim" style={{ fontSize: 11 }}>{`人口 ${Math.round(totalPop)}`}</div></div>

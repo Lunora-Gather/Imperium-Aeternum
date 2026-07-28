@@ -44,7 +44,7 @@ export default function TurnReportScreen({ onContinue }: { onContinue?: () => vo
   if (r.legitimacyDelta < 0) stories.push({ txt: `合法性 ${r.legitimacyDelta}`, tone: 'warn' });
   if (r.events.length > 0) stories.push({ txt: `发生 ${r.events.length} 起事件`, tone: 'info' });
 
-  return localizeReactTree(<div>
+  return localizeReactTree(<div className="ia-screen-stack">
     <Panel title={t('第 {{year}} 年 · 年度报告', { year: r.turn })} accent actions={<div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>{debrief && <Btn label={`复盘：${debrief.nextFocus.title}`} variant={debrief.nextFocus.tone === 'danger' ? 'warn' : 'primary'} onClick={() => jumpToTab(debrief.nextFocus.tab)} />}{primary && <Btn label={`处理：${primary.title}`} variant={primary.tone === 'danger' ? 'warn' : 'primary'} onClick={() => jumpToTab(primary.tab)} />}{onContinue && <Btn label="← 继续治理" variant="ghost" onClick={onContinue} />}</div>}>
       {debrief && <DebriefPanel debrief={debrief} jumpToTab={jumpToTab} />}
       {causality && <TurnCausalityPanel causality={causality} />}

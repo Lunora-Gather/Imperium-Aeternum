@@ -45,7 +45,7 @@ export default function TechnologyScreen() {
   const doResearch = (techId: string) => { research(techId); };
 
   return localizeReactTree(
-    <div>
+    <div className="ia-screen-stack">
       <Panel title="科技路线判断" accent>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))', gap: 8 }}>
           {route.slice(0, 4).map((r) => {

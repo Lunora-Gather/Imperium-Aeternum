@@ -63,7 +63,7 @@ export default function StatsScreen() {
   const radarPath = factionPts.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x.toFixed(1)} ${p.y.toFixed(1)}`).join(' ') + ' Z';
   const maxArmy = Math.max(playerArmy, topArmy || 1, 1);
 
-  return localizeReactTree(<div>
+  return localizeReactTree(<div className="ia-screen-stack">
     <Panel title="大局诊断" accent>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))', gap: 8 }}>
         {advice.slice(0, 4).map((a) => <Guide key={a.title} {...a} />)}

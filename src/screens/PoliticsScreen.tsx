@@ -42,7 +42,7 @@ export default function PoliticsScreen() {
   if (advice.length === 0) advice.push({ title: '政局尚稳', body: '可根据国运路线选择：稳国内政、降腐败、提高治能或补合法性。', tone: 'good' });
 
   return localizeReactTree(
-    <div>
+    <div className="ia-screen-stack">
       <Panel title="政局判断" accent>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 8, marginBottom: 10 }}>
           {advice.slice(0, 4).map((a) => <Guide key={a.title} title={a.title} body={a.body} tone={a.tone} onClick={a.tab ? () => setTab(a.tab!) : undefined} />)}

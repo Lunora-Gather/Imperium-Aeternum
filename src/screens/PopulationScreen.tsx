@@ -45,7 +45,7 @@ export default function PopulationScreen() {
   if (advice.length === 0) advice.push({ title: '社会尚稳', body: '人口和派系状态可支撑继续发展，适合转向经济、科技或外交目标。', tone: 'good' });
 
   return localizeReactTree(
-    <div>
+    <div className="ia-screen-stack">
       <Panel title="人口判断" accent>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 8 }}>
           {advice.slice(0, 4).map((a) => <Guide key={a.title} {...a} />)}

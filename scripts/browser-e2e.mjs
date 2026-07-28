@@ -145,6 +145,37 @@ function clickButton(text) {
   })()`;
 }
 
+function clickNavigationTab(tabId) {
+  return `(() => {
+    const button = document.querySelector('[data-navigation-tab="${tabId}"]');
+    if (!button) return false;
+    button.click();
+    return true;
+  })()`;
+}
+
+function screenLayoutAudit() {
+  return `(() => {
+    const screen = [...document.querySelectorAll('.ia-screen-stack')].find((item) => getComputedStyle(item).display !== 'none');
+    if (!screen) return null;
+    const children = [...screen.children].filter((item) => getComputedStyle(item).position !== 'fixed');
+    const gaps = children.slice(1).map((item, index) => {
+      const previous = children[index].getBoundingClientRect();
+      const current = item.getBoundingClientRect();
+      return Math.round((current.top - previous.bottom) * 10) / 10;
+    });
+    return {
+      gaps,
+      minGap: gaps.length > 0 ? Math.min(...gaps) : null,
+      scrollWidth: screen.scrollWidth,
+      clientWidth: screen.clientWidth,
+      display: getComputedStyle(screen).display,
+      rowGap: getComputedStyle(screen).rowGap,
+      children: children.map((item) => item.className),
+    };
+  })()`;
+}
+
 const chromePath = chromeExecutable();
 assert(chromePath, 'Chrome or Edge is required for browser E2E');
 
@@ -183,6 +214,18 @@ try {
   assert(briefCount === 1, `Expected one authoritative turn brief, found ${briefCount}`);
   assert(await cdp.evaluate(`document.body.innerText.includes('本回合简报')`), 'Turn brief heading is missing');
 
+  for (const tabId of ['province', 'economy', 'population', 'politics', 'tech', 'military', 'diplomacy', 'chronicle', 'save']) {
+    assert(await cdp.evaluate(clickNavigationTab(tabId)), `Navigation tab ${tabId} was not found`);
+    await cdp.waitFor(`document.querySelector('[data-navigation-tab="${tabId}"]')?.classList.contains('is-active')`, `Navigation tab ${tabId} did not become active`);
+    await cdp.waitFor(`[...document.querySelectorAll('.ia-screen-stack')].some((item) => getComputedStyle(item).display !== 'none')`, `Screen stack for ${tabId} did not load`);
+    const layout = await cdp.evaluate(screenLayoutAudit());
+    assert(layout, `Screen layout for ${tabId} could not be measured`);
+    assert(layout.minGap === null || layout.minGap >= 10, `Screen ${tabId} has collapsed vertical spacing: ${JSON.stringify(layout)}`);
+    assert(layout.scrollWidth <= layout.clientWidth + 1, `Screen ${tabId} overflows horizontally (${layout.scrollWidth}px > ${layout.clientWidth}px)`);
+  }
+
+  assert(await cdp.evaluate(clickNavigationTab('dashboard')), 'Overview navigation button was not found after layout audit');
+  await cdp.waitFor(`document.body?.innerText.includes('本回合简报')`, 'Dashboard did not return after layout audit');
   assert(await cdp.evaluate(clickButton('存档')), 'Save button was not found');
   assert(await cdp.evaluate(`JSON.parse(localStorage.getItem('imperium-aeternum-save-0')).gameState.turn === 0`), 'Manual save did not preserve the opening turn');
   assert(await cdp.evaluate(clickButton('下一回合')), 'Next-turn button was not found');
@@ -207,7 +250,13 @@ try {
   assert(mobile.statusHidden, 'Secondary status cards should be hidden on a 390px viewport');
   assert(mobile.briefTop < mobile.viewportHeight, `Turn brief begins below the mobile fold (${mobile.briefTop}px)`);
 
-  console.log('Browser E2E passed: start, turn advance, save/load, single brief, mobile fold.');
+  assert(await cdp.evaluate(clickNavigationTab('military')), 'Mobile military navigation button was not found');
+  await cdp.waitFor(`[...document.querySelectorAll('.ia-military-screen')].some((item) => getComputedStyle(item).display !== 'none')`, 'Mobile military screen did not load');
+  const mobileMilitary = await cdp.evaluate(screenLayoutAudit());
+  assert(mobileMilitary.minGap >= 8, `Mobile military cards have collapsed spacing (${mobileMilitary.minGap}px)`);
+  assert(mobileMilitary.scrollWidth <= mobileMilitary.clientWidth + 1, `Mobile military screen overflows horizontally (${mobileMilitary.scrollWidth}px > ${mobileMilitary.clientWidth}px)`);
+
+  console.log('Browser E2E passed: start, turn advance, save/load, screen spacing, horizontal fit, single brief, mobile fold.');
 } finally {
   cdp?.close();
   await stopChild(chrome);

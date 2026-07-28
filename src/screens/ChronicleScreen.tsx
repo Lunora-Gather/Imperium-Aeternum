@@ -45,7 +45,7 @@ export default function ChronicleScreen() {
   const eraText = crisisRatio > 0.28 ? '危机纪元' : warRatio > 0.25 ? '征伐纪元' : stats.reform >= 3 ? '改革纪元' : stats.trade >= 3 ? '富庶纪元' : '奠基纪元';
   const nextHint = stats.total < 3 ? '继续推进回合，史册会记录开国、扩张、危机和改革。' : stats.crisis > stats.victory ? '危局记录偏多，建议先稳财政、稳定和派系。' : stats.expansion > stats.reign + stats.reform ? '扩张记录偏多，建议补治理、法律和省份稳定。' : '史册结构较稳，可继续按国运目标推进。';
 
-  return localizeReactTree(<div>
+  return localizeReactTree(<div className="ia-screen-stack">
     <Panel title="史册判断" icon="✶" accent actions={<div style={{ display: 'flex', gap: 4 }}><Btn label="时间线" variant={view === 'timeline' ? 'primary' : 'ghost'} onClick={() => setView('timeline')} /><Btn label="分类" variant={view === 'category' ? 'primary' : 'ghost'} onClick={() => setView('category')} /></div>}>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: 10, marginBottom: 12 }}><Stat label="总条目" value={stats.total} color="var(--gold)" /><Stat label="治世" value={stats.reign} color="var(--gold)" /><Stat label="扩张" value={stats.expansion} color="var(--accent)" /><Stat label="武功" value={stats.victory} color="var(--war)" /><Stat label="危局" value={stats.crisis} color="var(--war)" /><Stat label="改革" value={stats.reform} color="var(--accent)" /></div>
       <div className="ia-card" style={{ padding: 10, display: 'flex', justifyContent: 'space-between', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}><div><Tag text={eraText} tone={eraTone} /><span style={{ marginLeft: 8, fontSize: 12, color: 'var(--text-mute)' }}>{`${player.name} · ${player.ruler.name} 治下 · 已历 ${state.turn} 年`}</span></div><div style={{ fontSize: 11, color: 'var(--text-dim)' }}>{nextHint}</div></div>

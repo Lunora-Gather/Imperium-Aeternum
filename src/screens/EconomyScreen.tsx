@@ -68,7 +68,7 @@ export default function EconomyScreen() {
   if (advice.length === 0) advice.push({ title: '经济尚稳', body: '可按国运目标选择贸易扩张、低税养民或积累国库。', tone: 'good' });
 
   return localizeReactTree(
-    <div>
+    <div className="ia-screen-stack">
       <Panel title="经济判断" accent>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 8 }}>
           {advice.slice(0, 4).map((a) => <Guide key={a.title} {...a} />)}

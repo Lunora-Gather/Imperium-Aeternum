@@ -170,7 +170,7 @@ export default function MilitaryScreen() {
 
   const doDeclare = (target: string, provId: string) => { storeDeclareWar(target, provId); setPreviewTarget(null); };
 
-  return localizeReactTree(<div>
+  return localizeReactTree(<div className="ia-screen-stack ia-military-screen">
     <Panel title="军情判断" accent>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))', gap: 8 }}>
         {guidance.slice(0, 3).map((g, i) => <div key={i} className="ia-card" style={{ padding: 10, borderLeft: `3px solid var(--${g.tone === 'danger' ? 'war' : g.tone === 'warn' ? 'warn' : g.tone === 'good' ? 'good' : 'border'})` }}>
@@ -183,13 +183,13 @@ export default function MilitaryScreen() {
     <MilitaryWarOpportunityBridge state={state} onPreview={(defenderId, provinceId) => setPreviewTarget({ defenderId, provinceId })} />
 
     <Panel title="军力概览" accent>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 10, marginBottom: 12 }}>
+      <div className="ia-military-overview-grid">
         <Stat kind="core" accent="var(--war)" label="总兵力" value={armyTotal} />
         <Stat kind="core" accent="var(--warn)" label="厌战" value={player.warExhaustion} warn={player.warExhaustion > 50} />
         <Stat kind="core" accent="var(--stable)" label="补给" value={player.resources.supply} />
         <Stat kind="core" accent={player.atWar ? 'var(--war)' : 'var(--good)'} label="状态" value={player.atWar ? '战争中' : '和平'} />
       </div>
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+      <div className="ia-military-meter-grid">
         <StatRowMini label="士气均值" value={player.army.length ? player.army.reduce((s, a) => s + a.morale, 0) / player.army.length : 0} kind="high" />
         <StatRowMini label="训练均值" value={player.army.length ? player.army.reduce((s, a) => s + a.training, 0) / player.army.length : 0} kind="high" />
       </div>
@@ -239,7 +239,7 @@ export default function MilitaryScreen() {
         const ratio = armyTotal > 0 ? armyTotal / Math.max(1, enemyArmy) : 0;
         const advantage = ratio >= 1.5 ? { txt: '占优', tone: 'good' as const } : ratio >= 0.8 ? { txt: '均势', tone: 'warn' as const } : { txt: '劣势', tone: 'danger' as const };
         const selected = previewTarget?.defenderId === adj.ownerId && previewTarget?.provinceId === adj.id;
-        return <div key={`${p.id}-${adj.id}`} style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr 60px 70px 82px', gap: 8, padding: '8px 0', borderBottom: '1px solid var(--border)', alignItems: 'center' }}><span style={{ fontSize: 12 }}>邻省 <strong>{adj.name}</strong> <span className="dim">属 {enemy?.name ?? '未知势力'}</span></span><span style={{ fontSize: 12, color: `var(--${tone === 'danger' ? 'war' : tone === 'warn' ? 'warn' : 'good'})` }}>关系 {Math.round(relation)}</span><span style={{ fontSize: 12 }}><span style={{ color: 'var(--good)' }}>{armyTotal}</span><span className="dim" style={{ margin: '0 4px' }}>vs</span><span style={{ color: 'var(--war)' }}>{enemyArmy}</span></span><Tag text={advantage.txt} tone={advantage.tone} /><Btn label={selected ? '已预演' : '预演'} variant="ghost" onClick={() => setPreviewTarget({ defenderId: adj.ownerId, provinceId: adj.id })} /><Btn label="宣战 1政" warn onClick={() => doDeclare(adj.ownerId, adj.id)} disabled={player.resources.adminPt < 1 || rel?.treaty === 'alliance'} /></div>;
+        return <div key={`${p.id}-${adj.id}`} className="ia-military-declare-row"><span className="ia-military-target">邻省 <strong>{adj.name}</strong> <span className="dim">属 {enemy?.name ?? '未知势力'}</span></span><span className="ia-military-relation" style={{ color: `var(--${tone === 'danger' ? 'war' : tone === 'warn' ? 'warn' : 'good'})` }}>关系 {Math.round(relation)}</span><span className="ia-military-strength"><span style={{ color: 'var(--good)' }}>{armyTotal}</span><span className="dim" style={{ margin: '0 4px' }}>vs</span><span style={{ color: 'var(--war)' }}>{enemyArmy}</span></span><Tag text={advantage.txt} tone={advantage.tone} /><Btn label={selected ? '已预演' : '预演'} variant="ghost" onClick={() => setPreviewTarget({ defenderId: adj.ownerId, provinceId: adj.id })} /><Btn label="宣战 1政" warn onClick={() => doDeclare(adj.ownerId, adj.id)} disabled={player.resources.adminPt < 1 || rel?.treaty === 'alliance'} /></div>;
       })}</div>
     </Panel>
 

@@ -68,7 +68,7 @@ export default function SaveLoadScreen() {
               : { text: '槽位已满，覆盖前先确认年份和国家。', tone: 'info' as const };
   const cloudBySlot = new Map(account.cloudSaves.map((save) => [save.slot, save]));
 
-  return localizeReactTree(<div>
+  return localizeReactTree(<div className="ia-screen-stack">
     <Panel title="存档恢复体检" accent>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 8, marginBottom: 10 }}>
         <Health label="已用槽位" value={filled} tone="info" />
