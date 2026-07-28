@@ -7,7 +7,7 @@ export type { AmbitionMeta } from '../types/game';
 
 export interface AmbitionSnapshot {
   conquest: { current: number; target: number; done: boolean };
-  economy: { current: number; target: number; turns: number; needTurns: number; done: boolean };
+  economy: { current: number; target: number; turns: number; needTurns: number; buildings: number; buildingTarget: number; tradeRoutes: number; foundationDone: boolean; done: boolean };
   diplomacy: { influence: number; influenceTarget: number; goodRelations: number; goodTarget: number; done: boolean };
   eternal: { turns: number; target: number; done: boolean };
   worldScale: 'local' | 'regional' | 'world';
@@ -107,6 +107,14 @@ function fallbackProfile(worldScale: AmbitionSnapshot['worldScale']): VictoryTar
   return [6, .16, 1.8, 12000, 9000, 8, 190, 5, 10, 100];
 }
 
+function economyFoundation(state: GameState, id: string): { buildings: number; buildingTarget: number; tradeRoutes: number; done: boolean } {
+  const owned = Object.values(state.provinces).filter((province) => province.ownerId === id);
+  const buildings = owned.reduce((sum, province) => sum + province.buildings.length, 0);
+  const buildingTarget = Math.max(2, Math.ceil(owned.length * 0.35));
+  const tradeRoutes = state.nations[id]?.activeTradeRoutes.length ?? 0;
+  return { buildings, buildingTarget, tradeRoutes, done: buildings >= buildingTarget && tradeRoutes >= 1 };
+}
+
 function targets(meta: AmbitionMeta, scenarioId?: string) {
   const worldScale = scaleOf(meta.worldProvinces);
   const profile = (scenarioId && SCENARIO_TARGETS[scenarioId]) || fallbackProfile(worldScale);
@@ -132,9 +140,10 @@ export function getAmbitionSnapshot(state: GameState): AmbitionSnapshot {
   const t = targets(meta, s.scenarioId);
   const currentProvs = provinceCount(s, pid);
   const good = goodRelationCount(s, pid);
+  const foundation = economyFoundation(s, pid);
   return {
     conquest: { current: currentProvs, target: t.conquestTarget, done: currentProvs >= t.conquestTarget && (player?.government.stability ?? 0) >= 40 },
-    economy: { current: Math.round(player?.resources.gold ?? 0), target: t.economyTarget, turns: meta.economyTurns, needTurns: t.economyNeedTurns, done: meta.economyTurns >= t.economyNeedTurns },
+    economy: { current: Math.round(player?.resources.gold ?? 0), target: t.economyTarget, turns: meta.economyTurns, needTurns: t.economyNeedTurns, buildings: foundation.buildings, buildingTarget: foundation.buildingTarget, tradeRoutes: foundation.tradeRoutes, foundationDone: foundation.done, done: foundation.done && meta.economyTurns >= t.economyNeedTurns },
     diplomacy: { influence: Math.round(player?.resources.influence ?? 0), influenceTarget: t.influenceTarget, goodRelations: good, goodTarget: t.goodTarget, done: (player?.resources.influence ?? 0) >= t.influenceTarget && good >= t.goodTarget && s.wars.length === 0 },
     eternal: { turns: meta.peaceTurns, target: t.eternalTarget, done: meta.peaceTurns >= t.eternalTarget },
     worldScale: t.worldScale,
@@ -159,10 +168,11 @@ export function applyAmbitionsAfterTurn(state: GameState): { state: GameState; n
   const atWar = next.wars.some((w) => w.attackerId === pid || w.defenderId === pid);
   const stable = player.government.stability >= 40;
   const good = goodRelationCount(next, pid);
+  const foundation = economyFoundation(next, pid);
 
   // 进度计数只允许每个 state.turn 推进一次，避免 wrapper 重装、读档恢复或重复 setState 造成右侧目标条跳动。
   if (meta.lastProgressTurn !== next.turn) {
-    if (player.resources.gold >= t.economyTarget && stable) meta.economyTurns += 1;
+    if (player.resources.gold >= t.economyTarget && stable && foundation.done) meta.economyTurns += 1;
     else meta.economyTurns = 0;
 
     if (!atWar && player.government.stability >= 45 && player.government.legitimacy >= 35) meta.peaceTurns += 1;
@@ -176,7 +186,7 @@ export function applyAmbitionsAfterTurn(state: GameState): { state: GameState; n
   if (next.victory.type?.startsWith('win')) {
     const premature =
       (next.victory.type === 'win_conquest' && !(provs >= t.conquestTarget && stable)) ||
-      (next.victory.type === 'win_economy' && meta.economyTurns < t.economyNeedTurns) ||
+      (next.victory.type === 'win_economy' && (!foundation.done || meta.economyTurns < t.economyNeedTurns)) ||
       (next.victory.type === 'win_culture' && !((player.resources.influence >= t.influenceTarget) && good >= t.goodTarget && !atWar)) ||
       (next.victory.type === 'win_eternal' && meta.peaceTurns < t.eternalTarget);
     if (premature) {

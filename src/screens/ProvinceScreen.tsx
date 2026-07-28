@@ -2,7 +2,7 @@ import { registerGovernanceTranslations } from '../i18n/catalogs/governance';
 import { localizeReactTree } from '../i18n/reactTree';
 registerGovernanceTranslations();
 // Province v3 — 摘要 → 风险 → 省份操作，减少盲点选省
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useGameStore } from '../store/gameStore';
 import { provincesOf } from '../engine/init';
 import { BUILDINGS } from '../data/buildings';
@@ -70,6 +70,8 @@ export default function ProvinceScreen() {
   const pendingId = useGameStore((s) => s.pendingProvinceId);
   const setPendingProvince = useGameStore((s) => s.setPendingProvince);
   const [selected, setSelected] = useState(provs[0]?.id ?? '');
+  const [provinceQuery, setProvinceQuery] = useState('');
+  const [provinceSort, setProvinceSort] = useState<'risk' | 'population' | 'name'>('risk');
 
   useEffect(() => {
     if (pendingId && provs.some((p) => p.id === pendingId)) {
@@ -115,6 +117,18 @@ export default function ProvinceScreen() {
   const avgUnrest = provs.length ? provs.reduce((s, p) => s + p.unrest, 0) / provs.length : 0;
   const avgLoyalty = provs.length ? provs.reduce((s, p) => s + p.loyalty, 0) / provs.length : 0;
   const dangerous = [...provs].sort((a, b) => riskScore(b) - riskScore(a)).slice(0, 4);
+  const visibleProvs = useMemo(() => {
+    const normalized = provinceQuery.trim().toLocaleLowerCase();
+    const filtered = normalized
+      ? provs.filter((province) => `${province.name} ${province.terrain} ${province.culture} ${province.religion}`.toLocaleLowerCase().includes(normalized))
+      : [...provs];
+    filtered.sort((left, right) => {
+      if (provinceSort === 'population') return right.population - left.population;
+      if (provinceSort === 'name') return left.name.localeCompare(right.name, 'zh-CN');
+      return riskScore(right) - riskScore(left);
+    });
+    return filtered;
+  }, [provs, provinceQuery, provinceSort]);
   const allIds = Object.keys(BUILDINGS) as BuildingId[];
   const unlocked = allIds.filter((bid) => techUnlocked(player, BUILDINGS[bid].prereqTech));
   const locked = allIds.filter((bid) => !techUnlocked(player, BUILDINGS[bid].prereqTech));
@@ -163,8 +177,16 @@ export default function ProvinceScreen() {
       </Panel>
 
       <Panel title={`省份列表（${provs.length}）`}>
+        <div className="ia-list-toolbar">
+          <input className="ia-input" value={provinceQuery} onChange={(event) => setProvinceQuery(event.target.value)} aria-label="搜索省份" placeholder="搜索省名、地形、文化或宗教" />
+          <div className="ia-segmented-control" role="group" aria-label="省份排序">
+            <button className={`ia-btn ${provinceSort === 'risk' ? 'ia-btn--primary' : ''}`} onClick={() => setProvinceSort('risk')}>风险优先</button>
+            <button className={`ia-btn ${provinceSort === 'population' ? 'ia-btn--primary' : ''}`} onClick={() => setProvinceSort('population')}>人口优先</button>
+            <button className={`ia-btn ${provinceSort === 'name' ? 'ia-btn--primary' : ''}`} onClick={() => setProvinceSort('name')}>名称</button>
+          </div>
+        </div>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: 6 }}>
-          {provs.map((p) => {
+          {visibleProvs.map((p) => {
             const st = provStatus(p);
             return (
               <button key={p.id} onClick={() => setSelected(p.id)} className="ia-btn" style={selected === p.id ? { background: 'var(--border-hi)', borderColor: 'var(--gold)', color: '#fff', justifyContent: 'flex-start' } : { justifyContent: 'flex-start', fontSize: 12 }}>
@@ -172,6 +194,7 @@ export default function ProvinceScreen() {
               </button>
             );
           })}
+          {visibleProvs.length === 0 && <div className="ia-risk-empty">没有符合条件的省份。</div>}
         </div>
         <div style={{ marginTop: 8, fontSize: 11, color: 'var(--text-dim)' }}><StatusDot status="good" />稳定 <StatusDot status="warn" />不满 <StatusDot status="danger" />叛乱风险</div>
       </Panel>

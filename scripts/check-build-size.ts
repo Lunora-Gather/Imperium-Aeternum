@@ -25,7 +25,9 @@ const budgets = {
   // the bounded data stays in the locale layer and leaves every initial-route cap unchanged.
   // Scenario-specific victory goals, causal annual reports and neutral-frontier actions add
   // 3.2 KiB after compaction; entry/App and every route-specific cap remain unchanged.
-  totalJavaScript: 1176 * KIB,
+  // Long-campaign health analysis plus lazy province/map discovery controls add a bounded
+  // 11 KiB across route chunks; entry/App and every route-specific cap remain unchanged.
+  totalJavaScript: 1187 * KIB,
   // Purpose/crisis panels, event decisions and the mobile navigation sheet
   // extend the measured UI baseline without changing entry-script limits.
   // Shared screen rhythm and the responsive military action grid add 1.1 KiB

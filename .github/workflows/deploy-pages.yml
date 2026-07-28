@@ -59,6 +59,12 @@ jobs:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
+      - name: Checkout verification script
+        uses: actions/checkout@v7
+
       - name: Deploy artifact
         id: deployment
         uses: actions/deploy-pages@v5
+
+      - name: Verify public deployment
+        run: node scripts/verify-production.mjs "${{ steps.deployment.outputs.page_url }}"

@@ -176,6 +176,30 @@ function screenLayoutAudit() {
   })()`;
 }
 
+function accessibilityAudit() {
+  return `(() => {
+    const visible = (item) => {
+      const style = getComputedStyle(item);
+      return style.display !== 'none' && style.visibility !== 'hidden' && item.getClientRects().length > 0;
+    };
+    const unnamedButtons = [...document.querySelectorAll('button, [role="button"]')]
+      .filter(visible)
+      .filter((item) => !(item.getAttribute('aria-label') || item.getAttribute('aria-labelledby') || item.textContent?.trim() || item.getAttribute('title')))
+      .map((item) => item.outerHTML.slice(0, 120));
+    const unnamedFields = [...document.querySelectorAll('input, select, textarea')]
+      .filter(visible)
+      .filter((item) => {
+        if (item.getAttribute('aria-label') || item.getAttribute('aria-labelledby')) return false;
+        if (item.id && document.querySelector('label[for="' + CSS.escape(item.id) + '"]')) return false;
+        return !item.closest('label');
+      })
+      .map((item) => item.outerHTML.slice(0, 120));
+    const ids = [...document.querySelectorAll('[id]')].map((item) => item.id);
+    const duplicateIds = [...new Set(ids.filter((id, index) => ids.indexOf(id) !== index))];
+    return { unnamedButtons, unnamedFields, duplicateIds };
+  })()`;
+}
+
 const chromePath = chromeExecutable();
 assert(chromePath, 'Chrome or Edge is required for browser E2E');
 
@@ -222,6 +246,10 @@ try {
     assert(layout, `Screen layout for ${tabId} could not be measured`);
     assert(layout.minGap === null || layout.minGap >= 10, `Screen ${tabId} has collapsed vertical spacing: ${JSON.stringify(layout)}`);
     assert(layout.scrollWidth <= layout.clientWidth + 1, `Screen ${tabId} overflows horizontally (${layout.scrollWidth}px > ${layout.clientWidth}px)`);
+    const accessibility = await cdp.evaluate(accessibilityAudit());
+    assert(accessibility.unnamedButtons.length === 0, `Screen ${tabId} has unnamed controls: ${JSON.stringify(accessibility.unnamedButtons)}`);
+    assert(accessibility.unnamedFields.length === 0, `Screen ${tabId} has unnamed fields: ${JSON.stringify(accessibility.unnamedFields)}`);
+    assert(accessibility.duplicateIds.length === 0, `Screen ${tabId} has duplicate IDs: ${JSON.stringify(accessibility.duplicateIds)}`);
   }
 
   assert(await cdp.evaluate(clickNavigationTab('dashboard')), 'Overview navigation button was not found after layout audit');
@@ -231,6 +259,12 @@ try {
   assert(await cdp.evaluate(clickButton('下一回合')), 'Next-turn button was not found');
   await cdp.waitFor(`document.querySelector('.ia-ruler-subline')?.innerText.includes('Anno · 2')`, 'The first turn did not advance');
   assert(await cdp.evaluate(`JSON.parse(localStorage.getItem('imperium-aeternum-save-0')).gameState.turn === 0`), 'Turn advance unexpectedly overwrote the manual save');
+  assert(await cdp.evaluate(clickNavigationTab('stats')), 'Statistics navigation button was not found');
+  await cdp.waitFor(`document.body?.innerText.includes('长局体检')`, 'Campaign health panel did not load');
+  const statsLayout = await cdp.evaluate(screenLayoutAudit());
+  assert(statsLayout.scrollWidth <= statsLayout.clientWidth + 1, `Statistics screen overflows horizontally (${statsLayout.scrollWidth}px > ${statsLayout.clientWidth}px)`);
+  const chartFit = await cdp.evaluate(`[...document.querySelectorAll('svg[aria-label]')].every((svg) => svg.getBoundingClientRect().width <= svg.parentElement.getBoundingClientRect().width + 1)`);
+  assert(chartFit, 'A statistics chart exceeds its panel width');
   assert(await cdp.evaluate(`(() => { const button = document.querySelector('[data-navigation-tab="dashboard"]'); button?.click(); return !!button; })()`), 'Overview navigation button was not found');
   await cdp.waitFor(`document.body?.innerText.includes('本回合简报')`, 'Dashboard did not return after the first turn');
   assert(await cdp.evaluate(clickButton('读档')), 'Load button was not found');
@@ -250,13 +284,19 @@ try {
   assert(mobile.statusHidden, 'Secondary status cards should be hidden on a 390px viewport');
   assert(mobile.briefTop < mobile.viewportHeight, `Turn brief begins below the mobile fold (${mobile.briefTop}px)`);
 
+  assert(await cdp.evaluate(clickNavigationTab('map')), 'Mobile map navigation button was not found');
+  await cdp.waitFor(`!!document.querySelector('.ia-map-page')`, 'Mobile map did not load');
+  const mobileMap = await cdp.evaluate(`(() => { const page = document.querySelector('.ia-map-page'); return { scrollWidth: page.scrollWidth, clientWidth: page.clientWidth, hasSearch: !!page.querySelector('.ia-map-search') }; })()`);
+  assert(mobileMap.hasSearch, 'Strategic map search is missing');
+  assert(mobileMap.scrollWidth <= mobileMap.clientWidth + 1, `Mobile map overflows horizontally (${mobileMap.scrollWidth}px > ${mobileMap.clientWidth}px)`);
+
   assert(await cdp.evaluate(clickNavigationTab('military')), 'Mobile military navigation button was not found');
   await cdp.waitFor(`[...document.querySelectorAll('.ia-military-screen')].some((item) => getComputedStyle(item).display !== 'none')`, 'Mobile military screen did not load');
   const mobileMilitary = await cdp.evaluate(screenLayoutAudit());
   assert(mobileMilitary.minGap >= 8, `Mobile military cards have collapsed spacing (${mobileMilitary.minGap}px)`);
   assert(mobileMilitary.scrollWidth <= mobileMilitary.clientWidth + 1, `Mobile military screen overflows horizontally (${mobileMilitary.scrollWidth}px > ${mobileMilitary.clientWidth}px)`);
 
-  console.log('Browser E2E passed: start, turn advance, save/load, screen spacing, horizontal fit, single brief, mobile fold.');
+  console.log('Browser E2E passed: start, turn advance, save/load, campaign health, search, accessibility, screen spacing, horizontal fit, single brief, mobile fold.');
 } finally {
   cdp?.close();
   await stopChild(chrome);

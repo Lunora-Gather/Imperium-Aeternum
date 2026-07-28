@@ -8,6 +8,16 @@ function player(state: GameState) {
   return state.nations[state.playerNationId];
 }
 
+function establishEconomicFoundation(state: GameState): void {
+  const owned = Object.values(state.provinces).filter((province) => province.ownerId === state.playerNationId);
+  const target = getAmbitionSnapshot(state).economy.buildingTarget;
+  for (let index = 0; index < target; index += 1) {
+    const province = owned[index % owned.length];
+    province.buildings.push({ id: `victory-building-${index}`, defId: 'farm', provinceId: province.id, level: 1 });
+  }
+  player(state).activeTradeRoutes = [{ routeId: 'silk_road', establishedTurn: state.turn }];
+}
+
 describe('ambition progress synchronization', () => {
   it('materializes ambition metadata before the first turn so UI progress has a persisted baseline', () => {
     const state = createInitialState() as GameState & { ambitionMeta?: unknown };
@@ -52,6 +62,7 @@ describe('ambition progress synchronization', () => {
     player(base).resources.gold = 5000;
     player(base).government.stability = 70;
     player(base).government.legitimacy = 70;
+    establishEconomicFoundation(base);
 
     const turnAdvanced = { ...base, turn: base.turn + 1 };
     const first = applyAmbitionsAfterTurn(turnAdvanced).state as GameState & { ambitionMeta: { economyTurns: number; peaceTurns: number; lastProgressTurn?: number } };
@@ -114,6 +125,7 @@ describe('ambition progress synchronization', () => {
     if (!meta) return;
     player(state).resources.gold = snapshot.economy.target;
     player(state).government.stability = 70;
+    establishEconomicFoundation(state);
     meta.economyTurns = snapshot.economy.needTurns - 2;
     meta.lastProgressTurn = state.turn;
 
@@ -126,6 +138,22 @@ describe('ambition progress synchronization', () => {
     expect(final.victory.type).toBe('win_economy');
   });
 
+  it('does not award passive economic victory without buildings and trade', () => {
+    const state = syncAmbitionMeta(createInitialState());
+    const snapshot = getAmbitionSnapshot(state);
+    const meta = state.ambitionMeta;
+    expect(meta).toBeDefined();
+    if (!meta) return;
+    player(state).resources.gold = snapshot.economy.target * 2;
+    player(state).government.stability = 80;
+    meta.economyTurns = snapshot.economy.needTurns;
+
+    const result = applyAmbitionsAfterTurn({ ...state, turn: state.turn + 1 }).state;
+
+    expect(getAmbitionSnapshot(result).economy.foundationDone).toBe(false);
+    expect(result.victory.type).toBeNull();
+  });
+
   it('does not repeat victory awards after the player enters legacy mode', () => {
     const state = syncAmbitionMeta(createInitialState());
     const snapshot = getAmbitionSnapshot(state);
@@ -134,6 +162,7 @@ describe('ambition progress synchronization', () => {
     if (!meta) return;
     player(state).resources.gold = snapshot.economy.target;
     player(state).government.stability = 70;
+    establishEconomicFoundation(state);
     meta.economyTurns = snapshot.economy.needTurns;
     state.legacyMode = true;
 

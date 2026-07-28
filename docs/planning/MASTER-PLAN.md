@@ -1,5 +1,7 @@
 # Imperium Aeternum — 超级完善方案 v1.0（MASTER PLAN）
 
+> **历史规划说明（2026-07-28）**：本文记录 MVP 与早期扩展阶段，文中的测试数量、缺口表和文件位置可能已过时。当前正式版优先级请以 [`../maintenance/CURRENT-ROADMAP.md`](../maintenance/CURRENT-ROADMAP.md) 为准；已完成项目不要依据本文重复实现。
+
 > **唯一指挥棒**。本文档收敛 `06-expansion.md`（10 项 E 系列）+ `08-comprehensive-plan.md`（31 项 P 系列）+ 散落 ADR，统一为一条可追溯的执行线。
 > 任何后续改动必须能映射回本文档的某个工作包（WP），否则不予立项。
 >

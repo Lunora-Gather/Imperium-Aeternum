@@ -2,7 +2,8 @@ import { createInitialState, createWorldState } from '../src/engine/init';
 import { auditStateInvariants } from '../src/gameplay/stateInvariants';
 import { resolvePendingEventChoice } from '../src/gameplay/pendingEventResolution';
 import { advanceTurnPipeline, prepareGameState } from '../src/gameplay/turnPipeline';
-import type { GameState } from '../src/types/game';
+import { analyzeCampaignReports } from '../src/gameplay/campaignHealth';
+import type { GameState, TurnReport } from '../src/types/game';
 
 interface SimulationCase {
   id: string;
@@ -49,6 +50,7 @@ for (const simulation of cases) {
     const startedAt = performance.now();
     let completedTurns = 0;
     let firstVictory: { type: string; turn: number } | null = null;
+    const reports: TurnReport[] = [];
     for (; completedTurns < simulation.turns; completedTurns += 1) {
       // A stability run must cover the requested horizon. Record the first real
       // ending, then clear it only inside this synthetic stress harness.
@@ -56,7 +58,9 @@ for (const simulation of cases) {
         firstVictory ??= { type: state.victory.type, turn: state.turn };
         state = { ...state, victory: { type: null } };
       }
-      state = resolvePlayerQueue(advanceTurnPipeline(state).state);
+      const advanced = advanceTurnPipeline(state);
+      reports.push(advanced.report);
+      state = resolvePlayerQueue(advanced.state);
       const issues = auditStateInvariants(state);
       if (issues.length > 0) {
         throw new Error(`${simulation.id} 样本 ${sample + 1} 第 ${state.turn} 回合：${issues.map((issue) => `${issue.severity}/${issue.id} ${issue.detail}`).join('; ')}`);
@@ -75,6 +79,7 @@ for (const simulation of cases) {
       provinces: Object.keys(state.provinces).length,
       firstVictory,
       finalStateKiB: Math.round(JSON.stringify(state).length / 102.4) / 10,
+      campaignHealth: analyzeCampaignReports(reports),
     };
   }
 

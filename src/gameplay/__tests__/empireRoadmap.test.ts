@@ -8,7 +8,10 @@ import type { CommandCenterAction } from '../commandCenterActions';
 
 const ambition: AmbitionSnapshot = {
   conquest: { current: 2, target: 10, done: false },
-  economy: { current: 100, target: 2000, turns: 0, needTurns: 6, done: false },
+  economy: {
+    current: 100, target: 2000, turns: 0, needTurns: 6,
+    buildings: 0, buildingTarget: 2, tradeRoutes: 0, foundationDone: false, done: false,
+  },
   diplomacy: { influence: 180, influenceTarget: 200, goodRelations: 4, goodTarget: 5, done: false },
   eternal: { turns: 4, target: 80, done: false },
   worldScale: 'local',
@@ -55,7 +58,10 @@ describe('empire roadmap', () => {
     const state = createInitialState();
     const maxed: AmbitionSnapshot = {
       conquest: { current: 999, target: 1, done: true },
-      economy: { current: 9999, target: 1, turns: 99, needTurns: 1, done: true },
+      economy: {
+        current: 9999, target: 1, turns: 99, needTurns: 1,
+        buildings: 99, buildingTarget: 1, tradeRoutes: 1, foundationDone: true, done: true,
+      },
       diplomacy: { influence: 999, influenceTarget: 1, goodRelations: 99, goodTarget: 1, done: true },
       eternal: { turns: 999, target: 1, done: true },
       worldScale: 'world',

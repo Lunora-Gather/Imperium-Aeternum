@@ -88,7 +88,7 @@ function headline(tier: RoadmapTier): string {
 function routeFromAmbition(a: AmbitionSnapshot): VictoryRoute {
   const routes: VictoryRoute[] = [
     { id: 'conquest', label: '征服路线', progress: pct(a.conquest.current, a.conquest.target), tab: 'military', hint: `${a.conquest.current}/${a.conquest.target} 省，且安定需 ≥40` },
-    { id: 'economy', label: '富国路线', progress: Math.min(pct(a.economy.current, a.economy.target), pct(a.economy.turns, a.economy.needTurns)), tab: 'economy', hint: `国库 ${a.economy.current}/${a.economy.target}，连续 ${a.economy.turns}/${a.economy.needTurns} 年` },
+    { id: 'economy', label: '富国路线', progress: Math.min(pct(a.economy.current, a.economy.target), pct(a.economy.turns, a.economy.needTurns), a.economy.foundationDone ? 100 : 0), tab: 'economy', hint: a.economy.foundationDone ? `国库 ${a.economy.current}/${a.economy.target}，连续 ${a.economy.turns}/${a.economy.needTurns} 年` : `经济基础 ${a.economy.buildings}/${a.economy.buildingTarget} 建筑 · ${a.economy.tradeRoutes}/1 商路` },
     { id: 'diplomacy', label: '合纵路线', progress: Math.min(pct(a.diplomacy.influence, a.diplomacy.influenceTarget), pct(a.diplomacy.goodRelations, a.diplomacy.goodTarget)), tab: 'diplomacy', hint: `影响力 ${a.diplomacy.influence}/${a.diplomacy.influenceTarget}，高关系 ${a.diplomacy.goodRelations}/${a.diplomacy.goodTarget}` },
     { id: 'eternal', label: '永恒路线', progress: pct(a.eternal.turns, a.eternal.target), tab: 'dashboard', hint: `和平稳定 ${a.eternal.turns}/${a.eternal.target} 年` },
   ];

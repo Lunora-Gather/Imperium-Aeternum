@@ -5,7 +5,10 @@ import type { AmbitionSnapshot } from '../ambitions';
 
 const snapshot: AmbitionSnapshot = {
   conquest: { current: 4, target: 10, done: false },
-  economy: { current: 1500, target: 2000, turns: 4, needTurns: 6, done: false },
+  economy: {
+    current: 1500, target: 2000, turns: 4, needTurns: 6,
+    buildings: 3, buildingTarget: 3, tradeRoutes: 1, foundationDone: true, done: false,
+  },
   diplomacy: { influence: 180, influenceTarget: 200, goodRelations: 5, goodTarget: 5, done: false },
   eternal: { turns: 10, target: 80, done: false },
   worldScale: 'local',

@@ -37,7 +37,8 @@ export default function WorldMap() {
   const provs = Object.values(state.provinces);
   const [hover, setHover] = useState<string | null>(null);
   const [selected, setSelected] = useState<string | null>(null);
-  const [filter, setFilter] = useState<'all' | 'player' | 'neighbors'>('all');
+  const [filter, setFilter] = useState<'all' | 'player' | 'neighbors' | 'risk'>('all');
+  const [query, setQuery] = useState('');
 
   const bounds = useMemo(() => {
     if (provs.length === 0) return { minX: 0, minY: 0, maxX: 1000, maxY: 620 };
@@ -56,8 +57,13 @@ export default function WorldMap() {
   playerProvs.forEach((p) => p.adjacent.forEach((a) => playerNeighborIds.add(a)));
 
   const visible = provs.filter((p) => {
+    const owner = state.nations[p.ownerId];
+    const normalized = query.trim().toLocaleLowerCase();
+    const matchesQuery = !normalized || `${p.name} ${owner?.name ?? ''} ${terrainLabel(p.terrain)}`.toLocaleLowerCase().includes(normalized);
+    if (!matchesQuery) return false;
     if (filter === 'player') return p.ownerId === pid;
     if (filter === 'neighbors') return p.ownerId === pid || playerNeighborIds.has(p.id);
+    if (filter === 'risk') return p.ownerId === pid && (p.rebellionRisk >= 45 || p.unrest >= 40 || p.loyalty < 50);
     return true;
   });
   const visibleIds = new Set(visible.map((p) => p.id));
@@ -78,9 +84,11 @@ export default function WorldMap() {
           <p>羊皮战略图 · 点为省份，光晕为国土影响，线为道路/边境联系。</p>
         </div>
         <div className="ia-map-controls">
+          <input className="ia-input ia-map-search" value={query} onChange={(event) => setQuery(event.target.value)} aria-label="搜索地图" placeholder="搜索省份或国家" />
           <button className={filter === 'all' ? 'is-active' : ''} onClick={() => setFilter('all')}>全图</button>
           <button className={filter === 'player' ? 'is-active' : ''} onClick={() => setFilter('player')}>吾土</button>
           <button className={filter === 'neighbors' ? 'is-active' : ''} onClick={() => setFilter('neighbors')}>边境</button>
+          <button className={filter === 'risk' ? 'is-active' : ''} onClick={() => setFilter('risk')}>风险</button>
         </div>
       </header>
 
@@ -144,7 +152,7 @@ export default function WorldMap() {
                 const r = isCapital ? 8 : (p.population > 800 ? 5.6 : p.population > 420 ? 4.5 : 3.5);
                 const playerArmyHere = isPlayer ? player?.army.find((a) => a.location === p.id && a.size > 0) : null;
                 return (
-                  <g key={p.id} className="wm-province" onMouseEnter={() => setHover(p.id)} onMouseLeave={() => setHover(null)} onClick={() => { setSelected(p.id); if (isPlayer) { setPendingProvince(p.id); } }}>
+                  <g key={p.id} className="wm-province" role="button" tabIndex={0} aria-label={`${p.name} · ${state.nations[p.ownerId]?.name ?? '未知势力'}`} onMouseEnter={() => setHover(p.id)} onMouseLeave={() => setHover(null)} onFocus={() => setHover(p.id)} onBlur={() => setHover(null)} onClick={() => { setSelected(p.id); if (isPlayer) { setPendingProvince(p.id); } }} onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); setSelected(p.id); if (isPlayer) setPendingProvince(p.id); } }}>
                     <circle cx={p.x} cy={p.y} r={r + 4} fill="rgba(24,20,16,0.26)" />
                     {isCapital && <circle cx={p.x} cy={p.y} r={r + 7} fill="none" stroke={nationColor(p.ownerId, isPlayer)} strokeWidth={1.2} opacity="0.58" />}
                     {(isHover || isSelected) && <circle cx={p.x} cy={p.y} r={r + 9} fill="none" stroke="var(--gold)" strokeWidth={1.5} opacity="0.9" />}
@@ -205,8 +213,8 @@ export default function WorldMap() {
           ) : (
             <div className="ia-map-detail ia-map-detail--empty">
               <p className="ia-up">Map Guide</p>
-              <h3 className="ia-display">悬停省份查看详情</h3>
-              <p>金色外圈为吾土，大圆为首都。点击吾土省份可进入省份治理。</p>
+              <h3 className="ia-display">{visible.length === 0 ? '没有符合条件的省份' : '悬停省份查看详情'}</h3>
+              <p>{visible.length === 0 ? '清空搜索或切换地图筛选后继续。' : '金色外圈为吾土，大圆为首都。点击吾土省份可进入省份治理。'}</p>
             </div>
           )}
 

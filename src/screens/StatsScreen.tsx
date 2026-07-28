@@ -5,6 +5,7 @@ registerGovernanceTranslations();
 import { useGameStore } from '../store/gameStore';
 import { Panel, Tag } from '../components/ui';
 import { FACTIONS } from '../data/factions';
+import { analyzeCampaignReports } from '../gameplay/campaignHealth';
 
 function LineChart({ data, color, label, unit }: { data: { x: number; y: number }[]; color: string; label: string; unit: string }) {
   if (data.length < 2) return <Panel title={label}><p className="dim" style={{ padding: 8 }}>数据不足（需 ≥2 回合）</p></Panel>;
@@ -17,7 +18,7 @@ function LineChart({ data, color, label, unit }: { data: { x: number; y: number 
   const sy = (y: number) => H - PAD - ((y - yMin) / yRange) * (H - PAD * 2);
   const path = data.map((d, i) => `${i === 0 ? 'M' : 'L'} ${sx(d.x).toFixed(1)} ${sy(d.y).toFixed(1)}`).join(' ');
   const zeroY = sy(0);
-  return <Panel title={label}><svg width={W} height={H} style={{ display: 'block', overflow: 'visible' }}><line x1={PAD} y1={zeroY} x2={W - PAD} y2={zeroY} stroke="var(--border)" strokeWidth={0.5} strokeDasharray="3 3" /><path d={path} fill="none" stroke={color} strokeWidth={1.8} strokeLinejoin="round" strokeLinecap="round" />{data.map((d, i) => <circle key={i} cx={sx(d.x)} cy={sy(d.y)} r={2.5} fill={color} />)}<text x={PAD} y={H - 6} fontSize={9} fill="var(--text-dim)" textAnchor="start">回合 {xMin}</text><text x={W - PAD} y={H - 6} fontSize={9} fill="var(--text-dim)" textAnchor="end">回合 {xMax}</text><text x={4} y={PAD + 4} fontSize={9} fill="var(--text-dim)" textAnchor="start">{yMax.toFixed(0)}{unit}</text><text x={4} y={H - PAD} fontSize={9} fill="var(--text-dim)" textAnchor="start">{yMin.toFixed(0)}{unit}</text></svg></Panel>;
+  return <Panel title={label}><svg viewBox={`0 0 ${W} ${H}`} width="100%" role="img" aria-label={label} style={{ display: 'block', overflow: 'visible', maxWidth: W, height: 'auto' }}><line x1={PAD} y1={zeroY} x2={W - PAD} y2={zeroY} stroke="var(--border)" strokeWidth={0.5} strokeDasharray="3 3" /><path d={path} fill="none" stroke={color} strokeWidth={1.8} strokeLinejoin="round" strokeLinecap="round" />{data.map((d, i) => <circle key={i} cx={sx(d.x)} cy={sy(d.y)} r={2.5} fill={color} />)}<text x={PAD} y={H - 6} fontSize={9} fill="var(--text-dim)" textAnchor="start">回合 {xMin}</text><text x={W - PAD} y={H - 6} fontSize={9} fill="var(--text-dim)" textAnchor="end">回合 {xMax}</text><text x={4} y={PAD + 4} fontSize={9} fill="var(--text-dim)" textAnchor="start">{yMax.toFixed(0)}{unit}</text><text x={4} y={H - PAD} fontSize={9} fill="var(--text-dim)" textAnchor="start">{yMin.toFixed(0)}{unit}</text></svg></Panel>;
 }
 
 function avg(v: number[]) { return v.length ? v.reduce((s, x) => s + x, 0) / v.length : 0; }
@@ -62,6 +63,7 @@ export default function StatsScreen() {
   const factionPts = hasFactions ? factions.map((f, i) => { const angle = (i / factions.length) * Math.PI * 2 - Math.PI / 2; const r = (f.satisfaction / 100) * FR; return { x: FCX + Math.cos(angle) * r, y: FCY + Math.sin(angle) * r, label: FACTIONS[f.id]?.name ?? f.id, sat: f.satisfaction }; }) : [];
   const radarPath = factionPts.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x.toFixed(1)} ${p.y.toFixed(1)}`).join(' ') + ' Z';
   const maxArmy = Math.max(playerArmy, topArmy || 1, 1);
+  const campaignHealth = analyzeCampaignReports(history);
 
   return localizeReactTree(<div className="ia-screen-stack">
     <Panel title="大局诊断" accent>
@@ -70,7 +72,20 @@ export default function StatsScreen() {
       </div>
     </Panel>
 
-    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(520px, 1fr))', gap: 'var(--space-4)' }}>
+    <Panel title={`长局体检 · 近 ${campaignHealth.horizon} 回合`} accent actions={<Tag text={`${campaignHealth.score} 分`} tone={campaignHealth.tone} />}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: 8, marginBottom: 10 }}>
+        <HealthMetric label="平均净收入" value={campaignHealth.averageNetIncome} tone={campaignHealth.averageNetIncome < 0 ? 'danger' : 'good'} />
+        <HealthMetric label="赤字回合" value={`${campaignHealth.negativeIncomeTurns}/${campaignHealth.horizon}`} tone={campaignHealth.negativeIncomeTurns > campaignHealth.horizon / 2 ? 'danger' : 'info'} />
+        <HealthMetric label="缺粮回合" value={`${campaignHealth.foodDeficitTurns}/${campaignHealth.horizon}`} tone={campaignHealth.foodDeficitTurns > campaignHealth.horizon / 2 ? 'danger' : 'info'} />
+        <HealthMetric label="厌战峰值" value={campaignHealth.maxWarExhaustion} tone={campaignHealth.maxWarExhaustion >= 75 ? 'danger' : campaignHealth.maxWarExhaustion >= 55 ? 'warn' : 'good'} />
+      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))', gap: 8 }}>
+        {campaignHealth.findings.map((finding) => <Guide key={finding.id} title={finding.title} body={finding.detail} tone={finding.tone} />)}
+      </div>
+      <p className="dim" style={{ fontSize: 10, margin: '9px 0 0' }}>体检只分析已保存的近期年报，用来发现连续赤字、缺粮、战争过载和反馈密度；它不能替代真人对“是否有趣”的判断。</p>
+    </Panel>
+
+    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 520px), 1fr))', gap: 'var(--space-4)', minWidth: 0 }}>
       <LineChart data={goldData} color="var(--gold)" label="国库净收入（金/年）" unit="" />
       <LineChart data={foodData} color="var(--food)" label="粮食变化（粮/年）" unit="" />
       <LineChart data={popData} color="var(--text-soft)" label="人口变化（人/年）" unit="" />
@@ -88,6 +103,9 @@ export default function StatsScreen() {
 
 function Guide({ title, body, tone }: { title: string; body: string; tone: 'danger' | 'warn' | 'good' | 'info' }) {
   return <div className="ia-card" style={{ padding: 10, borderLeft: `3px solid var(--${tone === 'danger' ? 'war' : tone === 'warn' ? 'warn' : tone === 'good' ? 'good' : 'border'})` }}><div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}><strong style={{ fontSize: 13 }}>{title}</strong><Tag text={tone === 'danger' ? '紧急' : tone === 'warn' ? '注意' : tone === 'good' ? '良好' : '建议'} tone={tone} /></div><div style={{ fontSize: 11, color: 'var(--text-dim)', lineHeight: 1.5 }}>{body}</div></div>;
+}
+function HealthMetric({ label, value, tone }: { label: string; value: string | number; tone: 'danger' | 'warn' | 'good' | 'info' }) {
+  return <div className="ia-card" style={{ padding: 9 }}><Tag text={label} tone={tone} /><div className="ia-num" style={{ marginTop: 7, fontSize: 19 }}>{value}</div></div>;
 }
 function ArmyRow({ name, value, max, color }: { name: string; value: number; max: number; color: string }) {
   return <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}><span style={{ width: 80, fontSize: 11, color }}>{name}</span><div style={{ flex: 1, height: 14, background: 'var(--bg-inset)', borderRadius: 3, overflow: 'hidden' }}><div style={{ width: `${(value / max) * 100}%`, height: '100%', background: color }} /></div><span className="ia-num" style={{ fontSize: 11, color: 'var(--text-soft)', width: 40 }}>{value}</span></div>;

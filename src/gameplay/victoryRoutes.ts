@@ -65,6 +65,9 @@ export function buildVictoryRoutes(state: GameState, snapshot: AmbitionSnapshot 
   const conquestWarning = !stable ? '征服胜利需要安定 ≥40' : undefined;
   const diplomacyWarning = atWar ? '合纵胜利需要先结束战争' : undefined;
   const economyWarning = player && player.government.stability < 40 ? '富国路线需要稳定政局维持连续年数' : undefined;
+  const economyFoundationWarning = !snapshot.economy.foundationDone
+    ? `富国路线需要至少 ${snapshot.economy.buildingTarget} 座建筑和 1 条商路`
+    : economyWarning;
   const eternalWarning = atWar ? '永恒路线需要和平稳定年数' : player && player.government.legitimacy < 35 ? '永恒路线需要维持法统' : undefined;
 
   const routes: VictoryRouteCard[] = [
@@ -84,13 +87,13 @@ export function buildVictoryRoutes(state: GameState, snapshot: AmbitionSnapshot 
       id: 'economy',
       label: '富国路线',
       tab: 'economy',
-      progress: Math.min(pct(snapshot.economy.current, snapshot.economy.target), pct(snapshot.economy.turns, snapshot.economy.needTurns)),
+      progress: Math.min(pct(snapshot.economy.current, snapshot.economy.target), pct(snapshot.economy.turns, snapshot.economy.needTurns), snapshot.economy.foundationDone ? 100 : 0),
       done: snapshot.economy.done,
       current: `${snapshot.economy.current} 金 · ${snapshot.economy.turns} 年`,
       target: `${snapshot.economy.target} 金 · ${snapshot.economy.needTurns} 年`,
-      next: '提高净收入，连续多年维持国库与稳定。',
-      warning: economyWarning,
-      tone: tone(Math.min(pct(snapshot.economy.current, snapshot.economy.target), pct(snapshot.economy.turns, snapshot.economy.needTurns)), snapshot.economy.done, economyWarning),
+      next: snapshot.economy.foundationDone ? '提高净收入，连续多年维持国库与稳定。' : `先建设 ${snapshot.economy.buildingTarget} 座建筑并建立至少 1 条商路。`,
+      warning: economyFoundationWarning,
+      tone: tone(Math.min(pct(snapshot.economy.current, snapshot.economy.target), pct(snapshot.economy.turns, snapshot.economy.needTurns), snapshot.economy.foundationDone ? 100 : 0), snapshot.economy.done, economyFoundationWarning),
     },
     {
       id: 'diplomacy',
