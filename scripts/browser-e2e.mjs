@@ -200,7 +200,11 @@ function accessibilityAudit() {
       .map((item) => item.outerHTML.slice(0, 120));
     const ids = [...document.querySelectorAll('[id]')].map((item) => item.id);
     const duplicateIds = [...new Set(ids.filter((id, index) => ids.indexOf(id) !== index))];
-    return { unnamedButtons, unnamedFields, unnamedProgress, duplicateIds, nestedMain: document.querySelectorAll('main main').length };
+    const visualProgressWithoutSemantics = [...document.querySelectorAll('.ia-goal-line > i, .ia-purpose-progress > i')]
+      .filter(visible)
+      .filter((item) => item.getAttribute('role') !== 'progressbar')
+      .map((item) => item.outerHTML.slice(0, 120));
+    return { unnamedButtons, unnamedFields, unnamedProgress, visualProgressWithoutSemantics, duplicateIds, nestedMain: document.querySelectorAll('main main').length, mainCount: document.querySelectorAll('main').length };
   })()`;
 }
 
@@ -242,6 +246,7 @@ try {
   assert(launchAccessibility.unnamedButtons.length === 0, `Campaign lobby has unnamed controls: ${JSON.stringify(launchAccessibility.unnamedButtons)}`);
   assert(launchAccessibility.unnamedFields.length === 0, `Campaign lobby has unnamed fields: ${JSON.stringify(launchAccessibility.unnamedFields)}`);
   assert(launchAccessibility.duplicateIds.length === 0, `Campaign lobby has duplicate IDs: ${JSON.stringify(launchAccessibility.duplicateIds)}`);
+  assert(launchAccessibility.mainCount === 1, `Campaign lobby should expose exactly one main landmark, found ${launchAccessibility.mainCount}`);
   assert(await cdp.evaluate(`document.querySelector('#scenario-library')?.hidden === true`), 'Full campaign library should be collapsed on initial entry');
   assert(await cdp.evaluate(clickButton('查看全部剧本')), 'Campaign library toggle was not found');
   await cdp.waitFor(`document.querySelector('#scenario-library')?.hidden === false`, 'Campaign library did not expand');
@@ -267,6 +272,7 @@ try {
     assert(accessibility.unnamedButtons.length === 0, `Screen ${tabId} has unnamed controls: ${JSON.stringify(accessibility.unnamedButtons)}`);
     assert(accessibility.unnamedFields.length === 0, `Screen ${tabId} has unnamed fields: ${JSON.stringify(accessibility.unnamedFields)}`);
     assert(accessibility.unnamedProgress.length === 0, `Screen ${tabId} has unnamed progress indicators: ${JSON.stringify(accessibility.unnamedProgress)}`);
+    assert(accessibility.visualProgressWithoutSemantics.length === 0, `Screen ${tabId} has visual progress without semantics: ${JSON.stringify(accessibility.visualProgressWithoutSemantics)}`);
     assert(accessibility.duplicateIds.length === 0, `Screen ${tabId} has duplicate IDs: ${JSON.stringify(accessibility.duplicateIds)}`);
     assert(accessibility.nestedMain === 0, `Screen ${tabId} contains nested main landmarks`);
   }
@@ -298,10 +304,12 @@ try {
   const mobile = await cdp.evaluate(`(() => ({
     statusHidden: getComputedStyle(document.querySelector('.ia-status-panel')).display === 'none',
     briefTop: document.querySelector('.ia-dash-priority-grid').getBoundingClientRect().top,
+    minTabHeight: Math.min(...[...document.querySelectorAll('[data-navigation-tab]')].map((item) => item.getBoundingClientRect().height)),
     viewportHeight: innerHeight,
   }))()`);
   assert(mobile.statusHidden, 'Secondary status cards should be hidden on a 390px viewport');
   assert(mobile.briefTop < mobile.viewportHeight, `Turn brief begins below the mobile fold (${mobile.briefTop}px)`);
+  assert(mobile.minTabHeight >= 32, `Mobile navigation touch target is too short (${mobile.minTabHeight}px)`);
   assert(await cdp.evaluate(clickButton('全部页面')), 'Mobile page directory trigger was not found');
   await cdp.waitFor(`!!document.querySelector('#mobile-page-navigation')`, 'Mobile page directory did not open');
   assert(await cdp.evaluate(`document.querySelector('#mobile-page-navigation')?.contains(document.activeElement) === true`), 'Mobile page directory did not receive keyboard focus');

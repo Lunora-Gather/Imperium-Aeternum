@@ -106,7 +106,7 @@ function ReadinessPanel({ report, system, jumpToTab }: { report: ReadinessReport
   const devWarn = report.devChecks.length;
   return <section className="ia-dash-section" style={{ borderColor: report.tone === 'danger' ? 'var(--war)' : report.tone === 'warn' ? 'var(--warn)' : 'var(--border)' }}>
     <header><div><small>Pre-turn</small><h3>{t('下一回合前检查')}</h3></div><Tag text={`${t(report.label)} ${report.score}`} tone={tagTone(report.tone)} /></header>
-    <div className="ia-goal-line" style={{ marginBottom: 8 }}><div><span>{t('综合健康度')}</span><strong>{report.score}/100</strong></div><i><b style={{ width: `${report.score}%` }} /></i><em>{t(report.canAdvance ? '没有硬性阻断，仍建议先处理红黄项' : '存在高危项，推进前请先处理')}</em></div>
+    <div className="ia-goal-line" style={{ marginBottom: 8 }}><div><span>{t('综合健康度')}</span><strong>{report.score}/100</strong></div><i role="progressbar" aria-label={t('综合健康度')} aria-valuemin={0} aria-valuemax={100} aria-valuenow={report.score}><b style={{ width: `${report.score}%` }} /></i><em>{t(report.canAdvance ? '没有硬性阻断，仍建议先处理红黄项' : '存在高危项，推进前请先处理')}</em></div>
     <div className="ia-action-list">{visible.length === 0 ? <div className="ia-risk-empty">{t('暂无阻断项，可以稳步推进。')}</div> : visible.map((item) => <ReadinessButton key={item.id} item={item} jumpToTab={jumpToTab} />)}</div>
     <div className="ia-dash-note" style={{ marginTop: 8 }}>
       <span className={system.tone}>{t('系统体检')} {system.buildMark}</span>

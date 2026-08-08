@@ -32,9 +32,13 @@ function tone(level: number, danger = false): CommandActionTone {
   return 'normal';
 }
 
+function actionKey(item: CommandCenterAction): string { return `${item.id}|${item.tab}`; }
+function semanticKey(item: CommandCenterAction): string { return `${item.tab}|${item.label.trim()}|${item.desc.trim()}`; }
+
 function pushUnique(out: CommandCenterAction[], item: CommandCenterAction): void {
-  const key = `${item.id}|${item.tab}`;
-  if (out.some((x) => `${x.id}|${x.tab}` === key)) return;
+  const key = actionKey(item);
+  const meaning = semanticKey(item);
+  if (out.some((x) => actionKey(x) === key || semanticKey(x) === meaning)) return;
   out.push(item);
 }
 
@@ -82,12 +86,15 @@ export function arrangeCommandCenterActions(actions: CommandCenterAction[], limi
   const sorted = [...actions].sort((a, b) => b.level - a.level);
   const selected: CommandCenterAction[] = [];
   const selectedKeys = new Set<string>();
+  const selectedSemanticKeys = new Set<string>();
   const selectedTabs = new Set<NavigationTab>();
   const add = (item: CommandCenterAction) => {
-    const key = `${item.id}|${item.tab}`;
-    if (selected.length >= limit || selectedKeys.has(key)) return;
+    const key = actionKey(item);
+    const meaning = semanticKey(item);
+    if (selected.length >= limit || selectedKeys.has(key) || selectedSemanticKeys.has(meaning)) return;
     selected.push(item);
     selectedKeys.add(key);
+    selectedSemanticKeys.add(meaning);
     selectedTabs.add(item.tab);
   };
 

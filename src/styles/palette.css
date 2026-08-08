@@ -711,6 +711,7 @@ body > div[style*="position:fixed"][style*="right:8px"] {
   }
 
   .ia-tab-btn {
+    min-height: 36px !important;
     scroll-snap-align: center;
   }
 }

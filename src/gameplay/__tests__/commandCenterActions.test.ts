@@ -89,6 +89,17 @@ describe('command center actions', () => {
     expect(new Set(keys).size).toBe(keys.length);
   });
 
+  it('deduplicates semantically identical advice emitted by different sources', () => {
+    const arranged = arrangeCommandCenterActions([
+      { ...action('strategy-threat', 'diplomacy', 84, 'warn'), label: '外部威胁', desc: '邻国正在觊觎我国。', source: 'strategy' },
+      { ...action('ready-threat', 'diplomacy', 78, 'warn'), label: '外部威胁', desc: '邻国正在觊觎我国。', source: 'readiness' },
+      action('province-growth', 'province', 30),
+    ], 3);
+
+    expect(arranged.filter((item) => item.label === '外部威胁')).toHaveLength(1);
+    expect(arranged).toHaveLength(2);
+  });
+
   it('can reuse precomputed diagnostics and report actions', () => {
     const state = createInitialState();
     const readiness = buildReadinessReport(state);
