@@ -7,14 +7,19 @@ import net from 'node:net';
 
 const HOST = '127.0.0.1';
 const APP_PORT = 4179;
-const APP_URL = `http://${HOST}:${APP_PORT}/`;
+const requestedAppUrl = process.env.E2E_URL?.trim();
+const APP_URL = requestedAppUrl ? new URL(requestedAppUrl.endsWith('/') ? requestedAppUrl : `${requestedAppUrl}/`).href : `http://${HOST}:${APP_PORT}/`;
+const useLocalServer = !requestedAppUrl;
 const isWindows = process.platform === 'win32';
+
+assert(['http:', 'https:'].includes(new URL(APP_URL).protocol), `Unsupported E2E URL protocol: ${APP_URL}`);
 
 function assert(value, message) {
   if (!value) throw new Error(message);
 }
 
 async function stopChild(child) {
+  if (!child) return;
   if (child.exitCode !== null || child.signalCode !== null) return;
   const exited = new Promise((resolve) => child.once('exit', resolve));
   child.kill();
@@ -214,7 +219,7 @@ assert(chromePath, 'Chrome or Edge is required for browser E2E');
 const userDataDir = await mkdtemp(join(tmpdir(), 'imperium-e2e-'));
 const debugPort = await freePort();
 const viteEntry = join(process.cwd(), 'node_modules/vite/bin/vite.js');
-const server = spawn(process.execPath, [viteEntry, '--host', HOST, '--port', String(APP_PORT), '--strictPort'], { stdio: ['ignore', 'pipe', 'pipe'] });
+const server = useLocalServer ? spawn(process.execPath, [viteEntry, '--host', HOST, '--port', String(APP_PORT), '--strictPort'], { stdio: ['ignore', 'pipe', 'pipe'] }) : null;
 const chrome = spawn(chromePath, [
   '--headless=new',
   `--remote-debugging-port=${debugPort}`,
@@ -328,7 +333,7 @@ try {
   assert(mobileMilitary.minGap >= 8, `Mobile military cards have collapsed spacing (${mobileMilitary.minGap}px)`);
   assert(mobileMilitary.scrollWidth <= mobileMilitary.clientWidth + 1, `Mobile military screen overflows horizontally (${mobileMilitary.scrollWidth}px > ${mobileMilitary.clientWidth}px)`);
 
-  console.log('Browser E2E passed: launch disclosure, start, turn advance, save/load, campaign health, search, modal focus, accessibility, screen spacing, horizontal fit, single brief, mobile fold.');
+  console.log(`Browser E2E passed (${useLocalServer ? 'local' : APP_URL}): launch disclosure, start, turn advance, save/load, campaign health, search, modal focus, accessibility, screen spacing, horizontal fit, single brief, mobile fold.`);
 } finally {
   cdp?.close();
   await stopChild(chrome);

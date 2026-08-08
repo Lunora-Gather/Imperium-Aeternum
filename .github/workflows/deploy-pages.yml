@@ -68,3 +68,8 @@ jobs:
 
       - name: Verify public deployment
         run: node scripts/verify-production.mjs "${{ steps.deployment.outputs.page_url }}"
+
+      - name: Browser smoke test public deployment
+        env:
+          E2E_URL: ${{ steps.deployment.outputs.page_url }}
+        run: npm run test:e2e
