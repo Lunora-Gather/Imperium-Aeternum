@@ -95,8 +95,12 @@ jobs:
         run: npx vitest run src/engine/__tests__/longRunSimulation.test.ts
       - name: Full regression suite
         run: npm run test
-      - name: Browser gameplay smoke test
-        run: npm run test:e2e
+      - name: Install WebKit for gameplay tests
+        run: npx --no-install playwright-core install --with-deps webkit
+      - name: Browser gameplay smoke test (WebKit)
+        run: npm run test:e2e:webkit
+      - name: Browser gameplay smoke test (Chromium)
+        run: npm run test:e2e -- --chromium
       - name: Data and scenario validation
         run: npm run validate
       - name: Shared-world engine parity

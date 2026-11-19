@@ -29,7 +29,9 @@
     "validate": "tsx src/data/__validate__.ts",
     "export-data": "tsx scripts/export-data.ts",
     "build:shared-world-engine": "esbuild scripts/shared-world-engine-entry.ts --bundle --platform=node --format=esm --target=node22 --outfile=functions/shared-world-gateway/src/generated/engine-bundle.js",
-    "check:shared-world-engine": "tsx scripts/check-shared-world-engine.ts"
+    "check:shared-world-engine": "tsx scripts/check-shared-world-engine.ts",
+    "test:e2e:safari": "node scripts/browser-e2e.mjs --safari",
+    "test:e2e:webkit": "node scripts/browser-e2e.mjs --webkit"
   },
   "dependencies": {
     "appwrite": "^26.2.0",
@@ -48,6 +50,8 @@
     "tsx": "^4.16.2",
     "typescript": "^5.5.3",
     "vite": "^8.1.0",
-    "vitest": "^4.1.9"
+    "vitest": "^4.1.9",
+    "playwright-core": "1.65.1",
+    "selenium-webdriver": "4.35.0"
   }
 }
