@@ -15,7 +15,7 @@ concurrency:
 jobs:
   verify:
     name: Typecheck, targeted tests, validation and Pages build
-    runs-on: ubuntu-latest
+    runs-on: macos-latest
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
@@ -95,12 +95,8 @@ jobs:
         run: npx vitest run src/engine/__tests__/longRunSimulation.test.ts
       - name: Full regression suite
         run: npm run test
-      - name: Install WebKit for gameplay tests
-        run: npx --no-install playwright-core install --with-deps webkit
-      - name: Browser gameplay smoke test (WebKit)
-        run: npm run test:e2e:webkit
-      - name: Browser gameplay smoke test (Chromium)
-        run: npm run test:e2e -- --chromium
+      - run: sudo safaridriver --enable
+      - run: npm run test:e2e
       - name: Data and scenario validation
         run: npm run validate
       - name: Shared-world engine parity

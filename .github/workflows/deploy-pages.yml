@@ -18,7 +18,7 @@ concurrency:
 jobs:
   build:
     name: Build stable release
-    runs-on: ubuntu-latest
+    runs-on: macos-latest
     steps:
       - name: Checkout current ref
         uses: actions/checkout@v7
@@ -37,12 +37,8 @@ jobs:
           VITE_BASE: /Imperium-Aeternum/
         run: npm run rc:check
 
-      - name: Install WebKit for gameplay tests
-        run: npx --no-install playwright-core install --with-deps webkit
-      - name: Browser gameplay smoke test (WebKit)
-        run: npm run test:e2e:webkit
-      - name: Browser gameplay smoke test (Chromium)
-        run: npm run test:e2e -- --chromium
+      - run: sudo safaridriver --enable
+      - run: npm run test:e2e
 
       - name: Copy SPA fallback
         run: cp dist/index.html dist/404.html
@@ -58,7 +54,7 @@ jobs:
   deploy:
     name: Deploy to GitHub Pages
     needs: build
-    runs-on: ubuntu-latest
+    runs-on: macos-latest
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
@@ -73,7 +69,12 @@ jobs:
       - name: Verify public deployment
         run: node scripts/verify-production.mjs "${{ steps.deployment.outputs.page_url }}"
 
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+      - run: npm ci
+      - run: sudo safaridriver --enable
       - name: Browser smoke test public deployment
         env:
           E2E_URL: ${{ steps.deployment.outputs.page_url }}
-        run: npm run test:e2e -- --chromium
+        run: npm run test:e2e

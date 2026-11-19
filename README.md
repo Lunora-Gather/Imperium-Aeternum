@@ -125,12 +125,6 @@ npm run pages:build        # GitHub Pages 兼容构建
 
 如果开启权限后仍在创建会话时超时，可保存手头的页面，正常退出 Safari，再运行测试，让驱动启动 Safari。
 
-其他平台默认使用 WebKit。在 Mac 上也可用 WebKit 在后台运行同一套检查。首次使用前安装引擎。要复跑 Chromium 兼容性检查，可执行 `npm run test:e2e -- --chromium`。
-
-```bash
-npx playwright-core install webkit
-npm run test:e2e:webkit
-```
 
 合并或发布前只需运行统一门禁：
 

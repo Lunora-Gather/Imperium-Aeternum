@@ -1,7 +1,5 @@
 import { spawn } from 'node:child_process';
-import { existsSync } from 'node:fs';
-import { mkdtemp, rm } from 'node:fs/promises';
-import { tmpdir } from 'node:os';
+import { launchSafari } from './lib/safari-e2e.mjs';
 import { join } from 'node:path';
 import net from 'node:net';
 
@@ -10,7 +8,7 @@ const requestedAppUrl = process.env.E2E_URL?.trim();
 const APP_PORT = requestedAppUrl ? undefined : await freePort();
 const APP_URL = requestedAppUrl ? new URL(requestedAppUrl.endsWith('/') ? requestedAppUrl : `${requestedAppUrl}/`).href : `http://${HOST}:${APP_PORT}/`;
 const useLocalServer = !requestedAppUrl;
-const isWindows = process.platform === 'win32';
+
 
 assert(['http:', 'https:'].includes(new URL(APP_URL).protocol), `Unsupported E2E URL protocol: ${APP_URL}`);
 
@@ -26,18 +24,6 @@ async function stopChild(child) {
   await Promise.race([exited, new Promise((resolve) => setTimeout(resolve, 2_000))]);
 }
 
-async function removeTempDir(path) {
-  for (let attempt = 0; attempt < 5; attempt += 1) {
-    try {
-      await rm(path, { recursive: true, force: true, maxRetries: 2, retryDelay: 100 });
-      return;
-    } catch (error) {
-      if (attempt === 4) throw error;
-      await new Promise((resolve) => setTimeout(resolve, 250));
-    }
-  }
-}
-
 function freePort() {
   return new Promise((resolve, reject) => {
     const server = net.createServer();
@@ -48,21 +34,6 @@ function freePort() {
       server.close(() => resolve(port));
     });
   });
-}
-
-function chromeExecutable() {
-  const candidates = [
-    process.env.CHROME_BIN,
-    process.platform === 'darwin' ? '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome' : undefined,
-    isWindows ? join(process.env.ProgramFiles ?? '', 'Google/Chrome/Application/chrome.exe') : undefined,
-    isWindows ? join(process.env['ProgramFiles(x86)'] ?? '', 'Microsoft/Edge/Application/msedge.exe') : undefined,
-    isWindows ? join(process.env.ProgramFiles ?? '', 'Microsoft/Edge/Application/msedge.exe') : undefined,
-    '/usr/bin/google-chrome',
-    '/usr/bin/google-chrome-stable',
-    '/usr/bin/chromium',
-    '/usr/bin/chromium-browser',
-  ].filter(Boolean);
-  return candidates.find((candidate) => existsSync(candidate));
 }
 
 async function waitForHttp(url, timeoutMs = 30_000) {
@@ -77,124 +48,6 @@ async function waitForHttp(url, timeoutMs = 30_000) {
     await new Promise((resolve) => setTimeout(resolve, 150));
   }
   throw new Error(`Timed out waiting for ${url}`);
-}
-
-async function waitForJson(url, timeoutMs = 15_000) {
-  const until = Date.now() + timeoutMs;
-  while (Date.now() < until) {
-    try {
-      const response = await fetch(url);
-      if (response.ok) return response.json();
-    } catch {
-      // Browser is still starting.
-    }
-    await new Promise((resolve) => setTimeout(resolve, 100));
-  }
-  throw new Error(`Timed out waiting for browser endpoint ${url}`);
-}
-
-function createCdp(webSocketUrl) {
-  const socket = new WebSocket(webSocketUrl);
-  const pending = new Map();
-  const runtimeErrors = [];
-  let nextId = 0;
-
-  socket.addEventListener('message', (event) => {
-    const message = JSON.parse(String(event.data));
-    if (message.method === 'Runtime.exceptionThrown') {
-      const details = message.params.exceptionDetails;
-      runtimeErrors.push(details.exception?.description ?? details.text);
-    }
-    if (!message.id) return;
-    const request = pending.get(message.id);
-    if (!request) return;
-    pending.delete(message.id);
-    if (message.error) request.reject(new Error(message.error.message));
-    else request.resolve(message.result);
-  });
-
-  const ready = new Promise((resolve, reject) => {
-    socket.addEventListener('open', resolve, { once: true });
-    socket.addEventListener('error', () => reject(new Error('Chrome DevTools WebSocket failed')), { once: true });
-  });
-
-  async function send(method, params = {}) {
-    await ready;
-    const id = ++nextId;
-    const response = new Promise((resolve, reject) => pending.set(id, { resolve, reject }));
-    socket.send(JSON.stringify({ id, method, params }));
-    return response;
-  }
-
-  async function evaluate(expression) {
-    const result = await send('Runtime.evaluate', { expression, awaitPromise: true, returnByValue: true });
-    if (result.exceptionDetails) throw new Error(result.exceptionDetails.exception?.description ?? result.exceptionDetails.text);
-    return result.result?.value;
-  }
-
-  return {
-    evaluate,
-    runtimeErrors,
-    enable: () => Promise.all([send('Page.enable'), send('Runtime.enable')]),
-    navigate: url => send('Page.navigate', { url }),
-    setMobileViewport: () => send('Emulation.setDeviceMetricsOverride', { width: 390, height: 844, deviceScaleFactor: 1, mobile: true }),
-    close: () => socket.close(),
-  };
-}
-
-async function launchChromium() {
-  const chromePath = chromeExecutable();
-  assert(chromePath, 'Chrome or Edge is required for the Chromium E2E run');
-  const debugPort = await freePort();
-  const userDataDir = await mkdtemp(join(tmpdir(), 'imperium-e2e-'));
-  const chrome = spawn(chromePath, [
-    '--headless=new',
-    `--remote-debugging-port=${debugPort}`,
-    `--user-data-dir=${userDataDir}`,
-    '--no-first-run',
-    '--no-default-browser-check',
-    '--disable-gpu',
-    '--no-sandbox',
-    'about:blank',
-  ], { stdio: 'ignore' });
-  let session;
-  async function close() {
-    session?.close();
-    await stopChild(chrome);
-    await removeTempDir(userDataDir);
-  }
-  try {
-    const pages = await waitForJson(`http://${HOST}:${debugPort}/json/list`);
-    const page = pages.find(item => item.type === 'page');
-    assert(page?.webSocketDebuggerUrl, 'No debuggable browser page was created');
-    session = createCdp(page.webSocketDebuggerUrl);
-    await session.enable();
-    return { ...session, close };
-  } catch (error) {
-    await close();
-    throw error;
-  }
-}
-
-async function launchWebKit() {
-  const { webkit } = await import('playwright-core');
-  const browser = await webkit.launch({ headless: true });
-  try {
-    const viewport = { width: 1280, height: 800 };
-    const page = await browser.newPage({ viewport });
-    const runtimeErrors = [];
-    page.on('pageerror', error => runtimeErrors.push(error.message));
-    return {
-      evaluate: expression => page.evaluate(expression),
-      runtimeErrors,
-      navigate: url => page.goto(url),
-      setMobileViewport: () => page.setViewportSize({ width: 390, height: 844 }),
-      close: () => browser.close(),
-    };
-  } catch (error) {
-    await browser.close();
-    throw error;
-  }
 }
 
 function withPageChecks(session) {
@@ -287,27 +140,15 @@ function accessibilityAudit() {
   })()`;
 }
 
-const [browserFlag, ...extraFlags] = process.argv.slice(2);
-assert(!extraFlags.length && [undefined, '--safari', '--webkit', '--chromium'].includes(browserFlag),
-  'Usage: node scripts/browser-e2e.mjs [--safari | --webkit | --chromium]');
-const defaultFlag = process.platform === 'darwin' ? '--safari' : '--webkit';
-const browserName = { '--safari': 'Safari', '--webkit': 'WebKit', '--chromium': 'Chromium' }[browserFlag ?? defaultFlag];
 const viteEntry = join(process.cwd(), 'node_modules/vite/bin/vite.js');
 const server = useLocalServer ? spawn(process.execPath, [viteEntry, '--host', HOST, '--port', String(APP_PORT), '--strictPort'], { stdio: ['ignore', 'pipe', 'pipe'] }) : null;
 let browser;
 try {
   await waitForHttp(APP_URL);
-  if (browserName === 'Safari') {
-    const { launchSafari } = await import('./lib/safari-e2e.mjs');
-    browser = withPageChecks(await launchSafari());
-  } else {
-    browser = withPageChecks(await (browserName === 'WebKit' ? launchWebKit() : launchChromium()));
-  }
+  browser = withPageChecks(await launchSafari());
   await browser.navigate(APP_URL);
   await browser.waitFor('document.readyState === "complete"', 'App did not finish loading');
   await browser.evaluate(`(() => { localStorage.clear(); localStorage.setItem('ia-tutorial-done', '1'); localStorage.setItem('ia-locale', 'zh-CN'); })()`);
-  // Keep navigation outside Runtime.evaluate. A fresh top-level navigation is
-  // more reliable than Page.reload across Chrome/Edge CDP implementations.
   await browser.navigate(`${APP_URL}?e2e=fresh`);
   await browser.waitFor(`document.body?.innerText.includes('开始推荐剧本')`, 'Campaign lobby did not load');
   const launchAccessibility = await browser.evaluate(accessibilityAudit());
@@ -396,7 +237,7 @@ try {
   assert(mobileMilitary.minGap >= 8, `Mobile military cards have collapsed spacing (${mobileMilitary.minGap}px)`);
   assert(mobileMilitary.scrollWidth <= mobileMilitary.clientWidth + 1, `Mobile military screen overflows horizontally (${mobileMilitary.scrollWidth}px > ${mobileMilitary.clientWidth}px)`);
 
-  console.log(`Browser E2E passed [${browserName}] (${useLocalServer ? 'local' : APP_URL}): launch disclosure, start, turn advance, save/load, campaign health, search, modal focus, accessibility, screen spacing, horizontal fit, single brief, mobile fold.`);
+  console.log(`Browser E2E passed [Safari] (${useLocalServer ? 'local' : APP_URL}): launch disclosure, start, turn advance, save/load, campaign health, search, modal focus, accessibility, screen spacing, horizontal fit, single brief, mobile fold.`);
 } finally {
   try { await browser?.close(); } finally { await stopChild(server); }
 }
