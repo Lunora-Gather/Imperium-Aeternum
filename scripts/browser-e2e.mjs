@@ -380,7 +380,7 @@ try {
   assert(mobile.minTabHeight >= 32, `Mobile navigation touch target is too short (${mobile.minTabHeight}px)`);
   assert(await browser.evaluate(clickButton('全部页面')), 'Mobile page directory trigger was not found');
   await browser.waitFor(`!!document.querySelector('#mobile-page-navigation')`, 'Mobile page directory did not open');
-  assert(await browser.evaluate(`document.querySelector('#mobile-page-navigation')?.contains(document.activeElement) === true`), 'Mobile page directory did not receive keyboard focus');
+  await browser.waitFor(`document.querySelector('#mobile-page-navigation')?.contains(document.activeElement) === true`, 'Mobile page directory did not receive keyboard focus');
   await browser.evaluate(`document.activeElement?.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))`);
   await browser.waitFor(`!document.querySelector('#mobile-page-navigation')`, 'Escape did not close the mobile page directory');
 
