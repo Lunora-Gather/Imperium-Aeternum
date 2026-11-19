@@ -37,8 +37,12 @@ jobs:
           VITE_BASE: /Imperium-Aeternum/
         run: npm run rc:check
 
-      - name: Browser gameplay smoke test
-        run: npm run test:e2e
+      - name: Install WebKit for gameplay tests
+        run: npx --no-install playwright-core install --with-deps webkit
+      - name: Browser gameplay smoke test (WebKit)
+        run: npm run test:e2e:webkit
+      - name: Browser gameplay smoke test (Chromium)
+        run: npm run test:e2e -- --chromium
 
       - name: Copy SPA fallback
         run: cp dist/index.html dist/404.html
@@ -72,4 +76,4 @@ jobs:
       - name: Browser smoke test public deployment
         env:
           E2E_URL: ${{ steps.deployment.outputs.page_url }}
-        run: npm run test:e2e
+        run: npm run test:e2e -- --chromium

@@ -121,6 +121,17 @@ npm run simulate:stability # 长局稳定性模拟
 npm run pages:build        # GitHub Pages 兼容构建
 ```
 
+在 Mac 上执行 `npm run test:e2e` 默认使用系统 Safari，也可用 `npm run test:e2e:safari` 明确指定。首次运行需在 Safari「设置 → 开发者」开启「允许远程自动化」。测试使用独立的自动化窗口，覆盖剧本启动、回合推进、存读档、键盘焦点和窄屏布局。
+
+如果开启权限后仍在创建会话时超时，可保存手头的页面，正常退出 Safari，再运行测试，让驱动启动 Safari。
+
+其他平台默认使用 WebKit。在 Mac 上也可用 WebKit 在后台运行同一套检查。首次使用前安装引擎。要复跑 Chromium 兼容性检查，可执行 `npm run test:e2e -- --chromium`。
+
+```bash
+npx playwright-core install webkit
+npm run test:e2e:webkit
+```
+
 合并或发布前只需运行统一门禁：
 
 ```bash
