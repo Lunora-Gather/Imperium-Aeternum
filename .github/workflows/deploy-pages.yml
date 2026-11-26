@@ -5,6 +5,14 @@ on:
     branches:
       - main
   workflow_dispatch:
+    inputs:
+      safari_runner:
+        description: macOS runner for the native Safari release checks
+        type: choice
+        default: macos-latest
+        options:
+          - macos-latest
+          - macos-15-intel
 
 permissions:
   contents: read
@@ -18,7 +26,7 @@ concurrency:
 jobs:
   build:
     name: Build stable release
-    runs-on: macos-latest
+    runs-on: ${{ inputs.safari_runner || 'macos-latest' }}
     outputs:
       files: ${{ steps.fingerprint.outputs.files }}
     steps:
@@ -63,7 +71,7 @@ jobs:
   deploy:
     name: Deploy to GitHub Pages
     needs: build
-    runs-on: macos-latest
+    runs-on: ${{ inputs.safari_runner || 'macos-latest' }}
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
