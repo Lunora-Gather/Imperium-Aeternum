@@ -62,11 +62,18 @@ export default function ScenarioSelect({ theme, applyTheme }: ThemeControls) {
     const id = focusAfterStep.current;
     if (!id) return;
     focusAfterStep.current = '';
-    const target = document.getElementById(id);
-    if (id === 'campaign-step-title') {
-      target?.focus({ preventScroll: true });
-      window.scrollTo(0, 0);
-    } else target?.focus();
+    // Wait for WebKit to lay out the new step after the roster is removed.
+    const frame = window.requestAnimationFrame(() => {
+      const target = document.getElementById(id);
+      if (!target) return;
+      if (id === 'campaign-step-title') window.scrollTo({ top: 0, behavior: 'instant' });
+      target.focus({ preventScroll: true });
+      const { top, bottom } = target.getBoundingClientRect();
+      if (top < 0 || bottom > window.innerHeight) {
+        target.scrollIntoView({ block: 'nearest', behavior: 'instant' });
+      }
+    });
+    return () => window.cancelAnimationFrame(frame);
   }, [selected, pickedNation]);
 
   const startPickedScenario = (id: ScenarioId, triggerId = '') => {

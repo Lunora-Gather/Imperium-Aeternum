@@ -123,7 +123,13 @@ function withPageChecks(session) {
       if (await evaluate(expression)) return;
       await new Promise((resolve) => setTimeout(resolve, 100));
     }
-    const page = await evaluate(`({ text: document.body?.innerText?.slice(0, 500) ?? '', visibility: document.visibilityState, readyState: document.readyState })`);
+    const page = await evaluate(`({
+      text: document.body?.innerText?.slice(0, 500) ?? '',
+      visibility: document.visibilityState, readyState: document.readyState,
+      focus: document.activeElement?.id || document.activeElement?.tagName,
+      headingTop: document.getElementById('campaign-step-title')?.getBoundingClientRect().top,
+      scrollY, innerHeight,
+    })`);
     const errors = runtimeErrors?.length ? `\nRuntime errors: ${JSON.stringify(runtimeErrors)}` : '';
     throw new Error(`${message}\nPage state: ${JSON.stringify(page)}${errors}`);
   }
@@ -524,7 +530,12 @@ try {
   await browser.evaluate(`(() => { const b = document.querySelector('#scenario-world'); b.scrollIntoView(); b.click(); })()`);
   const headingInView = `document.activeElement.id === 'campaign-step-title' && document.activeElement.getBoundingClientRect().top >= 0 && document.activeElement.getBoundingClientRect().top < innerHeight`;
   await browser.waitFor(headingInView, 'Selecting a world left the nation list below the mobile viewport');
-  assert(await browser.evaluate(clickButton('法兰克')), 'Could not select the last world nation');
+  assert(await browser.evaluate(`(() => {
+    const nation = document.getElementById('nation-n_we_frank');
+    nation?.scrollIntoView({ block: 'end', behavior: 'instant' });
+    nation?.click();
+    return !!nation;
+  })()`), 'Could not select the last world nation');
   await browser.waitFor(headingInView, 'Campaign confirmation did not move focus to its heading');
   assert(await browser.evaluate(clickButton('重选邦国')), 'Could not return to the world roster');
   await browser.waitFor(`document.activeElement.id === 'nation-n_we_frank'`, 'Reselect lost the previously chosen nation');
