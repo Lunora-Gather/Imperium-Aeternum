@@ -45,6 +45,7 @@ jobs:
       - name: Release candidate gate
         env:
           VITE_BASE: /Imperium-Aeternum/
+          VITEST_MAX_WORKERS: '2'
         run: npm run rc:check
 
       - run: sudo safaridriver --enable
