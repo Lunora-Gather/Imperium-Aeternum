@@ -1,3 +1,4 @@
+import { operatingNet } from './reportFinances';
 // V23 年报行动路由：复用统一 NavigationTab 合约，避免跳转目标字符串漂移。
 // 纯函数，供年报页、行动中心、未来快捷行动栏和测试复用。
 
@@ -59,9 +60,7 @@ export function buildTurnReportActions(state: GameState, context: TurnReportActi
   }
 
   const actions: TurnReportAction[] = [];
-  const income = r.income.tax + r.income.trade + r.income.building;
-  const expense = r.expense.military + r.expense.corruption;
-  const net = income - expense;
+  const net = operatingNet(r);
   const atWar = state.wars.some((w) => w.attackerId === pid || w.defenderId === pid);
   const pending = state.pendingEvents.some((p) => p.nationId === pid);
   const lostProvince = r.provinceChanges.some((pc) => pc.from === pid);

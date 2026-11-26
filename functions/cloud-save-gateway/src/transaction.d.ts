@@ -5,6 +5,6 @@ export function commitUploadedSave(
   slot: number,
   uploaded: { $id: string },
   metadata: Record<string, unknown>,
-  body: { force?: boolean },
+  body: { force?: boolean; baseHash?: string | null },
   access: string[],
 ): Promise<unknown>;

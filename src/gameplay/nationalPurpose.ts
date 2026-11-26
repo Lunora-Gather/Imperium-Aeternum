@@ -261,9 +261,13 @@ function pushStrategicNote(state: GameState, note: string): void {
 }
 
 export function applyNationalPurposeAfterTurn(state: GameState): { state: GameState; notes: string[] } {
-  const next = cloneGameState(initializeNationalPurpose(state));
+  return settleNationalPurpose(cloneGameState(state));
+}
+
+/** Mutates the private turn snapshot returned by processTurn. */
+export function settleNationalPurpose(next: GameState): { state: GameState; notes: string[] } {
   const notes: string[] = [];
-  const meta = next.nationalMission as NationalMissionMeta;
+  const meta = next.nationalMission ??= makeMissionMeta(next);
   const mission = getNationalMissionView(next);
 
   if (meta.lastEvaluatedTurn !== next.turn) {
@@ -286,7 +290,8 @@ export function applyNationalPurposeAfterTurn(state: GameState): { state: GameSt
     meta.lastEvaluatedTurn = next.turn;
   }
 
-  const highest = crisisCandidates(next)[0];
+  const candidates = crisisCandidates(next);
+  const highest = candidates[0];
   const active = next.nationalCrisis;
   if (!active && highest && highest.pressure >= 60) {
     next.nationalCrisis = {
@@ -304,7 +309,7 @@ export function applyNationalPurposeAfterTurn(state: GameState): { state: GameSt
     pushStrategicNote(next, note);
     addChronicle(next, { id: `crisis_${highest.kind}_${next.turn}`, turn: next.turn, kind: 'crisis', title, desc: CRISIS_COPY[highest.kind].summary, actorId: next.playerNationId });
   } else if (active && active.lastUpdatedTurn !== next.turn) {
-    const currentPressure = crisisCandidates(next).find((candidate) => candidate.kind === active.kind)?.pressure ?? 0;
+    const currentPressure = candidates.find((candidate) => candidate.kind === active.kind)?.pressure ?? 0;
     active.pressure = currentPressure;
     active.lastUpdatedTurn = next.turn;
     active.recoveryTurns = currentPressure <= 35 ? active.recoveryTurns + 1 : 0;

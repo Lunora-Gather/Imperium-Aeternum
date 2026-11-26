@@ -67,7 +67,22 @@ export function shouldBlockGlobalShortcut(input: {
   targetIsContentEditable?: boolean;
 }): boolean {
   const tag = input.targetTagName?.toUpperCase();
-  return input.hasOpenDialog || tag === 'INPUT' || tag === 'TEXTAREA' || input.targetIsContentEditable === true;
+  return input.hasOpenDialog || tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || input.targetIsContentEditable === true;
+}
+
+export function isModifiedOrRepeatedKey(event: KeyboardEvent): boolean {
+  return event.defaultPrevented || event.repeat || event.isComposing || event.ctrlKey || event.metaKey || event.altKey;
+}
+
+export function ignoreGameShortcut(event: KeyboardEvent): boolean {
+  if (isModifiedOrRepeatedKey(event)) return true;
+  const target = event.target instanceof Element ? event.target : null;
+  if (event.code === 'Space' && target?.closest('button, a[href], [role="button"]')) return true;
+  return shouldBlockGlobalShortcut({
+    hasOpenDialog: !!document.querySelector('[role="dialog"][aria-modal="true"]'),
+    targetTagName: target?.tagName,
+    targetIsContentEditable: (target as HTMLElement | null)?.isContentEditable,
+  });
 }
 
 export function centeredTabScrollLeft(input: {

@@ -132,7 +132,7 @@ export function SummitPanel({ state, target, onClose, onConvene }: Props) {
       </div>}
     </div>
 
-    {latest && <div style={{ marginBottom: 10, padding: 8, borderLeft: '3px solid var(--border-hi)', background: 'var(--bg-card)' }}>
+    {latest && <div style={{ marginBottom: 10, padding: 8, borderLeft: '3px solid var(--border-bright)', background: 'var(--bg-panel)' }}>
       <div style={{ fontSize: 10, color: 'var(--text-mute)' }}>最近接触 · 第 {latest.turn + 1} 年 · {OUTCOME[latest.outcome]}</div>
       <div style={{ fontSize: 11, lineHeight: 1.5 }}>{latest.summary}</div>
       {latest.commitments.length > 0 && <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginTop: 4 }}>{latest.commitments.map((item) => <Tag key={item} text={item} tone="good" />)}</div>}

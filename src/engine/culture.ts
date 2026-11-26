@@ -1,84 +1,33 @@
 // Imperium Aeternum — 文化与宗教系统 engine
 // 阶段 5b：完整实现 docs/reference/02-system-rules.md §14
 
-import type { Nation, GameState } from '../types/game';
+import type { Nation, GameState, Province } from '../types/game';
 import { assimilationDelta, loyaltyDelta, computeRebellion } from './formulas';
 import { clamp } from '../utils/math';
 import { provincesOf } from './init';
-import type { CultureId, ReligionId } from '../data/provinces';
 
 export interface CultureReligionResult {
   rebellionTriggered: string[];  // 触发叛乱的省份 id
 }
 
-export function settleCultureReligion(nation: Nation, state: GameState): CultureReligionResult {
-  const provs = provincesOf(nation.id, state.provinces);
-  const triggered: string[] = [];
-  // 默认政策：宽容 + 尊重（5b 简化；玩家可通过事件切换）
-  const culturePolicy: 'assimilate' | 'respect' = 'assimilate';
-  const religionPolicy: 'tolerant' | 'state' | 'persecute' = 'tolerant';
-  // 国文化/国教取首都
-  const capital = state.provinces[nation.capital];
-  const stateCulture: CultureId | null = capital?.culture ?? null;
-  const stateReligion: ReligionId | null = capital?.religion ?? null;
-
-  for (const p of provs) {
-    const cultureDiff = stateCulture !== null && p.culture !== stateCulture;
-    const religionDiff = stateReligion !== null && p.religion !== stateReligion;
-    const farFromCapital = p.distToPlayerCapital > 2;
-
-    // E18: 文化科技加成同化速度（每级 +0.5）+ P-fix 政策 assimilationMod
-    const cultureTechBonus = nation.tech.culture * 0.5 + (nation.policyMods?.assimilationMod ?? 0);
-    const dAssim = assimilationDelta(
-      p.buildings.filter((b) => b.defId === 'road').length,
-      culturePolicy, nation.government.efficiency, cultureDiff, farFromCapital,
-    ) + cultureTechBonus;
-    p.assimilation = clamp(p.assimilation + dAssim, 0, 100);
-
-    const dLoy = loyaltyDelta(
-      nation.government.stability, p.assimilation, p.garrison > 0, p.unrest,
-      nation.activeCharacterBonuses.includes('welfare'),
-    );
-    p.loyalty = clamp(p.loyalty + dLoy, 0, 100);
-
-    // 叛乱风险
-    p.rebellionRisk = clamp(computeRebellion({
-      unrest: p.unrest, cultureDiff, religionDiff, religionPolicy,
-      garrison: p.garrison, stability: nation.government.stability,
-    }), 0, 100);
-
-    // 触发叛乱
-    if (p.rebellionRisk >= 100 && p.garrison === 0) {
-      triggered.push(p.id);
-    }
-  }
-  return { rebellionTriggered: triggered };
-}
-
-export { assimilationDelta, loyaltyDelta };
-
-// ── C1: 纯函数版本 settleCultureReligionPure ──
-// 不 mutate nation/provinces，返回每省 delta + rebellionTriggered，供 processTurn 合并建新 state
-// 与原 settleCultureReligion 并存（零回归）
 export interface CultureReligionPartial extends CultureReligionResult {
-  // 每省覆写值（assimilation/loyalty/rebellionRisk 都是 clamp 后最终值）
-  provFinal: Record<string, { assimilation: number; loyalty: number; rebellionRisk: number }>;
+  provFinal: Record<string, Pick<Province, 'assimilation' | 'loyalty' | 'rebellionRisk'>>;
 }
-export function settleCultureReligionPure(nation: Nation, state: GameState): CultureReligionPartial {
-  const provs = provincesOf(nation.id, state.provinces);
+
+function settleCulture(
+  nation: Nation, state: GameState, provs: Province[], provFinal?: CultureReligionPartial['provFinal'],
+): string[] {
   const triggered: string[] = [];
   const culturePolicy: 'assimilate' | 'respect' = 'assimilate';
   const religionPolicy: 'tolerant' | 'state' | 'persecute' = 'tolerant';
   const capital = state.provinces[nation.capital];
-  const stateCulture: CultureId | null = capital?.culture ?? null;
-  const stateReligion: ReligionId | null = capital?.religion ?? null;
-  const provFinal: Record<string, { assimilation: number; loyalty: number; rebellionRisk: number }> = {};
+  const cultureTechBonus = nation.tech.culture * 0.5 + (nation.policyMods?.assimilationMod ?? 0);
 
   for (const p of provs) {
-    const cultureDiff = stateCulture !== null && p.culture !== stateCulture;
-    const religionDiff = stateReligion !== null && p.religion !== stateReligion;
-    const farFromCapital = p.distToPlayerCapital > 2;
-    const cultureTechBonus = nation.tech.culture * 0.5 + (nation.policyMods?.assimilationMod ?? 0);
+    const cultureDiff = !!capital && p.culture !== capital.culture;
+    const religionDiff = !!capital && p.religion !== capital.religion;
+    const farFromCapital = !capital || (p.id !== capital.id && !capital.adjacent.includes(p.id)
+      && !capital.adjacent.some(id => state.provinces[id]?.adjacent.includes(p.id)));
     const dAssim = assimilationDelta(
       p.buildings.filter((b) => b.defId === 'road').length,
       culturePolicy, nation.government.efficiency, cultureDiff, farFromCapital,
@@ -94,8 +43,24 @@ export function settleCultureReligionPure(nation: Nation, state: GameState): Cul
       unrest: p.unrest, cultureDiff, religionDiff, religionPolicy,
       garrison: p.garrison, stability: nation.government.stability,
     }), 0, 100);
-    provFinal[p.id] = { assimilation: finalAssim, loyalty: finalLoy, rebellionRisk: finalReb };
+    if (provFinal) provFinal[p.id] = { assimilation: finalAssim, loyalty: finalLoy, rebellionRisk: finalReb };
+    else {
+      p.assimilation = finalAssim;
+      p.loyalty = finalLoy;
+      p.rebellionRisk = finalReb;
+    }
     if (finalReb >= 100 && p.garrison === 0) triggered.push(p.id);
   }
-  return { rebellionTriggered: triggered, provFinal };
+  return triggered;
 }
+
+export function settleCultureReligion(nation: Nation, state: GameState, provs = provincesOf(nation.id, state.provinces)): CultureReligionResult {
+  return { rebellionTriggered: settleCulture(nation, state, provs) };
+}
+
+export function settleCultureReligionPure(nation: Nation, state: GameState, provs = provincesOf(nation.id, state.provinces)): CultureReligionPartial {
+  const provFinal: CultureReligionPartial['provFinal'] = {};
+  return { rebellionTriggered: settleCulture(nation, state, provs, provFinal), provFinal };
+}
+
+export { assimilationDelta, loyaltyDelta };

@@ -1,9 +1,23 @@
 // 状态净化链：防止长局、读档、AI 行动和 UI wrapper 让 GameState 越玩越脏。
 // V15：导出纯函数，不污染输入；新局、选国、读档、槽位读档、每回合后都统一走安全修复。
 
-import type { DiplomaticRelation, GameState, Nation, Province, War } from '../types/game';
+import type { DiplomaticRelation, GameState, Province, War } from '../types/game';
+import { buildTendency } from '../engine/init';
+import { cloneGameState } from '../engine/stateClone';
+import { syncWarFlags } from '../engine/turnIntel';
 import { EVENT_BY_ID } from '../data/events';
 import { isValidProvinceOwner } from './stateOwnership';
+
+export function validPendingEvents(state: GameState) {
+  const pendingKeys = new Set<string>();
+  return (state.pendingEvents ?? []).filter((entry) => {
+    if (!entry || !state.nations[entry.nationId] || state.nations[entry.nationId].defeated || !Object.prototype.hasOwnProperty.call(EVENT_BY_ID, entry.eventId)) return false;
+    const key = `${entry.nationId}|${entry.eventId}`;
+    if (pendingKeys.has(key)) return false;
+    pendingKeys.add(key);
+    return true;
+  });
+}
 
 function finite(v: number, fallback = 0): number {
   return Number.isFinite(v) ? v : fallback;
@@ -18,93 +32,20 @@ function relationKey(from: string, to: string): string {
 }
 
 function pairKey(a: string, b: string): string {
-  return [a, b].sort().join('|');
-}
-
-function cloneProvince(p: Province): Province {
-  return {
-    ...p,
-    classes: Array.isArray(p.classes) ? p.classes.map((c) => ({ ...c })) : [],
-    buildings: Array.isArray(p.buildings) ? p.buildings.map((b) => ({ ...b })) : [],
-    baseResources: { ...(p.baseResources ?? {}) },
-    adjacent: Array.isArray(p.adjacent) ? [...p.adjacent] : [],
-  };
-}
-
-function cloneNation(n: Nation): Nation {
-  return {
-    ...n,
-    government: { ...n.government },
-    tendency: { ...n.tendency },
-    ruler: { ...n.ruler, heir: n.ruler.heir ? { ...n.ruler.heir } : undefined },
-    resources: { ...n.resources },
-    factions: Array.isArray(n.factions) ? n.factions.map((f) => ({ ...f })) : [],
-    tech: { ...n.tech, researchProgress: n.tech.researchProgress ? { ...n.tech.researchProgress } : null },
-    army: Array.isArray(n.army) ? n.army.map((a) => ({ ...a })) : [],
-    activePolicies: Array.isArray(n.activePolicies) ? n.activePolicies.map((p) => ({ ...p })) : [],
-    activeLaws: Array.isArray(n.activeLaws) ? n.activeLaws.map((l) => ({ ...l })) : [],
-    activeTradeRoutes: Array.isArray(n.activeTradeRoutes) ? n.activeTradeRoutes.map((r) => ({ ...r })) : [],
-    embargoedRoutes: Array.isArray(n.embargoedRoutes) ? [...n.embargoedRoutes] : [],
-    civilWar: n.civilWar ? { active: n.civilWar.active, rebels: [...n.civilWar.rebels] } : undefined,
-    policyMods: n.policyMods ? { ...n.policyMods } : undefined,
-  };
-}
-
-function cloneWar(w: War): War {
-  return { ...w, battleReports: Array.isArray(w.battleReports) ? w.battleReports.map((b) => ({ ...b })) : [] };
-}
-
-function cloneState(state: GameState): GameState {
-  return {
-    ...state,
-    nations: Object.fromEntries(Object.entries(state.nations).map(([id, nation]) => [id, cloneNation(nation)])),
-    provinces: Object.fromEntries(Object.entries(state.provinces).map(([id, province]) => [id, cloneProvince(province)])),
-    relations: Array.isArray(state.relations) ? state.relations.map((r) => ({ ...r })) : [],
-    diplomaticSummits: Array.isArray(state.diplomaticSummits)
-      ? state.diplomaticSummits.map((summit) => ({
-        ...summit,
-        commitments: Array.isArray(summit.commitments) ? [...summit.commitments] : [],
-      }))
-      : [],
-    diplomaticAccords: Array.isArray(state.diplomaticAccords)
-      ? state.diplomaticAccords.map((accord) => ({ ...accord }))
-      : [],
-    wars: Array.isArray(state.wars) ? state.wars.map(cloneWar) : [],
-    triggeredEvents: Array.isArray(state.triggeredEvents) ? state.triggeredEvents.map((e) => ({ ...e })) : [],
-    eventCooldowns: Array.isArray(state.eventCooldowns) ? state.eventCooldowns.map((e) => ({ ...e })) : [],
-    pendingEvents: Array.isArray(state.pendingEvents) ? state.pendingEvents.map((e) => ({ ...e })) : [],
-    pendingEventOptions: state.pendingEventOptions ? { ...state.pendingEventOptions, options: state.pendingEventOptions.options.map((o) => ({ ...o })) } : null,
-    lastReport: state.lastReport ? JSON.parse(JSON.stringify(state.lastReport)) as GameState['lastReport'] : null,
-    history: Array.isArray(state.history) ? state.history.map((r) => JSON.parse(JSON.stringify(r)) as typeof r) : [],
-    victory: { ...(state.victory ?? { type: null }) },
-    chronicle: Array.isArray(state.chronicle) ? state.chronicle.map((c) => ({ ...c })) : [],
-    aiStrategyMeta: state.aiStrategyMeta ? Object.fromEntries(Object.entries(state.aiStrategyMeta).map(([id, entry]) => [id, { ...entry }])) : undefined,
-    aiMemory: state.aiMemory ? Object.fromEntries(Object.entries(state.aiMemory).map(([id, memory]) => [id, { ...memory, territory: memory.territory ? { ...memory.territory } : undefined, incidents: memory.incidents?.map((incident) => ({ ...incident })) }])) : undefined,
-    ambitionMeta: state.ambitionMeta ? { ...state.ambitionMeta } : undefined,
-    nationalMission: state.nationalMission ? { ...state.nationalMission, completedStages: [...state.nationalMission.completedStages] } : undefined,
-    nationalCrisis: state.nationalCrisis ? { ...state.nationalCrisis } : undefined,
-    _relMap: undefined,
-  };
+  return a < b ? relationKey(a, b) : relationKey(b, a);
 }
 
 function syncTreaty(left: DiplomaticRelation, right: DiplomaticRelation): void {
-  const major = new Set(['war', 'truce', 'alliance', 'trade']);
-  if (!major.has(left.treaty) && !major.has(right.treaty)) return;
-  const treaty = left.treaty === 'war' || right.treaty === 'war' ? 'war'
-    : left.treaty === 'truce' || right.treaty === 'truce' ? 'truce'
-      : left.treaty === 'alliance' || right.treaty === 'alliance' ? 'alliance'
-        : 'trade';
-  left.treaty = treaty;
-  right.treaty = treaty;
-  const relation = treaty === 'war' ? -100 : Math.min(left.relation, right.relation);
-  const trust = treaty === 'war' ? Math.min(left.trust, right.trust, 20) : Math.min(left.trust, right.trust);
-  left.relation = relation;
-  right.relation = relation;
-  left.trust = trust;
-  right.trust = trust;
+  const treaties = [left.treaty, right.treaty];
   const truceTurns = Math.max(left.truceTurns, right.truceTurns);
-  left.truceTurns = truceTurns;
-  right.truceTurns = truceTurns;
+  const treaty = treaties.includes('truce') && truceTurns > 0 ? 'truce'
+    : treaties.includes('alliance') ? 'alliance' : treaties.includes('trade') ? 'trade' : 'none';
+  left.treaty = right.treaty = treaty;
+  left.truceTurns = right.truceTurns = treaty === 'truce' ? truceTurns : 0;
+  if (treaty !== 'none') {
+    left.relation = right.relation = Math.min(left.relation, right.relation);
+    left.trust = right.trust = Math.min(left.trust, right.trust);
+  }
 }
 
 function sanitizeRelations(relations: DiplomaticRelation[], nations: GameState['nations'], wars: War[]): DiplomaticRelation[] {
@@ -124,34 +65,64 @@ function sanitizeRelations(relations: DiplomaticRelation[], nations: GameState['
   }
 
   // 补齐缺失的反向关系，避免 UI/AI 只读一边时判断不一致。
-  for (const r of [...dedup.values()]) {
+  for (const r of dedup.values()) {
     const reverseKey = relationKey(r.to, r.from);
     if (!dedup.has(reverseKey)) {
       dedup.set(reverseKey, { ...r, from: r.to, to: r.from });
     }
   }
 
-  const pairSeen = new Set<string>();
   for (const r of dedup.values()) {
-    const pk = pairKey(r.from, r.to);
-    if (pairSeen.has(pk)) continue;
-    pairSeen.add(pk);
-    const reverse = dedup.get(relationKey(r.to, r.from));
-    if (reverse) syncTreaty(r, reverse);
+    if (r.from < r.to) syncTreaty(r, dedup.get(relationKey(r.to, r.from))!);
   }
 
   for (const w of wars) {
-    const a = dedup.get(relationKey(w.attackerId, w.defenderId));
-    const b = dedup.get(relationKey(w.defenderId, w.attackerId));
-    if (a) { a.treaty = 'war'; a.relation = -100; a.trust = Math.min(a.trust, 20); }
-    if (b) { b.treaty = 'war'; b.relation = -100; b.trust = Math.min(b.trust, 20); }
+    for (const [from, to] of [[w.attackerId, w.defenderId], [w.defenderId, w.attackerId]]) {
+      const key = relationKey(from, to);
+      const previous = dedup.get(key);
+      dedup.set(key, { from, to, threat: previous?.threat ?? 0, tradeDep: previous?.tradeDep ?? 0,
+        treaty: 'war', relation: -100, truceTurns: 0, trust: Math.min(20, previous?.trust ?? 0) });
+    }
   }
 
   return [...dedup.values()];
 }
 
-export function sanitizeState(state: GameState): GameState {
-  const next = cloneState(state);
+export function sanitizeState(state: GameState, resourcePrecision: 'round' | 'preserve' = 'round'): GameState {
+  const next = cloneGameState(state);
+  // Old snapshots can predate individual collections. Restore their defaults
+  // here, before passing the private copy to the same settlement rules.
+  for (const key of ['relations', 'wars', 'triggeredEvents', 'eventCooldowns', 'pendingEvents', 'history',
+    'chronicle', 'diplomaticSummits', 'diplomaticAccords'] as const) {
+    if (!Array.isArray(next[key])) next[key] = [];
+  }
+  const defaults = buildTendency();
+  const tendencyKeys = Object.keys(defaults) as (keyof typeof defaults)[];
+  for (const nation of Object.values(next.nations)) {
+    nation.tendency ??= { ...defaults };
+    for (const key of tendencyKeys) nation.tendency[key] = clamp(finite(nation.tendency[key]), 0, 100);
+    nation.resources ??= { gold: 0, food: 0, wood: 0, iron: 0, adminPt: 5, sciPt: 0, influence: 20, supply: 50 };
+    nation.government ??= { type: 'monarchy', stability: 50, legitimacy: 50, efficiency: 50, corruption: 10 };
+    for (const key of ['factions', 'army', 'activePolicies', 'activeLaws', 'activeTradeRoutes', 'embargoedRoutes', 'activeCharacterBonuses'] as const) {
+      if (!Array.isArray(nation[key])) nation[key] = [];
+    }
+    nation.tech.researchProgress ??= null;
+    if (nation.civilWar && !Array.isArray(nation.civilWar.rebels)) nation.civilWar.rebels = [];
+  }
+  for (const province of Object.values(next.provinces)) {
+    if (!Array.isArray(province.classes)) province.classes = [];
+    if (!Array.isArray(province.buildings)) province.buildings = [];
+    province.baseResources ??= {};
+  }
+  for (const war of next.wars) if (!Array.isArray(war.battleReports)) war.battleReports = [];
+  next.pendingEventOptions ??= null;
+  next.lastReport ??= null;
+  return sanitizeTurnSnapshot(next, resourcePrecision);
+}
+
+/** The turn engine already owns an isolated snapshot. Reuse it for final settlement. */
+export function sanitizeTurnSnapshot(next: GameState, resourcePrecision: 'round' | 'preserve' = 'round'): GameState {
+  const resourceValue = resourcePrecision === 'round' ? (value: number) => Math.round(finite(value)) : finite;
 
   next.version = Math.max(1, Math.round(finite(next.version, 1)));
   next.turn = Math.max(0, Math.round(finite(next.turn)));
@@ -167,15 +138,19 @@ export function sanitizeState(state: GameState): GameState {
   }
 
   for (const n of Object.values(next.nations)) {
+    if (n.civilWar?.active) {
+      const rebels = n.civilWar.rebels.filter((id) => next.nations[id]?.rebelOf === n.id);
+      n.civilWar = { active: rebels.length > 0, rebels };
+    }
     n.isPlayer = n.id === next.playerNationId;
-    n.resources.gold = Math.round(finite(n.resources.gold));
-    n.resources.food = Math.round(finite(n.resources.food));
-    n.resources.wood = Math.max(0, Math.round(finite(n.resources.wood)));
-    n.resources.iron = Math.max(0, Math.round(finite(n.resources.iron)));
-    n.resources.adminPt = Math.max(0, Math.round(finite(n.resources.adminPt)));
-    n.resources.sciPt = Math.max(0, Math.round(finite(n.resources.sciPt)));
-    n.resources.influence = Math.max(0, Math.round(finite(n.resources.influence)));
-    n.resources.supply = Math.max(0, Math.round(finite(n.resources.supply)));
+    n.resources.gold = resourceValue(n.resources.gold);
+    n.resources.food = resourceValue(n.resources.food);
+    n.resources.wood = Math.max(0, resourceValue(n.resources.wood));
+    n.resources.iron = Math.max(0, resourceValue(n.resources.iron));
+    n.resources.adminPt = Math.max(0, resourceValue(n.resources.adminPt));
+    n.resources.sciPt = Math.max(0, resourceValue(n.resources.sciPt));
+    n.resources.influence = Math.max(0, resourceValue(n.resources.influence));
+    n.resources.supply = Math.max(0, resourceValue(n.resources.supply));
     n.government.stability = clamp(finite(n.government.stability, 50), 0, 100);
     n.government.legitimacy = clamp(finite(n.government.legitimacy, 50), 0, 100);
     n.government.efficiency = clamp(finite(n.government.efficiency, 50), 0, 100);
@@ -186,12 +161,14 @@ export function sanitizeState(state: GameState): GameState {
     n.army = n.army.filter((a) => a && finite(a.size) > 0);
   }
 
+  const provincesByOwner = new Map<string, Province[]>();
   for (const p of Object.values(next.provinces)) {
     if (!isValidProvinceOwner(next, p.ownerId)) {
       const fallback = next.nations[next.playerNationId] ?? Object.values(next.nations)[0];
       if (fallback) p.ownerId = fallback.id;
     }
     p.population = Math.max(0, Math.round(finite(p.population)));
+    if (!next.nations[p.ownerId]) p.isCapital = false;
     p.garrison = Math.max(0, Math.round(finite(p.garrison)));
     p.unrest = clamp(finite(p.unrest), 0, 100);
     p.rebellionRisk = clamp(finite(p.rebellionRisk), 0, 100);
@@ -199,13 +176,17 @@ export function sanitizeState(state: GameState): GameState {
     p.assimilation = clamp(finite(p.assimilation, 50), 0, 100);
     p.adjacent = [...new Set((Array.isArray(p.adjacent) ? p.adjacent : []).filter((id) => !!next.provinces[id] && id !== p.id))];
     p.classes = p.classes.map((c) => ({ ...c, count: Math.max(0, Math.round(finite(c.count))), satisfaction: clamp(finite(c.satisfaction, 50), 0, 100) }));
+    const owned = provincesByOwner.get(p.ownerId);
+    if (owned) owned.push(p);
+    else provincesByOwner.set(p.ownerId, [p]);
   }
 
   for (const n of Object.values(next.nations)) {
-    const owned = Object.values(next.provinces).filter((p) => p.ownerId === n.id);
-    const currentCapital = owned.find((p) => p.id === n.capital);
-    const fallback = currentCapital ?? owned.find((p) => p.isCapital) ?? owned[0];
-    if (!currentCapital && fallback) n.capital = fallback.id;
+    const owned = provincesByOwner.get(n.id) ?? [];
+    const designated = next.provinces[n.capital];
+    const fallback = designated?.ownerId === n.id ? designated : owned.find(p => p.isCapital) ?? owned[0];
+    if (fallback) n.capital = fallback.id;
+    for (const province of owned) province.isCapital = province === fallback;
     n.army = n.army
       .map((a) => {
         const loc = next.provinces[a.location];
@@ -228,6 +209,7 @@ export function sanitizeState(state: GameState): GameState {
   const seenWars = new Set<string>();
   next.wars = next.wars.filter((w) => {
     if (!next.nations[w.attackerId] || !next.nations[w.defenderId] || !next.provinces[w.targetProvinceId]) return false;
+    if (w.attackerId === w.defenderId || next.provinces[w.targetProvinceId].ownerId !== w.defenderId) return false;
     if (next.nations[w.attackerId].defeated || next.nations[w.defenderId].defeated) return false;
     const key = pairKey(w.attackerId, w.defenderId);
     if (seenWars.has(key)) return false;
@@ -238,9 +220,7 @@ export function sanitizeState(state: GameState): GameState {
     return true;
   });
 
-  const activeWarNations = new Set<string>();
-  next.wars.forEach((w) => { activeWarNations.add(w.attackerId); activeWarNations.add(w.defenderId); });
-  for (const n of Object.values(next.nations)) n.atWar = activeWarNations.has(n.id);
+  syncWarFlags(next);
 
   next.relations = sanitizeRelations(next.relations, next.nations, next.wars);
 
@@ -325,14 +305,7 @@ export function sanitizeState(state: GameState): GameState {
   }
   next.eventCooldowns = [...cooldownByKey.values()];
 
-  const pendingKeys = new Set<string>();
-  next.pendingEvents = next.pendingEvents.filter((entry) => {
-    if (!entry || !next.nations[entry.nationId] || !EVENT_BY_ID[entry.eventId]) return false;
-    const key = `${entry.nationId}|${entry.eventId}`;
-    if (pendingKeys.has(key)) return false;
-    pendingKeys.add(key);
-    return true;
-  });
+  next.pendingEvents = validPendingEvents(next);
   if (
     next.pendingEventOptions
     && (

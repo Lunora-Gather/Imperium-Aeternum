@@ -80,13 +80,13 @@ export function assertReadyCommandIdentity(command, expected) {
   return command;
 }
 
-export function wasWorldActiveDuringWindow(world, memberships) {
+export function wasWorldActiveDuringWindow(world, controls) {
   if (!world.pauseWhenEmpty) return true;
   const deadline = Date.parse(world.planningDeadlineAt);
   const windowMs = Number(world.planningWindowSeconds) * 1000;
   if (!Number.isFinite(deadline) || !Number.isFinite(windowMs) || windowMs <= 0) return false;
   const openedAt = deadline - windowMs;
-  return memberships.some((membership) => Date.parse(membership.lastSeenAt) >= openedAt);
+  return controls.some((control) => Date.parse(control.lastActiveAt ?? control.claimedAt) >= openedAt);
 }
 
 export function isWorldDue(world, nowMs = Date.now()) {

@@ -1,15 +1,12 @@
 import { createHash } from 'node:crypto';
 import { Client, ID, Permission, Role, Storage, TablesDB } from 'node-appwrite';
 import { InputFile } from 'node-appwrite/file';
-import { buildCloudSaveRowId } from './identity.js';
 import { normalizeCloudSavePayload } from './policy.js';
-import { commitUploadedSave } from './transaction.js';
+import { checkReplacement, currentRow, commitUploadedSave } from './transaction.js';
 
 export { buildCloudSaveRowId } from './identity.js';
 export { commitUploadedSave } from './transaction.js';
 
-const DATABASE_ID = 'imperium_game';
-const SAVE_TABLE = 'cloud_saves';
 const SAVE_BUCKET = 'cloud_saves';
 const MAX_SAVE_BYTES = 5 * 1024 * 1024;
 
@@ -25,18 +22,6 @@ const integer = (value, min, max, label) => {
   return parsed;
 };
 
-async function currentRow(db, userId, slot, transactionId) {
-  try {
-    return await db.getRow({
-      databaseId: DATABASE_ID,
-      tableId: SAVE_TABLE,
-      rowId: buildCloudSaveRowId(userId, slot),
-      ...(transactionId ? { transactionId } : {}),
-    });
-  }
-  catch (error) { if (error?.code === 404) return null; throw error; }
-}
-
 async function uploadSave(db, storage, userId, body) {
   const slot = integer(body.slot, 0, 4, '存档槽位');
   const raw = typeof body.raw === 'string' ? body.raw : '';
@@ -48,11 +33,7 @@ async function uploadSave(db, storage, userId, body) {
   const contentHash = createHash('sha256').update(bytes).digest('hex');
   const previous = await currentRow(db, userId, slot);
   if (previous?.contentHash === contentHash) return previous;
-  if (previous && previous.clientUpdatedAt > clientUpdatedAt && previous.deviceId !== deviceId && body.force !== true) {
-    const conflict = new Error('云端存在另一设备更新的存档，请先下载比较，或确认覆盖云端');
-    conflict.code = 409;
-    throw conflict;
-  }
+  checkReplacement(previous, { deviceId, clientUpdatedAt }, body);
   const access = permissions(userId);
   const uploaded = await storage.createFile({ bucketId: SAVE_BUCKET, fileId: ID.unique(), file: InputFile.fromBuffer(bytes, `imperium-slot-${slot}.json`), permissions: access });
   return commitUploadedSave(
@@ -73,6 +54,7 @@ export default async ({ req, res, error }) => {
     const userId = req.headers['x-appwrite-user-id'];
     if (!userId) return res.json({ ok: false, message: '登录后才能同步云存档' }, 401);
     const body = req.bodyJson ?? {};
+    if (body.userId !== undefined && body.userId !== userId) return res.json({ ok: false, message: '登录账号已更换，请重新同步' }, 401);
     if (body.action !== 'upload_save') return res.json({ ok: false, message: '不支持的云存档操作' }, 400);
     const { db, storage } = services(req);
     return res.json({ ok: true, row: await uploadSave(db, storage, userId, body) });
@@ -81,6 +63,6 @@ export default async ({ req, res, error }) => {
     const appwriteFailure = typeof cause?.code === 'number' && ![404, 409].includes(cause.code);
     const status = cause?.code === 409 ? 409 : cause?.code === 404 ? 404 : appwriteFailure ? 503 : 400;
     const message = appwriteFailure ? '云存档服务暂不可用，请稍后重试' : cause instanceof Error ? cause.message : '云存档同步失败';
-    return res.json({ ok: false, message }, status);
+    return res.json({ ok: false, message, cloudHash: cause?.cloudHash }, status);
   }
 };

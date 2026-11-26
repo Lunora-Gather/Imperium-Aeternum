@@ -2,7 +2,11 @@ import { registerGovernanceTranslations } from '../i18n/catalogs/governance';
 import { localizeReactTree } from '../i18n/reactTree';
 registerGovernanceTranslations();
 // 世界地图 SVG — 羊皮战略舆图：底纹、国土光晕、首都、悬停情报
-import { useState, useMemo } from 'react';
+import { memo, useCallback, useState, useMemo } from 'react';
+import { translate, useI18n, type Locale } from '../i18n';
+import { TERRAIN_LABELS, terrainLabel } from '../data/terrain';
+import type { Terrain } from '../data/provinces';
+import type { Province } from '../types/game';
 import { useGameStore } from '../store/gameStore';
 import { Tag, StatusDot } from '../components/ui';
 
@@ -14,31 +18,29 @@ function nationColor(id: string, isPlayer: boolean): string {
   return `hsl(${hue}, 38%, 44%)`;
 }
 
-const TERRAIN_COLOR: Record<string, string> = {
-  plain: '#7b8f58',
-  hill: '#a88e5a',
-  mountain: '#80644d',
-  coast: '#5f8793',
-  desert: '#c1a15b',
-  forest: '#557a49',
-  river: '#6d8fac',
-  marsh: '#657b64',
+const TERRAIN_COLOR: Record<Terrain, string> = {
+  plain: '#7b8f58', hill: '#a88e5a', mountain: '#80644d', coast: '#5f8793', desert: '#c1a15b', forest: '#557a49',
+  tundra: '#9ea9a8', jungle: '#366750', swamp: '#657b64', ocean: '#486f96', island: '#a79b67',
 };
-const TERRAIN_LABEL: Record<string, string> = {
-  plain: '平原', hill: '丘陵', mountain: '山地', coast: '海岸', desert: '沙漠', forest: '森林', river: '河谷', marsh: '湿地',
-};
-function terrainColor(terrain: string): string { return TERRAIN_COLOR[terrain] ?? '#8a8370'; }
-function terrainLabel(terrain: string): string { return TERRAIN_LABEL[terrain] ?? terrain; }
+function terrainColor(terrain: Terrain): string { return TERRAIN_COLOR[terrain] ?? '#8a8370'; }
+
+type MapEntry = { province: Province; name: string; owner: string; search: string };
+type Edge = readonly [Province, Province];
 
 export default function WorldMap() {
   const { state, setPendingProvince, jumpToTab } = useGameStore();
-  const pid = useGameStore((s) => s.state.playerNationId);
-  const player = useGameStore((s) => s.state.nations[pid]);
-  const provs = Object.values(state.provinces);
+  const pid = state.playerNationId;
+  const player = state.nations[pid];
+  const { locale } = useI18n();
+  const provs = useMemo(() => Object.values(state.provinces), [state.provinces]);
   const [hover, setHover] = useState<string | null>(null);
   const [selected, setSelected] = useState<string | null>(null);
   const [filter, setFilter] = useState<'all' | 'player' | 'neighbors' | 'risk'>('all');
   const [query, setQuery] = useState('');
+  const selectProvince = useCallback((id: string) => {
+    setHover(null);
+    setSelected(id);
+  }, []);
 
   const bounds = useMemo(() => {
     if (provs.length === 0) return { minX: 0, minY: 0, maxX: 1000, maxY: 620 };
@@ -52,28 +54,55 @@ export default function WorldMap() {
     return { minX: minX - 60, minY: minY - 60, maxX: maxX + 60, maxY: maxY + 60 };
   }, [provs]);
 
-  const playerProvs = provs.filter((p) => p.ownerId === pid);
-  const playerNeighborIds = new Set<string>();
-  playerProvs.forEach((p) => p.adjacent.forEach((a) => playerNeighborIds.add(a)));
-
-  const visible = provs.filter((p) => {
-    const owner = state.nations[p.ownerId];
+  const { edges, frontier } = useMemo(() => {
+    const edges: Edge[] = [];
+    const frontier = new Set<string>();
+    for (const p of provs) {
+      for (const id of p.adjacent) {
+        const q = state.provinces[id];
+        if (!q || id === p.id || (id < p.id && q.adjacent.includes(p.id))) continue;
+        edges.push([p, q]);
+        if ((p.ownerId === pid) !== (q.ownerId === pid)) {
+          frontier.add(p.id);
+          frontier.add(q.id);
+        }
+      }
+    }
+    return { edges, frontier };
+  }, [pid, provs, state.provinces]);
+  const entries = useMemo(() => provs.map((province) => {
+    const ownerName = state.nations[province.ownerId]?.name ?? '中立省份';
+    const terrain = terrainLabel(province.terrain);
+    const name = translate(province.name, {}, locale);
+    const owner = translate(ownerName, {}, locale);
+    const search = [province.name, name, ownerName, owner, province.terrain, terrain, translate(terrain, {}, locale)].join(' ').toLocaleLowerCase();
+    return { province, name, owner, search };
+  }), [provs, state.nations, locale]);
+  const visible = useMemo(() => {
     const normalized = query.trim().toLocaleLowerCase();
-    const matchesQuery = !normalized || `${p.name} ${owner?.name ?? ''} ${terrainLabel(p.terrain)}`.toLocaleLowerCase().includes(normalized);
-    if (!matchesQuery) return false;
-    if (filter === 'player') return p.ownerId === pid;
-    if (filter === 'neighbors') return p.ownerId === pid || playerNeighborIds.has(p.id);
-    if (filter === 'risk') return p.ownerId === pid && (p.rebellionRisk >= 45 || p.unrest >= 40 || p.loyalty < 50);
-    return true;
-  });
-  const visibleIds = new Set(visible.map((p) => p.id));
-
-  const activeId = hover ?? selected;
-  const activeProv = activeId ? state.provinces[activeId] : null;
-  const activeNation = activeProv ? state.nations[activeProv.ownerId] : null;
-  const W = Math.max(320, bounds.maxX - bounds.minX);
-  const H = Math.max(240, bounds.maxY - bounds.minY);
-  const capitalCount = visible.filter((p) => p.isCapital).length;
+    return entries.filter(({ province: p, search }) => {
+      if (normalized && !search.includes(normalized)) return false;
+      if (filter === 'player') return p.ownerId === pid;
+      if (filter === 'neighbors') return frontier.has(p.id);
+      if (filter === 'risk') return p.ownerId === pid && (p.rebellionRisk >= 45 || p.unrest >= 40 || p.loyalty < 50);
+      return true;
+    });
+  }, [entries, query, filter, pid, frontier]);
+  const visibleIds = useMemo(() => new Set(visible.map(({ province }) => province.id)), [visible]);
+  const shownEdges = useMemo(() => edges.filter(([p, q]) => visibleIds.has(p.id) && visibleIds.has(q.id)), [edges, visibleIds]);
+  const armySizes = useMemo(() => {
+    const sizes = new Map<string, number>();
+    for (const army of player?.army ?? []) {
+      if (army.size > 0) sizes.set(army.location, (sizes.get(army.location) ?? 0) + army.size);
+    }
+    return sizes;
+  }, [player?.army]);
+  const selectedId = selected && visibleIds.has(selected) ? selected : visible.length === 1 ? visible[0].province.id : '';
+  const activeId = hover && visibleIds.has(hover) ? hover : selectedId;
+  const activeProv = state.provinces[activeId];
+  const activeNation = activeProv && state.nations[activeProv.ownerId];
+  const playerCount = useMemo(() => provs.filter((p) => p.ownerId === pid).length, [pid, provs]);
+  const capitalCount = useMemo(() => visible.filter(({ province }) => province.isCapital).length, [visible]);
 
   return localizeReactTree(
     <section className="ia-map-page">
@@ -84,114 +113,38 @@ export default function WorldMap() {
           <p>羊皮战略图 · 点为省份，光晕为国土影响，线为道路/边境联系。</p>
         </div>
         <div className="ia-map-controls">
-          <input className="ia-input ia-map-search" value={query} onChange={(event) => setQuery(event.target.value)} aria-label="搜索地图" placeholder="搜索省份或国家" />
-          <button className={filter === 'all' ? 'is-active' : ''} onClick={() => setFilter('all')}>全图</button>
-          <button className={filter === 'player' ? 'is-active' : ''} onClick={() => setFilter('player')}>吾土</button>
-          <button className={filter === 'neighbors' ? 'is-active' : ''} onClick={() => setFilter('neighbors')}>边境</button>
-          <button className={filter === 'risk' ? 'is-active' : ''} onClick={() => setFilter('risk')}>风险</button>
+          <input className="ia-input ia-map-search" value={query} onChange={(event) => { setHover(null); setQuery(event.target.value); }} aria-label="搜索地图" placeholder="搜索省份、国家或地形" />
+          <button aria-pressed={filter === 'all'} className={filter === 'all' ? 'is-active' : ''} onClick={() => setFilter('all')}>全图</button>
+          <button aria-pressed={filter === 'player'} className={filter === 'player' ? 'is-active' : ''} onClick={() => setFilter('player')}>吾土</button>
+          <button aria-pressed={filter === 'neighbors'} className={filter === 'neighbors' ? 'is-active' : ''} onClick={() => setFilter('neighbors')}>边境</button>
+          <button aria-pressed={filter === 'risk'} className={filter === 'risk' ? 'is-active' : ''} onClick={() => setFilter('risk')}>风险</button>
         </div>
       </header>
 
       <div className="ia-map-layout">
         <div className="ia-map-atlas">
           <div className="ia-map-compass">N</div>
-          <svg viewBox={`${bounds.minX} ${bounds.minY} ${W} ${H}`} className="ia-world-svg" preserveAspectRatio="xMidYMid meet">
-            <defs>
-              <radialGradient id="wmParchment" cx="50%" cy="42%" r="78%">
-                <stop offset="0%" stopColor="rgba(255,248,222,0.42)" />
-                <stop offset="62%" stopColor="rgba(201,164,78,0.10)" />
-                <stop offset="100%" stopColor="rgba(80,61,35,0.18)" />
-              </radialGradient>
-              <filter id="wmGlow" x="-40%" y="-40%" width="180%" height="180%">
-                <feGaussianBlur stdDeviation="4" result="blur" />
-                <feMerge><feMergeNode in="blur" /><feMergeNode in="SourceGraphic" /></feMerge>
-              </filter>
-              <pattern id="wmGrid" width="42" height="42" patternUnits="userSpaceOnUse">
-                <path d="M 42 0 L 0 0 0 42" fill="none" stroke="rgba(90,78,54,0.16)" strokeWidth="0.55" />
-              </pattern>
-              <pattern id="wmTinyDots" width="18" height="18" patternUnits="userSpaceOnUse">
-                <circle cx="1" cy="1" r="0.7" fill="rgba(90,78,54,0.18)" />
-              </pattern>
-            </defs>
-
-            <rect x={bounds.minX} y={bounds.minY} width={W} height={H} rx="18" fill="url(#wmParchment)" />
-            <rect x={bounds.minX} y={bounds.minY} width={W} height={H} fill="url(#wmGrid)" opacity="0.42" />
-            <rect x={bounds.minX} y={bounds.minY} width={W} height={H} fill="url(#wmTinyDots)" opacity="0.55" />
-
-            {/* 地缘联系线 */}
-            <g className="wm-links">
-              {visible.flatMap((p) => p.adjacent.filter((a) => state.provinces[a] && visibleIds.has(a) && p.id < a).map((a) => {
-                const q = state.provinces[a];
-                const sameOwner = p.ownerId === q.ownerId;
-                const touchesPlayer = p.ownerId === pid || q.ownerId === pid;
-                return <line key={`${p.id}-${a}`} x1={p.x} y1={p.y} x2={q.x} y2={q.y}
-                  stroke={touchesPlayer ? 'rgba(184,146,74,0.48)' : sameOwner ? 'rgba(80,72,50,0.42)' : 'rgba(130,90,64,0.22)'}
-                  strokeWidth={touchesPlayer ? 1.25 : sameOwner ? 0.75 : 0.45} />;
-              }))}
-            </g>
-
-            {/* 国土/地形光晕，先铺大块，避免只有零散圆点 */}
-            <g className="wm-terrain-halos">
-              {visible.map((p) => {
-                const isPlayer = p.ownerId === pid;
-                const isCapital = p.isCapital;
-                const haloR = isCapital ? 26 : p.population > 900 ? 20 : p.population > 450 ? 16 : 12;
-                return <circle key={`halo-${p.id}`} cx={p.x} cy={p.y} r={haloR}
-                  fill={isPlayer ? 'rgba(201,164,78,0.16)' : terrainColor(p.terrain)}
-                  opacity={isPlayer ? 0.52 : 0.18} filter="url(#wmGlow)" />;
-              })}
-            </g>
-
-            {/* 省份节点 */}
-            <g className="wm-provinces">
-              {visible.map((p) => {
-                const isPlayer = p.ownerId === pid;
-                const isHover = hover === p.id;
-                const isSelected = selected === p.id;
-                const isCapital = p.isCapital;
-                const r = isCapital ? 8 : (p.population > 800 ? 5.6 : p.population > 420 ? 4.5 : 3.5);
-                const playerArmyHere = isPlayer ? player?.army.find((a) => a.location === p.id && a.size > 0) : null;
-                return (
-                  <g key={p.id} className="wm-province" role="button" tabIndex={0} aria-label={`${p.name} · ${state.nations[p.ownerId]?.name ?? '未知势力'}`} onMouseEnter={() => setHover(p.id)} onMouseLeave={() => setHover(null)} onFocus={() => setHover(p.id)} onBlur={() => setHover(null)} onClick={() => { setSelected(p.id); if (isPlayer) { setPendingProvince(p.id); } }} onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); setSelected(p.id); if (isPlayer) setPendingProvince(p.id); } }}>
-                    <circle cx={p.x} cy={p.y} r={r + 4} fill="rgba(24,20,16,0.26)" />
-                    {isCapital && <circle cx={p.x} cy={p.y} r={r + 7} fill="none" stroke={nationColor(p.ownerId, isPlayer)} strokeWidth={1.2} opacity="0.58" />}
-                    {(isHover || isSelected) && <circle cx={p.x} cy={p.y} r={r + 9} fill="none" stroke="var(--gold)" strokeWidth={1.5} opacity="0.9" />}
-                    <circle cx={p.x} cy={p.y} r={r}
-                      fill={terrainColor(p.terrain)}
-                      stroke={isPlayer ? 'var(--gold)' : isHover || isSelected ? 'var(--text)' : nationColor(p.ownerId, false)}
-                      strokeWidth={isPlayer ? 2 : isHover || isSelected ? 1.7 : 0.9}
-                      style={{ cursor: 'pointer' }} />
-                    {isCapital && <text x={p.x} y={p.y - r - 10} textAnchor="middle" className="wm-capital-label">{state.nations[p.ownerId]?.name?.slice(0, 4)}</text>}
-                    {playerArmyHere && (
-                      <g>
-                        <title>{`${playerArmyHere.size} 兵`}</title>
-                        <polygon points={`${p.x},${p.y - r - 7} ${p.x - 5},${p.y - r + 1} ${p.x + 5},${p.y - r + 1}`} fill="var(--war)" stroke="var(--gold)" strokeWidth={0.7} />
-                        <text x={p.x} y={p.y - r - 10} textAnchor="middle" fontSize={7} fill="var(--war)" style={{ pointerEvents: 'none' }}>{playerArmyHere.size}</text>
-                      </g>
-                    )}
-                  </g>
-                );
-              })}
-            </g>
-          </svg>
+          <ProvinceAtlas bounds={bounds} visible={visible} edges={shownEdges} pid={pid} armySizes={armySizes}
+            selected={selectedId} onPreview={setHover} onSelect={selectProvince} locale={locale} />
         </div>
 
         <aside className="ia-map-info">
           <div className="ia-map-stat-grid">
             <div><span>显示省份</span><strong>{visible.length}</strong></div>
             <div><span>首都</span><strong>{capitalCount}</strong></div>
-            <div><span>吾土</span><strong>{playerProvs.length}</strong></div>
-            <div><span>边境点</span><strong>{playerNeighborIds.size}</strong></div>
+            <div><span>吾土</span><strong>{playerCount}</strong></div>
+            <div><span>边境点</span><strong>{frontier.size}</strong></div>
           </div>
 
-          {activeProv && activeNation ? (
+          <ProvincePicker visible={visible} selected={selectedId} onSelect={selectProvince} locale={locale} />
+          {activeProv ? (
             <div className="ia-map-detail">
               <div className="ia-map-detail-head">
                 <div>
                   <p className="ia-up">Province Intel</p>
                   <h3 className="ia-display">{activeProv.name}{activeProv.isCapital ? ' ★' : ''}</h3>
                 </div>
-                <Tag text={activeProv.ownerId === pid ? '吾土' : activeNation.name} tone={activeProv.ownerId === pid ? 'gold' : 'info'} />
+                <Tag text={activeProv.ownerId === pid ? '吾土' : activeNation?.name ?? '中立省份'} tone={activeProv.ownerId === pid ? 'gold' : 'info'} />
               </div>
               <div className="ia-map-tags">
                 <span style={{ background: terrainColor(activeProv.terrain) }} />
@@ -213,14 +166,14 @@ export default function WorldMap() {
           ) : (
             <div className="ia-map-detail ia-map-detail--empty">
               <p className="ia-up">Map Guide</p>
-              <h3 className="ia-display">{visible.length === 0 ? '没有符合条件的省份' : '悬停省份查看详情'}</h3>
-              <p>{visible.length === 0 ? '清空搜索或切换地图筛选后继续。' : '金色外圈为吾土，大圆为首都。点击吾土省份可进入省份治理。'}</p>
+              <h3 className="ia-display">{visible.length === 0 ? '没有符合条件的省份' : '选择省份查看详情'}</h3>
+              <p>{visible.length === 0 ? '清空搜索或切换地图筛选后继续。' : '点选地图或从列表选省，再选择治理此省。'}</p>
             </div>
           )}
 
           <div className="ia-map-legend">
-            {Object.entries(TERRAIN_LABEL).slice(0, 8).map(([key, label]) => (
-              <span key={key}><i style={{ background: terrainColor(key) }} />{label}</span>
+            {(Object.keys(TERRAIN_LABELS) as Terrain[]).map((key) => (
+              <span key={key}><i style={{ background: terrainColor(key) }} />{terrainLabel(key)}</span>
             ))}
           </div>
         </aside>
@@ -228,3 +181,126 @@ export default function WorldMap() {
     </section>
   );
 }
+
+type PickerProps = {
+  visible: MapEntry[];
+  selected: string;
+  onSelect: (id: string) => void;
+  locale: Locale;
+};
+
+const ProvincePicker = memo(function ProvincePicker({ visible, selected, onSelect, locale }: PickerProps) {
+  const label = translate('选择省份', {}, locale);
+  return <select className="ia-input" aria-label={label} value={selected} disabled={!visible.length}
+    onChange={(event) => onSelect(event.target.value)}>
+    <option value="">{label}</option>
+    {visible.map(({ province, name, owner }) => <option key={province.id} value={province.id}>{name} · {owner}</option>)}
+  </select>;
+});
+
+type AtlasProps = PickerProps & {
+  bounds: { minX: number; minY: number; maxX: number; maxY: number };
+  edges: Edge[];
+  pid: string;
+  armySizes: Map<string, number>;
+  onPreview: (id: string | null) => void;
+};
+
+const ProvinceAtlas = memo(function ProvinceAtlas({ bounds, visible, edges, pid, armySizes, selected, onPreview, onSelect, locale }: AtlasProps) {
+  const W = Math.max(320, bounds.maxX - bounds.minX);
+  const H = Math.max(240, bounds.maxY - bounds.minY);
+  return (
+    <svg viewBox={`${bounds.minX} ${bounds.minY} ${W} ${H}`} className="ia-world-svg" preserveAspectRatio="xMidYMid meet">
+      <defs>
+        <radialGradient id="wmParchment" cx="50%" cy="42%" r="78%">
+          <stop offset="0%" stopColor="var(--bg-raised)" />
+          <stop offset="62%" stopColor="var(--bg-panel)" />
+          <stop offset="100%" stopColor="var(--bg-inset)" />
+        </radialGradient>
+        <filter id="wmGlow" x="-40%" y="-40%" width="180%" height="180%">
+          <feGaussianBlur stdDeviation="4" result="blur" />
+          <feMerge><feMergeNode in="blur" /><feMergeNode in="SourceGraphic" /></feMerge>
+        </filter>
+        <pattern id="wmGrid" width="42" height="42" patternUnits="userSpaceOnUse">
+          <path d="M 42 0 L 0 0 0 42" fill="none" stroke="var(--border)" strokeWidth="0.55" />
+        </pattern>
+        <pattern id="wmTinyDots" width="18" height="18" patternUnits="userSpaceOnUse">
+          <circle cx="1" cy="1" r="0.7" fill="var(--border)" />
+        </pattern>
+      </defs>
+
+      <rect x={bounds.minX} y={bounds.minY} width={W} height={H} rx="18" fill="url(#wmParchment)" />
+      <rect x={bounds.minX} y={bounds.minY} width={W} height={H} fill="url(#wmGrid)" opacity="0.42" />
+      <rect x={bounds.minX} y={bounds.minY} width={W} height={H} fill="url(#wmTinyDots)" opacity="0.55" />
+
+      {/* 地缘联系线 */}
+      <g className="wm-links">
+        {edges.map(([p, q]) => {
+          const sameOwner = p.ownerId === q.ownerId;
+          const touchesPlayer = p.ownerId === pid || q.ownerId === pid;
+          return <line key={`${p.id}-${q.id}`} x1={p.x} y1={p.y} x2={q.x} y2={q.y}
+            stroke={touchesPlayer ? 'rgba(184,146,74,0.48)' : sameOwner ? 'rgba(80,72,50,0.42)' : 'rgba(130,90,64,0.22)'}
+            strokeWidth={touchesPlayer ? 1.25 : sameOwner ? 0.75 : 0.45} />;
+        })}
+      </g>
+
+      {/* 国土/地形光晕，先铺大块，避免只有零散圆点 */}
+      <g className="wm-terrain-halos">
+        {visible.map(({ province: p }) => {
+          const isPlayer = p.ownerId === pid;
+          const isCapital = p.isCapital;
+          const haloR = isCapital ? 26 : p.population > 900 ? 20 : p.population > 450 ? 16 : 12;
+          return <circle key={`halo-${p.id}`} cx={p.x} cy={p.y} r={haloR}
+            fill={isPlayer ? 'var(--gold)' : terrainColor(p.terrain)}
+            opacity={isPlayer ? 0.26 : 0.18} filter="url(#wmGlow)" />;
+        })}
+      </g>
+
+      {/* 省份节点 */}
+      <g className="wm-provinces">
+        {visible.map(({ province: p, name, owner }, index) => {
+          const isPlayer = p.ownerId === pid;
+          const isSelected = selected === p.id;
+          const isCapital = p.isCapital;
+          const r = isCapital ? 8 : (p.population > 800 ? 5.6 : p.population > 420 ? 4.5 : 3.5);
+          const armySize = armySizes.get(p.id);
+          return (
+            <g key={p.id} className="wm-province" role="button" tabIndex={(selected ? isSelected : index === 0) ? 0 : -1}
+              aria-label={`${name} · ${owner}`} aria-pressed={isSelected}
+              onMouseEnter={() => onPreview(p.id)} onMouseLeave={() => onPreview(null)}
+              onFocus={() => onPreview(p.id)} onBlur={() => onPreview(null)} onClick={() => onSelect(p.id)}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter' || event.key === ' ') {
+                  event.preventDefault();
+                  onSelect(p.id);
+                } else if (['ArrowLeft', 'ArrowUp', 'ArrowRight', 'ArrowDown'].includes(event.key)) {
+                  event.preventDefault();
+                  const step = event.key === 'ArrowLeft' || event.key === 'ArrowUp' ? -1 : 1;
+                  const next = (index + step + visible.length) % visible.length;
+                  onSelect(visible[next].province.id);
+                  (event.currentTarget.parentElement?.children[next] as SVGElement | undefined)?.focus();
+                }
+              }}>
+              <circle cx={p.x} cy={p.y} r={r + 4} fill="rgba(24,20,16,0.26)" />
+              {isCapital && <circle cx={p.x} cy={p.y} r={r + 7} fill="none" stroke={nationColor(p.ownerId, isPlayer)} strokeWidth={1.2} opacity="0.58" />}
+              <circle className="wm-selection-ring" cx={p.x} cy={p.y} r={r + 9} fill="none" stroke="var(--gold)" strokeWidth={1.5} pointerEvents="none" />
+              <circle cx={p.x} cy={p.y} r={r}
+                fill={terrainColor(p.terrain)}
+                stroke={isPlayer ? 'var(--gold)' : isSelected ? 'var(--text)' : nationColor(p.ownerId, false)}
+                strokeWidth={isPlayer ? 2 : isSelected ? 1.7 : 0.9}
+                style={{ cursor: 'pointer' }} />
+              {isCapital && <text x={p.x} y={p.y - r - 10} textAnchor="middle" className="wm-capital-label">{owner.slice(0, 4)}</text>}
+              {armySize && (
+                <g>
+                  <title>{translate('{{count}} 兵', { count: armySize }, locale)}</title>
+                  <polygon points={`${p.x},${p.y - r - 7} ${p.x - 5},${p.y - r + 1} ${p.x + 5},${p.y - r + 1}`} fill="var(--war)" stroke="var(--gold)" strokeWidth={0.7} />
+                  <text x={p.x} y={p.y - r - 10} textAnchor="middle" fontSize={7} fill="var(--war)" style={{ pointerEvents: 'none' }}>{armySize}</text>
+                </g>
+              )}
+            </g>
+          );
+        })}
+      </g>
+    </svg>
+  );
+});

@@ -5,7 +5,7 @@
 import type { GameState, Nation, DiplomaticRelation } from '../types/game';
 import { relationDrift, computeThreat } from './formulas';
 import { clamp } from '../utils/math';
-import { provincesOf, getRelationObj } from './init';
+import { provincesOf, getRelationObj, relationPair } from './init';
 import { addChronicle } from './chronicle';
 import { mulberry32 } from '../utils/random';
 
@@ -46,152 +46,51 @@ export function findRelationExplicit(from: string, to: string, state: GameState)
 
 // 每回合关系自然漂移
 export function settleDiplomacy(state: GameState): void {
-  // E9 性能优化：预算 nation→provinces 和 nation→warOpponents 索引
-  // 消除内层 O(provinces) 和 O(wars) 扫描（1717 relations × 全省扫描）
-  const provsByOwner = new Map<string, ReturnType<typeof provincesOf>>();
-  const getProvs = (id: string): ReturnType<typeof provincesOf> => {
-    let arr = provsByOwner.get(id);
-    if (!arr) { arr = provincesOf(id, state.provinces); provsByOwner.set(id, arr); }
-    return arr;
-  };
-  // nation → 战争对手 Set
-  const warOpponents = new Map<string, Set<string>>();
-  for (const w of state.wars) {
-    let s1 = warOpponents.get(w.attackerId);
-    if (!s1) { s1 = new Set(); warOpponents.set(w.attackerId, s1); }
-    s1.add(w.defenderId);
-    let s2 = warOpponents.get(w.defenderId);
-    if (!s2) { s2 = new Set(); warOpponents.set(w.defenderId, s2); }
-    s2.add(w.attackerId);
-  }
-
-  for (const r of state.relations) {
-    // 检查停战期
-    if (r.treaty === 'truce' && r.truceTurns > 0) {
-      r.truceTurns -= 1;
-      if (r.truceTurns === 0) r.treaty = 'none';
-    }
-    // 边境相邻判定（用缓存）
-    const fromProvs = getProvs(r.from);
-    const toProvs = getProvs(r.to);
-    const borderClash = fromProvs.some((p) => p.adjacent.some((adj) => state.provinces[adj]?.ownerId === r.to));
-
-    // 共同敌人（用索引，O(1)）
-    const fromOps = warOpponents.get(r.from);
-    const toOps = warOpponents.get(r.to);
-    const atWarWithEachOther = !!(fromOps?.has(r.to));
-    const commonEnemy = atWarWithEachOther ? false : !!(
-      fromOps && toOps && [...fromOps].some((o) => toOps.has(o))
-    );
-
-    // 重新计算威胁
-    const fromNation = state.nations[r.from];
-    const toNation = state.nations[r.to];
-    if (fromNation && toNation) {
-      const fromMil = fromNation.army.reduce((s, a) => s + a.size, 0);
-      const toMil = toNation.army.reduce((s, a) => s + a.size, 0);
-      const toProvCount = toProvs.length;
-      r.threat = computeThreat(fromMil, toMil, toProvCount, r.relation);
-    }
-
-    if (r.treaty !== 'war') {
-      const d = relationDrift(r.treaty, borderClash, r.threat, commonEnemy);
-      r.relation = clamp(r.relation + d, -100, 100);
-    }
-  }
-
-  // P1 杆组闭环：联军反制阻尼——威胁值超阈值的国家被邻国联合抵制
-  // 逻辑：对每个国家，统计有多少邻国对其威胁值 ≥70；若 ≥3 个邻国抵制，触发联军反制
-  const threatThreshold = 70;
-  const coalitionMin = 3;  // 至少 3 个邻国抵制才触发
-  for (const nation of Object.values(state.nations)) {
-    if (nation.defeated) continue;
-    const nationProvs = getProvs(nation.id);
-    if (nationProvs.length === 0) continue;
-    // 收集所有邻国 id
-    const neighborIds = new Set<string>();
-    for (const p of nationProvs) {
-      for (const adj of p.adjacent) {
-        const adjProv = state.provinces[adj];
-        if (adjProv && adjProv.ownerId !== nation.id) neighborIds.add(adjProv.ownerId);
-      }
-    }
-    // 统计抵制邻国数（谁觉得该国威胁 ≥70）
-    let resisters = 0;
-    for (const nid of neighborIds) {
-      if (nid === 'rebel' || nid.startsWith('rebel_')) continue;
-      const r = getRelationObj(nid, nation.id, state);
-      if (r && r.threat >= threatThreshold) resisters++;
-    }
-    if (resisters >= coalitionMin) {
-      // 联军反制：该国稳定 -5、合法性 -3、所有抵制国对其关系再 -10
-      nation.government.stability = clamp(nation.government.stability - 5, 0, 100);
-      nation.government.legitimacy = clamp(nation.government.legitimacy - 3, 0, 100);
-      for (const nid of neighborIds) {
-        if (nid === 'rebel' || nid.startsWith('rebel_')) continue;
-        const r = getRelationObj(nid, nation.id, state);
-        if (r && r.threat >= threatThreshold) {
-          r.relation = clamp(r.relation - 10, -100, 100);
-          r.threat = clamp(r.threat + 5, 0, 100);  // 抵制国更警觉
-        }
-      }
-      // 纪事记录
-      addChronicle(state, {
-        id: `coalition_${nation.id}_${state.turn}`,
-        turn: state.turn, kind: 'milestone_diplomacy',
-        title: `${nation.name} 遭联军反制`,
-        desc: `${resisters} 个邻国因威胁过大联合抵制，稳定 -5、合法性 -3。`,
-        actorId: nation.id,
-      });
-    }
-  }
+  const result = settleDiplomacyPure(state);
+  for (const r of state.relations) Object.assign(r, result.relationsFinal[`${r.from}_${r.to}`]);
+  for (const [id, final] of Object.entries(result.nationsGovFinal)) Object.assign(state.nations[id].government, final);
+  for (const entry of result.newChronicle) addChronicle(state, entry);
 }
 
-// 改善关系
+export function peacefulRelationPair(state: GameState, from: string, to: string) {
+  if (from === to || !state.nations[to] || state.nations[to].defeated) return null;
+  const pair = relationPair(state, from, to);
+  return pair?.every((r) => r.treaty !== 'war' && r.treaty !== 'truce') ? pair : null;
+}
+
 export function improveRelation(nation: Nation, target: string, state: GameState): { ok: boolean; reason?: string } {
+  const pair = peacefulRelationPair(state, nation.id, target);
+  if (!pair) return { ok: false, reason: '当前无法改善关系' };
   if (nation.resources.influence < 20) return { ok: false, reason: '影响力不足' };
   nation.resources.influence -= 20;
-  const rel = getRelationObj(nation.id, target, state);
-  if (rel) rel.relation = clamp(rel.relation + 5, -100, 100);
+  pair[0].relation = clamp(pair[0].relation + 5, -100, 100);
   return { ok: true };
 }
 
-// 贸易协定
 export function establishTrade(nation: Nation, target: string, state: GameState): { ok: boolean; reason?: string } {
+  const pair = peacefulRelationPair(state, nation.id, target);
+  if (!pair || pair.some((r) => r.treaty !== 'none') || pair[0].relation < 0) return { ok: false, reason: '无法建立贸易' };
   if (nation.resources.influence < 30) return { ok: false, reason: '影响力不足' };
-  const rel = getRelationObj(nation.id, target, state);
-  if (!rel) return { ok: false, reason: '无外交关系' };
-  if (rel.treaty === 'war') return { ok: false, reason: '处于战争' };
-  if (rel.relation < 0) return { ok: false, reason: '关系过差' };
   nation.resources.influence -= 30;
-  rel.treaty = 'trade';
-  rel.tradeDep = 30;
-  // 对方关系也改善
-  const rel2 = getRelationObj(target, nation.id, state);
-  if (rel2) { rel2.treaty = 'trade'; rel2.tradeDep = 30; rel2.relation = clamp(rel2.relation + 10, -100, 100); }
+  for (const r of pair) { r.treaty = 'trade'; r.tradeDep = Math.max(30, r.tradeDep); }
+  pair[1].relation = clamp(pair[1].relation + 10, -100, 100);
   return { ok: true };
 }
 
-// 结盟
 export function formAlliance(nation: Nation, target: string, state: GameState): { ok: boolean; reason?: string } {
+  const pair = peacefulRelationPair(state, nation.id, target);
+  if (!pair || pair.some((r) => r.treaty === 'alliance') || pair[0].relation < 50) return { ok: false, reason: '无法结盟' };
   if (nation.resources.influence < 50) return { ok: false, reason: '影响力不足' };
-  const rel = getRelationObj(nation.id, target, state);
-  if (!rel) return { ok: false, reason: '无外交关系' };
-  if (rel.relation < 50) return { ok: false, reason: '关系不足' };
   nation.resources.influence -= 50;
-  rel.treaty = 'alliance';
-  rel.trust = clamp(rel.trust + 20, 0, 100);
-  const rel2 = getRelationObj(target, nation.id, state);
-  if (rel2) { rel2.treaty = 'alliance'; rel2.trust = clamp(rel2.trust + 20, 0, 100); }
+  for (const r of pair) { r.treaty = 'alliance'; r.trust = clamp(r.trust + 20, 0, 100); }
   return { ok: true };
 }
 
-// 撕毁条约（信任大降）
 export function breakTreaty(nation: Nation, target: string, state: GameState): void {
-  const rel = getRelationObj(nation.id, target, state);
-  if (rel) { rel.treaty = 'none'; rel.trust = clamp(rel.trust - 30, 0, 100); rel.relation = clamp(rel.relation - 20, -100, 100); }
-  const rel2 = getRelationObj(target, nation.id, state);
-  if (rel2) { rel2.treaty = 'none'; rel2.trust = clamp(rel2.trust - 30, 0, 100); }
+  const pair = peacefulRelationPair(state, nation.id, target);
+  if (!pair || pair.every((r) => r.treaty === 'none')) return;
+  for (const r of pair) { r.treaty = 'none'; r.trust = clamp(r.trust - 30, 0, 100); }
+  pair[0].relation = clamp(pair[0].relation - 20, -100, 100);
 }
 
 // E17: 间谍活动——窃取科技/煽动叛乱/刺探军情（耗影响力，失败降信任）
@@ -294,12 +193,18 @@ export interface DiplomacyPartial {
   newChronicle: Array<{ id: string; turn: number; kind: 'milestone_diplomacy'; title: string; desc: string; actorId: string }>;
 }
 export function settleDiplomacyPure(state: GameState): DiplomacyPartial {
-  const provsByOwner = new Map<string, ReturnType<typeof provincesOf>>();
-  const getProvs = (id: string): ReturnType<typeof provincesOf> => {
-    let arr = provsByOwner.get(id);
-    if (!arr) { arr = provincesOf(id, state.provinces); provsByOwner.set(id, arr); }
-    return arr;
-  };
+  const counts = new Map<string, number>();
+  const neighbors = new Map<string, Set<string>>();
+  for (const p of Object.values(state.provinces)) {
+    counts.set(p.ownerId, (counts.get(p.ownerId) ?? 0) + 1);
+    let borders = neighbors.get(p.ownerId);
+    if (!borders) { borders = new Set(); neighbors.set(p.ownerId, borders); }
+    for (const id of p.adjacent) {
+      const owner = state.provinces[id]?.ownerId;
+      if (owner && owner !== p.ownerId) borders.add(owner);
+    }
+  }
+  const armies = new Map(Object.values(state.nations).map((n) => [n.id, n.army.reduce((sum, a) => sum + a.size, 0)]));
   const warOpponents = new Map<string, Set<string>>();
   for (const w of state.wars) {
     let s1 = warOpponents.get(w.attackerId);
@@ -318,33 +223,21 @@ export function settleDiplomacyPure(state: GameState): DiplomacyPartial {
 
   // 先建 relation key → relation 对象索引（纯函数不 mutate，用 key 引用原对象算 final）
   const relKey = (r: { from: string; to: string }) => `${r.from}_${r.to}`;
-  const relByFromTo: Record<string, typeof state.relations[number]> = {};
-  for (const r of state.relations) relByFromTo[relKey(r)] = r;
-
   // 第一遍：算每条 relation final
   for (const r of state.relations) {
     let finalTruceTurns = r.truceTurns;
     let finalTreaty = r.treaty;
-    if (r.treaty === 'truce' && r.truceTurns > 0) {
-      finalTruceTurns = r.truceTurns - 1;
+    if (r.treaty === 'truce') {
+      finalTruceTurns = Math.max(0, r.truceTurns - 1);
       if (finalTruceTurns === 0) finalTreaty = 'none';
     }
-    const fromProvs = getProvs(r.from);
-    const toProvs = getProvs(r.to);
-    const borderClash = fromProvs.some((p) => p.adjacent.some((adj) => state.provinces[adj]?.ownerId === r.to));
+    const borderClash = neighbors.get(r.from)?.has(r.to) ?? false;
     const fromOps = warOpponents.get(r.from);
     const toOps = warOpponents.get(r.to);
     const atWarWithEachOther = !!(fromOps?.has(r.to));
     const commonEnemy = atWarWithEachOther ? false : !!(fromOps && toOps && [...fromOps].some((o) => toOps.has(o)));
-    const fromNation = state.nations[r.from];
-    const toNation = state.nations[r.to];
-    let finalThreat = r.threat;
-    if (fromNation && toNation) {
-      const fromMil = fromNation.army.reduce((s, a) => s + a.size, 0);
-      const toMil = toNation.army.reduce((s, a) => s + a.size, 0);
-      const toProvCount = toProvs.length;
-      finalThreat = computeThreat(fromMil, toMil, toProvCount, r.relation);
-    }
+    const fromMil = armies.get(r.from), toMil = armies.get(r.to);
+    const finalThreat = fromMil === undefined || toMil === undefined ? r.threat : computeThreat(fromMil, toMil, counts.get(r.to) ?? 0, r.relation);
     let finalRelation = r.relation;
     if (finalTreaty !== 'war') {
       const d = relationDrift(finalTreaty, borderClash, finalThreat, commonEnemy);
@@ -358,19 +251,12 @@ export function settleDiplomacyPure(state: GameState): DiplomacyPartial {
   const coalitionMin = 3;
   for (const nation of Object.values(state.nations)) {
     if (nation.defeated) continue;
-    const nationProvs = getProvs(nation.id);
-    if (nationProvs.length === 0) continue;
-    const neighborIds = new Set<string>();
-    for (const p of nationProvs) {
-      for (const adj of p.adjacent) {
-        const adjProv = state.provinces[adj];
-        if (adjProv && adjProv.ownerId !== nation.id) neighborIds.add(adjProv.ownerId);
-      }
-    }
+    const neighborIds = neighbors.get(nation.id);
+    if (!neighborIds) continue;
     let resisters = 0;
     const resisterIds: string[] = [];
     for (const nid of neighborIds) {
-      if (nid === 'rebel' || nid.startsWith('rebel_')) continue;
+      if (nid === 'rebel' || state.nations[nid]?.rebelOf) continue;
       const rf = relationsFinal[`${nid}_${nation.id}`];
       if (rf && rf.threat >= threatThreshold) { resisters++; resisterIds.push(nid); }
     }

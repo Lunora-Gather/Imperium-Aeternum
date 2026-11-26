@@ -8,30 +8,17 @@ import { provincesOf } from './init';
 import { GOVERNMENTS } from '../data/governments';
 import { POLICIES } from '../data/policies';
 import { LAWS } from '../data/laws';
-import { NATIONAL_CHARACTERS } from '../data/national-characters';
+import { nationalCharacterMods } from '../data/national-characters';
 import type { GovernmentId } from '../data/governments';
 import type { PolicyId } from '../data/policies';
-import type { NationalCharacterId, NationalCharacterMods } from '../data/national-characters';
 
-// P1-4: 合并激活性格的加成+副作用
-function charMods(nation: Nation): NationalCharacterMods {
-  const merged: NationalCharacterMods = {};
-  for (const cid of nation.activeCharacterBonuses) {
-    const def = NATIONAL_CHARACTERS[cid as NationalCharacterId];
-    if (!def) continue;
-    for (const [k, v] of Object.entries(def.bonuses)) { (merged as Record<string, number>)[k] = ((merged as Record<string, number>)[k] ?? 0) + (v as number); }
-    for (const [k, v] of Object.entries(def.penalties)) { (merged as Record<string, number>)[k] = ((merged as Record<string, number>)[k] ?? 0) + (v as number); }
-  }
-  return merged;
-}
 
 export interface PoliticsResult {
   stabilityDelta: number;
   legitimacyDelta: number;
 }
 
-export function settlePolitics(nation: Nation, state: GameState): PoliticsResult {
-  const provs = provincesOf(nation.id, state.provinces);
+export function settlePolitics(nation: Nation, state: GameState, provs = provincesOf(nation.id, state.provinces)): PoliticsResult {
   const fw = factionWeightedSat(nation.factions);
   const avgUnrest = provs.length ? provs.reduce((s, p) => s + p.unrest, 0) / provs.length : 0;
   const rebellionProvCount = provs.filter((p) => p.rebellionRisk >= 100).length;
@@ -86,7 +73,7 @@ export function settlePolitics(nation: Nation, state: GameState): PoliticsResult
   nation.government.corruption = clamp(nation.government.corruption + corruptionDelta, 0, 100);
 
   // P1-4: 性格加成——稳定度/合法性/行政效率/派系满意度
-  const cm = charMods(nation);
+  const cm = nationalCharacterMods(nation.activeCharacterBonuses);
   if (cm.stabilityMod) nation.government.stability = clamp(nation.government.stability + cm.stabilityMod, 0, 100);
   if (cm.legitimacyMod) nation.government.legitimacy = clamp(nation.government.legitimacy + cm.legitimacyMod, 0, 100);
   if (cm.efficiencyMod) nation.government.efficiency = clamp(nation.government.efficiency + cm.efficiencyMod, 0, 100);
@@ -170,7 +157,7 @@ export function enactPolicy(nation: Nation, policyId: PolicyId, state: GameState
   if (def.effects.taxRateMod) nation.taxRate = clamp(nation.taxRate + (def.effects.taxRateMod ?? 0), 0, 0.5);
 
   // 从已推行政策重建持续修正，避免重复调用、AI 与旧存档走出不同结果。
-  nation.policyMods = derivePolicyMods(nation);
+  nation.policyMods = derivePolicyMods(nation, def.effects.assimilationMod);
 
   // 派系反应
   for (const [fid, delta] of Object.entries(def.factionReaction)) {
@@ -187,7 +174,7 @@ function hasTech(nation: Nation, techId: string): boolean {
   return nation.tech[branch] >= Number(match[2]);
 }
 
-export function derivePolicyMods(nation: Nation): NonNullable<Nation['policyMods']> {
+export function derivePolicyMods(nation: Nation, addedAssimilation = 0): NonNullable<Nation['policyMods']> {
   const mods: NonNullable<Nation['policyMods']> = {};
   for (const active of nation.activePolicies) {
     const effects = POLICIES.find((policy) => policy.id === active.policyId)?.effects;
@@ -204,6 +191,12 @@ export function derivePolicyMods(nation: Nation): NonNullable<Nation['policyMods
       mods.influenceMod = (mods.influenceMod ?? 1) * influenceMultiplier;
     }
     if (effects.assimilationMod) mods.assimilationMod = (mods.assimilationMod ?? 0) + effects.assimilationMod;
+  }
+  // Events add permanent assimilation to the same persisted total as policies.
+  // Keep that contribution when loading or adding the newly enacted policy.
+  const saved = nation.policyMods?.assimilationMod;
+  if (saved !== undefined && Number.isFinite(saved)) {
+    mods.assimilationMod = Math.max(mods.assimilationMod ?? 0, saved + addedAssimilation);
   }
   return mods;
 }
@@ -323,8 +316,7 @@ export interface PoliticsPartial extends PoliticsResult {
   // 每派系 satisfaction 最终值（覆写）
   factionSatFinal: Record<string, number>;
 }
-export function settlePoliticsPure(nation: Nation, state: GameState): PoliticsPartial {
-  const provs = provincesOf(nation.id, state.provinces);
+export function settlePoliticsPure(nation: Nation, state: GameState, provs = provincesOf(nation.id, state.provinces)): PoliticsPartial {
   const fw = factionWeightedSat(nation.factions);
   const avgUnrest = provs.length ? provs.reduce((s, p) => s + p.unrest, 0) / provs.length : 0;
   const rebellionProvCount = provs.filter((p) => p.rebellionRisk >= 100).length;
@@ -359,7 +351,7 @@ export function settlePoliticsPure(nation: Nation, state: GameState): PoliticsPa
   let finalCorruption = clamp(nation.government.corruption + corruptionDelta, 0, 100);
 
   let finalEfficiency = nation.government.efficiency;
-  const cm = charMods(nation);
+  const cm = nationalCharacterMods(nation.activeCharacterBonuses);
   if (cm.stabilityMod) finalStab = clamp(finalStab + cm.stabilityMod, 0, 100);
   if (cm.legitimacyMod) finalLegit = clamp(finalLegit + cm.legitimacyMod, 0, 100);
   if (cm.efficiencyMod) finalEfficiency = clamp(finalEfficiency + cm.efficiencyMod, 0, 100);

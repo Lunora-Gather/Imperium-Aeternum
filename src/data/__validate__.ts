@@ -12,7 +12,7 @@ import { FACTIONS } from './factions';
 import { EVENTS } from './events';
 import { NATIONAL_CHARACTERS, BEHAVIOR_MAPPINGS } from './national-characters';
 import { createInitialState, createWorldState } from '../engine/init';
-import { SCENARIOS } from '../store/scenarioCatalog';
+import { SCENARIOS, RANDOM_SCENARIO_REGIONS, type ScenarioId } from '../store/scenarioCatalog';
 
 interface ValidateResult {
   ok: boolean;
@@ -20,41 +20,25 @@ interface ValidateResult {
   warnings: string[];
 }
 
-interface ScenarioCheck {
-  id: string;
-  seed: number;
-  playerNationId?: string;
-  regionFilter?: string[];
-  expectedMinNations: number;
-  expectedMinProvinces: number;
-  build: () => GameState;
-}
-
 const NEUTRAL_OWNER = 'barbarian';
 
-const SCENARIO_CHECKS: ScenarioCheck[] = [
-  { id: 'classic', seed: 12345, expectedMinNations: 5, expectedMinProvinces: 30, build: () => createInitialState() },
-  { id: 'world', seed: 20260626, playerNationId: 'n_med_rome', expectedMinNations: 120, expectedMinProvinces: 300, build: () => createWorldState(20260626, 'n_med_rome') },
-  { id: 'eastasia', seed: 20260626, playerNationId: 'n_ea_qin', regionFilter: ['asia_east', 'asia_central', 'asia_south'], expectedMinNations: 10, expectedMinProvinces: 30, build: () => createWorldState(20260626, 'n_ea_qin', ['asia_east', 'asia_central', 'asia_south']) },
-  { id: 'w3_eastasia', seed: 20260626, playerNationId: 'n_ea_qin', regionFilter: ['asia_east', 'asia_central', 'asia_south'], expectedMinNations: 10, expectedMinProvinces: 30, build: () => createWorldState(20260626, 'n_ea_qin', ['asia_east', 'asia_central', 'asia_south']) },
-  { id: 'w5_mediterranean', seed: 20260626, playerNationId: 'n_med_rome', regionFilter: ['mediterranean', 'europe_w', 'middle_east', 'africa_n'], expectedMinNations: 10, expectedMinProvinces: 30, build: () => createWorldState(20260626, 'n_med_rome', ['mediterranean', 'europe_w', 'middle_east', 'africa_n']) },
-  { id: 'w6_americas', seed: 20260626, playerNationId: 'n_am_inca', regionFilter: ['americas'], expectedMinNations: 5, expectedMinProvinces: 10, build: () => createWorldState(20260626, 'n_am_inca', ['americas']) },
-  { id: 'w4_europe', seed: 20260626, playerNationId: 'n_we_frank', regionFilter: ['europe_w', 'europe_e', 'europe_n', 'mediterranean'], expectedMinNations: 10, expectedMinProvinces: 30, build: () => createWorldState(20260626, 'n_we_frank', ['europe_w', 'europe_e', 'europe_n', 'mediterranean']) },
-  { id: 'w8_indianocean', seed: 20260626, playerNationId: 'n_sa_maurya', regionFilter: ['asia_south', 'africa_e', 'middle_east'], expectedMinNations: 8, expectedMinProvinces: 24, build: () => createWorldState(20260626, 'n_sa_maurya', ['asia_south', 'africa_e', 'middle_east']) },
-  { id: 'w7_random', seed: 20260627, regionFilter: ['asia_east'], expectedMinNations: 5, expectedMinProvinces: 10, build: () => createWorldState(20260627, undefined, ['asia_east']) },
-  { id: 'challenge_survival', seed: 12345, expectedMinNations: 5, expectedMinProvinces: 30, build: () => createInitialState() },
-];
+// Minimum generated nation/province counts. The launch catalog supplies the actual region filters.
+const MIN_SIZE: Record<ScenarioId, [number, number]> = {
+  classic: [5, 30], world: [120, 300], eastasia: [10, 30], w3_eastasia: [10, 30],
+  w5_mediterranean: [10, 30], w6_americas: [5, 10], w4_europe: [10, 30],
+  w8_indianocean: [8, 24], w7_random: [5, 10], challenge_survival: [5, 30],
+};
 
 function fail(acc: ValidateResult, msg: string): void { acc.errors.push(msg); acc.ok = false; }
 function warn(acc: ValidateResult, msg: string): void { acc.warnings.push(msg); }
 function isFiniteNumber(v: unknown): v is number { return typeof v === 'number' && Number.isFinite(v); }
 function hasRuntimeOwner(state: GameState, ownerId: string): boolean { return ownerId === NEUTRAL_OWNER || !!state.nations[ownerId]; }
 
-function validateGameStateShape(acc: ValidateResult, scenario: ScenarioCheck, state: GameState): void {
+function validateGameStateShape(acc: ValidateResult, scenario: typeof SCENARIOS[number], state: GameState): void {
   const nations = Object.values(state.nations);
   const provinces = Object.values(state.provinces);
-  if (nations.length < scenario.expectedMinNations) fail(acc, `剧本 ${scenario.id} 国家数过少：${nations.length} < ${scenario.expectedMinNations}`);
-  if (provinces.length < scenario.expectedMinProvinces) fail(acc, `剧本 ${scenario.id} 省份数过少：${provinces.length} < ${scenario.expectedMinProvinces}`);
+  if (nations.length < MIN_SIZE[scenario.id][0]) fail(acc, `剧本 ${scenario.id} 国家数过少：${nations.length} < ${MIN_SIZE[scenario.id][0]}`);
+  if (provinces.length < MIN_SIZE[scenario.id][1]) fail(acc, `剧本 ${scenario.id} 省份数过少：${provinces.length} < ${MIN_SIZE[scenario.id][1]}`);
   if (!state.playerNationId || !state.nations[state.playerNationId]) fail(acc, `剧本 ${scenario.id} 玩家国家不存在：${state.playerNationId}`);
   const markedPlayers = nations.filter((n) => n.isPlayer);
   if (markedPlayers.length !== 1) fail(acc, `剧本 ${scenario.id} isPlayer 标记应恰好 1，实际 ${markedPlayers.length}`);
@@ -101,14 +85,6 @@ function validateGameStateShape(acc: ValidateResult, scenario: ScenarioCheck, st
 
 export function validateData(): ValidateResult {
   const acc: ValidateResult = { ok: true, errors: [], warnings: [] };
-  const scenarioCheckIds = new Set(SCENARIO_CHECKS.map((scenario) => scenario.id));
-  for (const scenario of SCENARIOS) {
-    if (!scenarioCheckIds.has(scenario.id)) fail(acc, `可选剧本 ${scenario.id} 缺少生成校验`);
-  }
-  for (const scenario of SCENARIO_CHECKS) {
-    if (!SCENARIOS.some((entry) => entry.id === scenario.id)) fail(acc, `生成校验 ${scenario.id} 没有对应的可选剧本`);
-  }
-  if (scenarioCheckIds.size !== SCENARIO_CHECKS.length) fail(acc, '剧本生成校验存在重复 id');
   if (NATIONS.length !== 5) fail(acc, `经典国家数应为 5，实际 ${NATIONS.length}`);
   const players = NATIONS.filter((n) => n.isPlayer);
   if (players.length !== 1) fail(acc, `经典玩家国家应 1，实际 ${players.length}`);
@@ -198,9 +174,27 @@ export function validateData(): ValidateResult {
   for (const b of BEHAVIOR_MAPPINGS) for (const k of Object.keys(b.tendencyGain)) if (!NATIONAL_CHARACTERS[k as keyof typeof NATIONAL_CHARACTERS]) fail(acc, `行为 ${b.actionId} 性格 ${k} 不存在`);
   for (const f of Object.values(FACTIONS)) if (!EVENTS.find((e) => e.id === f.coupEventId)) fail(acc, `派系 ${f.id} 逼宫事件 ${f.coupEventId} 不存在`);
 
-  for (const scenario of SCENARIO_CHECKS) {
-    try { validateGameStateShape(acc, scenario, scenario.build()); }
-    catch (e) { fail(acc, `剧本 ${scenario.id} 生成异常：${e instanceof Error ? e.message : String(e)}`); }
+  for (const id of Object.keys(MIN_SIZE)) {
+    if (SCENARIOS.filter(s => s.id === id).length !== 1) fail(acc, `剧本目录应恰好包含一个 ${id}`);
+  }
+  for (const scenario of SCENARIOS) {
+    try {
+      const regions = scenario.id === 'w7_random' ? RANDOM_SCENARIO_REGIONS.map(ids => [...ids]) : [scenario.regionFilter];
+      const choices = scenario.playableNations ?? [];
+      if (scenario.needsNationPick && !choices.length) fail(acc, `剧本 ${scenario.id} 无可选邦国`);
+      for (const filter of regions) {
+        const state = scenario.id === 'classic' || scenario.id === 'challenge_survival'
+          ? createInitialState()
+          : createWorldState(20260626, choices[0]?.id, filter);
+        validateGameStateShape(acc, scenario, state);
+        for (const choice of choices) {
+          const generated = state.nations[choice.id];
+          if (generated?.name !== choice.name || generated.tier !== choice.tier) {
+            fail(acc, `剧本 ${scenario.id} 可选邦国与实际版图不符：${choice.id} ${choice.name}（${choice.tier}）`);
+          }
+        }
+      }
+    } catch (e) { fail(acc, `剧本 ${scenario.id} 生成异常：${e instanceof Error ? e.message : String(e)}`); }
   }
   return acc;
 }

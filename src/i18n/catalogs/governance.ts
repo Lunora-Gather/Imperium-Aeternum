@@ -1,6 +1,8 @@
 import { registerEnglishPatterns, registerEnglishTranslations } from '..';
 
 const en: Record<string, string> = {
+  '每回合投入可用科研点，点数足够后支付金并完成研发。': 'Available research is invested each turn. Once fully funded, the project completes when you can pay its gold cost.',
+  '行动点不足（需 1）': 'Requires 1 AP',
   '帕提亚': 'Parthia', '波斯': 'Persia', '西顿': 'Sidon',
   '危机': 'Crisis', '宗教': 'Religion', '机遇': 'Opportunity', '待决事件': 'Pending event',
   '进度': 'Progress', '税率': 'Tax rate', '战争进度': 'War progress', '研究进度': 'Research progress', '净收入': 'Net income',
@@ -10,6 +12,11 @@ const en: Record<string, string> = {
   '天下舆图': 'World Map', '羊皮战略图 · 点为省份，光晕为国土影响，线为道路/边境联系。': 'Parchment strategy map · dots are provinces, halos show national influence, and lines show roads or borders.',
   '全图': 'All', '吾土': 'Our realm', '边境': 'Frontier', '风险': 'Risk', '显示省份': 'Show provinces', '首都': 'Capital', '边境点': 'Frontier nodes',
   '搜索地图': 'Search map', '搜索省份或国家': 'Search provinces or nations', '没有符合条件的省份': 'No matching provinces', '清空搜索或切换地图筛选后继续。': 'Clear the search or change the map filter to continue.',
+  '需要 {{count}} 兵': 'Requires {{count}} troops',
+  '选择省份': 'Select a province', '中立省份': 'Neutral province', '治理此省 →': 'Govern province →',
+  '搜索省份、国家或地形': 'Search by province, nation, or terrain', '选择省份查看详情': 'Select a province for details',
+  '点选地图或从列表选省，再选择治理此省。': 'Choose a province on the map or in the list. Select Govern province to manage your land.',
+  '苔原': 'Tundra', '丛林': 'Jungle', '沼泽': 'Swamp', '海洋': 'Ocean', '岛屿': 'Island', '{{count}} 兵': '{{count}} troops',
   '悬停省份查看详情': 'Hover over a province for details', '金色外圈为吾土，大圆为首都。点击吾土省份可进入省份治理。': 'Gold outlines mark your realm; large circles are capitals. Select one of your provinces to govern it.',
   '平原': 'Plains', '丘陵': 'Hills', '山地': 'Mountains', '海岸': 'Coast', '沙漠': 'Desert', '森林': 'Forest', '河谷': 'River valley', '湿地': 'Wetlands',
   '省政判断': 'Provincial Assessment', '平均不满': 'Average unrest', '越低越稳': 'Lower is safer', '平均忠诚': 'Average loyalty', '越高越稳': 'Higher is safer',
@@ -85,7 +92,7 @@ const en: Record<string, string> = {
   '编户齐民法': 'Household Registration Act', '普查人口户籍，税收效率大升但贵族抵制。': 'Register households to raise tax efficiency despite noble resistance.',
   '商团特许法': 'Guild Charter Act', '授予商团专营特权，贸易升但小商户不满。': 'Grant guild monopolies, increasing trade but angering small merchants.',
   '宗教宽容法': 'Religious Tolerance Act',
-  '科技路线判断': 'Technology Route Assessment', '⚖ 补行政': '⚖ Improve administration', '补行政': 'Improve administration', '腐败和治能问题会拖累全局，行政科技能打开政策和法律空间。': 'Corruption and weak administration hold the state back; administrative technology unlocks policies and laws.', '✦ 补文化': '✦ Improve culture', '补文化': 'Improve culture', '文化': 'Culture', '文化科技适合外交、合法性和长期影响力路线。': 'Cultural technology supports diplomacy, legitimacy, and long-term influence.', '⚖ 通用路线': '⚖ General route', '通用路线': 'General route', '行政科技通常最稳，能解锁政策、法律和治理效率。': 'Administrative technology is usually safest and unlocks policies, laws, and governing efficiency.', '科技总览': 'Technology Overview', '农业': 'Agriculture', '军事': 'Military', '行政': 'Administration', '点下方科技即时研发完成（扣科研点+金）。优先按上方路线判断选择关键突破。': 'Research a technology below instantly by spending research and gold. Follow the route assessment for key breakthroughs.', '已学': 'Learned', '科研不足': 'Insufficient research', '锁定': 'Locked', '下一项：': 'Next: ', '科/': ' research / ', '科 · ': ' research · ', '科': ' research', '金': ' gold',
+  '科技路线判断': 'Technology Route Assessment', '⚖ 补行政': '⚖ Improve administration', '补行政': 'Improve administration', '腐败和治能问题会拖累全局，行政科技能打开政策和法律空间。': 'Corruption and weak administration hold the state back; administrative technology unlocks policies and laws.', '✦ 补文化': '✦ Improve culture', '补文化': 'Improve culture', '文化': 'Culture', '文化科技适合外交、合法性和长期影响力路线。': 'Cultural technology supports diplomacy, legitimacy, and long-term influence.', '⚖ 通用路线': '⚖ General route', '通用路线': 'General route', '行政科技通常最稳，能解锁政策、法律和治理效率。': 'Administrative technology is usually safest and unlocks policies, laws, and governing efficiency.', '科技总览': 'Technology Overview', '农业': 'Agriculture', '军事': 'Military', '行政': 'Administration', '每项科技消耗 1 行动点，以及列出的科研点和金。点击研发即可完成。': 'Each technology costs 1 AP plus the research and gold shown. Select Research to complete it immediately.', '已学': 'Learned', '科研不足': 'Insufficient research', '锁定': 'Locked', '下一项：': 'Next: ', '科/': ' research / ', '科 · ': ' research · ', '科': ' research', '金': ' gold',
   '政策（': 'Policies (', '法律（': 'Laws (', '）': ')', '岁': ' years old', '岁 · 能力 ': ' years old · Ability ', ' · 能力 ': ' · Ability ', '政 · ': ' admin · ',
   '休耕轮作': 'Crop Rotation', '基础耕作改进，提升粮食产量。': 'Improved basic cultivation raises food output.',
   '铁制农具': 'Iron Farm Tools', '推广铁犁铁锄，粮产再提升。': 'Iron plows and hoes raise food output again.',
@@ -176,6 +183,7 @@ const en: Record<string, string> = {
   '粮储下降，后续饥荒风险升高。': 'Food reserves will fall, increasing the risk of famine.',
   '史册判断': 'Chronicle Assessment', '时间线': 'Timeline', '分类': 'Categories', '总条目': 'Total entries', '治世': 'Governance', '武功': 'Military deeds', '危局': 'Crises', '奠基纪元': 'Founding Era', '继续推进回合，史册会记录开国、扩张、危机和改革。': 'Continue advancing; the chronicle will record founding, expansion, crises, and reforms.', '尚无史载': 'No historical records', '帝国初立，史册未开。推进回合，开国、扩张、武功、危局诸事将载入史册。': 'The empire is newly founded and its chronicle is blank. Advance years to record its founding, expansion, victories, and crises.',
   '扩张': 'Expansion', '改革': 'Reforms', '治下': 'under', '已历': 'elapsed',
+  '原始 {{size}} KB · 节省 {{percent}}%': 'Original {{size}} KB · {{percent}}% saved',
   '存档恢复体检': 'Save Recovery Check', '已用槽位': 'Used slots', '手动存档': 'Manual saves', '可自动修复': 'Auto-repairable', '风险/损坏': 'Risk/Damaged', '当前为游客模式': 'Guest mode', '本地存档完整可用；登录后可将槽位同步到 Appwrite 私有云端。': 'Local saves are fully available. Sign in to sync slots to your private Appwrite cloud.', '存档管理': 'Save Management', '操作': 'Actions', '新游戏': 'New Game', '清空全部存档': 'Delete all saves', '空': 'Empty', '空槽位，可保存当前路线。': 'Empty slot; save the current route here.', '存档到此': 'Save here', '稳定': 'Stability', '统治者': 'Ruler',
   '云端同步': 'Cloud Sync', '还没有手动存档，建议立刻存到槽位 1-4。': 'No manual save yet. Save to slot 1–4 now.',
   '存档槽位（槽位 0 = 自动存档）': 'Save Slots (slot 0 = autosave)', '槽位 0（自动）': 'Slot 0 (Auto)',
@@ -200,6 +208,7 @@ export function registerGovernanceTranslations(): void {
   if (registered) return;
   registerEnglishTranslations(en);
   registerEnglishPatterns([
+    { pattern: /^本年触发 (\d+) 起事件，选项效果在做出选择后生效。$/, replacement: '$1 events arose this year. Their effects apply when you choose a response.' },
     { pattern: /^槽位 (\d+)$/, replacement: 'Slot $1' },
     { pattern: /^当前：第 (\d+) 年$/, replacement: 'Current: Year $1' },
     { pattern: /^存档架构 v?(\d+)$/i, replacement: 'Save schema v$1' },

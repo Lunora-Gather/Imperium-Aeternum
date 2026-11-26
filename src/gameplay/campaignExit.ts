@@ -12,7 +12,7 @@ export function buildCampaignExitPolicy(shared: boolean): CampaignExitPolicy {
         showDiscardAction: false,
         saveBeforePrimary: false,
         statusTone: 'good',
-        statusLabel: '服务器已保存共享进度',
+        statusLabel: '共享进度由服务器保存',
         primaryLabel: '退出并返回大厅',
       }
     : {

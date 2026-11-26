@@ -1,10 +1,9 @@
 // 存档恢复预检：只读分析槽位健康度，不提前修改 localStorage。
 // 与 V14 readiness + V15 hygiene 形成闭环：预览问题、展示修复项、读档时再真正迁移写回。
 
-import type { SaveGame, GameState } from '../types/game';
-import { SAVE_VERSION, compactGameStateForSave, migrate, readSaveGameFromSlot } from '../store/persistence';
+import type { GameState } from '../types/game';
+import { SAVE_VERSION, SLOT_COUNT, migrateParsedSave, readSaveGameFromSlot, recoverMigratedSave, slotStorageValue, readStoredSave, type SlotReadResult } from '../store/persistence';
 import { buildReadinessReport } from './readiness';
-import { sanitizeState } from './stateHygiene';
 
 export type SaveRecoveryStatus = 'empty' | 'healthy' | 'repairable' | 'risky' | 'broken';
 export type SaveRecoveryTone = 'good' | 'warn' | 'danger' | 'info';
@@ -17,24 +16,15 @@ export interface SaveRecoveryPreview {
   details: string[];
   repairs: string[];
   savedKB?: number;
+  storageSavingsPercent?: number;
   compactedKB?: number;
   version?: number;
+  createdAt?: string;
   turn?: number;
   nationName?: string;
+  defeated?: boolean;
   score?: number;
   devIssueCount?: number;
-}
-
-function clone<T>(value: T): T {
-  return JSON.parse(JSON.stringify(value)) as T;
-}
-
-function sizeKB(value: unknown): number {
-  return Math.max(1, Math.round(JSON.stringify(value).length / 1024));
-}
-
-function safeMigrate(save: SaveGame): SaveGame {
-  return migrate(clone(save));
 }
 
 function safeReadiness(state: GameState) {
@@ -68,8 +58,7 @@ function structuralRepairs(before: GameState, after: GameState): string[] {
   return [...new Set(repairs)];
 }
 
-export function inspectSaveSlot(slot: number): SaveRecoveryPreview {
-  const read = readSaveGameFromSlot(slot);
+function inspectCurrentSlot(slot: number, read: SlotReadResult): SaveRecoveryPreview {
   if (!read.ok) {
     return {
       slot,
@@ -84,30 +73,30 @@ export function inspectSaveSlot(slot: number): SaveRecoveryPreview {
   try {
     const originalVersion = read.save.version ?? 0;
     const hadTransientRelMap = !!read.save.gameState?._relMap;
-    const migrated = safeMigrate(read.save);
+    const migrated = migrateParsedSave(read.save);
     const migratedState = migrated.gameState;
-    const repairedState = sanitizeState(migratedState);
-    const compacted = { ...migrated, version: SAVE_VERSION, gameState: compactGameStateForSave(repairedState) };
+    const compacted = recoverMigratedSave(migrated);
+    const repairedState = compacted.gameState;
     const beforeReport = safeReadiness(migratedState);
-    const afterReport = safeReadiness(repairedState);
+    const afterReport = buildReadinessReport(repairedState);
 
     const repairs = structuralRepairs(migratedState, repairedState);
     if (hadTransientRelMap) repairs.unshift('清理临时外交缓存');
     if (originalVersion < SAVE_VERSION) repairs.unshift(`升级存档架构 v${originalVersion || '?'} → v${SAVE_VERSION}`);
-    const compactedKB = sizeKB(compacted);
+    const compactedKB = Math.round(new Blob([JSON.stringify(compacted)]).size / 1024);
     if (read.sizeKB - compactedKB >= 64) repairs.push(`瘦身约 ${read.sizeKB - compactedKB}KB`);
 
     const devBefore = beforeReport?.devChecks.length ?? 0;
-    const devAfter = afterReport?.devChecks.length ?? 0;
+    const devAfter = afterReport.devChecks.length;
     if (devBefore > devAfter) repairs.push(`修复开发体检项 ${devBefore - devAfter} 项`);
 
-    const score = afterReport?.score ?? 0;
-    const status: SaveRecoveryStatus = devAfter > 0 || (afterReport?.blockers.length ?? 0) > 0
+    const score = afterReport.score;
+    const status: SaveRecoveryStatus = devAfter > 0 || afterReport.blockers.length > 0
       ? 'risky'
       : repairs.length > 0
         ? 'repairable'
         : 'healthy';
-    const tone: SaveRecoveryTone = status === 'healthy' ? 'good' : status === 'risky' ? 'warn' : 'warn';
+    const tone: SaveRecoveryTone = status === 'healthy' ? 'good' : 'warn';
     const label = status === 'healthy' ? '健康' : status === 'risky' ? '可读但有风险' : '可自动修复';
 
     return {
@@ -116,17 +105,20 @@ export function inspectSaveSlot(slot: number): SaveRecoveryPreview {
       tone,
       label,
       details: [
-        `第 ${(migratedState.turn ?? 0) + 1} 年`,
-        nationName(migratedState) ?? '未知国家',
+        `第 ${repairedState.turn + 1} 年`,
+        nationName(repairedState) ?? '未知国家',
         `体检 ${score}/100`,
         devAfter > 0 ? `仍有开发体检项 ${devAfter} 项` : '结构体检通过',
       ],
       repairs: [...new Set(repairs)].slice(0, 6),
       savedKB: read.sizeKB,
+      storageSavingsPercent: read.stored === read.raw ? undefined : Math.round(100 * (1 - read.stored.length / read.raw.length)),
       compactedKB,
       version: originalVersion,
-      turn: migratedState.turn ?? 0,
-      nationName: nationName(migratedState),
+      createdAt: read.save.createdAt,
+      turn: repairedState.turn,
+      defeated: repairedState.victory.type?.startsWith('fail'),
+      nationName: nationName(repairedState),
       score,
       devIssueCount: devAfter,
     };
@@ -143,6 +135,38 @@ export function inspectSaveSlot(slot: number): SaveRecoveryPreview {
   }
 }
 
-export function inspectAllSaveSlots(slotCount = 5): SaveRecoveryPreview[] {
+export function inspectStoredSlot(slot: number, stored: string): SaveRecoveryPreview {
+  return inspectCurrentSlot(slot, readStoredSave(stored));
+}
+
+// Reading a slot's exact storage value also detects changes from another tab.
+// Cache only the summary, never a mutable game state or a successful load.
+const previews = new Map<number, { stored: string; preview: SaveRecoveryPreview }>();
+
+export function cachedSavePreview(slot: number, stored: string | null): SaveRecoveryPreview | undefined {
+  if (stored === null) {
+    previews.delete(slot);
+    return inspectCurrentSlot(slot, readStoredSave(null));
+  }
+  const cached = previews.get(slot);
+  if (cached?.stored !== stored) return;
+  return { ...cached.preview, details: [...cached.preview.details], repairs: [...cached.preview.repairs] };
+}
+
+export function cacheSavePreview(slot: number, stored: string, preview: SaveRecoveryPreview) {
+  previews.set(slot, { stored, preview });
+}
+
+export function inspectSaveSlot(slot: number): SaveRecoveryPreview {
+  let stored: string | null;
+  try { stored = slotStorageValue(slot); } catch { return inspectCurrentSlot(slot, readSaveGameFromSlot(slot)); }
+  const cached = cachedSavePreview(slot, stored);
+  if (cached) return cached;
+  const preview = inspectCurrentSlot(slot, readStoredSave(stored));
+  if (stored !== null) cacheSavePreview(slot, stored, preview);
+  return { ...preview, details: [...preview.details], repairs: [...preview.repairs] };
+}
+
+export function inspectAllSaveSlots(slotCount = SLOT_COUNT): SaveRecoveryPreview[] {
   return Array.from({ length: slotCount }, (_, slot) => inspectSaveSlot(slot));
 }

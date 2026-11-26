@@ -1,7 +1,8 @@
-import { Channel, ExecutionMethod, Query, type Models } from 'appwrite';
+import { ExecutionMethod, Query, type Models } from 'appwrite';
 import type { DirectMessage, Friendship, GameProfile, WorldChatMessage } from '../../social/types';
-import { APPWRITE_CONFIG } from './config';
-import { getAppwriteServices } from './client';
+import { APPWRITE_CONFIG, tableRowChannel } from './config';
+import { getAppwriteServices, storageFileUrl } from './client';
+import { useAccountStore } from '../../store/accountStore';
 
 interface ProfileRow extends Models.Row { userId: string; displayName: string; friendCode: string; title?: string | null; bio?: string | null; avatarColor?: string | null; createdAt: string; lastSeenAt: string }
 interface FriendshipRow extends Models.Row { pairKey: string; requesterId: string; addresseeId: string; requesterName: string; addresseeName: string; status: Friendship['status']; createdAt: string; respondedAt: string | null }
@@ -15,10 +16,17 @@ const directMessage = (row: DirectMessageRow): DirectMessage => ({ id: row.$id, 
 
 interface SocialGatewayResult { ok: boolean; message?: string | MessageRow | DirectMessageRow; profile?: ProfileRow; profiles?: ProfileRow[]; messages?: (MessageRow | DirectMessageRow)[] }
 
-async function executeSocial(action: string, data: Record<string, unknown> = {}): Promise<SocialGatewayResult> {
+function currentActor(): string {
+  const id = useAccountStore.getState().user?.$id;
+  if (!id) throw new Error('需要登录后使用社交功能');
+  return id;
+}
+
+async function executeSocial(action: string, data: Record<string, unknown> = {}, expectedUserId = currentActor()): Promise<SocialGatewayResult> {
+  if (currentActor() !== expectedUserId) throw new Error('登录账号已更换');
   const execution = await getAppwriteServices().functions.createExecution({
     functionId: APPWRITE_CONFIG.socialGatewayFunctionId,
-    body: JSON.stringify({ action, ...data }),
+    body: JSON.stringify({ action, ...data, expectedUserId }),
     async: false,
     xpath: '/',
     method: ExecutionMethod.POST,
@@ -87,12 +95,14 @@ async function fileToBase64(file: File): Promise<string> {
     const reader = new FileReader();
     reader.onload = () => resolve(String(reader.result ?? ''));
     reader.onerror = () => reject(new Error('图片读取失败'));
+    reader.onabort = () => reject(new Error('图片读取已取消'));
     reader.readAsDataURL(file);
   });
   return dataUrl.slice(dataUrl.indexOf(',') + 1);
 }
 
 export async function sendWorldImage(worldId: string, file: File, caption: string, nationId?: string): Promise<WorldChatMessage> {
+  const sender = currentActor();
   if (!ALLOWED_IMAGE_TYPES.has(file.type)) throw new Error('仅支持 JPG、PNG、WebP 或 GIF 图片');
   if (file.size <= 0 || file.size > MAX_IMAGE_BYTES) throw new Error('图片大小需要在 2MB 以内');
   const result = await executeSocial('send_world_image', {
@@ -102,7 +112,7 @@ export async function sendWorldImage(worldId: string, file: File, caption: strin
     fileName: file.name.slice(0, 120),
     mime: file.type,
     base64: await fileToBase64(file),
-  });
+  }, sender);
   if (!result.message || typeof result.message === 'string') throw new Error('图片发送后未返回记录');
   return message(result.message as MessageRow);
 }
@@ -124,21 +134,22 @@ export async function sendDirectMessage(friendUserId: string, body: string): Pro
 }
 
 export async function sendDirectImage(friendUserId: string, file: File, caption: string): Promise<DirectMessage> {
+  const sender = currentActor();
   if (!ALLOWED_IMAGE_TYPES.has(file.type)) throw new Error('仅支持 JPG、PNG、WebP 或 GIF 图片');
   if (file.size <= 0 || file.size > MAX_IMAGE_BYTES) throw new Error('图片大小需要在 2MB 以内');
-  const result = await executeSocial('send_direct_image', { friendUserId, caption: caption.trim().slice(0, 300), fileName: file.name.slice(0, 120), mime: file.type, base64: await fileToBase64(file) });
+  const result = await executeSocial('send_direct_image', { friendUserId, caption: caption.trim().slice(0, 300), fileName: file.name.slice(0, 120), mime: file.type, base64: await fileToBase64(file) }, sender);
   if (!result.message || typeof result.message === 'string') throw new Error('私信图片发送后未返回记录');
   return directMessage(result.message as DirectMessageRow);
 }
 
 export function worldMessageMediaUrl(fileId: string): string {
-  return getAppwriteServices().storage.getFileView({ bucketId: APPWRITE_CONFIG.worldChatMediaBucketId, fileId }).toString();
+  return storageFileUrl(APPWRITE_CONFIG.worldChatMediaBucketId, fileId, 'view').toString();
 }
 
 export async function subscribeToWorldChat(worldId: string, onMessage: (entry: WorldChatMessage) => void): Promise<() => Promise<void>> {
   const { realtime } = getAppwriteServices();
   const subscription = await realtime.subscribe(
-    Channel.tablesdb(APPWRITE_CONFIG.databaseId).table(APPWRITE_CONFIG.worldMessageTableId).row(),
+    tableRowChannel(APPWRITE_CONFIG.worldMessageTableId),
     (event) => {
       const payload = event.payload as Partial<MessageRow>;
       if (payload.worldId === worldId && payload.$id) onMessage(message(payload as MessageRow));
@@ -149,7 +160,7 @@ export async function subscribeToWorldChat(worldId: string, onMessage: (entry: W
 
 export async function subscribeToDirectMessages(userId: string, onMessage: (entry: DirectMessage) => void): Promise<() => Promise<void>> {
   const subscription = await getAppwriteServices().realtime.subscribe(
-    Channel.tablesdb(APPWRITE_CONFIG.databaseId).table(APPWRITE_CONFIG.directMessageTableId).row(),
+    tableRowChannel(APPWRITE_CONFIG.directMessageTableId),
     (event) => {
       const payload = event.payload as Partial<DirectMessageRow>;
       if (payload.$id && (payload.senderId === userId || payload.recipientId === userId)) onMessage(directMessage(payload as DirectMessageRow));
@@ -160,7 +171,7 @@ export async function subscribeToDirectMessages(userId: string, onMessage: (entr
 
 export async function subscribeToFriendships(onChange: () => void): Promise<() => Promise<void>> {
   const subscription = await getAppwriteServices().realtime.subscribe(
-    Channel.tablesdb(APPWRITE_CONFIG.databaseId).table(APPWRITE_CONFIG.friendshipTableId).row(),
+    tableRowChannel(APPWRITE_CONFIG.friendshipTableId),
     () => onChange(),
   );
   return async () => { await subscription.unsubscribe(); };

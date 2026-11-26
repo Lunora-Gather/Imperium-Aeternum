@@ -69,7 +69,7 @@ export const SCENARIO_PROFILES: Record<ScenarioId, ScenarioProfile> = {
   },
   w8_indianocean: {
     style: '海贸经营', difficulty: '中', tone: 'good', audience: '喜欢贸易和港口路线', marketTag: '贸易推荐',
-    advice: '南亚、东非、中东围绕海贸互动，经济路线清晰，适合偏经营玩家。',
+    advice: '南亚、北非、中东和大洋洲围绕海贸互动，经济路线清晰，适合偏经营玩家。',
   },
   challenge_survival: {
     style: '高压生存', difficulty: '极高', tone: 'danger', audience: '硬核玩家 / 失败也能接受', marketTag: '硬核挑战',
@@ -101,15 +101,22 @@ export function nationStyleTags(desc: string, tier: string): NationStyleTag[] {
   return out.slice(0, 4);
 }
 
+function savedAt(preview: SaveRecoveryPreview): number {
+  return typeof preview.createdAt === 'string' ? Date.parse(preview.createdAt) || 0 : 0;
+}
+
 export function pickBestContinueSave(previews: SaveRecoveryPreview[]): SaveRecoveryPreview | undefined {
   return previews
     .filter((p) => STATUS_RANK[p.status] > 0)
     .sort((a, b) => {
+      if (!!a.defeated !== !!b.defeated) return a.defeated ? 1 : -1;
       const rank = STATUS_RANK[b.status] - STATUS_RANK[a.status];
       if (rank !== 0) return rank;
       const turn = (b.turn ?? -1) - (a.turn ?? -1);
       if (turn !== 0) return turn;
-      // 同等条件下偏向手动档，自动档 slot 0 排后。
+      const recency = savedAt(b) - savedAt(a);
+      if (recency !== 0) return recency;
+      // 同时保存或旧档缺少日期时，优先手动槽。
       if (a.slot === 0 && b.slot !== 0) return 1;
       if (b.slot === 0 && a.slot !== 0) return -1;
       return a.slot - b.slot;

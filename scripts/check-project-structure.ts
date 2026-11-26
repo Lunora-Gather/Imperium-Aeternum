@@ -22,8 +22,9 @@ const inbound = new Map(sourceFiles.map((file) => [resolve(file), [] as string[]
 
 function resolveRelativeImport(from: string, specifier: string): string | null {
   if (!specifier.startsWith('.')) return null;
-  const base = resolve(dirname(from), specifier);
+  const base = resolve(dirname(from), specifier.split('?')[0]);
   const candidates = [
+    base,
     `${base}.ts`,
     `${base}.tsx`,
     join(base, 'index.ts'),

@@ -1,9 +1,11 @@
+import { AppwriteException } from 'appwrite';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
   createEmailPasswordSession: vi.fn(),
   createSession: vi.fn(),
   deleteSession: vi.fn(),
+  getSession: vi.fn(),
   updateName: vi.fn(),
   updatePassword: vi.fn(),
   createExecution: vi.fn(),
@@ -17,7 +19,7 @@ import { completePasswordRecovery, completeVerifiedRegistration, loginWithPasswo
 describe('verified Appwrite account flow', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mocks.createEmailPasswordSession.mockResolvedValue({});
+    mocks.createEmailPasswordSession.mockResolvedValue({ $id: 'password-session', userId: 'u1' });
     mocks.createSession.mockResolvedValue({});
     mocks.deleteSession.mockResolvedValue({});
     mocks.updateName.mockResolvedValue({});
@@ -28,7 +30,7 @@ describe('verified Appwrite account flow', () => {
   it('rejects a password session whose email is not verified', async () => {
     mocks.get.mockResolvedValue({ $id: 'u1', emailVerification: false });
     await expect(loginWithPassword('ruler@example.com', 'Imperium42')).rejects.toThrow('尚未验证');
-    expect(mocks.deleteSession).toHaveBeenCalledWith({ sessionId: 'current' });
+    expect(mocks.deleteSession).toHaveBeenCalledWith({ sessionId: 'password-session' });
   });
 
   it('sets profile and password only after the OTP session is created', async () => {
@@ -41,6 +43,7 @@ describe('verified Appwrite account flow', () => {
   });
 
   it('cleans up the temporary session if registration finalization fails', async () => {
+    mocks.get.mockResolvedValue({ $id: 'u3', emailVerification: true });
     mocks.updatePassword.mockRejectedValueOnce(new Error('password rejected'));
     await expect(completeVerifiedRegistration('u3', '123456', 'weak', '执政官')).rejects.toThrow('password rejected');
     expect(mocks.deleteSession).toHaveBeenCalledWith({ sessionId: 'current' });
@@ -62,8 +65,34 @@ describe('verified Appwrite account flow', () => {
   });
 
   it('finishes local logout when the session deletion response is lost', async () => {
+    mocks.get.mockRejectedValueOnce(new AppwriteException('guest', 401));
     mocks.deleteSession.mockRejectedValueOnce(new TypeError('Failed to fetch'));
     await expect(logoutCurrentSession()).resolves.toBeUndefined();
     expect(mocks.deleteSession).toHaveBeenCalledWith({ sessionId: 'current' });
+  });
+
+  it('checks the OTP account before changing an existing registered profile', async () => {
+    mocks.get.mockResolvedValue({ $id: 'u5', emailVerification: true, passwordUpdate: '2026-01-01' });
+    await expect(completeVerifiedRegistration('u5', '123456', 'Password123', 'different')).rejects.toThrow('已经注册');
+    expect(mocks.updateName).not.toHaveBeenCalled();
+    expect(mocks.updatePassword).not.toHaveBeenCalled();
+  });
+
+  it('reports an unconfirmed logout when both deletion and session lookup are offline', async () => {
+    mocks.deleteSession.mockRejectedValueOnce(new TypeError('Failed to fetch'));
+    mocks.get.mockRejectedValueOnce(new TypeError('Failed to fetch'));
+    await expect(logoutCurrentSession()).rejects.toThrow();
+  });
+
+  it('resumes the same verified account after a lost login acknowledgement', async () => {
+    mocks.createEmailPasswordSession.mockRejectedValueOnce(new AppwriteException('active session', 401, 'user_session_already_exists'));
+    mocks.get.mockResolvedValue({ $id: 'u1', email: 'ruler@example.com', emailVerification: true });
+    await expect(loginWithPassword('Ruler@example.com', 'password')).resolves.toMatchObject({ $id: 'u1' });
+  });
+
+  it('leaves a replacement session in another tab alone when logging out', async () => {
+    mocks.getSession.mockResolvedValueOnce({ $id: 'session-b', userId: 'b' });
+    await expect(logoutCurrentSession('a')).rejects.toMatchObject({ sessionChanged: true });
+    expect(mocks.deleteSession).not.toHaveBeenCalled();
   });
 });

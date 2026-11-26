@@ -1,8 +1,9 @@
+import { warDeclarationBlocker } from '../engine/military';
 // V41 AI 战争决策：让 AI 基于 warAssessment 做宣战判断，而不是随机开战。
 // 纯函数，不改 GameState；后续可接入 AI 回合。
 
-import type { GameState, Province } from '../types/game';
-import { assessWar, type WarAssessment } from './warAssessment';
+import type { DiplomaticRelation, GameState, Province } from '../types/game';
+import { assessWar, warDiplomacy, type WarAssessment } from './warAssessment';
 
 export type AiWarDecisionType = 'declare' | 'prepare' | 'avoid';
 
@@ -41,8 +42,7 @@ function atWar(state: GameState, nationId: string): boolean {
   return state.wars.some((w) => w.attackerId === nationId || w.defenderId === nationId);
 }
 
-function relationLine(state: GameState, from: string, to: string): string {
-  const rel = state.relations.find((r) => r.from === from && r.to === to);
+function relationLine(rel?: DiplomaticRelation): string {
   if (!rel) return '外交情报不足。';
   if (rel.treaty === 'truce' && rel.truceTurns > 0) return `仍有 ${rel.truceTurns} 回合停战。`;
   if (rel.treaty === 'alliance') return '目标是同盟，不应宣战。';
@@ -52,17 +52,9 @@ function relationLine(state: GameState, from: string, to: string): string {
   return '外交阻力可控。';
 }
 
-function canTarget(state: GameState, attackerId: string, defenderId: string): boolean {
-  if (attackerId === defenderId) return false;
-  const rel = state.relations.find((r) => r.from === attackerId && r.to === defenderId);
-  if (rel?.treaty === 'alliance') return false;
-  if (rel?.treaty === 'truce' && rel.truceTurns > 0) return false;
-  return true;
-}
-
-function buildCandidate(state: GameState, attackerId: string, target: Province): AiWarCandidate | null {
-  if (!canTarget(state, attackerId, target.ownerId)) return null;
-  const assessment = assessWar(state, attackerId, target.ownerId, target.id);
+function buildCandidate(state: GameState, attackerId: string, target: Province, diplomacy: ReturnType<typeof warDiplomacy>): AiWarCandidate | null {
+  if (warDeclarationBlocker(state, attackerId, target.ownerId)) return null;
+  const assessment = assessWar(state, attackerId, target.ownerId, target.id, diplomacy);
   const nation = state.nations[attackerId];
   const expansionBias = nation?.tendency.expansionist ?? 50;
   const militarism = nation?.tendency.militarism ?? 50;
@@ -78,7 +70,7 @@ function buildCandidate(state: GameState, attackerId: string, target: Province):
   );
   const reasons = [
     `胜率 ${assessment.winChance}%、备战度 ${assessment.readiness}%。`,
-    relationLine(state, attackerId, target.ownerId),
+    relationLine(diplomacy.outgoing.get(target.ownerId)),
   ];
   if (assessment.logisticsPressure > 60) reasons.push('后勤压力偏高，需先调兵或补给。');
   if (assessment.fiscalPressure > 60) reasons.push('财政压力偏高，战争可能拖垮国库。');
@@ -92,9 +84,10 @@ export function decideAiWar(state: GameState, attackerId: string): AiWarDecision
   if (nation.defeated) return { attackerId, type: 'avoid', label: '已战败', confidence: 0, alternatives: [], reasons: ['战败国家不会主动开战。'] };
   if (atWar(state, attackerId)) return { attackerId, type: 'avoid', label: '已有战争', confidence: 80, alternatives: [], reasons: ['当前已有战争，避免多线作战。'] };
 
-  const candidates = ownedProvinces(state, attackerId).flatMap((p) => p.adjacent.map((id) => state.provinces[id]).filter(Boolean))
-    .filter((p) => p.ownerId !== attackerId)
-    .map((p) => buildCandidate(state, attackerId, p))
+  const diplomacy = warDiplomacy(state, attackerId);
+  const frontier = new Set(ownedProvinces(state, attackerId).flatMap((p) => p.adjacent));
+  const candidates = [...frontier].map((id) => state.provinces[id]).filter((p) => p && p.ownerId !== attackerId)
+    .map((p) => buildCandidate(state, attackerId, p, diplomacy))
     .filter((x): x is AiWarCandidate => !!x)
     .sort((a, b) => b.score - a.score);
 

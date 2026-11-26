@@ -1,8 +1,9 @@
 import { ExecutionMethod, Query, type Models } from 'appwrite';
 import { APPWRITE_CONFIG } from './config';
-import { getAppwriteServices } from './client';
+import { getAppwriteServices, storageFileUrl } from './client';
+import { MAX_SAVE_BYTES } from '../../store/localSaveCodec';
 import {
-  getSlotMeta,
+  storedSlotRaw,
   importSaveGameToSlot,
   readSaveGameFromSlot,
 } from '../../store/persistence';
@@ -19,14 +20,16 @@ export interface CloudSaveRow extends Models.Row {
   clientUpdatedAt: string;
 }
 
+export interface SaveVersions { local: string | null; cloud: string | null }
+
 export class CloudSaveConflictError extends Error {
-  constructor(public readonly slot: number, message: string) {
+  constructor(public readonly slot: number, message: string, public readonly versions: SaveVersions) {
     super(message);
     this.name = 'CloudSaveConflictError';
   }
 }
 
-function shortHash(value: string): string {
+export function shortHash(value: string): string {
   let a = 0x811c9dc5;
   let b = 0x9e3779b9;
   for (let i = 0; i < value.length; i += 1) {
@@ -56,13 +59,38 @@ function getDeviceId(): string {
   }
 }
 
-async function contentHash(raw: string): Promise<string> {
+async function contentHash(bytes: Uint8Array<ArrayBuffer>): Promise<string> {
   if (typeof crypto !== 'undefined' && crypto.subtle) {
-    const bytes = new TextEncoder().encode(raw);
     const digest = await crypto.subtle.digest('SHA-256', bytes);
     return [...new Uint8Array(digest)].map((part) => part.toString(16).padStart(2, '0')).join('');
   }
   throw new Error('当前浏览器不支持云存档完整性校验');
+}
+
+async function readCloudFile(response: Response): Promise<Uint8Array<ArrayBuffer>> {
+  const reader = response.body?.getReader();
+  if (!reader) throw new Error('云存档文件为空');
+  const chunks: Uint8Array[] = [];
+  let size = 0;
+  try {
+    for (;;) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      size += value.byteLength;
+      if (size > MAX_SAVE_BYTES) {
+        void reader.cancel().catch(() => undefined);
+        throw new Error('云存档超过 5MB 安全上限');
+      }
+      chunks.push(value);
+    }
+  } finally { reader.releaseLock(); }
+  const bytes = new Uint8Array(size);
+  let offset = 0;
+  for (const chunk of chunks) {
+    bytes.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  return bytes;
 }
 
 async function getCloudRow(userId: string, slot: number): Promise<CloudSaveRow | null> {
@@ -73,7 +101,7 @@ async function getCloudRow(userId: string, slot: number): Promise<CloudSaveRow |
     total: false,
     ttl: 0,
   });
-  return result.rows.find((row) => row.userId === userId) ?? null;
+  return result.rows.find((row) => row.userId === userId && row.slot === slot) ?? null;
 }
 
 export async function listCloudSaves(userId: string): Promise<CloudSaveRow[]> {
@@ -87,53 +115,82 @@ export async function listCloudSaves(userId: string): Promise<CloudSaveRow[]> {
   return result.rows.filter((row) => row.userId === userId).sort((a, b) => a.slot - b.slot);
 }
 
-export async function uploadLocalSave(_userId: string, slot: number, force = false): Promise<CloudSaveRow> {
-  const local = readSaveGameFromSlot(slot);
-  if (!local.ok) throw new Error(local.error);
-
-  const execution = await getAppwriteServices().functions.createExecution({
-    functionId: APPWRITE_CONFIG.cloudSaveGatewayFunctionId,
-    body: JSON.stringify({ action: 'upload_save', slot, raw: local.raw, deviceId: getDeviceId(), force }),
-    async: false,
-    xpath: '/',
-    method: ExecutionMethod.POST,
-  });
-  const result = JSON.parse(execution.responseBody || '{}') as { ok?: boolean; row?: CloudSaveRow; message?: string };
-  if (!result.ok || !result.row) {
-    if (execution.responseStatusCode === 409) throw new CloudSaveConflictError(slot, result.message || '云存档存在更新冲突');
-    throw new Error(result.message || '云存档上传失败');
-  }
-  return result.row;
+function versionsKey(userId: string, slot: number) { return `ia-cloud-base:${userId}:${slot}`; }
+function syncedVersions(userId: string, slot: number): SaveVersions | null {
+  try { return JSON.parse(localStorage.getItem(versionsKey(userId, slot)) ?? 'null'); } catch { return null; }
+}
+function remember(userId: string, slot: number, versions: SaveVersions) {
+  try { localStorage.setItem(versionsKey(userId, slot), JSON.stringify(versions)); } catch { /* The next sync can ask for confirmation again. */ }
 }
 
-export async function downloadCloudSave(userId: string, slot: number, force = false): Promise<void> {
-  const cloud = await getCloudRow(userId, slot);
-  if (!cloud) throw new Error('该云端槽位为空');
-  const local = readSaveGameFromSlot(slot);
-  if (local.ok) {
-    const hash = await contentHash(local.raw);
-    const meta = getSlotMeta(slot);
-    if (
-      hash !== cloud.contentHash
-      && meta
-      && meta.createdAt > cloud.clientUpdatedAt
-      && cloud.deviceId !== getDeviceId()
-      && !force
-    ) {
-      throw new CloudSaveConflictError(slot, '本地存档更新，请先上传，或确认用云端覆盖本地');
-    }
-  }
+export function slotFingerprint(slot: number) {
+  const raw = storedSlotRaw(slot);
+  return raw === null ? null : shortHash(raw);
+}
 
-  const url = getAppwriteServices().storage.getFileDownload({
-    bucketId: APPWRITE_CONFIG.saveBucketId,
-    fileId: cloud.fileId,
+export async function uploadLocalSave(userId: string, slot: number, confirmation?: SaveVersions, active = () => true, queuedLocal?: string): Promise<CloudSaveRow> {
+  const local = readSaveGameFromSlot(slot);
+  if (!local.ok) throw new Error(local.error);
+  const fingerprint = shortHash(local.raw);
+  if (queuedLocal !== undefined && fingerprint !== queuedLocal) throw new Error('本地存档已变化，请重新确认');
+  const baseHash = confirmation ? confirmation.cloud : syncedVersions(userId, slot)?.cloud ?? null;
+  if (confirmation && confirmation.local !== fingerprint) {
+    throw new CloudSaveConflictError(slot, '本地存档已变化，请重新确认', { local: fingerprint, cloud: baseHash });
+  }
+  const execution = await getAppwriteServices().functions.createExecution({
+    functionId: APPWRITE_CONFIG.cloudSaveGatewayFunctionId,
+    body: JSON.stringify({ action: 'upload_save', userId, slot, raw: local.raw, deviceId: getDeviceId(), force: !!confirmation, baseHash }),
+    async: false, xpath: '/', method: ExecutionMethod.POST,
   });
-  const response = await fetch(url, { credentials: 'include' });
-  if (!response.ok) throw new Error(`云存档下载失败（${response.status}）`);
-  const raw = await response.text();
-  const rawBytes = new TextEncoder().encode(raw);
-  if (rawBytes.byteLength > 5 * 1024 * 1024) throw new Error('云存档超过 5MB 安全上限');
-  if (await contentHash(raw) !== cloud.contentHash) throw new Error('云存档完整性校验失败，文件可能已损坏');
-  const imported = importSaveGameToSlot(slot, raw);
-  if (!imported.ok) throw new Error(imported.error);
+  if (!active()) throw new Error('登录账号已更换');
+  const result = JSON.parse(execution.responseBody || '{}');
+  if (!result.ok || !result.row) {
+    if (execution.responseStatusCode === 409) {
+      const cloud = result.cloudHash === undefined ? (await getCloudRow(userId, slot))?.contentHash ?? null : result.cloudHash;
+      throw new CloudSaveConflictError(slot, result.message || '云存档存在更新冲突', { local: fingerprint, cloud });
+    }
+    throw Object.assign(new Error(result.message || '云存档上传失败'), { code: execution.responseStatusCode });
+  }
+  const row: CloudSaveRow = result.row;
+  if (row.userId !== userId || row.slot !== slot) throw new Error('云存档回执不匹配');
+  remember(userId, slot, { local: fingerprint, cloud: row.contentHash });
+  return row;
+}
+
+export async function downloadCloudSave(userId: string, slot: number, confirmation?: SaveVersions, active = () => true): Promise<CloudSaveRow> {
+  const rawLocal = storedSlotRaw(slot);
+  const starting = rawLocal === null ? null : shortHash(rawLocal);
+  let cloud = await getCloudRow(userId, slot);
+  for (let attempt = 0; ; attempt++) {
+    if (!cloud) throw new Error('该云端槽位为空');
+    const versions = { local: slotFingerprint(slot), cloud: cloud.contentHash };
+    const conflict = () => new CloudSaveConflictError(slot, '存档已变化，请比较后确认用云端覆盖本地', versions);
+    if (versions.local !== starting || (confirmation && (confirmation.local !== starting || confirmation.cloud !== cloud.contentHash))) throw conflict();
+    if (!confirmation && rawLocal !== null && syncedVersions(userId, slot)?.local !== starting && await contentHash(new TextEncoder().encode(rawLocal)) !== cloud.contentHash) throw conflict();
+    const url = storageFileUrl(APPWRITE_CONFIG.saveBucketId, cloud.fileId, 'download');
+    const { uri, options } = getAppwriteServices().client.prepareRequest('GET', url);
+    const response = await fetch(uri, options);
+    if (!response.ok && response.status !== 404) throw Object.assign(new Error(`云存档下载失败（${response.status}）`), { code: response.status });
+    const bytes = response.ok ? await readCloudFile(response) : null;
+    if (bytes && await contentHash(bytes) !== cloud.contentHash) throw new Error('云存档完整性校验失败，文件可能已损坏');
+    const latest = await getCloudRow(userId, slot);
+    if (!active()) throw new Error('登录账号已更换');
+    if (latest?.contentHash !== cloud.contentHash || latest.fileId !== cloud.fileId) {
+      if (attempt >= 2) throw new Error('云存档持续更新，请稍后重试');
+      cloud = latest;
+      continue;
+    }
+    if (!bytes) throw new Error('云存档文件不存在');
+    const raw = new TextDecoder('utf-8', { fatal: true }).decode(bytes);
+    const imported = importSaveGameToSlot(slot, raw, rawLocal);
+    if (!imported.ok) {
+      if (imported.conflict) {
+        versions.local = slotFingerprint(slot);
+        throw conflict();
+      }
+      throw new Error(imported.error);
+    }
+    remember(userId, slot, { local: shortHash(imported.raw), cloud: cloud.contentHash });
+    return latest;
+  }
 }

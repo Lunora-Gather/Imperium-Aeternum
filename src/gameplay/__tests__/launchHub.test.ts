@@ -39,7 +39,22 @@ describe('launch hub intelligence', () => {
     expect(pickBestContinueSave(previews)).toMatchObject({ slot: 1, status: 'healthy' });
   });
 
-  it('prefers manual slots when status and turn are equal', () => {
+  it('recommends a campaign that can continue ahead of a later defeat, while allowing a lone ending to be reviewed', () => {
+    const ended = { ...save(0, 'healthy', 35), defeated: true };
+    const active = save(2, 'repairable', 10);
+    expect(pickBestContinueSave([ended, active])).toBe(active);
+    expect(pickBestContinueSave([ended])).toBe(ended);
+  });
+
+  it('continues the latest action in the same year even when an older manual checkpoint exists', () => {
+    const older = { ...save(2, 'healthy', 12), createdAt: '2026-01-02T12:00:00Z' };
+    const later = { ...save(0, 'healthy', 12), createdAt: '2026-01-02T12:00:03Z' };
+    const undated = { ...save(1, 'healthy', 12), createdAt: 'unknown' };
+    expect(pickBestContinueSave([older, later, undated])).toBe(later);
+    expect(pickBestContinueSave([later, { ...older, createdAt: later.createdAt }])?.slot).toBe(2);
+  });
+
+  it('prefers manual slots when status, turn and save time are equal', () => {
     const previews = [save(0, 'healthy', 12), save(2, 'healthy', 12)];
 
     expect(pickBestContinueSave(previews)).toMatchObject({ slot: 2 });

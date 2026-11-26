@@ -33,7 +33,7 @@ export function assertCommandOwnership<T extends CommandPolicyRow>(command: T, e
 export function assertCommandCategory(commandType: string, action: string): string;
 export function assertRenewableControl<T extends ControlPolicyRow>(control: T | null | undefined, userId: string, nowMs?: number): T;
 export function assertReadyCommandIdentity<T extends ReadyCommandPolicyRow>(command: T, expected: ReadyCommandPolicyRow): T;
-export function wasWorldActiveDuringWindow(world: WorldSchedulePolicyRow, memberships: { lastSeenAt: string }[]): boolean;
+export function wasWorldActiveDuringWindow(world: WorldSchedulePolicyRow, controls: { lastActiveAt?: string | null; claimedAt?: string | null }[]): boolean;
 export function isWorldDue(world: WorldSchedulePolicyRow | null | undefined, nowMs?: number): boolean;
 export function readyCommandKey(worldId: string, turn: number, nationId: string): string;
 export function decodeSnapshotPayload(payload: unknown): Record<string, unknown>;

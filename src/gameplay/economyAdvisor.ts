@@ -1,3 +1,4 @@
+import { operatingNet } from './reportFinances';
 // V43 经济与内政顾问：统一判断财政、粮食、补给、稳定、腐败和叛乱压力。
 // 纯函数，不改 GameState；供 Dashboard、内政页和 AI 后续复用。
 
@@ -51,7 +52,7 @@ function ownedProvinces(state: GameState, nationId: string): Province[] {
 function goldNet(state: GameState, nation: Nation): number {
   if (state.lastReport?.nationId === nation.id) {
     const r = state.lastReport;
-    return r.income.tax + r.income.trade + r.income.building - r.expense.military - r.expense.corruption;
+    return operatingNet(r);
   }
   const pop = ownedProvinces(state, nation.id).reduce((s, p) => s + p.population, 0);
   const tax = pop * nation.taxRate * (nation.policyMods?.taxEffMod ?? 1);

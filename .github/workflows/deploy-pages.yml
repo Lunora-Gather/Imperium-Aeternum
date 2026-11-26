@@ -19,6 +19,8 @@ jobs:
   build:
     name: Build stable release
     runs-on: macos-latest
+    outputs:
+      files: ${{ steps.fingerprint.outputs.files }}
     steps:
       - name: Checkout current ref
         uses: actions/checkout@v7
@@ -38,13 +40,20 @@ jobs:
         run: npm run rc:check
 
       - run: sudo safaridriver --enable
-      - run: npm run test:e2e
+      - name: Smoke test the built Pages candidate
+        run: npm run test:e2e -- --preview
 
       - name: Copy SPA fallback
         run: cp dist/index.html dist/404.html
 
       - name: Configure Pages
         uses: actions/configure-pages@v6
+
+      - name: Fingerprint files before upload
+        id: fingerprint
+        run: |
+          files=$(node scripts/verify-production.mjs --manifest dist)
+          echo "files=$files" >> "$GITHUB_OUTPUT"
 
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v5
@@ -66,12 +75,14 @@ jobs:
         id: deployment
         uses: actions/deploy-pages@v5
 
-      - name: Verify public deployment
-        run: node scripts/verify-production.mjs "${{ steps.deployment.outputs.page_url }}"
-
       - uses: actions/setup-node@v7
         with:
           node-version: 24
+      - name: Verify public deployment against the uploaded candidate
+        env:
+          PRODUCTION_URL: ${{ steps.deployment.outputs.page_url }}
+          EXPECTED_PAGES_FILES: ${{ needs.build.outputs.files }}
+        run: node scripts/verify-production.mjs
       - run: npm ci
       - run: sudo safaridriver --enable
       - name: Browser smoke test public deployment

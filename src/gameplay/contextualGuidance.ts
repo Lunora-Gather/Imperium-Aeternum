@@ -1,3 +1,4 @@
+import { operatingNet } from './reportFinances';
 // V33 情境式提示：根据当前局势生成“第一次遇到问题该怎么处理”的轻量引导。
 // 纯函数，不改 GameState；Dashboard 展示，测试复用。
 
@@ -34,7 +35,7 @@ export interface ContextualGuidance {
 function netIncome(state: GameState): number {
   const r = state.lastReport;
   if (!r) return 0;
-  return r.income.tax + r.income.trade + r.income.building - r.expense.military - r.expense.corruption;
+  return operatingNet(r);
 }
 
 function player(state: GameState): Nation | null {

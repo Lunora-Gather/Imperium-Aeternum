@@ -4,6 +4,17 @@ import { EVENTS } from '../../data/events';
 import { compactGameStateForSave } from '../persistence';
 
 describe('compactGameStateForSave', () => {
+  it('retains legacy unique-event history after its original entry leaves the recent log', () => {
+    const state = createInitialState();
+    const eventId = 'evt_sci_academy';
+    state.turn = 200;
+    state.triggeredEvents = [{ eventId, turn: 20, optionIndex: 0 },
+      ...Array.from({ length: 1000 }, () => ({ eventId: 'evt_famine', turn: 100, optionIndex: 0 }))];
+    const saved = compactGameStateForSave(state);
+    expect(saved.triggeredEvents.some(e => e.eventId === eventId)).toBe(false);
+    expect(saved.eventCooldowns).toContainEqual({ nationId: state.playerNationId, eventId, lastTriggeredTurn: 20 });
+  });
+
   it('drops transient relation maps and caps long-running arrays without losing core state', () => {
     const state = createInitialState();
     state.history = Array.from({ length: 20 }, (_, i) => ({

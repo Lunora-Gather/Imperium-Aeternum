@@ -1,7 +1,7 @@
-import { Channel, ExecutionMethod, Query, type Models } from 'appwrite';
+import { ExecutionMethod, Query, type Models } from 'appwrite';
 import type { NationControl, SharedWorldInstance, WorldTickPolicy } from '../../shared-world/types';
 import type { GameState } from '../../types/game';
-import { APPWRITE_CONFIG } from './config';
+import { APPWRITE_CONFIG, tableRowChannel } from './config';
 import { getAppwriteServices } from './client';
 
 export interface SharedWorldRow extends Models.Row {
@@ -26,6 +26,7 @@ export interface NationControlRow extends Models.Row {
   nationName: string;
   controllerUserId: string | null;
   status: NationControl['status'];
+  unavailable?: NationControl['unavailable'];
   claimedAt: string | null;
   releasedAt: string | null;
   leaseExpiresAt: string | null;
@@ -40,46 +41,28 @@ function toWorld(row: SharedWorldRow): SharedWorldInstance {
     caretakerEnabled: row.caretakerEnabled,
     maxNationsPerUser: row.maxNationsPerUser,
   };
-  return {
-    id: row.$id,
-    templateId: row.templateId,
-    name: row.name,
-    status: row.status,
-    phase: row.phase,
-    turn: row.turn,
-    revision: row.revision,
-    nationCount: row.nationCount,
-    snapshotFileId: row.snapshotFileId,
-    planningDeadlineAt: row.planningDeadlineAt,
-    tickPolicy,
-  };
+  return { ...row, id: row.$id, tickPolicy };
 }
 
 function toControl(row: NationControlRow): NationControl {
-  return {
-    id: row.$id,
-    worldId: row.worldId,
-    nationId: row.nationId,
-    nationName: row.nationName,
-    controllerUserId: row.controllerUserId,
-    status: row.status,
-    claimedAt: row.claimedAt,
-    releasedAt: row.releasedAt,
-    leaseExpiresAt: row.leaseExpiresAt,
-    lastActiveAt: row.lastActiveAt,
-    version: row.version,
-  };
+  const expired = row.leaseExpiresAt && Date.parse(row.leaseExpiresAt) <= Date.now();
+  return { ...row, id: row.$id, ...(expired && { controllerUserId: null, status: 'available' as const }) };
 }
 
 export async function listSharedWorlds(): Promise<SharedWorldInstance[]> {
-  const result = await getAppwriteServices().tablesDB.listRows<SharedWorldRow>({
-    databaseId: APPWRITE_CONFIG.databaseId,
-    tableId: APPWRITE_CONFIG.worldTableId,
-    queries: [Query.equal('status', ['forming', 'active', 'paused']), Query.orderAsc('name'), Query.limit(25)],
-    total: false,
-    ttl: 0,
-  });
-  return result.rows.map(toWorld);
+  const { tablesDB } = getAppwriteServices();
+  const worlds = new Map<string, SharedWorldInstance>();
+  let cursor: string | undefined;
+  do {
+    const queries = [Query.equal('status', ['forming', 'active', 'paused']), Query.orderAsc('name'), Query.limit(100)];
+    if (cursor) queries.push(Query.cursorAfter(cursor));
+    const page = await tablesDB.listRows<SharedWorldRow>({
+      databaseId: APPWRITE_CONFIG.databaseId, tableId: APPWRITE_CONFIG.worldTableId, queries, total: false, ttl: 0,
+    });
+    for (const row of page.rows) worlds.set(row.$id, toWorld(row));
+    cursor = page.rows.length === 100 ? page.rows[99].$id : undefined;
+  } while (cursor);
+  return [...worlds.values()];
 }
 
 export async function listNationControls(worldId: string): Promise<NationControl[]> {
@@ -127,7 +110,7 @@ async function executeGateway(action: string, worldId: string, nationId?: string
     method: ExecutionMethod.POST,
   });
   const result = JSON.parse(execution.responseBody || '{}') as GatewayResult;
-  if (!result.ok) throw new Error(result.message || '共享版图操作失败');
+  if (!result.ok) throw Object.assign(new Error(result.message || '共享版图操作失败'), { code: execution.responseStatusCode });
   return result;
 }
 
@@ -136,31 +119,54 @@ export const claimSharedNation = (worldId: string, nationId: string) => executeG
 export const releaseSharedNation = (worldId: string, nationId: string) => executeGateway('release_nation', worldId, nationId);
 export const renewSharedNationControl = (worldId: string, nationId: string) => executeGateway('renew_control', worldId, nationId);
 
-export async function enterSharedWorld(worldId: string, nationId: string): Promise<{ world: SharedWorldInstance; state: GameState; controls: NationControl[] }> {
+export async function enterSharedWorld(worldId: string, nationId: string): Promise<{ world: SharedWorldInstance; state: GameState; controls: NationControl[]; ready?: boolean }> {
   const result = await executeGateway('enter_world', worldId, nationId);
   const state = await decodeGatewayState(result);
   if (!result.world || !state) throw new Error('共享版图快照尚未准备完成');
-  return { world: toWorld(result.world), state, controls: (result.controls ?? []).map(toControl) };
+  return { world: toWorld(result.world), state, ready: result.ready, controls: (result.controls ?? []).map(toControl) };
+}
+
+export async function syncSharedWorld(worldId: string, nationId: string, baseRevision: number): Promise<{ world: SharedWorldInstance; state?: GameState; ready?: boolean } | null> {
+  const result = await executeGateway('sync_world', worldId, nationId, { baseRevision });
+  const state = await decodeGatewayState(result);
+  return result.world ? { world: toWorld(result.world), state, ready: result.ready } : null;
+}
+
+function retryOnConnectionFailure(send: () => Promise<GatewayResult>) {
+  return send().catch((error) => {
+    if (error instanceof TypeError || Number(error?.code) >= 500) return send();
+    throw error;
+  });
 }
 
 export async function submitSharedWorldAction(worldId: string, nationId: string, baseRevision: number, commandType: string, action: string, args: unknown[]): Promise<{ world: SharedWorldInstance; state: GameState }> {
-  const result = await executeGateway('submit_command', worldId, nationId, { baseRevision, commandType, idempotencyKey: crypto.randomUUID(), payload: { action, args } });
+  const request = { baseRevision, commandType, idempotencyKey: crypto.randomUUID(), payload: { action, args } };
+  const result = await retryOnConnectionFailure(() => executeGateway('submit_command', worldId, nationId, request));
   const state = await decodeGatewayState(result);
   if (!result.world || !state) throw new Error('共享行动没有返回最新世界状态');
   return { world: toWorld(result.world), state };
 }
 
-export async function markSharedWorldReady(worldId: string, nationId: string, baseRevision: number): Promise<{ resolved: boolean; world?: SharedWorldInstance; state?: GameState; readyCount?: number; requiredCount?: number }> {
-  const result = await executeGateway('set_ready', worldId, nationId, { baseRevision, idempotencyKey: `ready:${worldId}:${nationId}:${crypto.randomUUID()}` });
+export async function markSharedWorldReady(worldId: string, nationId: string, baseRevision: number, turn: number): Promise<{ resolved: boolean; world?: SharedWorldInstance; state?: GameState; readyCount?: number; requiredCount?: number }> {
+  const result = await retryOnConnectionFailure(() => executeGateway('set_ready', worldId, nationId, { baseRevision, turn }));
   const state = result.resolved ? await decodeGatewayState(result.resolved) : undefined;
   return { resolved: !!result.resolved, world: result.resolved?.world ? toWorld(result.resolved.world) : undefined, state, readyCount: result.readyCount, requiredCount: result.requiredCount };
 }
 
-export async function subscribeToWorldLobby(worldId: string, onChange: () => void): Promise<() => Promise<void>> {
+export type LobbyChange = 'world' | 'controls';
+
+export async function subscribeToWorldLobby(worldId: string, onChange: (part: LobbyChange) => void): Promise<() => Promise<void>> {
   const { realtime } = getAppwriteServices();
-  const subscription = await realtime.subscribe([
-    Channel.tablesdb(APPWRITE_CONFIG.databaseId).table(APPWRITE_CONFIG.worldTableId).row(worldId),
-    Channel.tablesdb(APPWRITE_CONFIG.databaseId).table(APPWRITE_CONFIG.nationControlTableId).row(),
-  ], () => onChange());
-  return async () => { await subscription.unsubscribe(); };
+  const world = await realtime.subscribe(tableRowChannel(APPWRITE_CONFIG.worldTableId, worldId), () => onChange('world'));
+  try {
+    const controls = await realtime.subscribe<NationControlRow>(
+      tableRowChannel(APPWRITE_CONFIG.nationControlTableId),
+      ({ payload }) => { if (payload.worldId === worldId) onChange('controls'); },
+      [Query.equal('worldId', worldId)],
+    );
+    return async () => { await Promise.all([world.unsubscribe(), controls.unsubscribe()]); };
+  } catch (error) {
+    await world.unsubscribe();
+    throw error;
+  }
 }

@@ -1,5 +1,5 @@
 import { enableMapSet, produce } from 'immer';
-import type { DiplomaticRelation, GameState, Nation } from '../../types/game';
+import type { GameState, Nation } from '../../types/game';
 import { invariantErrors } from '../stateInvariants';
 
 enableMapSet();
@@ -80,15 +80,7 @@ export function hasTech(player: Nation, techId: string | undefined): boolean {
   return player.tech[branch] >= Number(match[2]);
 }
 
-export function relationPair(
-  state: GameState,
-  from: string,
-  to: string,
-): [DiplomaticRelation, DiplomaticRelation] | null {
-  const left = state.relations.find((relation) => relation.from === from && relation.to === to);
-  const right = state.relations.find((relation) => relation.from === to && relation.to === from);
-  return left && right ? [left, right] : null;
-}
+export { relationPair } from '../../engine/init';
 
 export function validForeignTarget(state: GameState, player: Nation, targetId: string): Nation | null {
   if (!targetId || targetId === player.id) return null;

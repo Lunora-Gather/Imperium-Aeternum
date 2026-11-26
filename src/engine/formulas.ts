@@ -81,14 +81,15 @@ export interface TradeInput {
   baseTrade: number;
   marketCount: number;
   tradeDealCount: number;
-  commerceActive: boolean;       // commerce≥70
+  tradeMod?: number;
+  commerceActive?: boolean;       // commerce≥70
   tradeDepSafety: number;        // 0.5-1.0
 }
 
 export function computeTrade(input: TradeInput): number {
   const marketMod = 1 + input.marketCount * 0.1;
   const dealMod = 1 + input.tradeDealCount * 0.15;
-  const charMod = input.commerceActive ? 1.25 : 1.0;
+  const charMod = input.tradeMod ?? (input.commerceActive ? 1.25 : 1.0);
   return input.baseTrade * marketMod * dealMod * charMod * input.tradeDepSafety;
 }
 
@@ -167,14 +168,15 @@ export interface PopGrowthInput {
   stability: number;
   atWar: boolean;
   plague: boolean;
-  welfareActive: boolean;
+  growthMod?: number;
+  welfareActive?: boolean;
 }
 
 export function popGrowth(input: PopGrowthInput): number {
   const foodMod = clamp(input.foodNeed > 0 ? input.food / input.foodNeed : 1, 0.3, 1.5);
   const warMod = input.atWar ? 0.7 : 1.0;
   const plagueMod = input.plague ? 0.5 : 1.0;
-  const welfareMod = input.welfareActive ? 1.1 : 1.0;
+  const welfareMod = input.growthMod ?? (input.welfareActive ? 1.1 : 1.0);
   return input.population * input.baseGrowth * foodMod
     * stabilityPopModifier(input.stability) * warMod * plagueMod * welfareMod;
 }

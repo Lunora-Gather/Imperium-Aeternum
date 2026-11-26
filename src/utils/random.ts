@@ -20,17 +20,23 @@ export function randInt(rng: () => number, min: number, max: number): number {
 
 // 工具：按权重抽一项
 export function weightedPick<T>(rng: () => number, items: { item: T; weight: number }[]): T | null {
+  const entry = pickWeightedEntry(rng, items);
+  return entry ? entry.item : null;
+}
+
+export function pickWeightedEntry<T extends { weight: number }>(rng: () => number, items: readonly T[]): T | null {
   const total = items.reduce((s, i) => s + Math.max(0, i.weight), 0);
   if (total <= 0) return null;
   let r = rng() * total;
   for (const it of items) {
     const weight = Math.max(0, it.weight);
     if (weight <= 0) continue;
-    if (r < weight) return it.item;
+    if (r < weight) return it;
     r -= weight;
   }
   // Defensive fallback for a non-conforming RNG returning 1 exactly.
-  return [...items].reverse().find((item) => item.weight > 0)?.item ?? null;
+  for (let i = items.length - 1; i >= 0; i--) if (items[i].weight > 0) return items[i];
+  return null;
 }
 
 // 工具：从数组随机抽 n 个

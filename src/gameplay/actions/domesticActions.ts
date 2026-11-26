@@ -1,8 +1,9 @@
 import { BUILDINGS } from '../../data/buildings';
-import type { BuildingId } from '../../data/buildings';
-import { TECHNOLOGIES } from '../../data/technologies';
+import type { BuildingId, BuildingDef } from '../../data/buildings';
+import { instantResearchBlocker } from '../../engine/technology';
+import { TECH_BY_ID } from '../../data/technologies';
 import { allocateEntityId } from '../../utils/id';
-import type { GameState } from '../../types/game';
+import type { GameState, Nation, Province } from '../../types/game';
 import { clamp, failure, hasTech, runGameAction, spendAdmin, success } from './actionCore';
 
 export function setTaxRateAction(state: GameState, rate: number) {
@@ -26,20 +27,22 @@ export function appeaseFactionAction(state: GameState, factionId: string) {
   });
 }
 
+export function constructionBlocker(player: Nation, province: Province, definition: BuildingDef): string | null {
+  if (!hasTech(player, definition.prereqTech)) return `缺少前置科技：${definition.prereqTech}`;
+  if (definition.maxPerProvince > 0 && province.buildings.filter((b) => b.defId === definition.id).length >= definition.maxPerProvince) return '已达建造上限';
+  if (player.resources.gold < definition.costGold || player.resources.wood < definition.costWood || player.resources.iron < definition.costIron) return '建造资源不足';
+  if (player.resources.adminPt < definition.costAction) return `行动点不足（需 ${definition.costAction}）`;
+  return null;
+}
+
 export function buildAction(state: GameState, provinceId: string, buildingDefId: string) {
   return runGameAction(state, (working, player) => {
     const province = working.provinces[provinceId];
     const definition = BUILDINGS[buildingDefId as BuildingId];
     if (!province || province.ownerId !== player.id || !definition) return failure('无法在该省建造');
-    if (!hasTech(player, definition.prereqTech)) return failure(`缺少前置科技：${definition.prereqTech}`);
-    if (definition.maxPerProvince > 0 && province.buildings.filter((entry) => entry.defId === definition.id).length >= definition.maxPerProvince) {
-      return failure('已达建造上限');
-    }
-    if (player.resources.gold < definition.costGold || player.resources.wood < definition.costWood || player.resources.iron < definition.costIron) {
-      return failure('建造资源不足');
-    }
-    const apFailure = spendAdmin(player, definition.costAction);
-    if (apFailure) return apFailure;
+    const blocker = constructionBlocker(player, province, definition);
+    if (blocker) return failure(blocker);
+    player.resources.adminPt -= definition.costAction;
     player.resources.gold -= definition.costGold;
     player.resources.wood -= definition.costWood;
     player.resources.iron -= definition.costIron;
@@ -50,14 +53,11 @@ export function buildAction(state: GameState, provinceId: string, buildingDefId:
 
 export function researchAction(state: GameState, techId: string) {
   return runGameAction(state, (_working, player) => {
-    const definition = TECHNOLOGIES.find((entry) => entry.id === techId);
+    const definition = TECH_BY_ID[techId];
     if (!definition) return failure('科技不存在');
-    const currentLevel = player.tech[definition.branch];
-    if (definition.level <= currentLevel) return failure('该科技已经完成');
-    if (definition.level !== currentLevel + 1 || !hasTech(player, definition.prereqTech)) return failure('缺少前置科技');
-    if (player.resources.sciPt < definition.costSci || player.resources.gold < definition.costGold) return failure('科研点或金不足');
-    const apFailure = spendAdmin(player, 1);
-    if (apFailure) return apFailure;
+    const blocker = instantResearchBlocker(player, definition);
+    if (blocker) return failure(blocker);
+    player.resources.adminPt -= 1;
     player.resources.sciPt -= definition.costSci;
     player.resources.gold -= definition.costGold;
     player.tech[definition.branch] = definition.level;

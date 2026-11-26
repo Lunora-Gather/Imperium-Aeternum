@@ -32,7 +32,7 @@
 
 - [`releases/release-checklist.md`](releases/release-checklist.md)
 - [`releases/release-qa-v1.1.1.md`](releases/release-qa-v1.1.1.md)
-- [`releases/release-notes-v1.1.1.md`](releases/release-notes-v1.1.1.md)
+- [1.1.2 发布说明](releases/release-notes-v1.1.2.md)
 - [`releases/TAGGING_CHECKLIST.md`](releases/TAGGING_CHECKLIST.md)
 - [`releases/FINAL_QA.md`](releases/FINAL_QA.md)
 

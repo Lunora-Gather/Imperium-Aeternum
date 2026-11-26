@@ -1,3 +1,4 @@
+import { operatingNet } from './reportFinances';
 // V29 回合后复盘：把年报变化转成年度结论、改善项、恶化项和下一年重点。
 // 纯函数，不改 GameState。
 
@@ -28,14 +29,13 @@ export interface TurnDebrief {
   routes: VictoryRouteCard[];
 }
 
-function net(r: TurnReport): number { return r.income.tax + r.income.trade + r.income.building - r.expense.military - r.expense.corruption; }
 function clamp(v: number): number { return Math.max(0, Math.min(100, Math.round(v))); }
 function scoreTone(score: number): DebriefTone { return score >= 78 ? 'gold' : score >= 62 ? 'good' : score >= 42 ? 'warn' : 'danger'; }
 function point(id: string, title: string, body: string, tone: DebriefTone, tab: NavigationTab): DebriefPoint { return { id, title, body, tone, tab }; }
 
 function scoreReport(r: TurnReport): number {
   let score = 55;
-  const yearlyNet = net(r);
+  const yearlyNet = operatingNet(r);
   score += Math.max(-22, Math.min(22, yearlyNet / 8));
   score += Math.max(-18, Math.min(18, r.foodDelta / 8));
   score += Math.max(-14, Math.min(14, r.stabilityDelta * 3));
@@ -50,7 +50,7 @@ function scoreReport(r: TurnReport): number {
 
 function improved(r: TurnReport): DebriefPoint[] {
   const out: DebriefPoint[] = [];
-  const yearlyNet = net(r);
+  const yearlyNet = operatingNet(r);
   if (yearlyNet > 0) out.push(point('net-positive', '财政改善', `本年净收入 +${Math.round(yearlyNet)}，国家机器有继续运转空间。`, 'good', 'economy'));
   if (r.foodDelta > 0) out.push(point('food-positive', '粮食增收', `粮食 +${Math.round(r.foodDelta)}，人口和稳定底盘更安全。`, 'good', 'province'));
   if (r.stabilityDelta > 0) out.push(point('stability-positive', '安定上升', `安定 +${Math.round(r.stabilityDelta)}，地方风险下降。`, 'good', 'politics'));
@@ -62,7 +62,7 @@ function improved(r: TurnReport): DebriefPoint[] {
 
 function worsened(r: TurnReport): DebriefPoint[] {
   const out: DebriefPoint[] = [];
-  const yearlyNet = net(r);
+  const yearlyNet = operatingNet(r);
   if (yearlyNet < 0) out.push(point('net-negative', '财政失血', `本年净收入 ${Math.round(yearlyNet)}，需要检查税收、贸易和军费。`, yearlyNet < -40 ? 'danger' : 'warn', 'economy'));
   if (r.foodDelta < 0) out.push(point('food-negative', '粮食承压', `粮食 ${Math.round(r.foodDelta)}，需要检查省份生产和人口压力。`, r.foodDelta < -50 ? 'danger' : 'warn', 'province'));
   if (r.stabilityDelta < 0) out.push(point('stability-negative', '安定下滑', `安定 ${Math.round(r.stabilityDelta)}，下一年优先处理政治和不满。`, 'warn', 'politics'));

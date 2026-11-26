@@ -19,6 +19,21 @@ function establishEconomicFoundation(state: GameState): void {
 }
 
 describe('ambition progress synchronization', () => {
+  it('uses the player’s belligerent status for both diplomatic victory and its preview', () => {
+    const state = syncAmbitionMeta(createInitialState());
+    const id = state.playerNationId;
+    player(state).resources.influence = getAmbitionSnapshot(state).diplomacy.influenceTarget;
+    for (const rel of state.relations) { rel.relation = 80; rel.treaty = 'trade'; }
+    const [a, b] = Object.keys(state.nations).filter(x => x !== id);
+    state.wars = [{ id: 'foreign', attackerId: a, defenderId: b, targetProvinceId: state.nations[b].capital, progress: 0, turns: 1, battleReports: [] }];
+    expect(getAmbitionSnapshot(state).diplomacy.done).toBe(true);
+    expect(applyAmbitionsAfterTurn(state).state.victory.type).toBe('win_culture');
+    expect(state.victory.type).toBeNull();
+    state.wars[0].attackerId = id;
+    expect(getAmbitionSnapshot(state).diplomacy.done).toBe(false);
+    expect(applyAmbitionsAfterTurn(state).state.victory.type).toBeNull();
+  });
+
   it('materializes ambition metadata before the first turn so UI progress has a persisted baseline', () => {
     const state = createInitialState() as GameState & { ambitionMeta?: unknown };
     expect(state.ambitionMeta).toBeUndefined();

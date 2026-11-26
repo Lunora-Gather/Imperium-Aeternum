@@ -11,6 +11,7 @@ import { draftFromPopulation, settlePopulation, settlePopulationPure } from '../
 import { checkTrigger, rollEvents, applyEffect, applyEffectPure, recordEvent, recordEventPure } from '../events';
 import { ageRulers, ageRulersPure } from '../dynasty';
 import { lawPerTurnEffects, lawPerTurnEffectsPure } from '../politics';
+import { collectWorldEvents } from '../turnIntel';
 import { processTurn } from '../turn';
 import { PLAYER_ID } from '../../data/nations';
 import { mulberry32 } from '../../utils/random';
@@ -66,10 +67,13 @@ describe('C3 economy 针对性', () => {
   it('内战期间税收 ×0.7', () => {
     const state = createInitialState();
     const player = state.nations[PLAYER_ID];
+    const peace = settleEconomyPure(player, state);
     player.civilWar = { active: true, rebels: [] };
-    const goldBefore = player.resources.gold;
-    settleEconomy(player, state);
-    expect(player.resources.gold).toBeLessThanOrEqual(goldBefore + 1000);  // 内战折扣生效，不暴涨
+    const civil = settleEconomyPure(player, state);
+    expect(civil.taxIncome).toBeCloseTo(peace.taxIncome * 0.7);
+    expect(civil.militaryExpense).toBe(peace.militaryExpense);
+    expect(civil.tradeIncome).toBe(peace.tradeIncome);
+    expect(civil.delta.gold - peace.delta.gold).toBeCloseTo(civil.taxIncome - peace.taxIncome - (civil.corruptionLoss - peace.corruptionLoss));
   });
 });
 
@@ -553,6 +557,34 @@ describe('C1 settleTechnologyPure 纯函数对照', () => {
 
 // C1: settleCultureReligionPure 纯函数对照测试
 describe('C1 settleCultureReligionPure 纯函数对照', () => {
+  it('uses the governing capital and the current borders for the two-step distance rule', () => {
+    const state = createInitialState();
+    const ruler = state.nations.n02;
+    const provinces = ['p07', 'p08', 'p09', 'p10'].map(id => state.provinces[id]);
+    for (const [i, province] of provinces.entries()) {
+      province.adjacent = provinces.slice(i + 1, i + 2).map(p => p.id);
+      Object.assign(province, { culture: provinces[0].culture, assimilation: 40, buildings: [], distToPlayerCapital: 0 });
+    }
+    const first = settleCultureReligionPure(ruler, state, provinces).provFinal;
+    expect(first.p09.assimilation).toBe(first.p07.assimilation);
+    expect(first.p10.assimilation).toBe(first.p07.assimilation - 1);
+    ruler.capital = 'p08';
+    settleCultureReligion(ruler, state, provinces);
+    expect(provinces[3].assimilation).toBe(provinces[1].assimilation);
+    expect(provinces[0].assimilation).toBe(provinces[1].assimilation - 1);
+  });
+
+  it('isolates the map and resources of two fresh classic campaigns', () => {
+    const first = createInitialState().provinces.p01;
+    const second = createInitialState().provinces.p01;
+    expect(first.adjacent).not.toBe(second.adjacent);
+    expect(first.baseResources).not.toBe(second.baseResources);
+    first.adjacent.pop();
+    first.baseResources.wood = 999;
+    expect(createInitialState().provinces.p01).toEqual(second);
+    expect(first.adjacent).not.toEqual(second.adjacent);
+    expect(first.baseResources).not.toEqual(second.baseResources);
+  });
   it('provFinal 与 settleCultureReligion mutate 后的省值一致', () => {
     const state1 = createInitialState();
     const state2 = createInitialState();
@@ -627,35 +659,27 @@ describe('C1 settleWarsPure 纯函数对照', () => {
     expect(JSON.stringify(state.wars)).toBe(before);
   });
 
-  it('有战争时 warUpdates 与 settleWars mutate 后的 war 字段一致', () => {
-    const state1 = createInitialState();
-    const state2 = createInitialState();
-    // 玩家对某邻国宣战（target 取玩家邻省）
-    const playerProvs = Object.values(state1.provinces).filter((p) => p.ownerId === PLAYER_ID);
-    const targetAdj = playerProvs[0]?.adjacent.find((aid) => {
-      const ap = state1.provinces[aid];
-      return ap && ap.ownerId !== PLAYER_ID;
-    });
-    if (!targetAdj) return; // 无邻省可攻则跳过
-    const targetProv = state1.provinces[targetAdj];
-    const defenderId = targetProv.ownerId;
-    // 玩家军队调到前线（相邻己省或目标省）
-    const player = state1.nations[PLAYER_ID];
-    if (player.army.length === 0) {
-      player.army.push({ id: 'army_test', ownerId: PLAYER_ID, location: playerProvs[0].id, size: 100, morale: 60, training: 50, equipment: 50, supply: 80 });
-    } else {
-      player.army[0].size = Math.max(player.army[0].size, 100);
-    }
-    declareWar(state1, PLAYER_ID, defenderId, targetAdj);
-    declareWar(state2, PLAYER_ID, defenderId, targetAdj);
-    // state1 跑原版本，state2 跑 Pure
-    settleWarsPure(state2); // 先 Pure（不 mutate state2）
-    // 复制 Pure 结果用于对照（state2 未被 mutate）
-    const pureResult = settleWarsPure(state2);
-    settleWarsPure(state1); // state1 也跑 Pure（避免原版本 splice 难对照）
-    // 对照：两次 Pure 结果一致
-    expect(pureResult.peaceWarIds).toEqual(pureResult.peaceWarIds);
-    expect(Object.keys(pureResult.warUpdates).length).toBeGreaterThan(0);
+  it('纯结算可重复，保留输入状态并返回当年战报', () => {
+    const state = createInitialState();
+    const front = Object.values(state.provinces).find((p) =>
+      p.ownerId === PLAYER_ID && p.adjacent.some((id) => {
+        const owner = state.provinces[id]?.ownerId;
+        return owner !== PLAYER_ID && !!state.nations[owner];
+      }))!;
+    const target = front.adjacent.map((id) => state.provinces[id])
+      .find((p) => p && p.ownerId !== PLAYER_ID && state.nations[p.ownerId])!;
+    const attacker = state.nations[PLAYER_ID];
+    attacker.army[0].location = front.id;
+    attacker.army[0].size = 5000;
+    target.terrain = 'coast';
+    const war = declareWar(state, attacker.id, target.ownerId, target.id)!;
+    const snapshot = structuredClone(state);
+    const result = settleWarsPure(state);
+    expect(state).toEqual(snapshot);
+    expect(settleWarsPure(snapshot)).toEqual(result);
+    expect(result.warUpdates[war.id].battleReports).toEqual([
+      expect.objectContaining({ turn: state.turn, attSize: attacker.army[0].size, outcome: 'advance', narrative: expect.stringContaining(`${target.name}海岸推进`) }),
+    ]);
   });
 
   it('纯结果合并器与旧结算在完整战斗状态上完全一致', () => {
@@ -861,4 +885,97 @@ describe('processTurn 正式入口契约', () => {
     expect(r1.state.lastReport).toEqual(r1.report);
     expect(r1.state.history[r1.state.history.length - 1]).toEqual(r1.report);
   });
+});
+
+describe('annual treasury and research settlement', () => {
+  it('applies character and government multipliers only to annual production', () => {
+    const state = createInitialState();
+    const player = state.nations[PLAYER_ID];
+    player.activeCharacterBonuses = ['technocracy', 'religiosity', 'mercantilist'];
+    player.government.type = 'republic';
+    const provinces = Object.values(state.provinces).filter((p) => p.ownerId === player.id);
+    const scholars = provinces.reduce((n, p) => n + (p.classes.find((c) => c.classId === 'scholars')?.count ?? 0), 0);
+    player.resources.gold = 1000;
+    const a = settleEconomyPure(player, state);
+    player.resources.gold += 1000;
+    player.resources.sciPt += 1000;
+    const b = settleEconomyPure(player, state);
+    expect(b.delta.gold).toBeCloseTo(a.delta.gold);
+    expect(b.delta.sciPt).toBe(a.delta.sciPt);
+    expect(b.delta.sciPt).toBe(Math.round((scholars / 2 + computeBuildingYields(provinces).sciPt) * 1.25 * 0.9 * 1.03));
+  });
+
+  it('includes credited trade route yields in the annual breakdown', () => {
+    const state = createInitialState();
+    const player = state.nations[PLAYER_ID];
+    state.provinces.p01.ownerId = player.id;
+    player.activeTradeRoutes = [];
+    const before = settleEconomyPure(player, state);
+    player.activeTradeRoutes.push({ routeId: 'route_grain_route', establishedTurn: 0 });
+    const after = settleEconomyPure(player, state);
+    expect(after.tradeIncome - before.tradeIncome).toBeCloseTo(after.delta.gold - before.delta.gold);
+    expect(after.foodProduced - before.foodProduced).toBe(30);
+    expect(after.delta.food - before.delta.food).toBeCloseTo(30);
+  });
+
+  it('finishes queued research at the catalog price, charging gold only on completion', () => {
+    const state = createInitialState();
+    const player = state.nations[PLAYER_ID];
+    player.tech.agri = 1;
+    player.tech.researchProgress = { techId: 'agri_lv2', sciPtInvested: 385 };
+    player.resources.sciPt = 20;
+    player.resources.gold = 99;
+    settleTechnology(player, state);
+    expect(player.tech.researchProgress?.sciPtInvested).toBe(400);
+    expect(player.resources.sciPt).toBe(5);
+    expect(player.resources.gold).toBe(99);
+    player.resources.gold++;
+    settleTechnology(player, state);
+    expect([player.tech.agri, player.resources.gold, player.resources.sciPt]).toEqual([2, 0, 5]);
+    expect(player.tech.researchProgress).toBeNull();
+  });
+
+  it.each(['obsolete_id', 'agri_lv1'])('clears stale queued project %s during a real turn', (techId) => {
+    const state = createInitialState();
+    const player = state.nations[PLAYER_ID];
+    player.tech.agri = 1;
+    const baseline = processTurn(state).state.nations[PLAYER_ID];
+    player.tech.researchProgress = { techId, sciPtInvested: 5000 };
+    const settled = processTurn(state).state.nations[PLAYER_ID];
+    expect(settled.tech.researchProgress).toBeNull();
+    expect(settled.resources).toEqual(baseline.resources);
+  });
+});
+
+it('applies the commerce bonus once and reports actual rounded population growth', () => {
+  const state = createInitialState();
+  const player = state.nations[PLAYER_ID];
+  player.activeCharacterBonuses = [];
+  const base = settleEconomyPure(player, state).tradeIncome;
+  player.activeCharacterBonuses = ['commerce'];
+  expect(settleEconomyPure(player, state).tradeIncome).toBeCloseTo(base * 1.25);
+  const owned = Object.values(state.provinces).filter((p) => p.ownerId === player.id);
+  const population = settlePopulationPure(player, owned, false, true, false, false);
+  expect(population.totalGrowth).toBe(Object.values(population.popDelta).reduce((a, b) => a + b, 0));
+});
+
+it.each(['alliance', 'none'] as const)('announces a bilateral treaty transition to %s once', (treaty) => {
+  const before = createInitialState();
+  const after = structuredClone(before);
+  const foreign = Object.keys(before.nations).find((id) => id !== PLAYER_ID)!;
+  const isPair = (r: { from: string; to: string }) => [r.from, r.to].includes(PLAYER_ID) && [r.from, r.to].includes(foreign);
+  for (const r of before.relations.filter(isPair)) Object.assign(r, { treaty: 'truce', truceTurns: 1 });
+  for (const r of after.relations.filter(isPair)) Object.assign(r, { treaty, truceTurns: 0 });
+  expect(collectWorldEvents(before, after, PLAYER_ID, [])).toHaveLength(1);
+});
+
+it('charges the full military upkeep when a gold income modifier is active', () => {
+  const state = createInitialState();
+  const player = state.nations[PLAYER_ID];
+  player.activeCharacterBonuses = ['mercantilist'];
+  player.resources.gold = 10000;
+  const before = settleEconomyPure(player, state);
+  player.army[0].size += 200;
+  const after = settleEconomyPure(player, state);
+  expect(after.delta.gold - before.delta.gold).toBeCloseTo(before.militaryExpense - after.militaryExpense);
 });

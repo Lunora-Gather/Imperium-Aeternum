@@ -1,4 +1,7 @@
 import { createWorldState } from '../src/engine/init';
+import { addChronicle, CHRONICLE_MAX, personalChronicleOwner } from '../src/engine/chronicle';
+import { validPendingEvents } from '../src/gameplay/stateHygiene';
+import { sharedNationView } from '../src/shared-world/nationView';
 import { processTurn } from '../src/engine/turn';
 import type { GameState } from '../src/types/game';
 import {
@@ -11,22 +14,59 @@ import {
 } from '../src/gameplay/actions';
 import { resolvePendingEventChoice } from '../src/gameplay/pendingEventResolution';
 
+export { sharedNationView };
+
+export function prepareSharedSnapshot(state: GameState): GameState {
+  const next = { ...state, pendingEvents: validPendingEvents(state) };
+  const options = next.pendingEventOptions;
+  if (!next.pendingEvents.some(p => p.eventId === options?.eventId && p.nationId === options?.nationId)) next.pendingEventOptions = null;
+  if (!next.sharedChronicles) {
+    next.chronicle = [];
+    next.sharedChronicles = {};
+    for (const entry of state.chronicle ?? []) {
+      const owner = entry.kind === 'founding'
+        ? Object.values(state.nations).find((n) => entry.title === `${n.name} 立国`)?.id
+        : undefined;
+      if (personalChronicleOwner(entry) || owner) addChronicle(next, owner ? { ...entry, actorId: owner } : entry);
+      else next.chronicle.push(entry);
+    }
+  }
+  return next;
+}
+
+export function sharedRulerSnapshot(state: GameState, nationId: string): GameState {
+  const { sharedFocuses, sharedHistories, sharedChronicles, ...view } = sharedNationView(state, nationId);
+  view.chronicle = [...state.chronicle, ...(sharedChronicles?.[nationId] ?? [])]
+    .sort((a, b) => a.turn - b.turn).slice(-CHRONICLE_MAX);
+  view.pendingEvents = state.pendingEvents.filter((entry) => entry.nationId === nationId);
+  const options = state.pendingEventOptions;
+  view.pendingEventOptions = options?.nationId === nationId ? options : null;
+  return view;
+}
+
 type ActionPayload = { action?: string; args?: unknown[] };
 const STRATEGY_FOCUSES = new Set(['balance', 'stability', 'prosperity', 'military', 'diplomacy', 'reform']);
 
-function selectNation(state: GameState, nationId: string): void {
-  if (!state.nations[nationId] || state.nations[nationId].defeated) throw new Error('国家不存在或已经覆亡');
-  state.playerNationId = nationId;
-  for (const nation of Object.values(state.nations)) nation.isPlayer = nation.id === nationId;
+export function createSharedWorldSnapshot(): GameState {
+  return prepareSharedSnapshot(createWorldState(20260722));
 }
 
-export function createSharedWorldSnapshot(): GameState {
-  return createWorldState(20260722);
+function workingNationView(state: GameState, nationId: string) {
+  const view = sharedNationView(state.sharedChronicles ? state : prepareSharedSnapshot(state), nationId);
+  view.sharedFocuses ??= { [state.playerNationId]: state.strategyFocus ?? 'balance' };
+  if (!view.sharedHistories) {
+    view.sharedHistories = {};
+    for (const report of state.history) (view.sharedHistories[report.nationId] ??= []).push(report);
+  }
+  // Older snapshots recorded events only for the then-selected ruler.
+  view.triggeredEvents = state.triggeredEvents.map((e) => e.nationId ? e : { ...e, nationId: state.playerNationId });
+  view.eventCooldowns = state.eventCooldowns.map((e) => e.nationId ? e : { ...e, nationId: state.playerNationId });
+  return view;
 }
 
 export function applySharedWorldCommand(state: GameState, nationId: string, payload: ActionPayload): { state: GameState; messages: string[] } {
-  const working = structuredClone(state) as GameState;
-  selectNation(working, nationId);
+  if (!state.nations[nationId] || state.nations[nationId].defeated) throw new Error('国家不存在或已经覆亡');
+  const working = workingNationView(structuredClone(state), nationId);
   const action = String(payload.action ?? '');
   const args = Array.isArray(payload.args) ? payload.args : [];
   const text = (index: number) => String(args[index] ?? '');
@@ -42,7 +82,7 @@ export function applySharedWorldCommand(state: GameState, nationId: string, payl
     case 'set_strategy_focus': {
       const focus = text(0);
       if (!STRATEGY_FOCUSES.has(focus)) throw new Error('国策焦点无效');
-      working.strategyFocus = focus as never;
+      working.sharedFocuses![nationId] = working.strategyFocus = focus as NonNullable<GameState['strategyFocus']>;
       result = { ok: true, state: working, messages: ['国策焦点已更新'] };
       break;
     }
@@ -59,7 +99,7 @@ export function applySharedWorldCommand(state: GameState, nationId: string, payl
     case 'dynastic_marriage': result = dynasticMarriageAction(working, text(0)); break;
     case 'cultural_export': result = culturalExportAction(working, text(0)); break;
     case 'declare_war': result = declareWarAction(working, text(0), text(1)); break;
-    case 'make_peace': result = makePeaceAction(working, text(0)); break;
+    case 'make_peace': result = makePeaceAction(working, text(0), true); break;
     case 'move_army': result = moveArmyAction(working, text(0), text(1)); break;
     case 'enact_policy': result = enactPolicyAction(working, text(0) as never); break;
     case 'enact_law': result = enactLawAction(working, text(0)); break;
@@ -77,7 +117,9 @@ export function applySharedWorldCommand(state: GameState, nationId: string, payl
 }
 
 export function advanceSharedWorld(state: GameState, humanNationIds: string[]): GameState {
-  const active = humanNationIds.find((id) => state.nations[id] && !state.nations[id].defeated) ?? Object.keys(state.nations)[0];
-  selectNation(state, active);
-  return processTurn(state, { humanNationIds, sharedWorld: true }).state;
+  const rulers = [...new Set(humanNationIds)].filter((id) => state.nations[id] && !state.nations[id].defeated).sort();
+  const reference = rulers[0] ?? Object.values(state.nations).find((n) => !n.defeated)?.id;
+  if (!reference) throw new Error('版图已无存续国家');
+  const view = workingNationView(state, reference);
+  return processTurn(view, { humanNationIds: rulers, sharedWorld: true }).state;
 }

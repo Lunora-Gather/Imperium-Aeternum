@@ -1,4 +1,4 @@
-import { Account, Client, Functions, Realtime, Storage, TablesDB } from 'appwrite';
+import { Account, Client, Functions, Realtime, TablesDB } from 'appwrite';
 import { APPWRITE_CONFIG, isAppwriteConfigured } from './config';
 
 const client = isAppwriteConfigured
@@ -11,9 +11,16 @@ export function getAppwriteServices() {
   return {
     client,
     account: new Account(client),
-    storage: new Storage(client),
     tablesDB: new TablesDB(client),
     functions: new Functions(client),
     realtime: realtime!,
   };
+}
+
+export function storageFileUrl(bucket: string, file: string, method: 'download' | 'view') {
+  const { config } = getAppwriteServices().client;
+  const url = new URL(`${config.endpoint}/storage/buckets/${encodeURIComponent(bucket)}/files/${encodeURIComponent(file)}/${method}`);
+  url.searchParams.set('project', config.project);
+  if (config.impersonateuserid) url.searchParams.set('impersonateuserid', config.impersonateuserid);
+  return url;
 }

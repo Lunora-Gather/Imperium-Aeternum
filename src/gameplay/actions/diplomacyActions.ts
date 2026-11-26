@@ -1,18 +1,14 @@
+import { peacefulRelationPair } from '../../engine/diplomacy';
 import type { GameState } from '../../types/game';
 import { recordDiplomaticIncident } from '../diplomaticMemory';
 import { clamp, failure, relationPair, runGameAction, spendAdmin, success, validForeignTarget } from './actionCore';
 
 export type SpyKind = 'steal_tech' | 'foment_rebellion' | 'spy_military';
 
-function peacefulPair(state: GameState, playerId: string, targetId: string) {
-  const pair = relationPair(state, playerId, targetId);
-  if (!pair || pair.some((relation) => relation.treaty === 'war' || relation.treaty === 'truce')) return null;
-  return pair;
-}
 export function improveRelationAction(state: GameState, targetId: string) {
   return runGameAction(state, (working, player) => {
     const target = validForeignTarget(working, player, targetId);
-    const pair = target ? peacefulPair(working, player.id, target.id) : null;
+    const pair = target ? peacefulRelationPair(working, player.id, target.id) : null;
     if (!target || !pair) return failure('当前无法改善关系');
     if (player.resources.influence < 20) return failure('影响力不足');
     const apFailure = spendAdmin(player, 1);
@@ -30,7 +26,7 @@ export function improveRelationAction(state: GameState, targetId: string) {
 export function formTradeAction(state: GameState, targetId: string) {
   return runGameAction(state, (working, player) => {
     const target = validForeignTarget(working, player, targetId);
-    const pair = target ? peacefulPair(working, player.id, target.id) : null;
+    const pair = target ? peacefulRelationPair(working, player.id, target.id) : null;
     if (!target || !pair || pair[0].relation < 0 || pair.some((relation) => relation.treaty === 'alliance' || relation.treaty === 'trade')) {
       return failure('无法建立贸易');
     }
@@ -50,7 +46,7 @@ export function formTradeAction(state: GameState, targetId: string) {
 export function formAllianceAction(state: GameState, targetId: string) {
   return runGameAction(state, (working, player) => {
     const target = validForeignTarget(working, player, targetId);
-    const pair = target ? peacefulPair(working, player.id, target.id) : null;
+    const pair = target ? peacefulRelationPair(working, player.id, target.id) : null;
     if (!target || !pair || pair[0].relation < 50 || pair.some((relation) => relation.treaty === 'alliance')) return failure('无法结盟');
     if (player.resources.influence < 50) return failure('影响力不足');
     const apFailure = spendAdmin(player, 2);
@@ -91,7 +87,7 @@ export function espionageAction(state: GameState, targetId: string, kind: SpyKin
 export function dynasticMarriageAction(state: GameState, targetId: string) {
   return runGameAction(state, (working, player) => {
     const target = validForeignTarget(working, player, targetId);
-    const pair = target ? peacefulPair(working, player.id, target.id) : null;
+    const pair = target ? peacefulRelationPair(working, player.id, target.id) : null;
     if (!target || !pair || pair[0].relation < 20) return failure('联姻条件不足');
     if (player.resources.influence < 30 || player.resources.gold < 80) return failure('联姻资源不足');
     const apFailure = spendAdmin(player, 2);
@@ -110,7 +106,7 @@ export function dynasticMarriageAction(state: GameState, targetId: string) {
 export function culturalExportAction(state: GameState, targetId: string) {
   return runGameAction(state, (working, player) => {
     const target = validForeignTarget(working, player, targetId);
-    const pair = target ? peacefulPair(working, player.id, target.id) : null;
+    const pair = target ? peacefulRelationPair(working, player.id, target.id) : null;
     if (!target || !pair) return failure('当前无法进行文化输出');
     if (player.tech.culture < 5) return failure('文化输出需要文化科技 Lv5');
     if (player.resources.sciPt < 30) return failure('科研点不足');

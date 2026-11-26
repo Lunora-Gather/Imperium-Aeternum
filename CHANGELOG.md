@@ -2,6 +2,15 @@
 
 All notable player-facing changes are recorded here. Version numbers follow semantic versioning.
 
+## [1.1.2] - 2026-11-27
+
+- Refined all four themes, including text contrast, buttons, status colors, map labels, and mobile layout.
+- Added background save inspection, lossless local compression, and safer cloud slot conflict and reconnect handling.
+- Improved shared-world readiness, command retry, lease recovery, and settlement synchronization.
+- Corrected turn accounting and strengthened full-world performance checks without raising the turn budgets.
+- Preserved chat drafts and composition input across pending sends and network errors.
+- Added browser coverage for theme contrast, cloud save recovery, and two-player reconnect.
+
 ## [1.1.1] - 2026-07-26
 
 ### Fixed
@@ -52,6 +61,7 @@ All notable player-facing changes are recorded here. Version numbers follow sema
 
 - First public preview of the playable governance, war, diplomacy, event, report, and save/load loop.
 
+[1.1.2]: https://github.com/Lunora-Gather/Imperium-Aeternum/compare/v1.1.1...v1.1.2
 [1.1.1]: https://github.com/Lunora-Gather/Imperium-Aeternum/compare/v1.1.0...v1.1.1
 [1.1.0]: https://github.com/Lunora-Gather/Imperium-Aeternum/compare/v1.0.0-preview...v1.1.0
 [1.0.0-preview]: https://github.com/Lunora-Gather/Imperium-Aeternum/releases/tag/v1.0.0-preview

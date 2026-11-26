@@ -215,6 +215,9 @@ export default async ({ req, res, error }) => {
     const userId = req.headers['x-appwrite-user-id'];
     if (!userId) return res.json({ ok: false, message: '需要登录后使用社交功能' }, 401);
     const body = req.bodyJson ?? {};
+    if (body.expectedUserId !== undefined && body.expectedUserId !== userId) {
+      return res.json({ ok: false, message: '登录账号已更换' }, 409);
+    }
     const { action } = body;
     const { db, users, storage } = services(req);
     const self = await ensureProfile(db, users, userId);

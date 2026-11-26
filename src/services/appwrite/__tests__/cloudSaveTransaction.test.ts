@@ -55,9 +55,41 @@ describe('cloud save transactional replacement', () => {
     };
     const storage = storageMock();
 
-    const row = await commitUploadedSave(db, storage, 'user-a', 1, { $id: 'new-file' }, metadata, {}, []);
+    const row = await commitUploadedSave(db, storage, 'user-a', 1, { $id: 'new-file' }, metadata, { baseHash: 'old-hash' }, []);
     expect(row).toEqual(expect.objectContaining({ fileId: 'winner-file' }));
     expect(db.createTransaction).toHaveBeenCalledTimes(2);
     expect(storage.deleteFile).toHaveBeenCalledWith({ bucketId: 'cloud_saves', fileId: 'new-file' });
+  });
+
+  it('requires another choice when the version confirmed on screen has since changed', async () => {
+    const db = {
+      createTransaction: vi.fn().mockResolvedValue({ $id: 'tx' }),
+      getRow: vi.fn().mockResolvedValue({ contentHash: 'third', fileId: 'third-file', deviceId: 'device-a' }),
+      updateTransaction: vi.fn().mockResolvedValue(undefined), upsertRow: vi.fn(),
+    };
+    const storage = storageMock();
+    await expect(commitUploadedSave(db, storage, 'a', 1, { $id: 'new' }, metadata,
+      { force: true, baseHash: 'second' }, [])).rejects.toMatchObject({ code: 409, cloudHash: 'third' });
+    expect(db.upsertRow).not.toHaveBeenCalled();
+  });
+
+  it('retains the active payload when the commit succeeds but its reply is lost', async () => {
+    const current = { fileId: 'new', ...metadata };
+    const db = {
+      createTransaction: vi.fn().mockResolvedValue({ $id: 'tx' }),
+      getRow: vi.fn().mockResolvedValueOnce({ contentHash: 'old', fileId: 'old-file', deviceId: metadata.deviceId }).mockResolvedValue(current),
+      upsertRow: vi.fn().mockResolvedValue(current), updateTransaction: vi.fn().mockRejectedValue(new Error('lost acknowledgement')),
+    };
+    const storage = storageMock();
+    expect(await commitUploadedSave(db, storage, 'a', 1, { $id: 'new' }, metadata, {}, [])).toEqual(current);
+    expect(storage.deleteFile).not.toHaveBeenCalledWith({ bucketId: 'cloud_saves', fileId: 'new' });
+  });
+
+  it('asks a legacy client to confirm a divergent save from another device even if its clock is ahead', async () => {
+    const previous = { contentHash: 'other', deviceId: 'other-device', clientUpdatedAt: '2026-07-22T00:00:00.000Z' };
+    const db = { createTransaction: vi.fn().mockResolvedValue({ $id: 'tx' }), getRow: vi.fn().mockResolvedValue(previous),
+      updateTransaction: vi.fn().mockResolvedValue(undefined), upsertRow: vi.fn() };
+    await expect(commitUploadedSave(db, storageMock(), 'a', 1, { $id: 'new' }, metadata, {}, [])).rejects.toMatchObject({ code: 409, cloudHash: 'other' });
+    expect(db.upsertRow).not.toHaveBeenCalled();
   });
 });

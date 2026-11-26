@@ -37,6 +37,14 @@ describe('neutral province expansion', () => {
     expect(result.state.nations[player.id].warExhaustion).toBe(4);
   });
 
+  it('accepts a one-way frontier when the neutral province borders our territory', () => {
+    const { state, player, neutral } = frontier();
+    for (const province of Object.values(state.provinces)) {
+      if (province.ownerId === player.id) province.adjacent = province.adjacent.filter((id) => id !== neutral.id);
+    }
+    expect(developProvinceAction(state, neutral.id, 'neutral_colonize').ok).toBe(true);
+  });
+
   it('rejects non-adjacent neutral expansion without spending anything', () => {
     const { state } = frontier();
     const remote = Object.values(state.provinces).find((province) => province.ownerId !== state.playerNationId && !province.adjacent.some((id) => state.provinces[id]?.ownerId === state.playerNationId));

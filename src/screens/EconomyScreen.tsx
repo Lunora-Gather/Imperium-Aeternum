@@ -1,3 +1,4 @@
+import { ignoreGameShortcut } from '../gameplay/navigationTabs';
 import { registerGovernanceTranslations } from '../i18n/catalogs/governance';
 import { localizeReactTree } from '../i18n/reactTree';
 registerGovernanceTranslations();
@@ -48,8 +49,7 @@ export default function EconomyScreen() {
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      const t = e.target as HTMLElement;
-      if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return;
+      if (ignoreGameShortcut(e)) return;
       const hasPending = state.pendingEvents.some((p) => p.nationId === player.id);
       if (hasPending) return;
       if (e.key === 'ArrowLeft') { e.preventDefault(); setTaxRate(Math.max(0, player.taxRate - 0.02)); }
@@ -79,7 +79,7 @@ export default function EconomyScreen() {
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10, marginBottom: 12 }}>
           <Stat kind="core" accent="var(--gold)" label="国库" value={player.resources.gold} warn={player.resources.gold < 0} />
           <Stat kind="core" accent="var(--food)" label="粮食" value={player.resources.food} warn={player.resources.food < 0} />
-          <Stat kind="core" accent={netIncome >= 0 ? 'var(--good)' : 'var(--war)'} label="净收入/年" value={netIncome} warn={netIncome < 0} />
+          <Stat kind="core" accent={netIncome >= 0 ? 'var(--good)' : 'var(--war)'} label="常规净收入" value={netIncome} warn={netIncome < 0} />
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 10, marginBottom: 12 }}>
           <Stat label="木材" value={player.resources.wood} />
@@ -117,6 +117,12 @@ export default function EconomyScreen() {
         {report && (
           <>
             <Divider label="上回合收支" />
+            {report.goldDelta == null
+              ? <p className="dim">旧年报未记录国库实际变化。</p>
+              : <>
+                <Row k="国库实际变化" v={report.goldDelta} negative={report.goldDelta < 0} />
+                <Row k="其他结算差额" v={report.goldDelta - netIncome} negative={report.goldDelta < netIncome} />
+              </>}
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
               <div><strong style={{ fontSize: 13, color: 'var(--good)' }}>收入 +{Math.round(income)}</strong><div style={{ fontSize: 13, marginTop: 4 }}><Row k="税收" v={report.income.tax} /><Row k="贸易" v={report.income.trade} /><Row k="建筑" v={report.income.building} /></div></div>
               <div><strong style={{ fontSize: 13, color: 'var(--war)' }}>支出 −{Math.round(expense)}</strong><div style={{ fontSize: 13, marginTop: 4 }}><Row k="军费" v={-report.expense.military} negative /><Row k="腐败" v={-report.expense.corruption} negative /></div></div>
@@ -147,12 +153,12 @@ function Guide({ title, body, tone }: { title: string; body: string; tone: 'dang
 }
 
 function Row({ k, v, negative }: { k: string; v: number; negative?: boolean }) {
-  return <div style={{ display: 'flex', justifyContent: 'space-between', padding: '2px 0', borderBottom: '1px solid rgba(42,58,90,0.3)' }}><span style={{ color: 'var(--text-mute)' }}>{k}</span><span style={{ fontVariantNumeric: 'tabular-nums', color: negative ? 'var(--war)' : 'var(--good)', fontWeight: 600 }}>{v >= 0 ? '+' : ''}{Math.round(v)}</span></div>;
+  return localizeReactTree(<div style={{ display: 'flex', justifyContent: 'space-between', padding: '2px 0', borderBottom: '1px solid rgba(42,58,90,0.3)' }}><span style={{ color: 'var(--text-mute)' }}>{k}</span><span style={{ fontVariantNumeric: 'tabular-nums', color: negative ? 'var(--war)' : 'var(--good)', fontWeight: 600 }}>{v >= 0 ? '+' : ''}{Math.round(v)}</span></div>);
 }
 
 function Bar({ value, max = 100, kind = 'neutral', label = '进度' }: { value: number; max?: number; kind?: 'high' | 'low' | 'neutral'; label?: string }) {
   const pct = Math.max(0, Math.min(100, (value / max) * 100));
-  let c = 'var(--bar-ok)';
+  let c = 'var(--bar-good)';
   if (kind === 'low') c = pct <= 40 ? 'var(--bar-good)' : pct <= 70 ? 'var(--bar-warn)' : 'var(--bar-bad)';
   if (kind === 'high') c = pct >= 60 ? 'var(--bar-good)' : pct >= 30 ? 'var(--bar-warn)' : 'var(--bar-bad)';
   return <div role="progressbar" aria-label={label} aria-valuemin={0} aria-valuemax={max} aria-valuenow={Math.max(0, Math.min(max, value))} style={{ background: 'var(--bg-inset)', borderRadius: 3, height: 10, overflow: 'hidden' }}><div style={{ width: `${pct}%`, height: '100%', background: c, transition: 'width 0.25s' }} /></div>;

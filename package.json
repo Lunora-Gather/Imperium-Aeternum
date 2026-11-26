@@ -1,6 +1,6 @@
 {
   "name": "imperium-aeternum",
-  "version": "1.1.1",
+  "version": "1.1.2",
   "private": true,
   "type": "module",
   "scripts": {
@@ -16,6 +16,7 @@
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
+    "test:e2e:cloud": "node --import tsx scripts/cloud-save-e2e.mjs",
     "test:e2e": "node scripts/browser-e2e.mjs",
     "verify:production": "node scripts/verify-production.mjs",
     "test:watch": "vitest",
@@ -30,6 +31,7 @@
     "export-data": "tsx scripts/export-data.ts",
     "build:shared-world-engine": "esbuild scripts/shared-world-engine-entry.ts --bundle --platform=node --format=esm --target=node22 --outfile=functions/shared-world-gateway/src/generated/engine-bundle.js",
     "check:shared-world-engine": "tsx scripts/check-shared-world-engine.ts",
+    "test:e2e:safari:campaign": "node --import tsx scripts/safari-campaign-e2e.mjs",
     "test:e2e:safari": "node scripts/browser-e2e.mjs"
   },
   "dependencies": {
@@ -37,15 +39,18 @@
     "immer": "^10.2.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
+    "snappyjs": "0.7.0",
     "zustand": "^4.5.4"
   },
   "devDependencies": {
     "@types/node": "^26.0.0",
     "@types/react": "^18.3.3",
     "@types/react-dom": "^18.3.0",
+    "@types/snappyjs": "0.7.1",
     "@vitejs/plugin-react": "^6.0.3",
     "esbuild": "^0.28.1",
     "opencc-js": "^1.4.1",
+    "playwright-core": "1.65.1",
     "selenium-webdriver": "4.35.0",
     "tsx": "^4.16.2",
     "typescript": "^5.5.3",

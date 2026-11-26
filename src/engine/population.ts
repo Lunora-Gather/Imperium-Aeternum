@@ -1,25 +1,11 @@
 // Imperium Aeternum — 人口系统 engine
 // 阶段 5b：完整实现 docs/reference/02-system-rules.md §10
 
-import type { Nation, Province, ClassId } from '../types/game';
+import { CLASS_IDS, type Nation, type Province, type ClassId } from '../types/game';
 import { popGrowth, classRebellionRisk } from './formulas';
 import { clamp } from '../utils/math';
-import { NATIONAL_CHARACTERS } from '../data/national-characters';
-import type { NationalCharacterId, NationalCharacterMods } from '../data/national-characters';
+import { nationalCharacterMods } from '../data/national-characters';
 
-// P1-4: 合并激活性格的加成+副作用
-function charMods(nation: Nation): NationalCharacterMods {
-  const merged: NationalCharacterMods = {};
-  for (const cid of nation.activeCharacterBonuses) {
-    const def = NATIONAL_CHARACTERS[cid as NationalCharacterId];
-    if (!def) continue;
-    for (const [k, v] of Object.entries(def.bonuses)) { (merged as Record<string, number>)[k] = ((merged as Record<string, number>)[k] ?? 0) + (v as number); }
-    for (const [k, v] of Object.entries(def.penalties)) { (merged as Record<string, number>)[k] = ((merged as Record<string, number>)[k] ?? 0) + (v as number); }
-  }
-  return merged;
-}
-
-const CLASS_IDS: ClassId[] = ['peasants', 'workers', 'merchants', 'soldiers', 'scholars', 'nobles', 'clergy'];
 
 // 阶层关注点权重（影响满意度变化方向）
 const CLASS_INTEREST: Record<ClassId, { tax: number; food: number; draft: number; trade: number; war: number; religion: number }> = {
@@ -45,52 +31,13 @@ export function settlePopulation(
   atWar: boolean,
   warWonRecent: boolean,
 ): PopSettleResult {
-  let totalGrowth = 0;
-  const classSatChanges = {} as Record<ClassId, number>;
-
+  const result = settlePopulationPure(nation, provinces, foodShortage, tradeFree, atWar, warWonRecent);
   for (const p of provinces) {
-    // 人口增长
-    const totalPop = p.population;
-    const delta = popGrowth({
-      population: totalPop, baseGrowth: 0.01,
-      food: nation.resources.food, foodNeed: totalPop * 0.8,
-      stability: nation.government.stability,
-      atWar, plague: false,
-      welfareActive: nation.activeCharacterBonuses.includes('welfare'),
-    }) * (charMods(nation).popGrowthMod ?? 1) * (nation.policyMods?.popGrowthMod ?? 1);  // P1-4 性格 + P-fix 政策人口增长加成
-    p.population = Math.max(10, Math.round(p.population + delta));
-    totalGrowth += delta;
-
-    // 每阶层满意度变化
-    for (const grp of p.classes) {
-      const interest = CLASS_INTEREST[grp.classId];
-      // 各因素对该阶层的压力
-      const taxPressure = (nation.taxRate - 0.15) * 100 * interest.tax;
-      const foodPressure = foodShortage ? -15 * interest.food : 0;
-      const warPressure = atWar ? -5 * interest.war : (warWonRecent ? 5 * interest.war : 0);
-      const tradePressure = tradeFree ? 3 * interest.trade : -3 * interest.trade;
-      const religionPressure = 0; // 由 policies 处理
-
-      const d = -taxPressure + foodPressure + warPressure + tradePressure + religionPressure;
-      grp.satisfaction = clamp(grp.satisfaction + d, 0, 100);
-
-      // 累加同类阶层变化（全国汇总用于派系）
-      classSatChanges[grp.classId] = (classSatChanges[grp.classId] ?? 0) + d;
-    }
+    p.population += result.popDelta[p.id];
+    for (const group of p.classes) group.satisfaction += result.classSatDelta[p.id][group.classId];
   }
-
-  // 全国同类阶层 → 派系满意度影响（简化：派系满意度 = 各省该阶层满意度均值）
-  for (const fid of CLASS_IDS) {
-    const faction = nation.factions.find((f) => f.id === mapClassToFaction(fid));
-    if (!faction) continue;
-    const allGrps = provinces.flatMap((p) => p.classes.filter((c) => c.classId === fid));
-    if (allGrps.length === 0) continue;
-    const avgSat = allGrps.reduce((s, g) => s + g.satisfaction, 0) / allGrps.length;
-    // 派系满意度缓向均值靠拢
-    faction.satisfaction = clamp(faction.satisfaction + (avgSat - faction.satisfaction) * 0.3, 0, 100);
-  }
-
-  return { totalGrowth, classSatChanges };
+  for (const faction of nation.factions) faction.satisfaction = result.factionSatFinal[faction.id] ?? faction.satisfaction;
+  return result;
 }
 
 // 阶层 → 派系映射（共 7 阶层 → 5 派系）
@@ -154,6 +101,7 @@ export function settlePopulationPure(
   const classSatDelta: Record<string, Record<string, number>> = {};
   // 记录每省每阶层 satisfaction 新值（用于 avgSat 计算，保持与原函数 mutate 后语义等价）
   const classSatNew: Record<string, Record<string, number>> = {};
+  const growthMod = (nationalCharacterMods(nation.activeCharacterBonuses).popGrowthMod ?? 1) * (nation.policyMods?.popGrowthMod ?? 1);
 
   for (const p of provinces) {
     const totalPop = p.population;
@@ -162,11 +110,11 @@ export function settlePopulationPure(
       food: nation.resources.food, foodNeed: totalPop * 0.8,
       stability: nation.government.stability,
       atWar, plague: false,
-      welfareActive: nation.activeCharacterBonuses.includes('welfare'),
-    }) * (charMods(nation).popGrowthMod ?? 1) * (nation.policyMods?.popGrowthMod ?? 1);
+      growthMod,
+    });
     const newPop = Math.max(10, Math.round(p.population + delta));
     popDelta[p.id] = newPop - p.population;  // delta（原函数 p.population = newPop）
-    totalGrowth += delta;
+    totalGrowth += popDelta[p.id];
 
     const satDelta: Record<string, number> = {};
     const satNew: Record<string, number> = {};
@@ -193,16 +141,15 @@ export function settlePopulationPure(
     const factionId = mapClassToFaction(fid);
     const faction = nation.factions.find((f) => f.id === factionId);
     if (!faction) continue;
-    const allGrps = provinces.flatMap((p) => p.classes.filter((c) => c.classId === fid));
-    if (allGrps.length === 0) continue;
     // avgSat 用 satNew（等价原函数 mutate 后值）
     let avgSum = 0, cnt = 0;
     for (const p of provinces) {
       const newSat = classSatNew[p.id]?.[fid];
       if (newSat !== undefined) { avgSum += newSat; cnt++; }
     }
-    const avgSat = cnt > 0 ? avgSum / cnt : 0;
-    factionSatFinal[factionId] = clamp(faction.satisfaction + (avgSat - faction.satisfaction) * 0.3, 0, 100);
+    if (!cnt) continue;
+    const current = factionSatFinal[factionId] ?? faction.satisfaction;
+    factionSatFinal[factionId] = clamp(current + (avgSum / cnt - current) * 0.3, 0, 100);
   }
 
   return { totalGrowth, classSatChanges, popDelta, classSatDelta, factionSatFinal };

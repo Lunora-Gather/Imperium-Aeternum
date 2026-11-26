@@ -24,6 +24,15 @@ describe('localizeReactTree', () => {
     expect(card.props.body).toContain('Conditions are manageable');
   });
 
+  it('translates form labels while preserving typed text and submitted option values', () => {
+    registerGovernanceTranslations();
+    setLocale('en');
+    const tree = localizeReactTree(<form><input value="平原" readOnly /><textarea value="平原" readOnly /><select value="平原" onChange={() => {}}><option value="平原">平原</option></select></form>) as ReactElement<{ children: ReactElement[] }>;
+    const [input, textarea, select] = tree.props.children;
+    expect([input.props.value, textarea.props.value, select.props.value, select.props.children.props.value]).toEqual(Array(4).fill('平原'));
+    expect(select.props.children.props.children).toBe('Plains');
+  });
+
   it('uses the generated lightweight Traditional Chinese fallback', () => {
     setLocale('zh-TW');
     const tree = localizeReactTree(<p>当前为游客模式</p>) as ReactElement<{ children: string }>;

@@ -1,3 +1,5 @@
+import { useDialogFocus } from '../components/useDialogFocus';
+import { warDeclarationBlocker } from '../engine/military';
 import { registerGovernanceTranslations } from '../i18n/catalogs/governance';
 import { localizeReactTree } from '../i18n/reactTree';
 registerGovernanceTranslations();
@@ -47,7 +49,7 @@ function PeaceTermsBtn({ war, state, pid, makePeace }: {
     <div style={{ position: 'relative' }} onMouseEnter={() => setShow(true)} onMouseLeave={() => setShow(false)}>
       <Btn label="求和 1政30影" variant="ghost" onClick={() => makePeace(war.id)} disabled={player.resources.adminPt < 1 || player.resources.influence < 30} />
       {show && (
-        <div style={{ position: 'absolute', bottom: '100%', right: 0, marginBottom: 4, background: 'var(--bg-panel)', border: '1px solid var(--border-hi)', borderRadius: 6, padding: 8, minWidth: 140, zIndex: 50, fontSize: 11, boxShadow: '0 4px 12px rgba(0,0,0,0.4)' }}>
+        <div style={{ position: 'absolute', bottom: '100%', right: 0, marginBottom: 4, background: 'var(--bg-panel)', border: '1px solid var(--border-bright)', borderRadius: 6, padding: 8, minWidth: 140, zIndex: 50, fontSize: 11, boxShadow: '0 4px 12px rgba(0,0,0,0.4)' }}>
           <div style={{ fontSize: 9, color: 'var(--text-dim)', marginBottom: 4, letterSpacing: '0.05em' }}>和约条件（进度 {Math.round(war.progress)}%）</div>
           {terms.map((t, i) => <div key={i} style={{ color: `var(--${t.tone === 'good' ? 'good' : t.tone === 'danger' ? 'war' : t.tone === 'warn' ? 'warn' : 'text'})`, padding: '1px 0' }}>{t.txt}</div>)}
         </div>
@@ -57,6 +59,7 @@ function PeaceTermsBtn({ war, state, pid, makePeace }: {
 }
 
 function MoveArmyModal({ army, onClose }: { army: Army; onClose: () => void }) {
+  const dialogRef = useDialogFocus<HTMLDivElement>(onClose);
   const { state, moveArmy } = useGameStore();
   const pid = state.playerNationId;
   const player = state.nations[pid];
@@ -70,9 +73,9 @@ function MoveArmyModal({ army, onClose }: { army: Army; onClose: () => void }) {
   });
   return (
     <div onClick={onClose} style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100 }}>
-      <div onClick={(e) => e.stopPropagation()} style={{ background: 'var(--bg-panel)', borderRadius: 10, padding: 18, maxWidth: 480, width: '90%', border: '2px solid var(--border-hi)', boxShadow: '0 8px 32px rgba(0,0,0,0.5)', maxHeight: '80vh', overflow: 'auto' }}>
+      <div ref={dialogRef} role="dialog" aria-modal="true" tabIndex={-1} aria-labelledby="move-army-title" onClick={(e) => e.stopPropagation()} style={{ background: 'var(--bg-panel)', borderRadius: 10, padding: 18, maxWidth: 480, width: '90%', border: '2px solid var(--border-bright)', boxShadow: '0 8px 32px rgba(0,0,0,0.5)', maxHeight: '80vh', overflow: 'auto' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-          <h3 className="ia-display" style={{ margin: 0, fontSize: 16 }}>➤ 调动军队 · {fromProv?.name}</h3>
+          <h3 id="move-army-title" className="ia-display" style={{ margin: 0, fontSize: 16 }}>➤ 调动军队 · {fromProv?.name}</h3>
           <Btn label="✕" variant="ghost" onClick={onClose} />
         </div>
         <div style={{ fontSize: 12, color: 'var(--text-mute)', marginBottom: 10 }}>
@@ -101,15 +104,16 @@ function MoveArmyModal({ army, onClose }: { army: Army; onClose: () => void }) {
 }
 
 function BattleReportModal({ war, onClose }: { war: War; onClose: () => void }) {
+  const dialogRef = useDialogFocus<HTMLDivElement>(onClose);
   const state = useGameStore((s) => s.state);
   const prov = state.provinces[war.targetProvinceId];
   const attacker = state.nations[war.attackerId];
   const defender = state.nations[war.defenderId];
   return (
     <div onClick={onClose} style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100 }}>
-      <div onClick={(e) => e.stopPropagation()} className="ia-battle-in" style={{ background: 'var(--bg-panel)', borderRadius: 10, padding: 18, maxWidth: 560, width: '90%', border: '2px solid var(--war)', boxShadow: '0 8px 32px rgba(0,0,0,0.5), 0 0 24px rgba(162,61,40,0.15)', maxHeight: '80vh', overflow: 'auto' }}>
+      <div ref={dialogRef} role="dialog" aria-modal="true" tabIndex={-1} aria-labelledby="battle-report-title" onClick={(e) => e.stopPropagation()} className="ia-battle-in" style={{ background: 'var(--bg-panel)', borderRadius: 10, padding: 18, maxWidth: 560, width: '90%', border: '2px solid var(--war)', boxShadow: '0 8px 32px rgba(0,0,0,0.5), 0 0 24px rgba(162,61,40,0.15)', maxHeight: '80vh', overflow: 'auto' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-          <h3 className="ia-display" style={{ margin: 0, fontSize: 16, color: 'var(--war)' }}>⚔ 战报 · {prov?.name ?? war.targetProvinceId}</h3>
+          <h3 id="battle-report-title" className="ia-display" style={{ margin: 0, fontSize: 16, color: 'var(--war)' }}>⚔ 战报 · {prov?.name ?? war.targetProvinceId}</h3>
           <Btn label="✕" variant="ghost" onClick={onClose} />
         </div>
         <div style={{ fontSize: 12, color: 'var(--text-mute)', marginBottom: 12 }}>{attacker?.name} 攻 vs {defender?.name} 守 · 进度 {Math.round(war.progress)}% · 已 {war.turns} 年</div>
@@ -142,7 +146,7 @@ export default function MilitaryScreen() {
 
   const selectedWarPreview = useMemo(() => {
     if (!previewTarget) return null;
-    if (!state.nations[previewTarget.defenderId] || !state.provinces[previewTarget.provinceId]) return null;
+    if (state.provinces[previewTarget.provinceId]?.ownerId !== previewTarget.defenderId || warDeclarationBlocker(state, pid, previewTarget.defenderId)) return null;
     return buildWarPreview(assessWar(state, pid, previewTarget.defenderId, previewTarget.provinceId));
   }, [previewTarget, state, pid]);
 
@@ -152,20 +156,20 @@ export default function MilitaryScreen() {
   for (const p of provs) if (p.adjacent.some((id) => state.provinces[id] && state.provinces[id].ownerId !== pid)) frontierProvinceIds.add(p.id);
   const frontierArmies = player.army.filter((a) => frontierProvinceIds.has(a.location));
   const weakArmies = player.army.filter((a) => a.morale < 40 || a.supply < 35 || a.equipment < 35);
-  const possibleWarRows = provs.flatMap((p) => p.adjacent.map((adjId) => {
-    const adj = state.provinces[adjId];
-    if (!adj || adj.ownerId === pid) return null;
+  const possibleWarRows = [...new Set(provs.flatMap((p) => p.adjacent))].flatMap((id) => {
+    const adj = state.provinces[id];
+    if (!adj || adj.ownerId === pid || !state.nations[adj.ownerId] || state.nations[adj.ownerId].defeated) return [];
     const rel = findRelationExplicit(pid, adj.ownerId, state);
-    if (rel?.treaty === 'alliance') return null;
-    return { p, adj, rel };
-  })).filter((x): x is NonNullable<typeof x> => !!x);
+    if (!rel || rel.treaty === 'alliance' || rel.treaty === 'war') return [];
+    return [{ adj, rel, blocker: warDeclarationBlocker(state, pid, adj.ownerId) }];
+  });
 
   const guidance: { title: string; body: string; tone: 'good' | 'warn' | 'danger' | 'info' }[] = [];
   if (myWars.length > 0 && frontierArmies.length === 0) guidance.push({ title: '先调兵到前线', body: '你在战争中，但军队没有部署在边境省。先点“调动”，把军队移到敌省相邻的己省。', tone: 'danger' });
   if (player.warExhaustion > 60) guidance.push({ title: '考虑议和', body: '厌战过高会拖垮稳定和财政。若战线没有优势，优先求和止损。', tone: 'warn' });
   if (weakArmies.length > 0) guidance.push({ title: '军队状态偏差', body: `${weakArmies.length} 支军队士气/装备/补给偏低，避免贸然进攻。`, tone: 'warn' });
   if (armyTotal < Math.max(150, provs.length * 35)) guidance.push({ title: '兵力偏少', body: '当前兵力不足以支撑扩张，优先征兵或提升补给。', tone: 'warn' });
-  if (myWars.length === 0 && possibleWarRows.length > 0 && armyTotal >= Math.max(200, provs.length * 45)) guidance.push({ title: '可选择扩张', body: '当前无战争且兵力尚可，可在宣战区选择低关系邻国。', tone: 'good' });
+  if (myWars.length === 0 && possibleWarRows.some((row) => !row.blocker) && armyTotal >= Math.max(200, provs.length * 45)) guidance.push({ title: '可选择扩张', body: '当前无战争且兵力尚可，可在宣战区选择低关系邻国。', tone: 'good' });
   if (guidance.length === 0) guidance.push({ title: '军情平稳', body: '保持边境驻军，避免多线作战，等待更好的扩张机会。', tone: 'info' });
 
   const doDeclare = (target: string, provId: string) => { storeDeclareWar(target, provId); setPreviewTarget(null); };
@@ -215,7 +219,7 @@ export default function MilitaryScreen() {
         const attacking = w.attackerId === pid;
         return <div key={w.id} className="ia-card" style={{ marginBottom: 8, padding: 10 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}><div><Tag text={attacking ? '进攻' : '防守'} tone={attacking ? 'danger' : 'warn'} /><strong style={{ marginLeft: 6, fontSize: 13 }}>{prov?.name ?? w.targetProvinceId}</strong></div><span className="dim" style={{ fontSize: 11 }}>第 {w.turns} 回合</span></div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}><span style={{ fontSize: 11, color: 'var(--text-mute)', width: 36 }}>进度</span><div style={{ flex: 1 }}><Bar value={w.progress} kind="high" label="战争进度" /></div><strong style={{ fontSize: 13, color: 'var(--border-hi)', width: 40, textAlign: 'right' }}>{Math.round(w.progress)}%</strong><Btn label="战报" variant="ghost" onClick={() => setReportWar(w)} /><PeaceTermsBtn war={w} state={state} pid={pid} makePeace={makePeace} /></div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}><span style={{ fontSize: 11, color: 'var(--text-mute)', width: 36 }}>进度</span><div style={{ flex: 1 }}><Bar value={w.progress} kind="high" label="战争进度" /></div><strong style={{ fontSize: 13, color: 'var(--gold)', width: 40, textAlign: 'right' }}>{Math.round(w.progress)}%</strong><Btn label="战报" variant="ghost" onClick={() => setReportWar(w)} /><PeaceTermsBtn war={w} state={state} pid={pid} makePeace={makePeace} /></div>
         </div>;
       })}
     </Panel>
@@ -227,10 +231,10 @@ export default function MilitaryScreen() {
       <p className="dim" style={{ fontSize: 11, marginBottom: 8 }}>向相邻非同盟国家宣战。先点“预演”查看胜率、后勤、财政、厌战与外交风险，再决定是否发动战争。</p>
       <div className="ia-card" style={{ marginBottom: 8, padding: 8, background: 'rgba(201,120,40,0.08)', border: '1px solid var(--warn)' }}><span style={{ fontSize: 11, color: 'var(--warn)' }}>⚠ 战略要点：宣战后须在“军队部署”区把军队调动到与敌省相邻的己省（前线），否则无军队在前线将自动议和。</span></div>
       {selectedWarPreview && previewTarget && <div style={{ marginBottom: 10 }}><WarPreviewPanel preview={selectedWarPreview} onPrimary={() => doDeclare(previewTarget.defenderId, previewTarget.provinceId)} /></div>}
-      <div>{possibleWarRows.map(({ p, adj, rel }) => {
-        if (rel?.treaty === 'truce' && rel.truceTurns > 0) {
+      <div>{possibleWarRows.map(({ adj, rel, blocker }) => {
+        if (blocker) {
           const enemy = state.nations[adj.ownerId];
-          return <div key={`${p.id}-${adj.id}`} style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 60px', gap: 8, padding: '8px 0', borderBottom: '1px solid var(--border)', alignItems: 'center', opacity: 0.6 }}><span style={{ fontSize: 12 }}>邻省 <strong>{adj.name}</strong> <span className="dim">属 {enemy?.name ?? '未知势力'}</span></span><span style={{ fontSize: 12, color: 'var(--warn)' }}>停战 {rel.truceTurns} 回合</span><Tag text="停战" tone="warn" /></div>;
+          return <div key={adj.id} style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 60px', gap: 8, padding: '8px 0', borderBottom: '1px solid var(--border)', alignItems: 'center', opacity: 0.6 }}><span style={{ fontSize: 12 }}>邻省 <strong>{adj.name}</strong> <span className="dim">属 {enemy?.name ?? '未知势力'}</span></span><span style={{ fontSize: 12, color: 'var(--warn)' }}>{rel.treaty === 'truce' ? `停战 ${rel.truceTurns} 回合` : blocker}</span></div>;
         }
         const relation = rel?.relation ?? 0;
         const tone = relation < -30 ? 'danger' : relation < 30 ? 'warn' : 'good';
@@ -239,7 +243,7 @@ export default function MilitaryScreen() {
         const ratio = armyTotal > 0 ? armyTotal / Math.max(1, enemyArmy) : 0;
         const advantage = ratio >= 1.5 ? { txt: '占优', tone: 'good' as const } : ratio >= 0.8 ? { txt: '均势', tone: 'warn' as const } : { txt: '劣势', tone: 'danger' as const };
         const selected = previewTarget?.defenderId === adj.ownerId && previewTarget?.provinceId === adj.id;
-        return <div key={`${p.id}-${adj.id}`} className="ia-military-declare-row"><span className="ia-military-target">邻省 <strong>{adj.name}</strong> <span className="dim">属 {enemy?.name ?? '未知势力'}</span></span><span className="ia-military-relation" style={{ color: `var(--${tone === 'danger' ? 'war' : tone === 'warn' ? 'warn' : 'good'})` }}>关系 {Math.round(relation)}</span><span className="ia-military-strength"><span style={{ color: 'var(--good)' }}>{armyTotal}</span><span className="dim" style={{ margin: '0 4px' }}>vs</span><span style={{ color: 'var(--war)' }}>{enemyArmy}</span></span><Tag text={advantage.txt} tone={advantage.tone} /><Btn label={selected ? '已预演' : '预演'} variant="ghost" onClick={() => setPreviewTarget({ defenderId: adj.ownerId, provinceId: adj.id })} /><Btn label="宣战 1政" warn onClick={() => doDeclare(adj.ownerId, adj.id)} disabled={player.resources.adminPt < 1 || rel?.treaty === 'alliance'} /></div>;
+        return <div key={adj.id} className="ia-military-declare-row"><span className="ia-military-target">邻省 <strong>{adj.name}</strong> <span className="dim">属 {enemy?.name ?? '未知势力'}</span></span><span className="ia-military-relation" style={{ color: `var(--${tone === 'danger' ? 'war' : tone === 'warn' ? 'warn' : 'good'})` }}>关系 {Math.round(relation)}</span><span className="ia-military-strength"><span style={{ color: 'var(--good)' }}>{armyTotal}</span><span className="dim" style={{ margin: '0 4px' }}>vs</span><span style={{ color: 'var(--war)' }}>{enemyArmy}</span></span><Tag text={advantage.txt} tone={advantage.tone} /><Btn label={selected ? '已预演' : '预演'} variant="ghost" onClick={() => setPreviewTarget({ defenderId: adj.ownerId, provinceId: adj.id })} /><Btn label="宣战 1政" warn onClick={() => doDeclare(adj.ownerId, adj.id)} disabled={player.resources.adminPt < 1 || rel?.treaty === 'alliance'} /></div>;
       })}</div>
     </Panel>
 

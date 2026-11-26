@@ -1,9 +1,11 @@
 // 待决事件的原子化结算边界：基于最新状态生成新状态，避免双击/按键重复结算。
 
+import { Immer } from 'immer';
 import type { GameState } from '../types/game';
 import { applyEffect, EVENT_BY_ID, recordEvent } from '../engine/events';
-import { invalidateRelationMap } from '../engine/init';
-import { cloneGameStateForTurn } from '../engine/turnIsolation';
+
+// Keep untouched world data shared and preserve the engine's mutable snapshots.
+const eventUpdates = new Immer({ autoFreeze: false });
 
 export interface PendingEventResolution {
   state: GameState;
@@ -24,18 +26,18 @@ export function resolvePendingEventChoice(
 ): PendingEventResolution {
   const event = EVENT_BY_ID[eventId];
   const option = event?.options[optionIndex];
-  if (!event || !option || !state.nations[nationId] || pendingIndex(state, nationId, eventId) < 0) {
+  const index = pendingIndex(state, nationId, eventId);
+  if (!event || !option || !state.nations[nationId] || index < 0) {
     return { state, resolved: false };
   }
 
-  const next = cloneGameStateForTurn(state);
-  const index = pendingIndex(next, nationId, eventId);
-  if (index < 0) return { state, resolved: false };
-
-  applyEffect(next.nations[nationId], option.effects, next);
-  recordEvent(next, nationId, eventId, optionIndex);
-  next.pendingEvents.splice(index, 1);
-  invalidateRelationMap(next);
+  const next = eventUpdates.produce(state, (draft) => {
+    draft._relMap = undefined;
+    applyEffect(draft.nations[nationId], option.effects, draft);
+    recordEvent(draft, nationId, eventId, optionIndex);
+    draft.pendingEvents.splice(index, 1);
+    if (draft.pendingEventOptions?.nationId === nationId && draft.pendingEventOptions.eventId === eventId) draft.pendingEventOptions = null;
+  });
 
   return {
     state: next,
@@ -48,7 +50,5 @@ export function resolvePendingEventChoice(
 export function discardPendingEvent(state: GameState, nationId: string, eventId: string): GameState {
   const index = pendingIndex(state, nationId, eventId);
   if (index < 0) return state;
-  const next = cloneGameStateForTurn(state);
-  next.pendingEvents.splice(index, 1);
-  return next;
+  return { ...state, _relMap: undefined, pendingEvents: state.pendingEvents.filter((_, i) => i !== index) };
 }

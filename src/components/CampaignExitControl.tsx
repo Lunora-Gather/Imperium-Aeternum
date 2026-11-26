@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { useGameStore } from '../store/gameStore';
-import { useSharedWorldSessionStore } from '../store/sharedWorldSessionStore';
+import { useDialogFocus } from './useDialogFocus';
+import { saveCampaignForExit, useGameStore } from '../store/gameStore';
+import { currentSharedSession, useSharedWorldSessionStore, waitForSharedCommands } from '../store/sharedWorldSessionStore';
 import { createScopedTranslator, type ScopedCatalog } from '../i18n/scoped';
 import { useI18n } from '../i18n';
 import { buildCampaignExitPolicy } from '../gameplay/campaignExit';
@@ -16,10 +17,13 @@ const catalog: ScopedCatalog = {
     '战局去留': 'Campaign control',
     '离开当前战局？': 'Leave this campaign?',
     '退出共享治理？': 'Leave shared governance?',
-    '当前正在治理 {{nation}} · 第 {{year}} 年。返回大厅前，可以先保存当前进度。': 'You are governing {{nation}} · Year {{year}}. Save your current progress before returning to the lobby.',
-    '{{world}} 的进度由服务器持续保存。退出后可从共享版图大厅再次进入。': '{{world}} is continuously saved by the server. You can re-enter it later from the shared-world lobby.',
+    '{{nation}} · 第 {{year}} 年': '{{nation}} · Year {{year}}',
+    '{{world}} · 可从共享版图大厅继续。': '{{world}} · Resume from the shared-world lobby.',
     '未保存的行动将丢失': 'Unsaved actions will be lost',
-    '服务器已保存共享进度': 'Shared progress is saved on the server',
+    '共享进度由服务器保存': 'The server saves shared progress',
+    '正在等待共享操作完成…': 'Waiting for shared actions…',
+    '有行动未获确认，请核对当前版图后再退出。': 'An action was not confirmed. Review the world before leaving.',
+    '继续查看': 'Continue reading',
     '继续治理': 'Continue governing',
     '不保存，返回大厅': 'Return without saving',
     '保存并返回大厅': 'Save and return',
@@ -32,44 +36,48 @@ const t = createScopedTranslator(catalog);
 export default function CampaignExitControl({ presentation }: { presentation: 'icon' | 'dashboard' | 'save' }) {
   useI18n();
   const [open, setOpen] = useState(false);
-  const dialogRef = useRef<HTMLDivElement>(null);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const exitRequest = useRef(0);
+  const [waiting, setWaiting] = useState(false);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const state = useGameStore((current) => current.state);
-  const save = useGameStore((current) => current.save);
   const backToMenu = useGameStore((current) => current.backToMenu);
   const sharedSession = useSharedWorldSessionStore((current) => current.session);
   const player = state.nations[state.playerNationId];
   const policy = buildCampaignExitPolicy(!!sharedSession);
 
-  useEffect(() => {
-    if (!open) return;
-    const dialog = dialogRef.current;
-    dialog?.querySelector<HTMLButtonElement>('[data-safe-action]')?.focus();
-    const onKey = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') {
-        event.preventDefault();
-        close();
-        return;
-      }
-      if (event.key !== 'Tab') return;
-      const buttons = Array.from(dialog?.querySelectorAll<HTMLButtonElement>('button:not([disabled])') ?? []);
-      if (buttons.length === 0) return;
-      const first = buttons[0];
-      const last = buttons[buttons.length - 1];
-      if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus(); }
-      else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
-    };
-    window.addEventListener('keydown', onKey, true);
-    return () => window.removeEventListener('keydown', onKey, true);
-  }, [open]);
+  useEffect(() => () => { exitRequest.current++; }, [open]);
 
   const close = () => {
+    exitRequest.current++;
+    setWaiting(false);
     setOpen(false);
+    setSaveError(null);
     window.requestAnimationFrame(() => triggerRef.current?.focus());
   };
 
-  const leave = (saveFirst: boolean) => {
-    if (saveFirst && !sharedSession) save();
+  const dialogRef = useDialogFocus<HTMLDivElement>(close, open);
+
+  const leave = async (saveFirst: boolean) => {
+    if (sharedSession) {
+      const request = ++exitRequest.current;
+      setWaiting(true);
+      const confirmed = await waitForSharedCommands();
+      if (request !== exitRequest.current || !dialogRef.current?.isConnected) return;
+      setWaiting(false);
+      if (!currentSharedSession(sharedSession)) return;
+      if (!confirmed) {
+        setSaveError('有行动未获确认，请核对当前版图后再退出。');
+        return;
+      }
+    }
+    if (saveFirst && !sharedSession) {
+      const error = saveCampaignForExit();
+      if (error) {
+        setSaveError(error);
+        return;
+      }
+    }
     setOpen(false);
     backToMenu();
   };
@@ -93,16 +101,17 @@ export default function CampaignExitControl({ presentation }: { presentation: 'i
           </div>
           <div className="ia-help-step-body" style={{ marginTop: 12 }}>
             {sharedSession
-              ? t('{{world}} 的进度由服务器持续保存。退出后可从共享版图大厅再次进入。', { world: sharedSession.worldName })
-              : t('当前正在治理 {{nation}} · 第 {{year}} 年。返回大厅前，可以先保存当前进度。', { nation: player?.name ?? '—', year: state.turn + 1 })}
+              ? t('{{world}} · 可从共享版图大厅继续。', { world: sharedSession.worldName })
+              : t('{{nation}} · 第 {{year}} 年', { nation: t(player?.name ?? '—'), year: state.turn + 1 })}
           </div>
           <div className="ia-card" style={{ marginTop: 14, padding: 11, display: 'flex', alignItems: 'center', gap: 8 }}>
             <Tag text={t(policy.statusLabel)} tone={policy.statusTone} />
           </div>
+          {saveError && <p className="danger" role="alert">{t(saveError)}</p>}
           <div className="ia-help-actions" style={{ justifyContent: 'flex-end', marginTop: 18 }}>
-            <button type="button" className="ia-btn ia-btn--ghost" data-safe-action onClick={close}>{t('继续治理')}</button>
+            <button type="button" className="ia-btn ia-btn--ghost" data-safe-action onClick={close}>{t(sharedSession && player?.defeated ? '继续查看' : '继续治理')}</button>
             {policy.showDiscardAction && <button type="button" className="ia-btn ia-btn--warn" onClick={() => leave(false)}>{t('不保存，返回大厅')}</button>}
-            <button type="button" className="ia-btn ia-btn--primary" onClick={() => leave(policy.saveBeforePrimary)}>{t(policy.primaryLabel)}</button>
+            <button type="button" className="ia-btn ia-btn--primary" disabled={waiting} onClick={() => leave(policy.saveBeforePrimary)}>{t(waiting ? '正在等待共享操作完成…' : policy.primaryLabel)}</button>
           </div>
         </div>
       </div>,

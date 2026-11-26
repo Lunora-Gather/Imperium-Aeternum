@@ -9,12 +9,14 @@
 - `../functions/ai-diplomacy-gateway/`：受限的 Hugging Face 元首会谈简报；只解释规则事实，不参与结算。
 - `seeds/living-world-v1.json`：首张共享版图及首批开放国家的初始化数据。
 
-部署顺序：
+日常发版按变更更新现有 Function。记录当前部署 ID，上传候选代码，确认构建成功后激活，再检查执行状态。1.1.2 涉及 `cloud-save-gateway`、`shared-world-gateway` 和 `social-gateway`。已有版图继续使用原来的数据库行、快照和国家控制权。
+
+新建环境时，按下列顺序初始化资源。
 
 1. `appwrite push tables --all --force`（CLI 误判列类型时停止整表推送，按 `appwrite tables-db` 子命令逐项修复）
 2. `appwrite push buckets --all --force`
 3. `appwrite push functions --all --force --activate`
-4. 管理员按 seed 创建 `shared_worlds` 与 `nation_controls` 行。
+4. 新建版图时按 seed 创建 `shared_worlds` 与 `nation_controls` 行。已有快照的版图以快照中的国家 ID 和名称为准，保留现有玩家租约和历史。旧版图中的 `n_79` 是当时生成的国家，不能直接替换成新剧本的 `n_me_persia`。
 
 AI Function 的 `HF_TOKEN` 必须保存为远端 Function 变量。部署普通代码时不要使用 `--with-variables`，详细边界见 [`../docs/maintenance/AI-INFERENCE.md`](../docs/maintenance/AI-INFERENCE.md)。
 

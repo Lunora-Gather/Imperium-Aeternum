@@ -1,20 +1,28 @@
+import { operatingNet } from '../gameplay/reportFinances';
 // Imperium Aeternum — 史册引擎（E12：里程碑叙事层）
 // 在回合结算时检测关键里程碑，记入 GameState.chronicle
 // 目的：让玩家感受帝国百年历程，增强叙事感与记忆点
 
 import type { GameState, ChronicleEntry } from '../types/game';
+import type { SettleWarsPureResult } from './military';
 import { provincesOf } from './init';
 
-const CHRONICLE_MAX = 50;
+export const CHRONICLE_MAX = 50;
+
+export function personalChronicleOwner(entry: ChronicleEntry) {
+  if (entry.kind !== 'milestone_war' && entry.kind !== 'milestone_diplomacy') return entry.actorId;
+}
 
 // 添加史册条目（去重：同 kind+title 不重复记）
 export function addChronicle(state: GameState, entry: ChronicleEntry): void {
-  // 去重：同 kind 且标题相同则不重复记（避免扩张里程碑刷屏）
-  if (state.chronicle.some((c) => c.kind === entry.kind && c.title === entry.title)) return;
-  state.chronicle.push(entry);
-  if (state.chronicle.length > CHRONICLE_MAX) {
-    state.chronicle = state.chronicle.slice(-CHRONICLE_MAX);
-  }
+  const owner = personalChronicleOwner(entry);
+  const entries = owner && state.sharedChronicles ? (state.sharedChronicles[owner] ??= []) : state.chronicle;
+  const duplicate = entry.kind === 'milestone_war' && entry.id
+    ? entries.some((c) => c.id === entry.id)
+    : entries.some((c) => c.kind === entry.kind && c.title === entry.title);
+  if (duplicate) return;
+  entries.push(entry);
+  if (entries.length > CHRONICLE_MAX) entries.splice(0, entries.length - CHRONICLE_MAX);
 }
 
 // 回合结算时检测里程碑（在 turn.ts 调用）
@@ -100,7 +108,7 @@ export function detectMilestones(state: GameState, prev: GameState): void {
   let deficitStreak = 0;
   for (let i = state.history.length - 1; i >= 0; i--) {
     const r = state.history[i];
-    const net = r.income.tax + r.income.trade + r.income.building - r.expense.military - r.expense.corruption;
+    const net = operatingNet(r);
     if (net < 0) deficitStreak++; else break;
   }
   if (deficitStreak >= 3 && !state.chronicle.some((c) => c.kind === 'crisis' && c.title === '财政危机')) {
@@ -144,53 +152,28 @@ export function detectMilestones(state: GameState, prev: GameState): void {
       desc: `${player.ruler.name} 承大统，年 ${player.ruler.age}，治能 ${player.ruler.ability}。`,
     });
   }
+}
 
-  // E13: 战事里程碑——首胜/惨败/灭敌
-  for (const war of state.wars) {
+export function detectBattleMilestones(state: GameState, prev: GameState, warUpdates: SettleWarsPureResult['warUpdates']): void {
+  const { playerNationId: playerId, turn } = state;
+  for (const war of prev.wars) {
     const isAttacker = war.attackerId === playerId;
-    const isDefender = war.defenderId === playerId;
-    if (!isAttacker && !isDefender) continue;
-    const prevWar = prev.wars.find((w) => w.id === war.id);
-    if (!prevWar) continue;
-    // 新战报（防御：旧存档/AI 内联创建的战争可能无 battleReports 字段）
-    const prevReports = prevWar.battleReports ?? [];
-    const newReports = (war.battleReports ?? []).slice(prevReports.length);
-    for (const r of newReports) {
-      const playerWon = isAttacker ? r.outcome === 'advance' : r.outcome === 'repelled';
-      const playerLost = isAttacker ? r.outcome === 'repelled' : r.outcome === 'advance';
-      if (playerWon && !state.chronicle.some((c) => c.kind === 'victory' && c.title === '首战告捷')) {
-        addChronicle(state, {
-          turn, kind: 'victory',
-          title: `首战告捷`,
-          desc: `我军于 ${state.provinces[war.targetProvinceId]?.name ?? '前线'} 取胜，斩敌 ${r.defLoss}。`,
-        });
-      }
-      if (playerLost && r.attLoss + r.defLoss > 100 && !state.chronicle.some((c) => c.kind === 'crisis' && c.title === '兵败之辱')) {
-        addChronicle(state, {
-          turn, kind: 'crisis',
-          title: `兵败之辱`,
-          desc: `我军于 ${state.provinces[war.targetProvinceId]?.name ?? '前线'} 惨败，折损 ${isAttacker ? r.attLoss : r.defLoss} 人。`,
-        });
-      }
-    }
-  }
-
-  // E13: 灭敌国
-  for (const [nid, n] of Object.entries(state.nations)) {
-    if (n.defeated) {
-      const prevN = prev.nations[nid];
-      if (prevN && !prevN.defeated && !state.chronicle.some((c) => c.kind === 'victory' && c.title === `灭 ${n.name}`)) {
-        // 仅记玩家参与的灭国
-        const playerInvolved = state.wars.some((w) =>
-          (w.attackerId === playerId && w.defenderId === nid) || (w.defenderId === playerId && w.attackerId === nid));
-        if (playerInvolved) {
-          addChronicle(state, {
-            turn, kind: 'victory',
-            title: `灭 ${n.name}`,
-            desc: `${n.name} 国祚终绝，疆土尽归我有。`,
-          });
-        }
-      }
+    if (!isAttacker && war.defenderId !== playerId) continue;
+    const reports = warUpdates[war.id]?.battleReports;
+    if (!reports?.length) continue;
+    const r = reports[reports.length - 1];
+    const location = state.provinces[war.targetProvinceId]?.name ?? '前线';
+    const ownLoss = isAttacker ? r.attLoss : r.defLoss;
+    if (r.outcome === (isAttacker ? 'advance' : 'repelled')) {
+      addChronicle(state, {
+        turn, kind: 'victory', title: '首战告捷',
+        desc: `我军于 ${location} 取胜，斩敌 ${isAttacker ? r.defLoss : r.attLoss}。`,
+      });
+    } else if (r.outcome !== 'stalemate' && r.attLoss + r.defLoss > 100) {
+      addChronicle(state, {
+        turn, kind: 'crisis', title: '兵败之辱',
+        desc: `我军于 ${location} 惨败，折损 ${ownLoss} 人。`,
+      });
     }
   }
 }

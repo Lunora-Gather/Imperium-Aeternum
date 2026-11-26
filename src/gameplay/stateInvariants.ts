@@ -37,7 +37,9 @@ export function auditStateInvariants(state: GameState): StateInvariantIssue[] {
   }
 
   const buildingIds = new Set<string>();
+  const provinceOwners = new Set<string>();
   for (const [provinceKey, province] of Object.entries(state.provinces)) {
+    provinceOwners.add(province.ownerId);
     if (province.id !== provinceKey) add('province-key-mismatch', 'error', `${provinceKey} 的内部 id=${province.id}。`);
     if (!isValidProvinceOwner(state, province.ownerId)) add('province-owner-invalid', 'error', `${province.id} 指向无效 ownerId=${province.ownerId}。`);
     if (![province.population, province.garrison, province.unrest, province.rebellionRisk, province.loyalty, province.assimilation].every(finite)) {
@@ -75,8 +77,7 @@ export function auditStateInvariants(state: GameState): StateInvariantIssue[] {
       add('nation-resource-negative', 'error', `${nation.id} 含不允许为负的资源。`);
     }
     if ([...governmentValues, nation.warExhaustion].some((value) => value < 0 || value > 100)) add('nation-range-invalid', 'error', `${nation.id} 的治理字段越界。`);
-    const ownedProvinceCount = Object.values(state.provinces).filter((province) => province.ownerId === nation.id).length;
-    if (!nation.defeated && ownedProvinceCount > 0 && (!state.provinces[nation.capital] || state.provinces[nation.capital].ownerId !== nation.id)) {
+    if (!nation.defeated && provinceOwners.has(nation.id) && (!state.provinces[nation.capital] || state.provinces[nation.capital].ownerId !== nation.id)) {
       add('nation-capital-invalid', 'error', `${nation.id} 没有有效的本国首都（${nation.capital || '空'}）。`);
     }
     if (nation.atWar !== activeWarNations.has(nation.id)) add('nation-war-flag-mismatch', 'error', `${nation.id} 的 atWar 与战争列表不一致。`);

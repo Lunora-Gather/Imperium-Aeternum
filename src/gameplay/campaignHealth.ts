@@ -1,3 +1,4 @@
+import { operatingNet } from './reportFinances';
 import type { TurnReport } from '../types/game';
 
 export type CampaignHealthTone = 'good' | 'info' | 'warn' | 'danger';
@@ -47,7 +48,7 @@ export function analyzeCampaignReports(reports: readonly TurnReport[]): Campaign
     };
   }
 
-  const net = reports.map((report) => report.income.tax + report.income.trade + report.income.building - report.expense.military - report.expense.corruption);
+  const net = reports.map(operatingNet);
   const negativeIncomeTurns = net.filter((value) => value < 0).length;
   const foodDeficitTurns = reports.filter((report) => report.foodDelta < 0).length;
   // Two routine event draws are the normal annual cadence, not pressure by themselves.

@@ -28,6 +28,10 @@ function goodRelationCount(state: GameState, id: string): number {
   return state.relations.filter((r) => r.from === id && r.relation >= 70 && r.treaty !== 'war').length;
 }
 
+function atWarWithPlayer(state: GameState, id: string): boolean {
+  return state.wars.some((war) => war.attackerId === id || war.defenderId === id);
+}
+
 function scaleOf(total: number): AmbitionSnapshot['worldScale'] {
   // 经典剧本有 50 省；各区域剧本约 66–224 省，完整世界约 577 省。
   if (total <= 60) return 'local';
@@ -144,7 +148,7 @@ export function getAmbitionSnapshot(state: GameState): AmbitionSnapshot {
   return {
     conquest: { current: currentProvs, target: t.conquestTarget, done: currentProvs >= t.conquestTarget && (player?.government.stability ?? 0) >= 40 },
     economy: { current: Math.round(player?.resources.gold ?? 0), target: t.economyTarget, turns: meta.economyTurns, needTurns: t.economyNeedTurns, buildings: foundation.buildings, buildingTarget: foundation.buildingTarget, tradeRoutes: foundation.tradeRoutes, foundationDone: foundation.done, done: foundation.done && meta.economyTurns >= t.economyNeedTurns },
-    diplomacy: { influence: Math.round(player?.resources.influence ?? 0), influenceTarget: t.influenceTarget, goodRelations: good, goodTarget: t.goodTarget, done: (player?.resources.influence ?? 0) >= t.influenceTarget && good >= t.goodTarget && s.wars.length === 0 },
+    diplomacy: { influence: Math.round(player?.resources.influence ?? 0), influenceTarget: t.influenceTarget, goodRelations: good, goodTarget: t.goodTarget, done: (player?.resources.influence ?? 0) >= t.influenceTarget && good >= t.goodTarget && !atWarWithPlayer(s, pid) },
     eternal: { turns: meta.peaceTurns, target: t.eternalTarget, done: meta.peaceTurns >= t.eternalTarget },
     worldScale: t.worldScale,
   };
@@ -157,7 +161,7 @@ export function syncAmbitionMeta(state: GameState): GameState {
 }
 
 export function applyAmbitionsAfterTurn(state: GameState): { state: GameState; note?: string } {
-  const next = syncAmbitionMeta(state) as StateWithAmbition;
+  const next = { ...state, victory: { ...state.victory } };
   const meta = ensureMetaForWrite(next);
   const pid = playerId(next);
   const player = next.nations[pid];
@@ -165,7 +169,7 @@ export function applyAmbitionsAfterTurn(state: GameState): { state: GameState; n
 
   const t = targets(meta, next.scenarioId);
   const provs = provinceCount(next, pid);
-  const atWar = next.wars.some((w) => w.attackerId === pid || w.defenderId === pid);
+  const atWar = atWarWithPlayer(next, pid);
   const stable = player.government.stability >= 40;
   const good = goodRelationCount(next, pid);
   const foundation = economyFoundation(next, pid);

@@ -1,3 +1,4 @@
+import { operatingNet } from './reportFinances';
 // Strategic Advisor v1 — 帝国总参谋部
 // 统一分析财政、粮食、战争、地方、外交、科技、派系和国运阶段。
 
@@ -34,7 +35,7 @@ function clamp(v: number, min = 0, max = 100): number { return Math.max(min, Mat
 function n(v: number): number { return Math.round(v); }
 function playerOf(state: GameState): Nation | null { return state.nations[state.playerNationId] ?? Object.values(state.nations).find((x) => x.isPlayer && !x.defeated) ?? null; }
 function provsOf(state: GameState, nationId: string): Province[] { return Object.values(state.provinces).filter((p) => p.ownerId === nationId); }
-function netOf(r?: TurnReport | null): number { return r ? r.income.tax + r.income.trade + r.income.building - r.expense.military - r.expense.corruption : 0; }
+function netOf(r?: TurnReport | null): number { return r ? operatingNet(r) : 0; }
 function armySize(n?: Nation): number { return n ? n.army.reduce((s, a) => s + a.size, 0) : 0; }
 function avg(xs: number[]): number { return xs.length ? xs.reduce((s, x) => s + x, 0) / xs.length : 0; }
 function trend(xs: number[]): number { const n = Math.min(5, xs.length); if (n < 2) return 0; const a = avg(xs.slice(-n)); const b = avg(xs.slice(Math.max(0, xs.length - n * 2), xs.length - n)); return a - b; }

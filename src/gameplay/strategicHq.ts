@@ -1,3 +1,4 @@
+import { operatingNet } from './reportFinances';
 // V40 帝国总参：把行动计划升级成本年首要目标、风险、信心和预计影响。
 // 纯函数，不改 GameState；供 Dashboard 2.0 首页总参卡片消费。
 
@@ -67,7 +68,7 @@ function confidenceFrom(actions: CommandCenterAction[], canAdvance: boolean): nu
 function economyNet(state: GameState): number | null {
   const r = state.lastReport;
   if (!r) return null;
-  return r.income.tax + r.income.trade + r.income.building - r.expense.military - r.expense.corruption;
+  return operatingNet(r);
 }
 
 function buildWhy(state: GameState, actions: CommandCenterAction[]): string[] {

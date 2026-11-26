@@ -1,27 +1,26 @@
+import { ignoreGameShortcut } from '../gameplay/navigationTabs';
 import { registerGovernanceTranslations } from '../i18n/catalogs/governance';
 import { localizeReactTree } from '../i18n/reactTree';
 registerGovernanceTranslations();
 // Province v3 — 摘要 → 风险 → 省份操作，减少盲点选省
 import { useState, useEffect, useMemo } from 'react';
 import { useGameStore } from '../store/gameStore';
+import { terrainLabel } from '../data/terrain';
+import { translate, useI18n } from '../i18n';
 import { provincesOf } from '../engine/init';
 import { BUILDINGS } from '../data/buildings';
-import { TECHNOLOGIES } from '../data/technologies';
+import { bordersNation, occupationTroops } from '../gameplay/actions/provinceActions';
+import { hasTech } from '../gameplay/actions/actionCore';
+import { constructionBlocker } from '../gameplay/actions/domesticActions';
+import { TECH_BY_ID } from '../data/technologies';
 import { computeBuildingYield } from '../engine/economy';
 import { Panel, StatRow, Btn, Tag, StatusDot, Divider } from '../components/ui';
 import type { BuildingDef, BuildingId } from '../data/buildings';
-import type { Nation, Province } from '../types/game';
+import type { Province } from '../types/game';
 
-function techUnlocked(player: Nation, prereqTech?: string): boolean {
-  if (!prereqTech) return true;
-  const m = prereqTech.match(/^([a-z]+)_lv(\d+)$/);
-  if (!m) return true;
-  const branch = m[1] as 'agri' | 'mil' | 'admin' | 'culture';
-  return (player.tech[branch] ?? 0) >= Number(m[2]);
-}
 function techLabel(prereqTech?: string): string {
   if (!prereqTech) return '';
-  const t = TECHNOLOGIES.find((x) => x.id === prereqTech);
+  const t = TECH_BY_ID[prereqTech];
   return t ? t.name : prereqTech;
 }
 
@@ -51,9 +50,10 @@ function yieldText(bid: BuildingId, province: Province, level = 1): string {
   ].filter(Boolean);
   return parts.join(' ') || '治理加成';
 }
-function buildCostText(building: Pick<BuildingDef, 'costGold' | 'costWood' | 'costIron'>): string {
+function buildCostText(building: Pick<BuildingDef, 'costGold' | 'costWood' | 'costIron' | 'costAction'>): string {
   return [
     `${building.costGold}金`,
+    `${building.costAction}政`,
     building.costWood > 0 ? `${building.costWood}木` : '',
     building.costIron > 0 ? `${building.costIron}铁` : '',
   ].filter(Boolean).join('·');
@@ -63,44 +63,60 @@ export default function ProvinceScreen() {
   const { state, build, recruit, upgradeBuilding, demolishBuilding, developProvince } = useGameStore();
   const pid = useGameStore((s) => s.state.playerNationId);
   const player = useGameStore((s) => s.state.nations[pid]);
-  const provs = provincesOf(pid, state.provinces);
-  const neutralFrontier = [...new Set(provs.flatMap((province) => province.adjacent))]
-    .map((id) => state.provinces[id])
-    .filter((province): province is Province => !!province && !state.nations[province.ownerId]);
+  const { locale } = useI18n();
+  const provs = useMemo(() => provincesOf(pid, state.provinces), [pid, state.provinces]);
+  const neutralFrontier = useMemo(() => Object.values(state.provinces).filter((p) =>
+    !state.nations[p.ownerId] && bordersNation(p, state.provinces, pid)
+  ), [pid, state.provinces, state.nations]);
   const pendingId = useGameStore((s) => s.pendingProvinceId);
   const setPendingProvince = useGameStore((s) => s.setPendingProvince);
-  const [selected, setSelected] = useState(provs[0]?.id ?? '');
+  const [requestedId, setSelected] = useState(provs[0]?.id ?? '');
   const [provinceQuery, setProvinceQuery] = useState('');
   const [provinceSort, setProvinceSort] = useState<'risk' | 'population' | 'name'>('risk');
 
+  const visibleProvs = useMemo(() => {
+    const normalized = provinceQuery.trim().toLocaleLowerCase();
+    const filtered = normalized
+      ? provs.filter((province) => [province.name, terrainLabel(province.terrain), province.terrain, province.culture, province.religion]
+        .some((field) => field.toLocaleLowerCase().includes(normalized) || translate(field, {}, locale).toLocaleLowerCase().includes(normalized)))
+      : [...provs];
+    filtered.sort((left, right) => {
+      if (provinceSort === 'population') return right.population - left.population;
+      if (provinceSort === 'name') return translate(left.name, {}, locale).localeCompare(translate(right.name, {}, locale), locale);
+      return riskScore(right) - riskScore(left);
+    });
+    return filtered;
+  }, [provs, provinceQuery, provinceSort, locale]);
+  const prov = visibleProvs.find((p) => p.id === requestedId) ?? visibleProvs[0];
+  const selected = prov?.id;
+
   useEffect(() => {
     if (pendingId && provs.some((p) => p.id === pendingId)) {
+      setProvinceQuery('');
       setSelected(pendingId);
       setPendingProvince(null);
     }
   }, [pendingId, provs, setPendingProvince]);
 
   useEffect(() => {
-    if (provs.length < 2) return;
+    if (visibleProvs.length < 2) return;
     const onKey = (e: KeyboardEvent) => {
-      const t = e.target as HTMLElement;
-      if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return;
+      if (ignoreGameShortcut(e)) return;
       const hasPending = state.pendingEvents.some((p) => p.nationId === pid);
       if (hasPending || (e.key !== '[' && e.key !== ']')) return;
       e.preventDefault();
-      const idx = provs.findIndex((p) => p.id === selected);
+      const idx = visibleProvs.findIndex((p) => p.id === selected);
       if (idx < 0) return;
-      const next = e.key === '[' ? (idx - 1 + provs.length) % provs.length : (idx + 1) % provs.length;
-      setSelected(provs[next].id);
+      const next = e.key === '[' ? (idx - 1 + visibleProvs.length) % visibleProvs.length : (idx + 1) % visibleProvs.length;
+      setSelected(visibleProvs[next].id);
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [provs, selected, state.pendingEvents, pid]);
+  }, [visibleProvs, selected, state.pendingEvents, pid]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      const t = e.target as HTMLElement;
-      if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return;
+      if (ignoreGameShortcut(e)) return;
       const hasPending = state.pendingEvents.some((p) => p.nationId === pid);
       if (hasPending || !selected) return;
       if (e.key === 'b' || e.key === 'B') { e.preventDefault(); build(selected, 'farm'); }
@@ -110,29 +126,17 @@ export default function ProvinceScreen() {
     return () => window.removeEventListener('keydown', onKey);
   }, [selected, build, recruit, state.pendingEvents, pid]);
 
-  const prov = state.provinces[selected];
-  if (!player || !prov) return <Panel title="省份管理"><p className="dim">无省份</p></Panel>;
+  if (!player || !provs.length) return <Panel title="省份管理"><p className="dim">无省份</p></Panel>;
 
   const totalPop = provs.reduce((s, p) => s + p.population, 0);
   const avgUnrest = provs.length ? provs.reduce((s, p) => s + p.unrest, 0) / provs.length : 0;
   const avgLoyalty = provs.length ? provs.reduce((s, p) => s + p.loyalty, 0) / provs.length : 0;
   const dangerous = [...provs].sort((a, b) => riskScore(b) - riskScore(a)).slice(0, 4);
-  const visibleProvs = useMemo(() => {
-    const normalized = provinceQuery.trim().toLocaleLowerCase();
-    const filtered = normalized
-      ? provs.filter((province) => `${province.name} ${province.terrain} ${province.culture} ${province.religion}`.toLocaleLowerCase().includes(normalized))
-      : [...provs];
-    filtered.sort((left, right) => {
-      if (provinceSort === 'population') return right.population - left.population;
-      if (provinceSort === 'name') return left.name.localeCompare(right.name, 'zh-CN');
-      return riskScore(right) - riskScore(left);
-    });
-    return filtered;
-  }, [provs, provinceQuery, provinceSort]);
+  const armySize = player.army.reduce((size, army) => size + army.size, 0);
   const allIds = Object.keys(BUILDINGS) as BuildingId[];
-  const unlocked = allIds.filter((bid) => techUnlocked(player, BUILDINGS[bid].prereqTech));
-  const locked = allIds.filter((bid) => !techUnlocked(player, BUILDINGS[bid].prereqTech));
-  const advice = riskScore(dangerous[0] ?? prov) > 110
+  const unlocked = allIds.filter((bid) => hasTech(player, BUILDINGS[bid].prereqTech));
+  const locked = allIds.filter((bid) => !hasTech(player, BUILDINGS[bid].prereqTech));
+  const advice = riskScore(dangerous[0]) > 110
     ? '优先处理高风险省：加驻军、降不满、提高忠诚，避免叛乱扩大。'
     : player.resources.food < 0
       ? '粮储为负，优先建农田或开垦农业基础。'
@@ -140,14 +144,14 @@ export default function ProvinceScreen() {
         ? '国库偏紧，优先建市场或保留行政点处理危机。'
         : '局势尚可，可按国运目标选择经济、科研或军事建设。';
 
-  const BuildGrid = ({ ids, locked: isLocked }: { ids: BuildingId[]; locked?: boolean }) => localizeReactTree(
+  const renderBuildGrid = (prov: Province, ids: BuildingId[], isLocked = false) => (
     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(118px, 1fr))', gap: 6, opacity: isLocked ? 0.58 : 1 }}>
       {ids.map((bid) => {
         const b = BUILDINGS[bid];
-        const goldOk = player.resources.gold >= b.costGold;
+        const blocker = constructionBlocker(player, prov, b);
         return (
-          <button key={bid} className="ia-btn" onClick={() => build(prov.id, bid)} disabled={!goldOk || isLocked}
-            title={isLocked ? `需科技：${techLabel(b.prereqTech)}` : `${prov.terrain} · ${yieldText(bid, prov)}`}
+          <button key={bid} className="ia-btn" onClick={() => build(prov.id, bid)} disabled={!!blocker}
+            title={isLocked ? `需科技：${techLabel(b.prereqTech)}` : blocker ?? `${translate(terrainLabel(prov.terrain))} · ${yieldText(bid, prov)}`}
             style={{ flexDirection: 'column', alignItems: 'stretch', textAlign: 'left', fontSize: 12, padding: 8 }}>
             <div style={{ fontWeight: 600 }}>{b.name}</div>
             <div style={{ fontSize: 10, color: 'var(--text-dim)', marginTop: 2 }}>
@@ -168,11 +172,11 @@ export default function ProvinceScreen() {
           <div className="ia-card" style={{ padding: 10 }}><Tag text="疆土" tone="info" /><div style={{ fontSize: 18, marginTop: 6 }}>{`${provs.length} 省`}</div><div className="dim" style={{ fontSize: 11 }}>{`人口 ${Math.round(totalPop)}`}</div></div>
           <div className="ia-card" style={{ padding: 10 }}><Tag text="平均不满" tone={avgUnrest > 50 ? 'danger' : avgUnrest > 30 ? 'warn' : 'good'} /><div style={{ fontSize: 18, marginTop: 6 }}>{Math.round(avgUnrest)}</div><div className="dim" style={{ fontSize: 11 }}>越低越稳</div></div>
           <div className="ia-card" style={{ padding: 10 }}><Tag text="平均忠诚" tone={avgLoyalty < 40 ? 'danger' : avgLoyalty < 60 ? 'warn' : 'good'} /><div style={{ fontSize: 18, marginTop: 6 }}>{Math.round(avgLoyalty)}</div><div className="dim" style={{ fontSize: 11 }}>越高越稳</div></div>
-          <div className="ia-card" style={{ padding: 10 }}><Tag text="建议" tone={riskScore(dangerous[0] ?? prov) > 110 ? 'danger' : 'info'} /><div style={{ fontSize: 11, lineHeight: 1.55, marginTop: 6 }}>{advice}</div></div>
+          <div className="ia-card" style={{ padding: 10 }}><Tag text="建议" tone={riskScore(dangerous[0]) > 110 ? 'danger' : 'info'} /><div style={{ fontSize: 11, lineHeight: 1.55, marginTop: 6 }}>{advice}</div></div>
         </div>
         <Divider label="高风险省份" />
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(170px, 1fr))', gap: 6 }}>
-          {dangerous.map((p) => <button key={p.id} className="ia-btn" onClick={() => setSelected(p.id)} style={{ justifyContent: 'flex-start', textAlign: 'left' }}><StatusDot status={provStatus(p)} />{p.name}<span className="dim" style={{ marginLeft: 'auto', fontSize: 10 }}>风险 {riskScore(p)}</span></button>)}
+          {dangerous.map((p) => <button key={p.id} className="ia-btn" onClick={() => { setProvinceQuery(''); setSelected(p.id); }} style={{ justifyContent: 'flex-start', textAlign: 'left' }}><StatusDot status={provStatus(p)} />{p.name}<span className="dim" style={{ marginLeft: 'auto', fontSize: 10 }}>风险 {riskScore(p)}</span></button>)}
         </div>
       </Panel>
 
@@ -189,7 +193,7 @@ export default function ProvinceScreen() {
           {visibleProvs.map((p) => {
             const st = provStatus(p);
             return (
-              <button key={p.id} onClick={() => setSelected(p.id)} className="ia-btn" style={selected === p.id ? { background: 'var(--border-hi)', borderColor: 'var(--gold)', color: '#fff', justifyContent: 'flex-start' } : { justifyContent: 'flex-start', fontSize: 12 }}>
+              <button key={p.id} onClick={() => setSelected(p.id)} aria-pressed={selected === p.id} className="ia-btn" style={selected === p.id ? { background: 'var(--bg-inset)', borderColor: 'var(--border-gold)', color: 'var(--gold)', justifyContent: 'flex-start' } : { justifyContent: 'flex-start', fontSize: 12 }}>
                 <StatusDot status={st} />{p.name}{p.isCapital ? ' ★' : ''}<span className="dim" style={{ marginLeft: 'auto', fontSize: 10 }}>{p.population}</span>
               </button>
             );
@@ -204,16 +208,16 @@ export default function ProvinceScreen() {
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(230px, 1fr))', gap: 8 }}>
           {neutralFrontier.map((frontier) => <div key={frontier.id} className="ia-card" style={{ padding: 10 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', gap: 6 }}><strong>{frontier.name}</strong><Tag text={`驻军 ${frontier.garrison}`} tone={frontier.garrison > 50 ? 'warn' : 'info'} /></div>
-            <div className="dim" style={{ fontSize: 10, margin: '5px 0 8px' }}>{`${frontier.terrain} · 人口 ${frontier.population} · 农业 ${frontier.agriBase}`}</div>
-            <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap' }}><Btn label="交涉 80金·40影响·2政" variant="ghost" onClick={() => developProvince(frontier.id, 'neutral_negotiate' as never)} disabled={player.resources.gold < 80 || player.resources.influence < 40 || player.resources.adminPt < 2} /><Btn label="开拓 120金·150粮·2政" variant="ghost" onClick={() => developProvince(frontier.id, 'neutral_colonize' as never)} disabled={player.resources.gold < 120 || player.resources.food < 150 || player.resources.adminPt < 2} /><Btn label="占领 60补给·1政" variant="ghost" warn onClick={() => developProvince(frontier.id, 'neutral_occupy' as never)} disabled={player.resources.supply < 60 || player.resources.adminPt < 1} /></div>
+            <div className="dim" style={{ fontSize: 10, margin: '5px 0 8px' }}>{terrainLabel(frontier.terrain)} · {translate('人口')} {frontier.population} · {translate('农业')} {frontier.agriBase}</div>
+            <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap' }}><Btn label="交涉 80金·40影响·2政" variant="ghost" onClick={() => developProvince(frontier.id, 'neutral_negotiate')} disabled={player.resources.gold < 80 || player.resources.influence < 40 || player.resources.adminPt < 2} /><Btn label="开拓 120金·150粮·2政" variant="ghost" onClick={() => developProvince(frontier.id, 'neutral_colonize')} disabled={player.resources.gold < 120 || player.resources.food < 150 || player.resources.adminPt < 2} /><Btn label="占领 60补给·1政" variant="ghost" warn onClick={() => developProvince(frontier.id, 'neutral_occupy')} title={translate('需要 {{count}} 兵', { count: occupationTroops(frontier) })} disabled={player.resources.supply < 60 || player.resources.adminPt < 1 || armySize < occupationTroops(frontier)} /></div>
           </div>)}
         </div>
       </Panel>}
 
-      <Panel title={`${prov.name} ${prov.isCapital ? '★ 首都' : ''}`} accent>
+      {prov && <Panel title={[translate(prov.name), prov.isCapital && `★ ${translate('首都')}`].filter(Boolean).join(' ')} accent>
         <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr)', gap: 16 }}>
           <div>
-            <div style={{ marginBottom: 8, display: 'flex', gap: 6, flexWrap: 'wrap' }}><Tag text={prov.terrain} /><Tag text={prov.culture} tone="info" /><Tag text={prov.religion} tone="info" /><Tag text={`风险 ${riskScore(prov)}`} tone={provStatus(prov) === 'danger' ? 'danger' : provStatus(prov) === 'warn' ? 'warn' : 'info'} /></div>
+            <div style={{ marginBottom: 8, display: 'flex', gap: 6, flexWrap: 'wrap' }}><Tag text={terrainLabel(prov.terrain)} /><Tag text={prov.culture} tone="info" /><Tag text={prov.religion} tone="info" /><Tag text={`风险 ${riskScore(prov)}`} tone={provStatus(prov) === 'danger' ? 'danger' : provStatus(prov) === 'warn' ? 'warn' : 'info'} /></div>
             <div style={{ display: 'flex', gap: 16, marginBottom: 10, fontSize: 13 }}><span>人口 <strong>{prov.population}</strong></span><span>驻军 <strong>{prov.garrison}</strong></span><span>建筑 <strong>{prov.buildings.length}</strong></span></div>
             <StatRow label="同化" value={prov.assimilation} kind="high" />
             <StatRow label="忠诚" value={prov.loyalty} kind="high" warn={prov.loyalty < 40} />
@@ -239,21 +243,21 @@ export default function ProvinceScreen() {
 
         <Divider label="建设与征兵" />
         {unlocked.length > 0 && <div style={{ fontSize: 10, color: 'var(--good)', marginBottom: 4, letterSpacing: '0.05em' }}>{`▸ 可建（${unlocked.length}）`}</div>}
-        <BuildGrid ids={unlocked} />
-        {locked.length > 0 && <><div style={{ fontSize: 10, color: 'var(--text-dim)', marginTop: 8, marginBottom: 4, letterSpacing: '0.05em' }}>{`▸ 待解锁（${locked.length}·需科技）`}</div><BuildGrid ids={locked} locked /></>}
+        {renderBuildGrid(prov, unlocked)}
+        {locked.length > 0 && <><div style={{ fontSize: 10, color: 'var(--text-dim)', marginTop: 8, marginBottom: 4, letterSpacing: '0.05em' }}>{`▸ 待解锁（${locked.length}·需科技）`}</div>{renderBuildGrid(prov, locked, true)}</>}
         <div style={{ marginTop: 10, display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}><span style={{ fontSize: 12, color: 'var(--text-mute)' }}>征兵</span><Btn label="+50" variant="ghost" onClick={() => recruit(prov.id, 50)} /><Btn label="+100" variant="ghost" onClick={() => recruit(prov.id, 100)} /><span className="dim" style={{ fontSize: 11 }}>消耗人口与补给</span></div>
 
         <Divider label="开发与驻军" />
         <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}><Btn label="开垦 +2农 (60金)" variant="ghost" onClick={() => developProvince(prov.id, 'reclaim')} disabled={player.resources.gold < 60} /><Btn label="部署驻军50" variant="ghost" onClick={() => developProvince(prov.id, 'garrison_deploy')} /><Btn label="召回驻军50" variant="ghost" onClick={() => developProvince(prov.id, 'garrison_recall')} disabled={prov.garrison < 50} /><span className="dim" style={{ fontSize: 11 }}>开垦增产 · 驻军压叛乱</span></div>
         <div style={{ marginTop: 6, fontSize: 11, color: 'var(--text-dim)' }}>{`➤ 战略军队调动请至 军事页 · 农业基础 ${prov.agriBase} · 驻军 ${prov.garrison}`}</div>
-      </Panel>
+      </Panel>}
     </div>
   );
 }
 
 function Bar({ value, max = 100, kind = 'neutral', label = '进度' }: { value: number; max?: number; kind?: 'high' | 'low' | 'neutral'; label?: string }) {
   const pct = Math.max(0, Math.min(100, (value / max) * 100));
-  let c = 'var(--bar-ok)';
+  let c = 'var(--bar-good)';
   if (kind === 'high') c = pct >= 60 ? 'var(--bar-good)' : pct >= 30 ? 'var(--bar-warn)' : 'var(--bar-bad)';
   else if (kind === 'low') c = pct <= 30 ? 'var(--bar-good)' : pct <= 60 ? 'var(--bar-warn)' : 'var(--bar-bad)';
   return <div role="progressbar" aria-label={label} aria-valuemin={0} aria-valuemax={max} aria-valuenow={Math.max(0, Math.min(max, value))} style={{ background: 'var(--bg-inset)', borderRadius: 3, height: 7, overflow: 'hidden' }}><div style={{ width: `${pct}%`, height: '100%', background: c, transition: 'width 0.25s' }} /></div>;

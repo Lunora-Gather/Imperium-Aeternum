@@ -3,7 +3,8 @@ import { localizeReactTree } from '../i18n/reactTree';
 registerGovernanceTranslations();
 // Technology v3 — 科技路线判断：根据国势推荐农业/军事/行政/文化
 import { useGameStore } from '../store/gameStore';
-import { TECHNOLOGIES } from '../data/technologies';
+import { instantResearchBlocker } from '../engine/technology';
+import { TECHNOLOGIES, TECH_BY_ID } from '../data/technologies';
 import { Panel, Stat, Btn, Tag, Bar } from '../components/ui';
 
 const BRANCH_LABEL: Record<string, string> = { agri: '农业', mil: '军事', admin: '行政', culture: '文化' };
@@ -28,7 +29,7 @@ export default function TechnologyScreen() {
   const player = useGameStore((s) => s.state.nations[s.state.playerNationId]);
   const pid = state.playerNationId;
   const researching = player.tech.researchProgress;
-  const researchingTech = researching ? TECHNOLOGIES.find((t) => t.id === researching.techId) : null;
+  const researchingTech = researching ? TECH_BY_ID[researching.techId] : null;
   const researchingPct = researching && researchingTech ? Math.min(100, (researching.sciPtInvested / researchingTech.costSci) * 100) : 0;
   const atWar = state.wars.some((w) => w.attackerId === pid || w.defenderId === pid);
   const report = state.lastReport;
@@ -67,9 +68,9 @@ export default function TechnologyScreen() {
           <div className="ia-card" style={{ marginBottom: 0 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}><strong style={{ fontSize: 13 }}>研发中：{BRANCH_ICON[researchingTech.branch]} {researchingTech.name}</strong><Tag text={`${researching.sciPtInvested}/${researchingTech.costSci}科`} tone="warn" /></div>
             <Bar value={researchingPct} kind="high" label="研究进度" />
-            <p className="dim" style={{ fontSize: 10, marginTop: 6, marginBottom: 0 }}>AI 渐进研发中 · 玩家点下方“研发”即时完成</p>
+            <p className="dim" style={{ fontSize: 10, marginTop: 6, marginBottom: 0 }}>每回合投入可用科研点，点数足够后支付金并完成研发。</p>
           </div>
-        ) : <p className="dim" style={{ fontSize: 12 }}>点下方科技即时研发完成（扣科研点+金）。优先按上方路线判断选择关键突破。</p>}
+        ) : <p className="dim" style={{ fontSize: 12 }}>每项科技消耗 1 行动点，以及列出的科研点和金。点击研发即可完成。</p>}
       </Panel>
 
       {(['agri', 'mil', 'admin', 'culture'] as const).map((branch) => {
@@ -82,12 +83,9 @@ export default function TechnologyScreen() {
               <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                 {techs.map((t, idx) => {
                   const done = currentLv >= t.level;
-                  const available = !done && (!t.prereqTech || currentLv >= t.level - 1);
                   const inProgress = researching?.techId === t.id;
-                  const goldOk = player.resources.gold >= t.costGold;
-                  const sciOk = player.resources.sciPt >= t.costSci;
-                  const can = available && !done && !researching && goldOk && sciOk;
-                  const blocker = !available ? '锁定' : !sciOk ? '科研不足' : !goldOk ? '金不足' : null;
+                  const blocker = instantResearchBlocker(player, t);
+                  const can = blocker === null;
                   return (
                     <div key={t.id} className="ia-card" style={{ padding: 10, opacity: done ? 0.7 : 1, position: 'relative', border: done ? '1px solid var(--good)' : inProgress ? '1px solid var(--warn)' : can ? '1px solid var(--border-gold)' : '1px solid var(--border)', boxShadow: inProgress ? '0 0 12px rgba(201,164,78,0.3)' : 'none', animation: inProgress ? 'ia-pulse 1.5s ease-in-out infinite' : 'none' }}>
                       <div style={{ position: 'absolute', left: -18, top: '50%', transform: 'translateY(-50%)', width: 14, height: 14, borderRadius: '50%', background: done ? BRANCH_COLOR[branch] : inProgress ? 'var(--warn)' : 'var(--bg-inset)', border: `2px solid ${done ? BRANCH_COLOR[branch] : 'var(--border)'}`, zIndex: 1 }} />

@@ -205,6 +205,7 @@ describe('A1 叛乱机制', () => {
     expect(next.nations[rebelId].rebellionDecay).toBe(5);
     expect(next.nations[rebelId].rebelOf).toBe(PLAYER_ID);
     expect(next.provinces[provId].ownerId).toBe(rebelId);
+    expect(next.provinces[provId].isCapital).toBe(true);
     expect(next.provinces[provId].garrison).toBe(0);
     expect(next.lastReport?.provinceChanges).toContainEqual({
       id: provId,
@@ -233,6 +234,7 @@ describe('A1 叛乱机制', () => {
     // 叛军 Nation 应已删除，省归顺原主
     expect(state.nations[rebelId]).toBeUndefined();
     expect(state.provinces[provId].ownerId).toBe(PLAYER_ID);
+    expect(state.provinces[provId].isCapital).toBe(false);
     // 归顺后 loyalty 重置为 40，但后续 culture 结算可能微调，接受 ≥30
     expect(state.provinces[provId].loyalty).toBeGreaterThanOrEqual(30);
     expect(state.lastReport?.provinceChanges).toContainEqual({
@@ -241,6 +243,22 @@ describe('A1 叛乱机制', () => {
       from: rebelId,
       to: PLAYER_ID,
     });
+  });
+
+  it('settles a capital rebellion in the year it secedes and keeps the defeat after reload', () => {
+    const state = createInitialState();
+    const capital = state.nations[PLAYER_ID].capital;
+    forceRebellion(state, capital);
+    const result = processTurn(state);
+    expect(result.report.provinceChanges).toContainEqual(expect.objectContaining({ id: capital, from: PLAYER_ID, to: `rebel_${capital}` }));
+    expect(result.state.victory.type).toBe('fail_capital_lost');
+    const displaced = result.state.nations[PLAYER_ID];
+    expect(displaced.army.length).toBeGreaterThan(0);
+    expect(displaced.army.every(army => result.state.provinces[army.location].ownerId === PLAYER_ID)).toBe(true);
+    saveGame(result.state);
+    const restored = loadGame()!;
+    expect(restored.victory.type).toBe('fail_capital_lost');
+    expect(restored.provinces[restored.nations[PLAYER_ID].capital]).toMatchObject({ ownerId: PLAYER_ID, isCapital: true });
   });
 
   it('相邻同文化省连锁——叛乱省旁同文化省 rebellionRisk 抬升或保持', () => {

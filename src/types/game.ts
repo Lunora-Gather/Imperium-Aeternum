@@ -25,7 +25,8 @@ export interface ResourceStockpile {
 }
 
 // ── 人口阶层（每省每阶层一份） ──
-export type ClassId = 'peasants' | 'workers' | 'merchants' | 'soldiers' | 'scholars' | 'nobles' | 'clergy';
+export const CLASS_IDS = ['peasants', 'workers', 'merchants', 'soldiers', 'scholars', 'nobles', 'clergy'] as const;
+export type ClassId = typeof CLASS_IDS[number];
 
 export interface PopulationGroup {
   classId: ClassId;
@@ -236,6 +237,7 @@ export interface TurnReport {
   nationId: NationId;
   income: { tax: number; trade: number; building: number };
   expense: { military: number; corruption: number };
+  goldDelta?: number;  // 旧年报仅保存常规收支
   foodDelta: number;
   popDelta: number;
   stabilityDelta: number;
@@ -414,6 +416,9 @@ export interface GameState {
   lowStabilityTurns: number;        // 稳定度过低连续回合
   chronicle: ChronicleEntry[];      // E12: 史册（里程碑叙事，上限 50）
   strategyFocus?: StrategyFocusId;
+  sharedFocuses?: Record<NationId, StrategyFocusId>;
+  sharedChronicles?: Record<NationId, ChronicleEntry[]>;
+  sharedHistories?: Record<NationId, TurnReport[]>;
   aiStrategyMeta?: Record<string, AIStrategyEntry>;
   aiMemory?: Record<string, AIMemoryEntry>;
   ambitionMeta?: PersistedAmbitionMeta;

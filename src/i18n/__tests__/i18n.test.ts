@@ -21,6 +21,13 @@ describe('i18n catalog', () => {
     expect(translate('动态史实名称', {}, 'en')).toBe('动态史实名称');
   });
 
+  it('preserves names and placeholders that share an object method name', () => {
+    expect(hasExplicitTranslation('toString', 'en')).toBe(false);
+    expect(translate('toString', {}, 'en')).toBe('toString');
+    expect(translate('{{toString}}', {}, 'en')).toBe('{{toString}}');
+    expect(translate('{{toString}}', { toString: 'Rome' }, 'en')).toBe('Rome');
+  });
+
   it('keeps every launch campaign summary explicitly translated in English', () => {
     const sources = SCENARIOS.flatMap((scenario) => {
       const profile = SCENARIO_PROFILES[scenario.id];

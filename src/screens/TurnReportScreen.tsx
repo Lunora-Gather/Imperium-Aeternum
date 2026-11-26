@@ -20,24 +20,25 @@ function itemTone(t: string): 'good' | 'warn' | 'danger' | 'info' | 'gold' { ret
 function borderForAction(a: TurnReportAction): string { return a.tone === 'danger' ? 'var(--war)' : a.tone === 'warn' ? 'var(--warn)' : 'var(--border)'; }
 function toneBorder(t: string): string { return t === 'danger' ? 'var(--war)' : t === 'warn' ? 'var(--warn)' : t === 'gold' ? 'var(--gold)' : t === 'good' ? 'var(--good)' : 'var(--border)'; }
 
-export default function TurnReportScreen({ onContinue }: { onContinue?: () => void }) {
+export default function TurnReportScreen({ onContinue, readOnly = false }: { onContinue?: () => void; readOnly?: boolean }) {
   const { state, jumpToTab } = useGameStore();
   const { t } = useI18n();
   const sharedSession = useSharedWorldSessionStore((current) => current.session);
   const r = state.lastReport;
-  if (!r) return localizeReactTree(<Panel title="回合报告"><p className="dim">尚无报告。点击「下一回合」开始。</p></Panel>);
+  if (!r) return localizeReactTree(<Panel title="回合报告"><p className="dim">{readOnly ? '尚无年度报告' : '尚无报告。点击「下一回合」开始。'}</p></Panel>);
 
   const income = r.income.tax + r.income.trade + r.income.building;
   const expense = r.expense.military + r.expense.corruption;
   const net = income - expense;
-  const brief = buildStrategicBrief(state);
-  const actions = buildTurnReportActions(state);
-  const debrief = buildTurnDebrief(state);
-  const causality = buildTurnCausality(state);
+  const treasuryChange = r.goldDelta;
+  const brief = readOnly ? null : buildStrategicBrief(state);
+  const actions = readOnly ? [] : buildTurnReportActions(state);
+  const debrief = readOnly ? null : buildTurnDebrief(state);
+  const causality = readOnly ? null : buildTurnCausality(state);
   const primary = actions[0];
 
   const stories: { txt: string; tone: 'good' | 'warn' | 'danger' | 'info' }[] = [];
-  if (net > 0) stories.push({ txt: `国库净增 ${Math.round(net)} 金`, tone: 'good' }); else if (net < 0) stories.push({ txt: `国库净减 ${Math.round(-net)} 金`, tone: 'danger' });
+  if (treasuryChange != null && treasuryChange > 0) stories.push({ txt: `国库净增 ${Math.round(treasuryChange)} 金`, tone: 'good' }); else if (treasuryChange != null && treasuryChange < 0) stories.push({ txt: `国库净减 ${Math.round(-treasuryChange)} 金`, tone: 'danger' });
   if (r.foodDelta > 0) stories.push({ txt: `粮食增收 ${r.foodDelta}`, tone: 'good' }); else if (r.foodDelta < 0) stories.push({ txt: `粮食减产 ${-r.foodDelta}`, tone: 'warn' });
   if (r.popDelta > 0) stories.push({ txt: `人口增长 +${r.popDelta}`, tone: 'good' });
   if (r.stabilityDelta > 0) stories.push({ txt: `稳定度 +${r.stabilityDelta}`, tone: 'good' }); else if (r.stabilityDelta < 0) stories.push({ txt: `稳定度 ${r.stabilityDelta}`, tone: 'warn' });
@@ -46,29 +47,37 @@ export default function TurnReportScreen({ onContinue }: { onContinue?: () => vo
 
   return localizeReactTree(<div className="ia-screen-stack">
     <Panel title={t('第 {{year}} 年 · 年度报告', { year: r.turn })} accent actions={<div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>{debrief && <Btn label={`复盘：${debrief.nextFocus.title}`} variant={debrief.nextFocus.tone === 'danger' ? 'warn' : 'primary'} onClick={() => jumpToTab(debrief.nextFocus.tab)} />}{primary && <Btn label={`处理：${primary.title}`} variant={primary.tone === 'danger' ? 'warn' : 'primary'} onClick={() => jumpToTab(primary.tab)} />}{onContinue && <Btn label="← 继续治理" variant="ghost" onClick={onContinue} />}</div>}>
-      {debrief && <DebriefPanel debrief={debrief} jumpToTab={jumpToTab} />}
-      {causality && <TurnCausalityPanel causality={causality} />}
-      {!sharedSession && <NationalPurposePanel state={state} compact />}
-      {!sharedSession && (r.strategicNotes ?? []).length > 0 && <><Divider label="国运进展" /><div className="ia-purpose-notes">{(r.strategicNotes ?? []).map((note, index) => <div key={`${note}-${index}`}>✦ {note}</div>)}</div></>}
+      {brief && <>
+        {debrief && <DebriefPanel debrief={debrief} jumpToTab={jumpToTab} />}
+        {causality && <TurnCausalityPanel causality={causality} />}
+        {!sharedSession && <NationalPurposePanel state={state} compact />}
+        {!sharedSession && (r.strategicNotes ?? []).length > 0 && <><Divider label="国运进展" /><div className="ia-purpose-notes">{(r.strategicNotes ?? []).map((note, index) => <div key={`${note}-${index}`}>✦ {note}</div>)}</div></>}
 
-      <div style={{ marginBottom: 12 }}>
-        <strong style={{ fontSize: 13, color: 'var(--text-mute)' }}>下一年优先级</strong>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))', gap: 8, marginTop: 8 }}>{actions.slice(0, 4).map((a) => <button key={a.id} className="ia-card" onClick={() => jumpToTab(a.tab)} style={{ textAlign: 'left', padding: 10, cursor: 'pointer', border: `1px solid ${borderForAction(a)}` }}><div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, marginBottom: 4 }}><strong style={{ fontSize: 13 }}>{a.title}</strong><Tag text={a.tag} tone={a.tone} /></div><div style={{ fontSize: 11, color: 'var(--text-dim)', lineHeight: 1.5 }}>{a.body}</div></button>)}</div>
-      </div>
+        <div style={{ marginBottom: 12 }}>
+          <strong style={{ fontSize: 13, color: 'var(--text-mute)' }}>下一年优先级</strong>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))', gap: 8, marginTop: 8 }}>{actions.slice(0, 4).map((a) => <button key={a.id} className="ia-card" onClick={() => jumpToTab(a.tab)} style={{ textAlign: 'left', padding: 10, cursor: 'pointer', border: `1px solid ${borderForAction(a)}` }}><div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, marginBottom: 4 }}><strong style={{ fontSize: 13 }}>{a.title}</strong><Tag text={a.tag} tone={a.tone} /></div><div style={{ fontSize: 11, color: 'var(--text-dim)', lineHeight: 1.5 }}>{a.body}</div></button>)}</div>
+        </div>
 
-      {debrief && <VictoryRoutesPanel routes={debrief.routes} jumpToTab={jumpToTab} />}
+        {debrief && <VictoryRoutesPanel routes={debrief.routes} jumpToTab={jumpToTab} />}
 
-      <Divider label="下一阶段路线" />
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 8, marginBottom: 12 }}>
-        <div className="ia-card" style={{ padding: 10 }}><Tag text={brief.phase} tone={brief.score < 40 ? 'danger' : brief.score < 60 ? 'warn' : 'gold'} /><div style={{ marginTop: 6, fontSize: 12 }}><strong>{brief.doctrine}</strong></div><div style={{ fontSize: 11, color: 'var(--text-dim)', lineHeight: 1.5, marginTop: 4 }}>{brief.doctrineBody}</div></div>
-        {brief.horizon.map((x, i) => <div key={i} className="ia-card" style={{ padding: 10 }}><Tag text={i === 0 ? '今年' : i === 1 ? '三年内' : '长期'} tone={i === 0 && brief.score < 50 ? 'warn' : 'info'} /><div style={{ marginTop: 6, fontSize: 11, color: 'var(--text-mute)', lineHeight: 1.5 }}>{x}</div></div>)}
-      </div>
-      {brief.opportunities.length > 0 && <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 12 }}>{brief.opportunities.slice(0, 4).map((x: StrategicItem) => <button key={x.title} className="ia-btn ia-btn--ghost" onClick={() => jumpToTab(x.tab)}><Tag text={x.title} tone={itemTone(x.tone)} /></button>)}</div>}
-
+        <Divider label="下一阶段路线" />
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 8, marginBottom: 12 }}>
+          <div className="ia-card" style={{ padding: 10 }}><Tag text={brief.phase} tone={brief.score < 40 ? 'danger' : brief.score < 60 ? 'warn' : 'gold'} /><div style={{ marginTop: 6, fontSize: 12 }}><strong>{brief.doctrine}</strong></div><div style={{ fontSize: 11, color: 'var(--text-dim)', lineHeight: 1.5, marginTop: 4 }}>{brief.doctrineBody}</div></div>
+          {brief.horizon.map((x, i) => <div key={i} className="ia-card" style={{ padding: 10 }}><Tag text={i === 0 ? '今年' : i === 1 ? '三年内' : '长期'} tone={i === 0 && brief.score < 50 ? 'warn' : 'info'} /><div style={{ marginTop: 6, fontSize: 11, color: 'var(--text-mute)', lineHeight: 1.5 }}>{x}</div></div>)}
+        </div>
+        {brief.opportunities.length > 0 && <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 12 }}>{brief.opportunities.slice(0, 4).map((x: StrategicItem) => <button key={x.title} className="ia-btn ia-btn--ghost" onClick={() => jumpToTab(x.tab)}><Tag text={x.title} tone={itemTone(x.tone)} /></button>)}</div>}
+      </>}
       <div style={{ marginBottom: 12 }}><strong style={{ fontSize: 13, color: 'var(--text-mute)' }}>今年发生了什么</strong><div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 8 }}>{stories.length === 0 ? <span className="dim">风平浪静的一年</span> : stories.map((s, i) => <Tag key={i} text={s.txt} tone={s.tone} />)}</div></div>
       <Divider label="财政收支" />
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 12 }}><div><strong style={{ fontSize: 13, color: 'var(--good)' }}>{`收入 +${Math.round(income)}`}</strong><div style={{ fontSize: 13, marginTop: 6 }}><Row k="税收" v={r.income.tax} /><Row k="贸易" v={r.income.trade} /><Row k="建筑" v={r.income.building} /></div></div><div><strong style={{ fontSize: 13, color: 'var(--war)' }}>{`支出 −${Math.round(expense)}`}</strong><div style={{ fontSize: 13, marginTop: 6 }}><Row k="军费" v={-r.expense.military} neg /><Row k="腐败" v={-r.expense.corruption} neg /></div></div></div>
-      <div style={{ marginBottom: 12 }}><div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, marginBottom: 4 }}><span style={{ color: 'var(--text-mute)' }}>净收入</span><strong style={{ color: net >= 0 ? 'var(--good)' : 'var(--war)', fontVariantNumeric: 'tabular-nums' }}>{net >= 0 ? '+' : ''}{Math.round(net)} 金</strong></div><Bar value={Math.abs(net)} max={Math.max(100, Math.abs(net) * 1.5)} positive={net >= 0} label="净收入" /></div>
+      <Row k="常规净收入" v={net} neg={net < 0} />
+      {treasuryChange == null
+        ? <p className="dim">{t('旧年报未记录国库实际变化。')}</p>
+        : <>
+          <Row k="其他结算差额" v={treasuryChange - net} neg={treasuryChange < net} />
+          <Row k="国库实际变化" v={treasuryChange} neg={treasuryChange < 0} />
+          {treasuryChange !== net && <p className="dim">{t('差额包括战事、国策等其他结算，以及分项取整的影响。')}</p>}
+        </>}
       <Divider label="社会变化" />
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 10, marginBottom: 12 }}><DeltaBox label="粮食" v={r.foodDelta} /><DeltaBox label="人口" v={r.popDelta} /><DeltaBox label="稳定度" v={r.stabilityDelta} /><DeltaBox label="合法性" v={r.legitimacyDelta} /></div>
       {r.events.length > 0 && <><Divider label="事件" /><div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 12 }}>{r.events.map((e, i) => <Tag key={i} text={EVENT_BY_ID[e]?.title ?? e} tone="info" />)}</div></>}

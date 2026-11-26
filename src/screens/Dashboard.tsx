@@ -1,3 +1,4 @@
+import { operatingNet } from '../gameplay/reportFinances';
 // Dashboard v40 — 帝国总参 + 路线图 + 胜利路线焦点 + 情境式提示 + 作战会议 + 史册摘要
 import { useMemo } from 'react';
 import { useGameStore } from '../store/gameStore';
@@ -129,7 +130,7 @@ function ChronicleDigestPanel({ digest }: { digest: ChronicleDigest }) {
 
 export default function Dashboard() {
   const { state, nextTurn, continueLegacy, save, load, hasSave, backToMenu, jumpToTab, setStrategyFocus } = useGameStore();
-  const sharedSession = useSharedWorldSessionStore((current) => current.session);
+  const { session: sharedSession, voting } = useSharedWorldSessionStore();
   const pid = useGameStore((s) => s.state.playerNationId);
   const player = useGameStore((s) => s.state.nations[pid]);
   if (!player) return <Panel title={t('国政总览')}><p className="dim">{t('玩家国家缺失，请读档或开始新局。')}</p></Panel>;
@@ -161,11 +162,11 @@ export default function Dashboard() {
   const mission = useMemo(() => getNationalMissionView(state), [state]);
   const crisis = useMemo(() => getNationalCrisisView(state), [state]);
 
-  const lastNet = state.lastReport ? state.lastReport.income.tax + state.lastReport.income.trade + state.lastReport.income.building - state.lastReport.expense.military - state.lastReport.expense.corruption : 0;
+  const treasuryChange = state.lastReport?.goldDelta;
   const unrest = provs.filter((p) => p.rebellionRisk > 70 || p.unrest > 50);
   const relations = state.relations.filter((r) => r.from === pid);
   const allies = relations.filter((r) => r.relation >= 70).length;
-  const goldTrend = hist.map((r: TurnReport) => r.income.tax + r.income.trade + r.income.building - r.expense.military - r.expense.corruption);
+  const goldTrend = hist.map((r: TurnReport) => operatingNet(r));
   const foodTrend = hist.map((r: TurnReport) => r.foodDelta);
   const stabilityTrend = hist.map((r: TurnReport) => r.stabilityDelta);
 
@@ -185,6 +186,9 @@ export default function Dashboard() {
 
   const setFocus = (id: StrategyFocusId) => setStrategyFocus(id);
 
+  const submitting = !!voting && voting.id === sharedSession?.id && voting.turn === state.turn;
+  const turnLabel = submitting ? '正在确认准备…' : sharedSession?.ready ? '已准备 · 检查结算' : sharedSession ? '本年准备完毕 →' : '下一回合 →';
+  const readyProgress = sharedSession?.readyProgress;
   const hasPendingEventBlocker = readiness.blockers.some((item) => item.id === 'pending-events');
   const ending = state.victory.type;
   const won = ending?.startsWith('win') ?? false;
@@ -208,11 +212,14 @@ export default function Dashboard() {
         <CampaignExitControl presentation="dashboard" />
         {!sharedSession && <Btn label={t('读档')} variant="ghost" onClick={() => load()} disabled={!hasSave()} />}
         {!sharedSession && <Btn label={t('存档')} variant="ghost" onClick={() => save()} />}
-        <Btn label={t(sharedSession ? '本年准备完毕 →' : '下一回合 →')} variant="primary" onClick={() => nextTurn()} disabled={!!state.victory.type || hasPendingEventBlocker} title={t(hasPendingEventBlocker ? '先处理待决事件' : sharedSession ? '提交后等待同版图统治者统一结算' : council.title)} />
+        <Btn label={t(turnLabel)} variant="primary" onClick={() => nextTurn()} disabled={submitting || (!sharedSession && !!ending) || hasPendingEventBlocker} title={t(hasPendingEventBlocker ? '先处理待决事件' : sharedSession ? '提交后等待同版图统治者统一结算' : council.title)} />
+        {sharedSession?.ready && !submitting && <p className="ia-shared-turn-status" role="status">
+          {t(readyProgress ? `已准备，等待其他统治者（${readyProgress.ready}/${readyProgress.required}）` : '已准备，等待其他统治者')}
+        </p>}
       </div>
     </section>
     <div className="ia-dash-overview-strip">
-      <Metric label={t('国库')} value={n(player.resources.gold)} tone={player.resources.gold < 0 ? 'danger' : 'gold'} hint={lastNet ? `${lastNet >= 0 ? '+' : ''}${n(lastNet)}/${t('年')}` : '—'} />
+      <Metric label={t('国库')} value={n(player.resources.gold)} tone={player.resources.gold < 0 ? 'danger' : 'gold'} hint={treasuryChange == null ? '—' : `${treasuryChange >= 0 ? '+' : ''}${n(treasuryChange)}/${t('年')}`} />
       <Metric label={t('粮储')} value={n(player.resources.food)} tone={player.resources.food < 0 ? 'danger' : 'good'} />
       <Metric label={t('人口')} value={n(totalPop)} />
       <Metric label={t('疆土')} value={t(`${provs.length} 省`)} />
@@ -233,12 +240,12 @@ export default function Dashboard() {
         <DashboardStrategicHq state={state} commandActions={commandActions} jumpToTab={jumpToTab} />
         <RoadmapPanel roadmap={roadmap} jumpToTab={jumpToTab} />
         <ReadinessPanel report={readiness} system={system} jumpToTab={jumpToTab} />
-        {ending && <section className="ia-dash-section ia-dash-victory"><h3>{t(won ? '万世之业已成' : '社稷倾覆')}</h3><p>{t(won ? '核心国运目标已经完成。可继续经营，或查看史册。' : '本局已经结束。查看史册后读档，或重新开局。')}</p><div className="ia-dash-command-actions">{won && !sharedSession && <Btn label={t('继续传世经营')} variant="primary" onClick={continueLegacy} />}<Btn label={t('查看帝国史册')} onClick={() => jumpToTab('chronicle')} />{!won && !sharedSession && <Btn label={t('读取最近存档')} onClick={() => load()} disabled={!hasSave()} />}<Btn label={t(sharedSession ? '退出共享治理' : '返回剧本大厅')} variant="ghost" onClick={backToMenu} /></div></section>}
+        {ending && <section className="ia-dash-section ia-dash-victory"><h3>{t(won ? '万世之业已成' : '社稷倾覆')}</h3><p>{t(won ? '核心国运目标已经完成。可继续经营，或查看史册。' : '本局已经结束。查看史册后读档，或重新开局。')}</p><div className="ia-dash-command-actions">{won && !sharedSession && <Btn label={t('继续传世经营')} variant="primary" onClick={continueLegacy} />}<Btn label={t('查看帝国史册')} onClick={() => jumpToTab('chronicle')} />{!won && !sharedSession && <Btn label={t('选择存档')} onClick={() => jumpToTab('save')} />}{sharedSession ? <CampaignExitControl presentation="dashboard" /> : <Btn label={t('返回剧本大厅')} variant="ghost" onClick={backToMenu} />}</div></section>}
       </div>
       <aside className="ia-dash-col ia-dash-col--right">
         <FocusPanel focus={focus} onChange={setFocus} />
         <section className="ia-dash-section"><header><div><small>State</small><h3>{t('治理指标')}</h3></div></header><div className="ia-dash-meter-grid ia-dash-meter-grid--compact"><Meter label={t('安定')} value={g.stability} lowBad /><Meter label={t('法统')} value={g.legitimacy} lowBad /><Meter label={t('治能')} value={g.efficiency} lowBad /><Meter label={t('腐败')} value={g.corruption} /><Meter label={t('厌战')} value={player.warExhaustion} /><Meter label={t('补给')} value={player.resources.supply} lowBad /></div></section>
-        <section className="ia-dash-section"><header><div><small>Trend</small><h3>{t('近年趋势')}</h3></div></header><div className="ia-dash-trends ia-dash-trends--stacked"><Sparkline data={goldTrend} label={t('财政')} /><Sparkline data={foodTrend} label={t('粮食')} /><Sparkline data={stabilityTrend} label={t('安定')} /></div></section>
+        <section className="ia-dash-section"><header><div><small>Trend</small><h3>{t('近年趋势')}</h3></div></header><div className="ia-dash-trends ia-dash-trends--stacked"><Sparkline data={goldTrend} label={t('常规净收入')} /><Sparkline data={foodTrend} label={t('粮食')} /><Sparkline data={stabilityTrend} label={t('安定')} /></div></section>
         <AdvisorList title={t('战略机会')} items={brief.opportunities} empty={t('暂无明确机会')} jumpToTab={jumpToTab} />
         <ChronicleDigestPanel digest={chronicle} />
       </aside>

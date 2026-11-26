@@ -190,3 +190,23 @@ export const BEHAVIOR_MAP_BY_ACTION: Record<string, BehaviorMapping> = Object.fr
 export function nationalCharacterDisplayName(id: NationalCharacterId | string): string {
   return NATIONAL_CHARACTERS[id as NationalCharacterId]?.name ?? '未知国性';
 }
+
+const multiplicativeMods = new Set<keyof NationalCharacterMods>([
+  'combatMod', 'moraleMod', 'conscriptionMod', 'tradeMod', 'marketCostMod', 'mobilizationMod',
+  'sciPtMod', 'popGrowthMod', 'warExhaustionMod', 'rebellionMod',
+]);
+
+export function nationalCharacterMods(ids: NationalCharacterId[]): NationalCharacterMods {
+  const result: NationalCharacterMods = {};
+  for (const id of ids) {
+    const def = NATIONAL_CHARACTERS[id];
+    if (!def) continue;
+    for (const mods of [def.bonuses, def.penalties]) {
+      for (const key of Object.keys(mods) as (keyof NationalCharacterMods)[]) {
+        const value = mods[key]!;
+        result[key] = multiplicativeMods.has(key) ? (result[key] ?? 1) * value : (result[key] ?? 0) + value;
+      }
+    }
+  }
+  return result;
+}

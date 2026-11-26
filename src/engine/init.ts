@@ -5,28 +5,18 @@ import type {
   GameState, Nation, Province, PopulationGroup, Faction, Army,
   DiplomaticRelation, ResourceStockpile, Government, NationalTendency,
 } from '../types/game';
-import { SAVE_VERSION } from '../types/game';
-import { NATIONS, PLAYER_ID } from '../data/nations';
-import { PROVINCES } from '../data/provinces';
+import { CLASS_IDS, SAVE_VERSION } from '../types/game';
+import { NATIONS, PLAYER_ID, type NationDef } from '../data/nations';
+import { PROVINCES, type ProvinceDef } from '../data/provinces';
 import { GOVERNMENTS } from '../data/governments';
 import { FACTIONS } from '../data/factions';
 import { NATIONAL_CHARACTERS } from '../data/national-characters';
 import { generateWorld } from './worldgen';
+import { clamp } from '../utils/math';
 
-function buildClasses(totalPop: number, ratio: Province['classes'] extends never ? never : {
-  peasants: number; workers: number; merchants: number;
-  soldiers: number; scholars: number; nobles: number; clergy: number;
-}): PopulationGroup[] {
-  const ids: { key: 'peasants' | 'workers' | 'merchants' | 'soldiers' | 'scholars' | 'nobles' | 'clergy'; label: string }[] = [
-    { key: 'peasants', label: '农民' }, { key: 'workers', label: '工人' },
-    { key: 'merchants', label: '商人' }, { key: 'soldiers', label: '士兵' },
-    { key: 'scholars', label: '学者' }, { key: 'nobles', label: '贵族' },
-    { key: 'clergy', label: '神职' },
-  ];
-  return ids.map((i) => ({
-    classId: i.key,
-    count: Math.round(totalPop * ratio[i.key]),
-    satisfaction: 50,
+function buildClasses(totalPop: number, ratio: ProvinceDef['initClassRatio']): PopulationGroup[] {
+  return CLASS_IDS.map(classId => ({
+    classId, count: Math.round(totalPop * ratio[classId]), satisfaction: 50,
   }));
 }
 
@@ -37,10 +27,6 @@ function buildFactions(govId: keyof typeof GOVERNMENTS): Faction[] {
     power: f.initPower,
     satisfaction: clamp(f.initSatisfaction + gov.factionSatMod[f.id], 0, 100),
   }));
-}
-
-function clamp(v: number, min: number, max: number): number {
-  return Math.max(min, Math.min(max, v));
 }
 
 function buildGovernment(govId: keyof typeof GOVERNMENTS): Government {
@@ -54,7 +40,7 @@ function buildGovernment(govId: keyof typeof GOVERNMENTS): Government {
   };
 }
 
-function buildTendency(): NationalTendency {
+export function buildTendency(): NationalTendency {
   return {
     militarism: 0, commerce: 0, religiosity: 0, technocracy: 0,
     authoritarian: 0, welfare: 0, feudal: 0, revolutionary: 0,
@@ -63,14 +49,14 @@ function buildTendency(): NationalTendency {
   };
 }
 
-function buildResources(n: typeof NATIONS[number]): ResourceStockpile {
+function buildResources(n: NationDef): ResourceStockpile {
   return {
     gold: n.initGold, food: n.initFood, wood: n.initWood, iron: n.initIron,
     adminPt: 5, sciPt: 0, influence: 20, supply: 50,
   };
 }
 
-function buildArmy(n: typeof NATIONS[number]): Army[] {
+function buildArmy(n: NationDef): Army[] {
   if (!n.capital) return [];
   return [{
     id: `initial_army_${n.id}`,
@@ -84,23 +70,13 @@ function buildArmy(n: typeof NATIONS[number]): Army[] {
   }];
 }
 
-function buildRelations(): DiplomaticRelation[] {
-  const out: DiplomaticRelation[] = [];
-  for (const n of NATIONS) {
-    for (const r of n.initRelations) {
-      out.push({
-        from: n.id, to: r.target,
-        relation: r.relation, trust: r.trust, threat: 0, tradeDep: 0,
-        treaty: 'none', truceTurns: 0,
-      });
-    }
-  }
-  return out;
+function openingRelation(from: string, to: string, relation: number, trust: number): DiplomaticRelation {
+  return { from, to, relation, trust, threat: 0, tradeDep: 0, treaty: 'none', truceTurns: 0 };
 }
 
-function buildProvinces(playerId: string): Record<string, Province> {
+function buildProvinces(definitions: ProvinceDef[], rulers: NationDef[], playerId: string): Record<string, Province> {
   const out: Record<string, Province> = {};
-  for (const p of PROVINCES) {
+  for (const p of definitions) {
     out[p.id] = {
       id: p.id, name: p.name, terrain: p.terrain,
       ownerId: p.ownerId, isCapital: p.isCapital,
@@ -111,14 +87,14 @@ function buildProvinces(playerId: string): Record<string, Province> {
       loyalty: p.ownerId === playerId ? 70 : 50,
       unrest: 0, rebellionRisk: 0,
       buildings: [], garrison: 0,
-      baseResources: p.baseResources,
-      adjacent: p.adjacent,
+      baseResources: { ...p.baseResources },
+      adjacent: [...p.adjacent],
       distToPlayerCapital: p.distToPlayerCapital,
       x: p.x, y: p.y,
     };
   }
   // 首都驻初始军队
-  for (const n of NATIONS) {
+  for (const n of rulers) {
     if (n.capital && out[n.capital]) {
       out[n.capital].garrison = n.initArmy.size;
     }
@@ -126,11 +102,11 @@ function buildProvinces(playerId: string): Record<string, Province> {
   return out;
 }
 
-function buildNations(): Record<string, Nation> {
+function buildNations(rulers: NationDef[], playerId: string): Record<string, Nation> {
   const out: Record<string, Nation> = {};
-  for (const n of NATIONS) {
+  for (const n of rulers) {
     out[n.id] = {
-      id: n.id, name: n.name, isPlayer: n.isPlayer,
+      id: n.id, name: n.name, isPlayer: n.id === playerId,
       tier: n.tier,
       government: buildGovernment(n.government),
       character: n.character,
@@ -156,117 +132,19 @@ function buildNations(): Record<string, Nation> {
   return out;
 }
 
-export function createInitialState(): GameState {
+function createCampaign(
+  scenarioId: 'classic' | 'world', seed: number, playerNationId: string,
+  rulers: NationDef[], map: ProvinceDef[], relations: DiplomaticRelation[],
+): GameState {
   const state: GameState = {
     version: SAVE_VERSION,
-    scenarioId: 'classic',
-    turn: 0,
-    seed: 12345,
-    entityIdCounter: 0,
-    playerNationId: PLAYER_ID,
-    nations: buildNations(),
-    provinces: buildProvinces(PLAYER_ID),
-    relations: buildRelations(),
-    diplomaticSummits: [],
-    diplomaticAccords: [],
-    wars: [],
-    triggeredEvents: [],
-    eventCooldowns: [],
-    pendingEvents: [],
-    pendingEventOptions: null,
-    lastReport: null,
-    history: [],
-    victory: { type: null },
-    bankruptTurns: 0,
-    lowStabilityTurns: 0,
-    chronicle: [],
-  };
-  buildRelationMap(state);
-  return state;
-}
-
-// ── W4: 从 worldgen 创建世界级 GameState（192 国 / 600 省）──
-export function createWorldState(seed: number, playerNationId?: string, regionFilter?: string[]): GameState {
-  const world = generateWorld(seed, playerNationId, regionFilter);
-  // 选玩家国：优先用指定 id；若该 id 不存在则找 isPlayer 标记；再不行 fallback 第一个 S/A
-  let playerId = playerNationId ?? '';
-  if (!world.nations.some((n) => n.id === playerId)) {
-    const marked = world.nations.find((n) => n.isPlayer);
-    playerId = marked?.id ?? world.nations.find((n) => n.tier === 'S' || n.tier === 'A')?.id ?? world.nations[0].id;
-  }
-
-  const nations: Record<string, Nation> = {};
-  for (const nd of world.nations) {
-    const isPlayer = nd.id === playerId;
-    nations[nd.id] = {
-      id: nd.id, name: nd.name, isPlayer,
-      tier: nd.tier,
-      government: buildGovernment(nd.government),
-      character: nd.character,
-      tendency: buildTendency(),
-      activeCharacterBonuses: [],
-      capital: nd.capital,
-      ruler: { ...nd.ruler },
-      taxRate: nd.initTaxRate,
-      resources: {
-        gold: nd.initGold, food: nd.initFood, wood: nd.initWood, iron: nd.initIron,
-        adminPt: 5, sciPt: 0, influence: 20, supply: 50,
-      },
-      factions: buildFactions(nd.government),
-      tech: { agri: nd.initTech.agri, mil: nd.initTech.mil, admin: nd.initTech.admin, culture: 0, researchProgress: null },
-      army: nd.capital ? [{ id: `initial_army_${nd.id}`, ownerId: nd.id, location: nd.capital, size: nd.initArmy.size, morale: nd.initArmy.morale, training: nd.initArmy.training, equipment: nd.initArmy.equipment, supply: 80 }] : [],
-      activePolicies: [],
-      activeLaws: [],
-      activeTradeRoutes: [],
-      embargoedRoutes: [],
-      warExhaustion: 0,
-      influence: 20,
-      atWar: false,
-      defeated: false,
-    };
-  }
-
-  const provinces: Record<string, Province> = {};
-  for (const pd of world.provinces) {
-    provinces[pd.id] = {
-      id: pd.id, name: pd.name, terrain: pd.terrain,
-      ownerId: pd.ownerId, isCapital: pd.isCapital,
-      agriBase: pd.agriBase, culture: pd.culture, religion: pd.religion,
-      population: pd.initPop,
-      classes: buildClasses(pd.initPop, pd.initClassRatio),
-      assimilation: pd.ownerId === playerId ? 100 : 50,
-      loyalty: pd.ownerId === playerId ? 70 : 50,
-      unrest: 0, rebellionRisk: 0,
-      buildings: [], garrison: 0,
-      baseResources: pd.baseResources,
-      adjacent: pd.adjacent,
-      distToPlayerCapital: 0,
-      x: pd.x, y: pd.y,
-    };
-  }
-
-  // 首都驻军
-  for (const nd of world.nations) {
-    if (nd.capital && provinces[nd.capital]) {
-      provinces[nd.capital].garrison = nd.initArmy.size;
-    }
-  }
-
-  // 稀疏外交关系
-  const relations: DiplomaticRelation[] = [];
-  for (const r of world.relations) {
-    relations.push({ from: r.from, to: r.to, relation: r.relation, trust: r.trust, threat: 0, tradeDep: 0, treaty: 'none', truceTurns: 0 });
-  }
-
-  const state: GameState = {
-    version: SAVE_VERSION,
-    scenarioId: 'world',
+    scenarioId,
     turn: 0,
     seed,
     entityIdCounter: 0,
-    playerNationId: playerId,
-    nations,
-    provinces,
+    playerNationId,
+    nations: buildNations(rulers, playerNationId),
+    provinces: buildProvinces(map, rulers, playerNationId),
     relations,
     diplomaticSummits: [],
     diplomaticAccords: [],
@@ -286,37 +164,60 @@ export function createWorldState(seed: number, playerNationId?: string, regionFi
   return state;
 }
 
+export function createInitialState(): GameState {
+  const relations = NATIONS.flatMap(n => n.initRelations.map(r => openingRelation(n.id, r.target, r.relation, r.trust)));
+  return createCampaign('classic', 12345, PLAYER_ID, NATIONS, PROVINCES, relations);
+}
+
+// ── W4: 从 worldgen 创建世界级 GameState（192 国 / 600 省）──
+export function createWorldState(seed: number, playerNationId?: string, regionFilter?: string[]): GameState {
+  const world = generateWorld(seed, playerNationId, regionFilter);
+  // 选玩家国：优先用指定 id；若该 id 不存在则找 isPlayer 标记；再不行 fallback 第一个 S/A
+  let playerId = playerNationId ?? '';
+  if (!world.nations.some((n) => n.id === playerId)) {
+    const marked = world.nations.find((n) => n.isPlayer);
+    playerId = marked?.id ?? world.nations.find((n) => n.tier === 'S' || n.tier === 'A')?.id ?? world.nations[0].id;
+  }
+
+  const relations = world.relations.map(r => openingRelation(r.from, r.to, r.relation, r.trust));
+  return createCampaign('world', seed, playerId, world.nations, world.provinces, relations);
+}
+
+export function relationPair(
+  state: GameState,
+  from: string,
+  to: string,
+): [DiplomaticRelation, DiplomaticRelation] | null {
+  const left = getRelationObj(from, to, state);
+  const right = getRelationObj(to, from, state);
+  return left && right ? [left, right] : null;
+}
+
 export function findRelation(relations: DiplomaticRelation[], from: string, to: string): DiplomaticRelation | undefined {
   return relations.find((r) => r.from === from && r.to === to);
 }
 
-// E9 性能优化：关系索引 Map（transient，不序列化）
-// key=`${from}|${to}`，value=relation 对象引用
-// 运行时只 mutate 字段（treaty/relation/trust），不新增条目，故索引无需重建
-// worldgen/init 阶段批量建好后调用 buildRelationMap()；push 新 relation 后需重建
-const relationMapCache = new WeakMap<GameState, Map<string, DiplomaticRelation>>();
+// 索引仅记录数组位置。读写始终使用当前数组的元素，兼容冻结快照和 Immer 草稿。
+const relationIndices = new WeakMap<DiplomaticRelation[], { length: number; positions: Map<string, number> }>();
 
 export function buildRelationMap(state: GameState): void {
-  if (state._relMap) return;
-  const map = new Map<string, DiplomaticRelation>();
-  for (const relation of state.relations) map.set(`${relation.from}|${relation.to}`, relation);
-  relationMapCache.set(state, map);
-  // Immer freezes successful action snapshots. A read helper must never crash
-  // merely because the transient cache cannot be attached to that snapshot.
-  if (Object.isExtensible(state)) state._relMap = map;
+  const positions = new Map<string, number>();
+  state.relations.forEach((r, i) => positions.set(`${r.from}|${r.to}`, i));
+  relationIndices.set(state.relations, { length: state.relations.length, positions });
 }
 
 export function getRelationObj(from: string, to: string, state: GameState): DiplomaticRelation | undefined {
-  let map = state._relMap ?? relationMapCache.get(state);
-  if (!map) {
+  let index = relationIndices.get(state.relations);
+  if (!index || index.length !== state.relations.length) {
     buildRelationMap(state);
-    map = state._relMap ?? relationMapCache.get(state);
+    index = relationIndices.get(state.relations)!;
   }
-  return map?.get(`${from}|${to}`);
+  const position = index.positions.get(`${from}|${to}`);
+  return position === undefined ? undefined : state.relations[position];
 }
 
 export function invalidateRelationMap(state: GameState): void {
-  relationMapCache.delete(state);
+  relationIndices.delete(state.relations);
   if (Object.isExtensible(state)) state._relMap = undefined;
 }
 

@@ -25,7 +25,7 @@ export default function LogToast() {
     if (entries.length === 0) return;
     const firstSequence = logSequence - entries.length + 1;
     const newItems = entries.map((txt, index): ToastItem => {
-      const fail = /不足|失败|告竭|崩溃|破产|危急|倾覆|无效|不可|无法/.test(txt);
+      const fail = /不足|失败|告竭|未提交|未获确认|未同步|崩溃|破产|危急|倾覆|无效|不可|无法/.test(txt);
       return { id: firstSequence + index, text: txt, tone: fail ? 'fail' : 'ok' };
     });
     setQueue((q) => [...q, ...newItems].slice(-2));

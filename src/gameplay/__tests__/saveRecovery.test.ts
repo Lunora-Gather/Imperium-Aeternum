@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { createInitialState } from '../../engine/init';
 import { inspectSaveSlot } from '../saveRecovery';
 import { SAVE_VERSION, type SaveGame } from '../../types/game';
+import { loadGameFromSlot } from '../../store/persistence';
 
 const STORAGE: Record<string, string> = {};
 
@@ -57,6 +58,26 @@ describe('save recovery previews', () => {
     expect(preview.repairs).toContain(`升级存档架构 v3 → v${SAVE_VERSION}`);
     expect(preview.repairs).toEqual(expect.arrayContaining(['清理临时外交缓存', '移除无效或重复战争']));
     expect(preview.score).toBeGreaterThanOrEqual(0);
+
+    expect(loadGameFromSlot(1)?.wars).toEqual([]);
+    const rewritten = JSON.parse(localStorage.getItem(key(1))!) as SaveGame;
+    expect(rewritten.gameState.wars).toEqual([]);
+    expect(inspectSaveSlot(1).repairs).not.toContain('移除无效或重复战争');
+  });
+
+  it('refreshes cached health when another tab changes or removes the exact stored value', () => {
+    const save = healthySave();
+    localStorage.setItem(key(1), JSON.stringify(save));
+    const first = inspectSaveSlot(1);
+    first.details.length = 0;
+    expect(inspectSaveSlot(1).details.length).toBeGreaterThan(0);
+    save.gameState.turn = 27;
+    localStorage.setItem(key(1), JSON.stringify(save));
+    expect(inspectSaveSlot(1).turn).toBe(27);
+    localStorage.setItem(key(1), '{broken');
+    expect(inspectSaveSlot(1).status).toBe('broken');
+    localStorage.removeItem(key(1));
+    expect(inspectSaveSlot(1).status).toBe('empty');
   });
 
   it('marks structurally healthy saves as non-dangerous', () => {

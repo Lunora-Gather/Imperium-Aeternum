@@ -31,6 +31,8 @@ export function AccountAccessForm() {
     return () => window.clearInterval(timer);
   }, [resendSeconds]);
 
+  useEffect(() => () => useAccountStore.getState().resetOtp(), []);
+
   const switchMode = (next: AccessMode) => {
     setMode(next);
     setRecovering(false);

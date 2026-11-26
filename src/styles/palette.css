@@ -1,87 +1,4 @@
-/* ============================================================
-   Palette refinement — 配色统一层
-   目标：降低“黄白板”刺眼感，形成羊皮纸 + 暗金 + 墨绿 + 赭红的稳定策略界面。
-   放在最后加载，只覆盖视觉变量和少量状态样式。
-   ============================================================ */
-
-:root[data-theme="day"] {
-  --bg-void:    #efe5ce;
-  --bg-deep:    #e4d7bd;
-  --bg-panel:   #f3ead7;
-  --bg-raised:  #f8f1df;
-  --bg-inset:   #e3d4b8;
-
-  --border:        #c8b58d;
-  --border-bright: #a8874d;
-  --border-gold:   #9c7636;
-
-  --text:        #241b12;
-  --text-soft:   #3f3020;
-  --text-mute:   #6f6047;
-  --text-dim:    #a08d6b;
-
-  --gold:    #9c7636;
-  --food:    #56723a;
-  --stable:  #2f6862;
-  --war:     #8a3826;
-  --faith:   #6d5332;
-  --power:   #705033;
-  --warn:    #a76527;
-  --good:    #56723a;
-  --danger:  #8a3826;
-  --accent:  #514875;
-
-  --btn-primary-top: #c9a568;
-  --btn-primary-bot: #a77e3e;
-  --btn-primary-top-h: #d4b577;
-  --btn-primary-bot-h: #b88b49;
-  --btn-primary-fg: #241b12;
-  --btn-warn-top: #b46c4d;
-  --btn-warn-bot: #8f3d2a;
-  --btn-warn-fg: #fff2df;
-  --btn-good-top: #78945a;
-  --btn-good-bot: #56723a;
-  --btn-good-fg: #f5eddc;
-}
-
-:root[data-theme="ink"] {
-  --bg-void:    #e5ded3;
-  --bg-deep:    #d8d0c4;
-  --bg-panel:   #eee8de;
-  --bg-raised:  #f6f1e9;
-  --bg-inset:   #d6cabd;
-  --border:        #b5aa9b;
-  --border-bright: #7e6c5a;
-  --border-gold:   #534333;
-  --gold:          #534333;
-  --accent:        #3f4d5d;
-}
-
-/* 默认暗色也更沉稳一点，减少铜色发脏 */
-:root:not([data-theme]),
-:root[data-theme="night"] {
-  --bg-void:    #14110d;
-  --bg-deep:    #1b1711;
-  --bg-panel:   #242016;
-  --bg-raised:  #2b2519;
-  --bg-inset:   #19150f;
-  --border:        #3f3424;
-  --border-bright: #735f3b;
-  --border-gold:   #b58a42;
-  --gold:          #c29a4b;
-  --food:          #7a9146;
-  --stable:        #48706b;
-  --accent:        #6a6286;
-}
-
-/* 纸面背景不要太亮，避免大面积刺眼 */
-:root[data-theme="day"] body {
-  background-color: var(--bg-void);
-  background-image:
-    linear-gradient(180deg, rgba(255,255,255,0.22), transparent 180px),
-    radial-gradient(ellipse 80% 55% at 50% 0%, rgba(156,118,54,0.045) 0%, transparent 62%),
-    linear-gradient(90deg, rgba(85,60,30,0.035), transparent 18%, transparent 82%, rgba(85,60,30,0.03));
-}
+/* Final layout and component styling. Theme tokens live in base.css. */
 
 /* 面板统一：薄边、低对比、少阴影 */
 .ia-ruler-card,
@@ -325,7 +242,7 @@ body > div[style*="position:fixed"][style*="right:8px"] {
 
 .ia-dash-command-actions {
   gap: 5px !important;
-  flex-wrap: nowrap !important;
+  flex-wrap: wrap !important;
 }
 
 .ia-dash-command-actions .ia-btn {
@@ -729,9 +646,17 @@ body > div[style*="position:fixed"][style*="right:8px"] {
   white-space: normal !important;
 }
 
+.ia-btn.ia-btn:disabled {
+  opacity: 1;
+  background: var(--bg-inset) !important;
+  border-color: var(--border) !important;
+  color: var(--text-dim) !important;
+  box-shadow: none !important;
+}
+
 .ia-btn--primary {
   background:
-    linear-gradient(180deg, color-mix(in srgb, var(--gold) 92%, #fff 8%), color-mix(in srgb, var(--gold) 72%, #181410 28%)) !important;
+    linear-gradient(var(--btn-primary-top), var(--btn-primary-bot)) !important;
   border-color: color-mix(in srgb, var(--border-gold) 92%, #fff 8%) !important;
   color: var(--btn-primary-fg) !important;
   box-shadow: 0 8px 24px color-mix(in srgb, var(--gold) 14%, transparent), inset 0 1px 0 rgba(255,255,255,.18) !important;
@@ -785,25 +710,29 @@ body > div[style*="position:fixed"][style*="right:8px"] {
   margin: 0 auto 16px;
   padding: clamp(20px, 2.2vw, 28px);
   border: 1px solid color-mix(in srgb, var(--border-gold) 44%, var(--border));
-  border-radius: 14px;
+  border-top: var(--theme-edge);
+  border-radius: var(--theme-radius);
   background:
-    linear-gradient(120deg, color-mix(in srgb, var(--bg-raised) 94%, transparent), color-mix(in srgb, var(--bg-panel) 82%, transparent)),
-    repeating-linear-gradient(90deg, rgba(201,164,78,.035) 0 1px, transparent 1px 112px);
+    linear-gradient(95deg, var(--bg-raised) 22%, transparent 78%),
+    var(--theme-grain), var(--bg-panel);
   overflow: hidden;
 }
 
-.ia-launch-hero::after {
-  content: '';
-  position: absolute;
-  inset: auto -8% -34% 36%;
-  height: 68%;
-  pointer-events: none;
-  border-top: 1px solid color-mix(in srgb, var(--border-gold) 24%, transparent);
-  background:
-    linear-gradient(38deg, transparent 0 28%, color-mix(in srgb, var(--stable) 22%, transparent) 28.2% 29%, transparent 29.2%),
-    linear-gradient(151deg, transparent 0 38%, color-mix(in srgb, var(--gold) 18%, transparent) 38.2% 39%, transparent 39.2%);
-  opacity: .38;
+.ia-palette-swatch {
+  display: grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  border: 1px solid currentColor;
+  border-radius: 3px;
+  font-size: 11px;
+  line-height: 1;
 }
+
+[data-palette="night"] .ia-palette-swatch { background: #32291f; color: #e6be80; }
+[data-palette="day"] .ia-palette-swatch { background: #f6efdf; color: #71461f; }
+[data-palette="bamboo"] .ia-palette-swatch { background: #293e33; color: #bce4b1; }
+[data-palette="ink"] .ia-palette-swatch { background: #f3f3ed; color: #973e3a; }
 
 .ia-launch-copy {
   position: relative;
@@ -823,7 +752,7 @@ body > div[style*="position:fixed"][style*="right:8px"] {
   margin: 0;
   color: var(--gold);
   font-size: clamp(42px, 4.6vw, 62px);
-  line-height: .96;
+  line-height: 1.04;
   letter-spacing: 0;
 }
 
@@ -863,11 +792,8 @@ body > div[style*="position:fixed"][style*="right:8px"] {
   text-align: left;
   padding: clamp(16px, 1.9vw, 20px);
   border: 1px solid color-mix(in srgb, var(--border-gold) 68%, var(--border));
-  border-radius: 11px;
-  background:
-    linear-gradient(180deg, transparent 0 28%, color-mix(in srgb, var(--bg-inset) 78%, transparent)),
-    linear-gradient(135deg, color-mix(in srgb, var(--gold) 13%, transparent), transparent 52%),
-    color-mix(in srgb, var(--bg-panel) 86%, transparent);
+  border-radius: var(--theme-radius);
+  background: linear-gradient(150deg, var(--bg-raised), var(--bg-inset));
   color: var(--text);
   cursor: pointer;
   overflow: hidden;
@@ -878,16 +804,13 @@ body > div[style*="position:fixed"][style*="right:8px"] {
   position: absolute;
   inset: 12px;
   border: 1px solid color-mix(in srgb, var(--border-gold) 24%, transparent);
-  border-radius: 9px;
+  border-radius: var(--theme-radius);
   pointer-events: none;
 }
 
 .ia-featured-scenario:hover {
   border-color: var(--border-gold);
-  background:
-    linear-gradient(180deg, transparent 0 22%, color-mix(in srgb, var(--bg-inset) 84%, transparent)),
-    linear-gradient(135deg, color-mix(in srgb, var(--gold) 18%, transparent), transparent 56%),
-    color-mix(in srgb, var(--bg-raised) 90%, transparent);
+  background: var(--bg-raised);
 }
 
 .ia-featured-top,
@@ -900,13 +823,9 @@ body > div[style*="position:fixed"][style*="right:8px"] {
 
 .ia-featured-top {
   justify-content: space-between;
-  margin-bottom: 28px;
+  margin-bottom: 20px;
 }
 
-.ia-featured-top > span {
-  color: var(--text-dim);
-  font-size: 10px;
-}
 
 .ia-featured-scenario h2 {
   margin: 0 0 7px;
@@ -1102,7 +1021,7 @@ body > div[style*="position:fixed"][style*="right:8px"] {
 .ia-difficulty-step span,
 .ia-difficulty-step em {
   color: var(--text-dim);
-  font-size: 10px;
+  font-size: 11px;
   font-style: normal;
 }
 
@@ -1113,23 +1032,10 @@ body > div[style*="position:fixed"][style*="right:8px"] {
   line-height: 1.25;
 }
 
-:root[data-theme="day"] .ia-launch-hero {
-  background:
-    linear-gradient(115deg, rgba(255, 250, 236, .78), rgba(239, 229, 204, .72)),
-    repeating-linear-gradient(90deg, rgba(139, 101, 42, .026) 0 1px, transparent 1px 120px);
-  box-shadow: inset 0 1px 0 rgba(255,255,255,.52);
-}
-
-:root[data-theme="day"] .ia-featured-scenario,
-:root[data-theme="day"] .ia-launch-ops,
-:root[data-theme="day"] .ia-launch-handbook,
-:root[data-theme="day"] .ia-scenario-card {
-  background-color: rgba(248, 241, 223, .54) !important;
-}
-
-:root[data-theme="day"] .ia-difficulty-step,
-:root[data-theme="day"] .ia-handbook-item {
-  background-color: rgba(228, 215, 189, .28);
+.ia-featured-top > span:first-child {
+  color: var(--theme-mark);
+  font-size: 11px;
+  font-weight: 650;
 }
 
 .ia-launch-handbook {
@@ -1379,8 +1285,8 @@ body > div[style*="position:fixed"][style*="right:8px"] {
     min-height: auto;
   }
 
-  .ia-featured-scenario h2 {
-    margin-top: 38px;
+  .ia-featured-top {
+    margin-bottom: 14px;
   }
 
   .ia-difficulty-track {
@@ -1398,21 +1304,69 @@ body > div[style*="position:fixed"][style*="right:8px"] {
 
 @media (max-width: 640px) {
   .ia-menu--launch {
-    width: calc(100vw - 18px) !important;
+    width: calc(100% - 24px) !important;
+  }
+
+  .ia-menu-toolbar .ia-menu-controls {
+    width: 100%;
+  }
+
+  .ia-menu-controls .ia-locale-switch button {
+    min-width: 28px;
+    padding-inline: 5px !important;
+  }
+
+  .ia-menu-controls .ia-locale-switch [data-short] {
+    font-size: 0;
+  }
+
+  .ia-menu-controls .ia-locale-switch [data-short]::after {
+    content: attr(data-short);
+    font-size: 12px;
+  }
+
+  .ia-auth-field .ia-input {
+    font-size: 16px;
+  }
+
+  .ia-menu-controls .ia-theme-switch {
+    display: grid;
+    width: 100%;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
+  .ia-menu-controls .ia-theme-switch button {
+    justify-content: center;
+    padding-inline: 4px !important;
   }
 
   .ia-launch-hero {
     padding: 18px;
-    border-radius: 13px;
   }
 
   .ia-launch-copy h1 {
-    font-size: clamp(34px, 13vw, 50px);
+    font-size: clamp(34px, 11.4vw, 48px);
   }
 
-  .ia-launch-actions,
   .ia-launch-actions .ia-btn {
-    width: 100%;
+    flex: 1 1 115px;
+    min-width: 0;
+    min-height: 44px !important;
+  }
+
+  .ia-launch-actions > .ia-btn--primary {
+    flex-basis: 100%;
+  }
+
+  .ia-theme-switch .ia-palette-swatch {
+    width: 8px;
+    height: 8px;
+    font-size: 0;
+  }
+
+  .ia-menu--compact .ia-menu-toolbar,
+  .ia-menu--confirm .ia-menu-toolbar {
+    flex-direction: column;
   }
 
   .ia-dash-command-actions .ia-btn,

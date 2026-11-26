@@ -7,10 +7,12 @@ import {
   applyEffectResult,
   applyRecordEventResult,
   checkTrigger,
+  createEventAvailabilityIndex,
   EVENT_BY_ID,
   isEventAvailable,
   recordEvent,
   recordEventPure,
+  rollEvents,
 } from '../events';
 import { resolvePendingEventChoice } from '../../gameplay/pendingEventResolution';
 import { sanitizeState } from '../../gameplay/stateHygiene';
@@ -62,6 +64,22 @@ describe('event rule integrity', () => {
       { item: 'enabled', weight: 1 },
     ])).toBe('enabled');
     expect(weightedPick(() => 0, [{ item: 'disabled', weight: 0 }])).toBeNull();
+  });
+
+  it('preserves the draw order after peace, war and loading an earlier turn', () => {
+    const state = createInitialState();
+    const nation = state.nations[state.playerNationId];
+    for (const [turn, atWar] of [[25, false], [25, true], [1, false], [25, false]] as const) {
+      state.turn = turn;
+      nation.atWar = atWar;
+      const history = createEventAvailabilityIndex(state);
+      const eligible = EVENTS.filter(event => event.weight > 0
+        && checkTrigger(event.trigger, nation, state) && isEventAvailable(event, nation, state, history));
+      let draws = 0;
+      const picked = rollEvents(nation, state, () => { draws++; return 0; }, EVENTS.length, history);
+      expect(picked).toEqual(eligible.map(event => event.id));
+      expect(draws).toBe(eligible.length);
+    }
   });
 
   it('applies every declared event-effect family through the pure result applicator', () => {
@@ -143,6 +161,57 @@ describe('event rule integrity', () => {
     expect(Math.max(...gainValues) - Math.min(...gainValues)).toBeLessThanOrEqual(1);
   });
 
+  it.each([
+    [100, 100, 1], [1, 100, 100], [100, 1, 100], [0, 0, 0], [7, 0, 0],
+  ])('applies a 150-person event loss with provincial populations %i, %i, %i', (a, b, c) => {
+    const state = createInitialState();
+    const nation = state.nations[state.playerNationId];
+    const owned = Object.values(state.provinces).filter(p => p.ownerId === nation.id);
+    owned.forEach((p, i) => { p.population = [a, b, c][i] ?? 0; });
+    const total = a + b + c;
+    applyEffect(nation, { population: -150 }, state);
+    expect(owned.reduce((sum, p) => sum + p.population, 0)).toBe(Math.max(0, total - 150));
+    expect(owned.every(p => p.population >= 0)).toBe(true);
+    if (total > 150) {
+      expect(owned.map(p => p.population).sort((x, y) => y - x).slice(0, 3)).toEqual([26, 25, 0]);
+    }
+  });
+
+  it('preserves map-order rounding when the last province can pay its smaller share', () => {
+    const state = createInitialState();
+    const nation = state.nations[state.playerNationId];
+    const owned = Object.values(state.provinces).filter(p => p.ownerId === nation.id);
+    const populations = [100, 90, 80, 37];
+    owned.forEach((p, i) => {
+      if (i < populations.length) p.population = populations[i];
+      else p.ownerId = 'barbarian';
+    });
+    const result = applyEffectPure(nation, { population: -150 }, state);
+    expect(owned.slice(0, 4).map(p => result.provPopDeltas[p.id])).toEqual([-38, -38, -37, -37]);
+  });
+
+  it('allows event deficits only for gold and food', () => {
+    const state = createInitialState();
+    const nation = state.nations[state.playerNationId];
+    const starting = { gold: 3, food: 3, wood: 3, iron: 3, adminPt: 3, sciPt: 3, influence: 3 };
+    Object.assign(nation.resources, starting);
+    applyEffect(nation, { gold: -5, food: -5, wood: -5, iron: -5, adminPt: -5, sciPt: -5, influence: -5 }, state);
+    expect(nation.resources).toMatchObject({ gold: -2, food: -2, wood: 0, iron: 0, adminPt: 0, sciPt: 0, influence: 0 });
+  });
+
+  it('checks per-nation uniqueness for forced chain endings in later turns', () => {
+    const state = createInitialState();
+    const { id } = EVENT_BY_ID.evt_chain_plague_3;
+    const ruler = state.nations[state.playerNationId];
+    const peer = Object.values(state.nations).find(n => n.id !== ruler.id)!;
+    recordEvent(state, ruler.id, id, 0);
+    state.turn++;
+    state.triggeredEvents = [];
+    applyEffect(ruler, { triggerEvent: id }, state);
+    applyEffect(peer, { triggerEvent: id }, state);
+    expect(state.pendingEvents).toEqual([{ nationId: peer.id, eventId: id }]);
+  });
+
   it('scopes unique-event history and cooldowns to each nation', () => {
     const state = createInitialState();
     const player = state.nations[state.playerNationId];
@@ -194,6 +263,27 @@ describe('event rule integrity', () => {
 
     expect(right.triggeredEvents).toEqual(left.triggeredEvents);
     expect(right.eventCooldowns).toEqual(left.eventCooldowns);
+  });
+
+  it('keeps indexed cooldown writes equivalent for legacy duplicates and chained repeats', () => {
+    const state = createInitialState();
+    const player = state.playerNationId;
+    const event = EVENT_BY_ID.evt_famine;
+    state.turn = event.cooldown + 2;
+    state.eventCooldowns.push(
+      { eventId: event.id, lastTriggeredTurn: 0 },
+      { nationId: player, eventId: event.id, lastTriggeredTurn: state.turn - 1 },
+    );
+    const reference = structuredClone(state);
+    const index = createEventAvailabilityIndex(state);
+    expect(isEventAvailable(event, state.nations[player], state, index)).toBe(false);
+    for (const id of [player, 'n02', 'n02']) {
+      recordEvent(state, id, event.id, 0, index);
+      recordEvent(reference, id, event.id, 0);
+      expect(isEventAvailable(event, state.nations[id], state, index)).toBe(false);
+    }
+    expect(state.triggeredEvents).toEqual(reference.triggeredEvents);
+    expect(state.eventCooldowns).toEqual(reference.eventCooldowns);
   });
 
   it('normalizes legacy event history and removes duplicate or impossible pending entries', () => {

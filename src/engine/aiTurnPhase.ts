@@ -1,11 +1,11 @@
 import { NATIONAL_CHARACTERS } from '../data/national-characters';
 import type { NationalCharacterId } from '../data/national-characters';
-import type { GameState, Nation, Province } from '../types/game';
+import type { GameState, Nation } from '../types/game';
 import { clamp } from '../utils/math';
 import { processAITurn } from './ai';
 import { settleCultureReligion } from './culture';
 import { settleEconomy } from './economy';
-import { aiChooseOption, applyEffect, createEventAvailabilityIndex, EVENT_BY_ID, recordEvent, resolvePendingEventsForAI, rollEvents } from './events';
+import { aiChooseOption, applyEffect, createEventAvailabilityIndex, EVENT_BY_ID, type EventAvailabilityIndex, recordEvent, resolvePendingEventsForAI, rollEvents } from './events';
 import { activateTendency } from './formulas';
 import { lawPerTurnEffects, settlePolitics } from './politics';
 import { settlePopulation } from './population';
@@ -16,47 +16,56 @@ function refreshActiveCharacters(nation: Nation): void {
   nation.activeCharacterBonuses = activated.filter((id) => id !== 'balanced' && NATIONAL_CHARACTERS[id]);
 }
 
-export interface AITurnPhaseOptions { humanNationIds?: ReadonlySet<string> }
+function groupByNation<T>(items: T[], nationId: (item: T) => string): Map<string, T[]> {
+  const groups = new Map<string, T[]>();
+  for (const item of items) {
+    const id = nationId(item);
+    const group = groups.get(id);
+    if (group) group.push(item);
+    else groups.set(id, [item]);
+  }
+  return groups;
+}
+
+export interface AITurnPhaseOptions {
+  humanNationIds?: ReadonlySet<string>;
+  eventAvailability?: EventAvailabilityIndex;
+}
 
 export function runAITurnPhase(state: GameState, playerId: string, rng: () => number, options: AITurnPhaseOptions = {}): void {
   const humanNationIds = options.humanNationIds ?? new Set<string>();
   processAITurn(state, humanNationIds);
-  const eventAvailability = createEventAvailabilityIndex(state);
+  const eventAvailability = options.eventAvailability ?? createEventAvailabilityIndex(state);
 
-  const provincesByOwner = new Map<string, Province[]>();
-  for (const province of Object.values(state.provinces)) {
-    const owned = provincesByOwner.get(province.ownerId);
-    if (owned) owned.push(province);
-    else provincesByOwner.set(province.ownerId, [province]);
-  }
+  // Peace agreements can transfer provinces during AI orders. Group the resulting
+  // map only after those orders, preserving the generator's province order.
+  const provincesByOwner = groupByNation(Object.values(state.provinces), p => p.ownerId);
+  const relationsBySource = groupByNation(state.relations, r => r.from);
 
   for (const nation of Object.values(state.nations)) {
     if (nation.id === playerId || nation.isPlayer || nation.defeated) continue;
+    if (humanNationIds.has(nation.id)) { refreshActiveCharacters(nation); continue; }
     const provinces = provincesByOwner.get(nation.id) ?? [];
     if (provinces.length === 0) continue;
 
-    settleEconomy(nation, state);
+    settleEconomy(nation, state, provinces, relationsBySource.get(nation.id) ?? []);
     const totalPopulation = provinces.reduce((sum, province) => sum + province.population, 0);
     settlePopulation(nation, provinces, nation.resources.food < totalPopulation * 0.4, true, nation.atWar, false);
-    settlePolitics(nation, state);
+    settlePolitics(nation, state, provinces);
     lawPerTurnEffects(nation, provinces);
     settleTechnology(nation, state);
-    settleCultureReligion(nation, state);
+    settleCultureReligion(nation, state, provinces);
     nation.resources.influence = Math.min(nation.resources.influence + 3, 100);
 
-    for (const eventId of rollEvents(nation, state, rng, 1, eventAvailability)) {
+    for (const eventId of rollEvents(nation, state, rng, 1, eventAvailability, provinces)) {
       const event = EVENT_BY_ID[eventId];
       if (!event) continue;
-      if (humanNationIds.has(nation.id)) {
-        if (!state.pendingEvents.some((pending) => pending.nationId === nation.id && pending.eventId === eventId)) state.pendingEvents.push({ nationId: nation.id, eventId });
-        continue;
-      }
       const optionIndex = aiChooseOption(event, rng);
       const option = event.options[optionIndex];
-      if (option) applyEffect(nation, option.effects, state);
-      recordEvent(state, nation.id, eventId, optionIndex);
+      if (option) applyEffect(nation, option.effects, state, eventAvailability);
+      recordEvent(state, nation.id, eventId, optionIndex, eventAvailability);
     }
-    if (!humanNationIds.has(nation.id)) resolvePendingEventsForAI(nation, state, rng);
+    resolvePendingEventsForAI(nation, state, rng, undefined, eventAvailability);
 
     if (state.turn % 10 === 0) {
       for (const key of Object.keys(nation.tendency) as (keyof typeof nation.tendency)[]) {

@@ -31,6 +31,7 @@ export function localizeReactTree(node: ReactNode): ReactNode {
   let changed = false;
   for (const [key, value] of Object.entries(props)) {
     if (!TEXT_PROPS.has(key)) continue;
+    if (key === 'value' && typeof element.type === 'string' && ['input', 'textarea', 'select', 'option'].includes(element.type)) continue;
     const localized = typeof value === 'string' ? localizeString(value) : key === 'children' ? localizeReactTree(value as ReactNode) : value;
     if (localized !== value) { next[key] = localized; changed = true; }
   }

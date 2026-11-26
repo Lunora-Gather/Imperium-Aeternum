@@ -61,4 +61,32 @@ describe('cloud save import boundary', () => {
     expect(importSaveGameToSlot(5, payload)).toEqual({ ok: false, error: '无效存档槽位' });
     expect(localStorage.length).toBe(0);
   });
+
+  it('preserves the previous slot when the imported world has no addressable player', () => {
+    expect(saveGameToSlot(createInitialState(), 1).ok).toBe(true);
+    const before = readSaveGameFromSlot(1);
+    const state = { ...createInitialState(), nations: {} };
+    const raw = JSON.stringify({ version: SAVE_VERSION, gameState: state });
+
+    expect(importSaveGameToSlot(1, raw).ok).toBe(false);
+    const nation = createInitialState().nations[state.playerNationId];
+    const mismatched = { ...state, nations: { wrongKey: nation } };
+    expect(importSaveGameToSlot(1, JSON.stringify({ version: SAVE_VERSION, gameState: mismatched })).ok).toBe(false);
+    expect(readSaveGameFromSlot(1)).toEqual(before);
+  });
+
+  it('checks the size after migrating before replacing a slot', () => {
+    const state = createInitialState();
+    state.relations = state.relations.slice(0, 1);
+    const save = { version: 4, createdAt: '2025-01-01', gameState: state };
+    const limit = 5 * 1024 * 1024;
+    state.nations[state.playerNationId].name += 'x'.repeat(limit - new Blob([JSON.stringify(save)]).size);
+    const raw = JSON.stringify(save);
+    expect(new Blob([raw]).size).toBe(limit);
+    expect(saveGameToSlot(createInitialState(), 1).ok).toBe(true);
+    const before = readSaveGameFromSlot(1);
+
+    expect(importSaveGameToSlot(1, raw).ok).toBe(false);
+    expect(readSaveGameFromSlot(1)).toEqual(before);
+  });
 });

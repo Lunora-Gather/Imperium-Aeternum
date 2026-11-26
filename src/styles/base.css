@@ -9,191 +9,166 @@
 * { box-sizing: border-box; }
 
 :root {
-  /* 背景层级 —— 暖墨色,有深度感,不是死黑 */
-  --bg-void:    #14110d;
-  --bg-deep:    #1c1812;
-  --bg-panel:   #252017;
-  --bg-raised:  #2e281c;
-  --bg-inset:   #181410;
+  color-scheme: dark;
+  --bg-void: #171410;
+  --bg-deep: #201b15;
+  --bg-panel: #27211a;
+  --bg-raised: #32291f;
+  --bg-inset: #1b1712;
+  --border: #4c3d2d;
+  --border-bright: #8c7454;
+  --border-gold: #c49b64;
+  --text: #f5ebdb;
+  --text-soft: #dfcfb6;
+  --text-mute: #c1ab8e;
+  --text-dim: #b09a7e;
+  --gold: #e6be80;
+  --good: #afd091;
+  --warn: #f1b874;
+  --danger: #f5a292;
+  --stable: #9ccbc3;
+  --accent: #c2b1e3;
+  --faith: #d0ad91;
+  --power: #e0a88a;
+  --btn-primary-top: #ecc891;
+  --btn-primary-bot: #cc9e61;
+  --btn-primary-fg: #291b10;
+  --btn-warn-top: #572d27;
+  --btn-good-top: #2d4026;
+  --theme-mark: #c49b64;
+  --theme-grain: repeating-linear-gradient(128deg, transparent 0 18px, #d6a86a12 19px 20px, transparent 21px 42px);
+  --theme-edge: 1px solid var(--border-gold);
+  --theme-radius: 9px;
 
-  /* 古铜色系边框 —— 三档 */
-  --border:        #3d3324;
-  --border-bright: #6b5a3a;
-  --border-gold:   #b8924a;
-
-  /* 文字 —— 羊皮纸色,不是冷白 */
-  --text:        #f2e8d2;
-  --text-soft:   #d4c5a0;
-  --text-mute:   #9a8a6a;
-  --text-dim:    #5a4e36;
-
-  /* 语义色 —— 全部调暗一档,融入铜色基调 */
-  --gold:    #c9a44e;     /* 国库 */
-  --food:    #7a9a3e;     /* 粮食:苔绿 */
-  --stable:  #4a7a7a;     /* 稳定:青铜 */
-  --war:     #a23d28;     /* 战争:暗红 */
-  --faith:   #8a6a4a;     /* 信仰:赭石 */
-  --power:   #8a5a3a;     /* 权力:紫铜 */
-  --warn:    #c97828;     /* 警告:琥珀 */
-  --good:    #7a9a3e;
-  --danger:  #a23d28;
-  --accent:  #6a5a8a;     /* 行政:暗紫 */
-
-  /* Bar 阈值 */
-  --bar-good: #7a9a3e;
-  --bar-mid:  #c9a44e;
-  --bar-warn: #c97828;
-  --bar-bad:  #a23d28;
-
-  /* 字体 */
+  --on-danger: var(--btn-primary-fg);
+  --food: var(--good);
+  --war: var(--danger);
+  --bar-good: var(--good);
+  --bar-mid: var(--gold);
+  --bar-warn: var(--warn);
+  --bar-bad: var(--danger);
+  --btn-warn-bot: var(--btn-warn-top);
+  --btn-warn-fg: var(--text);
+  --btn-good-bot: var(--btn-good-top);
+  --btn-good-fg: var(--text);
+  --shadow-card: 0 4px 16px #0003;
+  --shadow-card-inset: inset 0 1px #ffffff12;
   --font-display: "Cinzel", "Songti SC", "STSong", serif;
-  --font-body:    "Inter", -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif;
-  --font-mono:    "JetBrains Mono", "SF Mono", "Consolas", monospace;
-
-  /* 节奏单位 */
+  --font-body: "Inter", -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif;
+  --font-mono: "JetBrains Mono", "SF Mono", "Consolas", monospace;
   --space-1: 4px;
   --space-2: 8px;
   --space-3: 12px;
   --space-4: 16px;
   --space-5: 24px;
   --space-6: 32px;
-
-  /* 圆角 */
   --radius-sm: 4px;
-  --radius:    8px;
+  --radius: 8px;
   --radius-lg: 12px;
 }
 
-/* ============================================================
-   白天主题 —— 象牙羊皮纸 / 古铜墨迹
-   同一套设计语言，反转明暗：暖象牙底 + 深铜墨色文字
-   ============================================================ */
+/* Flax paper, burnt umber ink and leather binding. */
 :root[data-theme="day"] {
-  --bg-void:    #f4ecd8;          /* 象牙羊皮纸 */
-  --bg-deep:    #ebe0c8;
-  --bg-panel:   #f8f2e2;          /* 面板：比底稍亮的纸面 */
-  --bg-raised:  #fdf7e8;
-  --bg-inset:   #e8dcc4;          /* 内嵌：浅赭槽 */
-
-  --border:        #c4b088;
-  --border-bright: #8a6a3a;
-  --border-gold:   #9a7430;
-
-  --text:        #2a1f12;          /* 深墨褐 */
-  --text-soft:   #4a3826;
-  --text-mute:   #6a5a3e;
-  --text-dim:    #9a8a6a;
-
-  /* 语义色 —— 调深一档，在浅底上可读 */
-  --gold:    #9a7430;
-  --food:    #4a6a28;
-  --stable:  #2a6a6a;
-  --war:     #8a2e1c;
-  --faith:   #6a4a2a;
-  --power:   #6a3a1e;
-  --warn:    #a25a1e;
-  --good:    #4a6a28;
-  --danger:  #8a2e1c;
-  --accent:  #4a3a6a;
-
-  --bar-good: #4a6a28;
-  --bar-mid:  #9a7430;
-  --bar-warn: #a25a1e;
-  --bar-bad:  #8a2e1c;
+  color-scheme: light;
+  --bg-void: #ede4d3;
+  --bg-deep: #e2d5be;
+  --bg-panel: #f6efdf;
+  --bg-raised: #fff8eb;
+  --bg-inset: #e8dbc4;
+  --border: #bba889;
+  --border-bright: #886e50;
+  --border-gold: #8b6336;
+  --text: #2f2318;
+  --text-soft: #4c3a29;
+  --text-mute: #614c36;
+  --text-dim: #695640;
+  --gold: #71461f;
+  --good: #3a542e;
+  --warn: #754219;
+  --danger: #862f2c;
+  --stable: #285854;
+  --accent: #544570;
+  --faith: #61492c;
+  --power: #713e33;
+  --btn-primary-top: #85522a;
+  --btn-primary-bot: #6d411c;
+  --btn-primary-fg: #fff7e8;
+  --btn-warn-top: #8a3930;
+  --btn-good-top: #405a33;
+  --btn-warn-fg: var(--btn-primary-fg);
+  --btn-good-fg: var(--btn-primary-fg);
+  --theme-mark: #78502c;
+  --theme-grain: repeating-linear-gradient(0deg, transparent 0 23px, #90633719 24px 25px);
+  --theme-radius: 5px;
 }
 
-/* ============================================================
-   竹简主题 —— 青简墨字 / 竹林夜读
-   深竹青底 + 浅竹简文字，古朴书卷气
-   ============================================================ */
+/* Split bamboo, jade details and forest shade. */
 :root[data-theme="bamboo"] {
-  --bg-void:    #1a2412;          /* 深竹青 */
-  --bg-deep:    #243018;
-  --bg-panel:   #2e3a1e;          /* 竹简面板 */
-  --bg-raised:  #384628;
-  --bg-inset:   #1e2810;
-
-  --border:        #3a4a28;
-  --border-bright: #6a7a48;
-  --border-gold:   #a8b870;       /* 竹青金 */
-
-  --text:        #e8e0c8;          /* 竹简米 */
-  --text-soft:   #c8c0a0;
-  --text-mute:   #8a8a6a;
-  --text-dim:    #4a5a3a;
-
-  --gold:    #a8b870;             /* 竹青 */
-  --food:    #6a8a3e;
-  --stable:  #3a6a5a;
-  --war:     #8a3e28;
-  --faith:   #7a5a3a;
-  --power:   #6a4a2a;
-  --warn:    #b87a28;
-  --good:    #6a8a3e;
-  --danger:  #8a3e28;
-  --accent:  #5a7a6a;
-
-  --bar-good: #6a8a3e;
-  --bar-mid:  #a8b870;
-  --bar-warn: #b87a28;
-  --bar-bad:  #8a3e28;
-
-  --btn-primary-top: #3a4a1e; --btn-primary-bot: #243012; --btn-primary-top-h: #4a5a28; --btn-primary-bot-h: #2e3a16; --btn-primary-fg: #e8e0c4;
-  --btn-warn-top: #5a2818; --btn-warn-bot: #2e1408; --btn-warn-fg: #e8c0a8;
-  --btn-good-top: #2e3e16; --btn-good-bot: #181e08; --btn-good-fg: #c0d8a0;
-  --shadow-card: 0 4px 16px rgba(0,0,0,0.3); --shadow-card-inset: inset 0 1px 0 rgba(168,184,112,0.05);
-}
-:root[data-theme="bamboo"] body {
-  background-image:
-    radial-gradient(ellipse 80% 50% at 50% 0%, rgba(168,184,112,0.04) 0%, transparent 60%),
-    radial-gradient(ellipse 100% 100% at 50% 50%, var(--bg-deep) 0%, var(--bg-void) 100%);
+  --bg-void: #10201b;
+  --bg-deep: #182a22;
+  --bg-panel: #1e3229;
+  --bg-raised: #293e33;
+  --bg-inset: #15271f;
+  --border: #405c4b;
+  --border-bright: #759682;
+  --border-gold: #91b698;
+  --text: #eaf1e4;
+  --text-soft: #d5e4d0;
+  --text-mute: #bbcfba;
+  --text-dim: #a5bda8;
+  --gold: #bce4b1;
+  --good: #b2d792;
+  --warn: #efca83;
+  --danger: #f1ad9f;
+  --stable: #a1d8d2;
+  --accent: #c4bce3;
+  --faith: #e0c199;
+  --power: #dab3a5;
+  --btn-primary-top: #c8e7ad;
+  --btn-primary-bot: #a2cf9e;
+  --btn-primary-fg: #14291e;
+  --btn-warn-top: #583730;
+  --btn-good-top: #304830;
+  --theme-mark: #96b798;
+  --theme-grain: repeating-linear-gradient(90deg, #bbd8ac13 0 1px, transparent 1px 9px, #bbd8ac06 9px 50px);
+  --theme-edge: 1px solid var(--border-gold);
+  --theme-radius: 3px;
 }
 
-/* ============================================================
-   水墨主题 —— 宣纸淡墨 / 丹青留白
-   浅灰宣纸底 + 浓墨文字，文人写意
-   ============================================================ */
+/* Cool xuan paper, graphite and a cinnabar seal. */
 :root[data-theme="ink"] {
-  --bg-void:    #e8e0d8;          /* 宣纸灰 */
-  --bg-deep:    #dcd4cc;
-  --bg-panel:   #f0eae2;          /* 宣纸面板 */
-  --bg-raised:  #f8f2ea;
-  --bg-inset:   #d8d0c8;
-
-  --border:        #b8b0a8;
-  --border-bright: #6a5a4a;
-  --border-gold:   #4a3a2a;       /* 浓墨 */
-
-  --text:        #2a241e;          /* 浓墨 */
-  --text-soft:   #4a3e34;
-  --text-mute:   #6a5a4a;
-  --text-dim:    #9a8a7a;
-
-  --gold:    #4a3a2a;
-  --food:    #3a5a28;
-  --stable:  #2a5a5a;
-  --war:     #6a2e1c;
-  --faith:   #5a4a2a;
-  --power:   #4a2a1e;
-  --warn:    #8a4a1e;
-  --good:    #3a5a28;
-  --danger:  #6a2e1c;
-  --accent:  #3a3a5a;
-
-  --bar-good: #3a5a28;
-  --bar-mid:  #4a3a2a;
-  --bar-warn: #8a4a1e;
-  --bar-bad:  #6a2e1c;
-
-  --btn-primary-top: #6a5a4a; --btn-primary-bot: #4a3a2a; --btn-primary-top-h: #7a6a5a; --btn-primary-bot-h: #5a4a3a; --btn-primary-fg: #f0eae2;
-  --btn-warn-top: #b8644a; --btn-warn-bot: #8a3e28; --btn-warn-fg: #f0eae2;
-  --btn-good-top: #7a9a3e; --btn-good-bot: #5a7a28; --btn-good-fg: #f0eae2;
-  --shadow-card: 0 4px 16px rgba(74,58,42,0.12); --shadow-card-inset: inset 0 1px 0 rgba(255,255,255,0.5);
-}
-:root[data-theme="ink"] body {
-  background-image:
-    radial-gradient(ellipse 80% 50% at 50% 0%, rgba(74,58,42,0.04) 0%, transparent 60%),
-    radial-gradient(ellipse 100% 100% at 50% 50%, var(--bg-deep) 0%, var(--bg-void) 100%);
+  color-scheme: light;
+  --bg-void: #e9eae7;
+  --bg-deep: #dbdfdb;
+  --bg-panel: #f3f3ed;
+  --bg-raised: #fafaf5;
+  --bg-inset: #e3e7e2;
+  --border: #aeb8b3;
+  --border-bright: #667570;
+  --border-gold: #4f625d;
+  --text: #202d2c;
+  --text-soft: #354743;
+  --text-mute: #465953;
+  --text-dim: #53615a;
+  --gold: #354f4a;
+  --good: #365b3e;
+  --warn: #754623;
+  --danger: #8b3533;
+  --stable: #2f5b67;
+  --accent: #484c75;
+  --faith: #614d3f;
+  --power: #6b4546;
+  --btn-primary-top: #405853;
+  --btn-primary-bot: #293d39;
+  --btn-primary-fg: #f8faf4;
+  --btn-warn-top: #8b3533;
+  --btn-good-top: #365b3e;
+  --btn-warn-fg: var(--btn-primary-fg);
+  --btn-good-fg: var(--btn-primary-fg);
+  --theme-mark: #973e3a;
+  --theme-grain: radial-gradient(ellipse at 100% 0%, #637d7440, transparent 62%);
+  --theme-edge: 1px solid var(--theme-mark);
+  --theme-radius: 3px;
 }
 
 html, body, #root { height: 100%; }
@@ -205,20 +180,10 @@ body {
   line-height: 1.6;
   color: var(--text);
   background: var(--bg-void);
-  /* 夜间：烛火氛围 —— 顶部暖光 + 四周暗角 */
-  background-image:
-    radial-gradient(ellipse 80% 50% at 50% 0%, rgba(201,164,78,0.04) 0%, transparent 60%),
-    radial-gradient(ellipse 100% 100% at 50% 50%, var(--bg-deep) 0%, var(--bg-void) 100%);
+  background-image: radial-gradient(ellipse at 50% 0%, var(--bg-deep), var(--bg-void) 72%);
   background-attachment: fixed;
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
-}
-
-/* 白天：象牙羊皮纸纹理 —— 顶部柔光 + 纸面微渐变 */
-:root[data-theme="day"] body {
-  background-image:
-    radial-gradient(ellipse 80% 50% at 50% 0%, rgba(154,116,48,0.06) 0%, transparent 60%),
-    radial-gradient(ellipse 100% 100% at 50% 50%, var(--bg-deep) 0%, var(--bg-void) 100%);
 }
 
 /* ── 滚动条 ── */
@@ -256,23 +221,13 @@ h1, h2, h3, h4 { font-family: var(--font-display); font-weight: 600; letter-spac
   box-shadow: 0 2px 8px rgba(0,0,0,0.2);
 }
 .ia-btn:active:not(:disabled) { transform: translateY(0); box-shadow: none; }
-.ia-btn:disabled { opacity: 0.3; cursor: not-allowed; }
+.ia-btn:disabled { opacity: .64; cursor: not-allowed; }
 .ia-btn, button { -webkit-tap-highlight-color: transparent; touch-action: manipulation; }
 button:active:not(:disabled) { transform: translateY(1px) scale(0.985); filter: brightness(1.08); }
 .ia-btn[aria-busy="true"] { cursor: progress; }
 .ia-btn-spinner { width: 12px; height: 12px; margin-right: 7px; display: inline-block; vertical-align: -2px; border: 2px solid currentColor; border-right-color: transparent; border-radius: 50%; animation: ia-spin .65s linear infinite; }
 @keyframes ia-spin { to { transform: rotate(360deg); } }
 @media (prefers-reduced-motion: reduce) { .ia-btn-spinner { animation-duration: 1.4s; } }
-
-/* 按钮渐变用主题变量，白天自动反转 */
-:root { --btn-primary-top: #4a3a1e; --btn-primary-bot: #2e2412; --btn-primary-top-h: #5a4828; --btn-primary-bot-h: #3a2e16; --btn-primary-fg: #f5e8c4;
-  --btn-warn-top: #5a2418; --btn-warn-bot: #2e1208; --btn-warn-fg: #e8c0a8;
-  --btn-good-top: #2e3e16; --btn-good-bot: #181e08; --btn-good-fg: #c0d8a0;
-  --shadow-card: 0 4px 16px rgba(0,0,0,0.3); --shadow-card-inset: inset 0 1px 0 rgba(201,164,78,0.05); }
-:root[data-theme="day"] { --btn-primary-top: #d8b870; --btn-primary-bot: #b8924a; --btn-primary-top-h: #e0c080; --btn-primary-bot-h: #c89a52; --btn-primary-fg: #2a1f12;
-  --btn-warn-top: #d4886a; --btn-warn-bot: #b8644a; --btn-warn-fg: #2a1410;
-  --btn-good-top: #9ab870; --btn-good-bot: #7a9a3e; --btn-good-fg: #1a2a08;
-  --shadow-card: 0 4px 16px rgba(120,90,40,0.15); --shadow-card-inset: inset 0 1px 0 rgba(255,255,255,0.4); }
 
 .ia-btn--primary {
   background: linear-gradient(180deg, var(--btn-primary-top) 0%, var(--btn-primary-bot) 100%);
@@ -282,7 +237,7 @@ button:active:not(:disabled) { transform: translateY(1px) scale(0.985); filter: 
   box-shadow: inset 0 1px 0 rgba(201,164,78,0.15);
 }
 .ia-btn--primary:hover:not(:disabled) {
-  background: linear-gradient(180deg, var(--btn-primary-top-h) 0%, var(--btn-primary-bot-h) 100%);
+  background: linear-gradient(180deg, var(--btn-primary-top) 0%, var(--btn-primary-bot) 100%);
   box-shadow: inset 0 1px 0 rgba(201,164,78,0.2), 0 2px 12px rgba(201,164,78,0.15);
 }
 .ia-btn--warn {
@@ -317,7 +272,7 @@ button:active:not(:disabled) { transform: translateY(1px) scale(0.985); filter: 
 }
 .ia-card--inset {
   background: var(--bg-inset);
-  border: 1px solid rgba(61,51,36,0.6);
+  border: 1px solid var(--border);
   border-radius: var(--radius-sm);
 }
 

@@ -1,11 +1,12 @@
+import { operatingNet } from './gameplay/reportFinances';
 // Imperium Aeternum — App shell
 // V23：主导航使用统一 NavigationTab 合约，避免各模块手写 tab 字符串漂移。
-import { lazy, Suspense, useState, useEffect, useCallback, useRef, type ComponentType } from 'react';
-import { useGameStore } from './store/gameStore';
+import { Suspense, useState, useEffect, useLayoutEffect, useCallback, useRef } from 'react';
+import { watchCampaignExit, useGameStore } from './store/gameStore';
 import { useSharedWorldSessionStore } from './store/sharedWorldSessionStore';
 import { playSfx, useSfxMute } from './utils/audio';
 import { BUILD_MARK } from './buildInfo';
-import { canAttemptLazyRecovery, isRecoverableLazyImportError } from './utils/lazyRecovery';
+import { lazyScreen, ScreenFallback } from './components/lazyScreen';
 import { getOnboardingStep, nextOnboardingIndex, onboardingProgress, prevOnboardingIndex } from './gameplay/onboarding';
 import { pushPageHistory, resolveBackTarget } from './gameplay/pageHistory';
 import {
@@ -13,7 +14,7 @@ import {
   centeredTabScrollLeft,
   isNavigationTab,
   NAVIGATION_GROUPS,
-  shouldBlockGlobalShortcut,
+  ignoreGameShortcut,
   type NavigationTab,
 } from './gameplay/navigationTabs';
 import {
@@ -31,51 +32,13 @@ import { ResourceStrip } from './components/ui';
 import LogToast from './components/LogToast';
 import ErrorBoundary from './components/ErrorBoundary';
 import { AccountButton } from './components/account/AccountPanel';
+import { watchAccountSession } from './store/accountStore';
 import CampaignExitControl from './components/CampaignExitControl';
 import { LocaleSwitch } from './components/LocaleSwitch';
 import { SocialDock } from './components/social/SocialPanel';
 import { useI18n } from './i18n';
 
 type Tab = NavigationTab;
-type LazyModule<T extends ComponentType<any>> = { default: T };
-
-const LAZY_RECOVERY_ATTEMPT_KEY = 'ia-lazy-recovery-attempt-v1';
-function attemptLazyImportRecovery(): boolean {
-  if (typeof window === 'undefined') return false;
-  const now = Date.now();
-  try {
-    if (!canAttemptLazyRecovery(sessionStorage.getItem(LAZY_RECOVERY_ATTEMPT_KEY), now)) return false;
-    sessionStorage.setItem(LAZY_RECOVERY_ATTEMPT_KEY, String(now));
-  } catch {
-    return false;
-  }
-  try {
-    const store = useGameStore.getState();
-    const isLocalCampaign = store.scene === 'playing' && !useSharedWorldSessionStore.getState().session;
-    if (isLocalCampaign) store.saveToSlot(0);
-  } catch {
-    // A blocked or full storage area must not prevent the newer application
-    // shell from loading. The existing save remains untouched on failure.
-  }
-  window.location.reload();
-  return true;
-}
-
-function lazyScreen<T extends ComponentType<any>>(
-  loader: () => Promise<LazyModule<T>>,
-) {
-  return lazy<T>(async () => {
-    try {
-      return await loader();
-    } catch (error) {
-      if (isRecoverableLazyImportError(error) && attemptLazyImportRecovery()) {
-        return await new Promise<LazyModule<T>>(() => undefined);
-      }
-      throw error;
-    }
-  });
-}
-
 const ScenarioSelect = lazyScreen(() => import('./screens/ScenarioSelect'));
 const WorldMap = lazyScreen(() => import('./screens/WorldMap'));
 const Dashboard = lazyScreen(() => import('./screens/Dashboard'));
@@ -114,10 +77,14 @@ function persistNoviceJourney(progress: NoviceJourneyProgress): void {
   try { localStorage.setItem(NOVICE_JOURNEY_KEY, JSON.stringify(progress)); } catch { /* non-critical preference */ }
 }
 
-function ScreenFallback() {
-  const { t } = useI18n();
-  return <div className="ia-display" style={{ minHeight: 180, display: 'grid', placeItems: 'center', color: 'var(--text-dim)' }}>{t('正在展开卷宗…')}</div>;
-}
+// Keep unload protection active even if a render error replaces the game screen.
+let stopWatchingExit = useGameStore.getState().scene === 'playing' ? watchCampaignExit() : undefined;
+const unsubscribeExit = useGameStore.subscribe(({ scene }, previous) => {
+  if (scene === previous.scene) return;
+  stopWatchingExit?.();
+  stopWatchingExit = scene === 'playing' ? watchCampaignExit() : undefined;
+});
+if (import.meta.hot) import.meta.hot.dispose(() => { unsubscribeExit(); stopWatchingExit?.(); });
 
 export default function App() {
   const { t } = useI18n();
@@ -141,14 +108,28 @@ export default function App() {
   });
 
   const { state, nextTurn, scene, justProcessedTurn, clearTurnFlag, pendingTab, consumePendingTab, hasSave } = useGameStore();
+  useEffect(watchAccountSession, []);
+  const sessionId = useSharedWorldSessionStore((s) => s.session?.id);
+  useEffect(() => {
+    const session = useSharedWorldSessionStore.getState().session;
+    if (!session || !sessionId || scene !== 'playing') return;
+    let active = true;
+    let stop: (() => void) | undefined;
+    void import('./store/sharedWorldStore').then(({ watchSharedWorld }) => {
+      if (active) stop = watchSharedWorld(session);
+    });
+    return () => { active = false; stop?.(); };
+  }, [sessionId, scene]);
   const pid = state.playerNationId;
   const player = state.nations[pid];
   const provs = player ? provincesOf(pid, state.provinces) : [];
   const totalPop = provs.reduce((s, p) => s + p.population, 0);
   const atWar = state.wars.some((w) => w.attackerId === pid || w.defenderId === pid);
-  const pendingCount = state.pendingEvents.filter((p) => p.nationId === pid).length;
+  const archived = !!sessionId && !!player?.defeated;
+  const campaignEnded = !sessionId && !!state.victory.type;
+  const pendingCount = campaignEnded ? 0 : state.pendingEvents.filter((p) => p.nationId === pid).length;
   const netIncome = state.lastReport
-    ? state.lastReport.income.tax + state.lastReport.income.trade + state.lastReport.income.building - state.lastReport.expense.military - state.lastReport.expense.corruption
+    ? operatingNet(state.lastReport)
     : null;
 
   const sfxMute = useSfxMute();
@@ -244,9 +225,9 @@ export default function App() {
   useEffect(() => {
     if (!justProcessedTurn) return;
     setPreReportTab(tab);
-    goToTab('report');
+    if (!archived) goToTab(campaignEnded ? 'dashboard' : 'report');
     clearTurnFlag();
-  }, [justProcessedTurn, clearTurnFlag, state.turn, tab, goToTab]);
+  }, [justProcessedTurn, clearTurnFlag, state.turn, tab, goToTab, campaignEnded, archived]);
 
   useEffect(() => {
     if (justProcessedTurn) playSfx('bell');
@@ -265,26 +246,25 @@ export default function App() {
     prevVictory.current = state.victory.type;
   }, [state.victory.type]);
 
-  useEffect(() => {
-    document.documentElement.setAttribute('data-theme', theme === 'night' ? '' : theme);
+  useLayoutEffect(() => {
+    document.documentElement.dataset.theme = theme;
   }, [theme]);
 
   useEffect(() => {
     window.requestAnimationFrame(() => window.scrollTo({ top: 0, left: 0 }));
   }, [scene, tab]);
 
-  const toggleTheme = useCallback(() => {
-    setTheme((t) => {
-      const order: ('night' | 'day' | 'bamboo' | 'ink')[] = ['night', 'day', 'bamboo', 'ink'];
-      const next = order[(order.indexOf(t) + 1) % order.length];
-      document.documentElement.setAttribute('data-theme', next === 'night' ? '' : next);
-      try { localStorage.setItem('ia-theme', next); } catch { /* ignore */ }
-      return next;
-    });
-  }, []);
+  const applyTheme = (next: typeof theme) => {
+    setTheme(next);
+    try { localStorage.setItem('ia-theme', next); } catch { /* optional preference */ }
+  };
+  const toggleTheme = () => {
+    const order = ['night', 'day', 'bamboo', 'ink'] as const;
+    applyTheme(order[(order.indexOf(theme) + 1) % order.length]);
+  };
 
   const onKey = useCallback((e: KeyboardEvent) => {
-    if (scene !== 'playing') return;
+    if (scene !== 'playing' || archived) return;
     if (showHelp) {
       if (e.key === 'Escape') {
         e.preventDefault();
@@ -292,12 +272,7 @@ export default function App() {
       }
       return;
     }
-    const target = e.target as HTMLElement | null;
-    if (shouldBlockGlobalShortcut({
-      hasOpenDialog: document.querySelector('[role="dialog"][aria-modal="true"]') !== null,
-      targetTagName: target?.tagName,
-      targetIsContentEditable: target?.isContentEditable,
-    })) return;
+    if (ignoreGameShortcut(e)) return;
 
     if (e.key === 'Escape') {
       e.preventDefault();
@@ -305,12 +280,11 @@ export default function App() {
       return;
     }
 
-    const hasPending = state.pendingEvents.some((p) => p.nationId === pid);
-    if (hasPending) return;
+    if (pendingCount > 0) return;
 
     if (e.code === 'Space') {
       e.preventDefault();
-      if (!state.victory.type) nextTurn();
+      if (!campaignEnded) nextTurn();
       return;
     }
     if (e.key === 't' || e.key === 'T') {
@@ -323,7 +297,7 @@ export default function App() {
       e.preventDefault();
       goToTab(hit.id);
     }
-  }, [scene, showHelp, state.pendingEvents, state.victory.type, pid, nextTurn, goToTab, goBackPage]);
+  }, [scene, archived, showHelp, pendingCount, campaignEnded, nextTurn, goToTab, goBackPage]);
 
   useEffect(() => {
     window.addEventListener('keydown', onKey);
@@ -348,7 +322,7 @@ export default function App() {
     });
   }, [tab]);
 
-  if (scene === 'menu') return <Suspense fallback={<ScreenFallback />}><ScenarioSelect /></Suspense>;
+  if (scene === 'menu') return <Suspense fallback={<ScreenFallback />}><ScenarioSelect theme={theme} applyTheme={applyTheme} /></Suspense>;
   if (!player) {
     return (
       <div className="ia-shell" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh' }}>
@@ -356,6 +330,19 @@ export default function App() {
       </div>
     );
   }
+
+  const archiveTab = tab === 'chronicle' ? 'chronicle' : 'report';
+  if (archived) return <main className="ia-content-shell ia-screen-stack">
+    <header className="ia-ruler-card"><h1 className="ia-ruler-title">{t(player.name)}</h1><p>{t('国家已覆亡')}</p>
+      <nav className="ia-world-nation-actions" aria-label={t('纪事')}>{(['report', 'chronicle'] as const).map(id =>
+        <button key={id} className="ia-btn" aria-pressed={archiveTab === id} onClick={() => setTab(id)}>{t(id === 'report' ? '年报' : '史册')}</button>)}
+        <CampaignExitControl presentation="dashboard" />
+      </nav>
+    </header>
+    <ErrorBoundary onReset={() => setTab('report')}><Suspense fallback={<ScreenFallback />}>
+      {archiveTab === 'chronicle' ? <ChronicleScreen /> : <TurnReportScreen readOnly />}
+    </Suspense></ErrorBoundary>
+  </main>;
 
   const helpProgress = onboardingProgress(tutorialStep);
   const helpStep = getOnboardingStep(tutorialStep);
@@ -434,7 +421,7 @@ export default function App() {
           <div className="ia-status-row"><span>{t('行政点')}</span><strong>{Math.round(player?.resources.adminPt ?? 0)}</strong></div>
           <div className="ia-status-row"><span>{t('科研点')}</span><strong>{Math.round(player?.resources.sciPt ?? 0)}</strong></div>
           <div className="ia-status-row"><span>{t('影响力')}</span><strong>{Math.round(player?.resources.influence ?? 0)}</strong></div>
-          <div className="ia-status-row"><span>{t('净收入')}</span><strong className={netIncome === null ? '' : netIncome >= 0 ? 'good' : 'danger'}>{netIncome === null ? '—' : t('{{value}}/年', { value: `${netIncome >= 0 ? '+' : ''}${Math.round(netIncome)}` })}</strong></div>
+          <div className="ia-status-row"><span>{t('常规净收入')}</span><strong className={netIncome === null ? '' : netIncome >= 0 ? 'good' : 'danger'}>{netIncome === null ? '—' : t('{{value}}/年', { value: `${netIncome >= 0 ? '+' : ''}${Math.round(netIncome)}` })}</strong></div>
         </aside>
       </header>
 
@@ -494,7 +481,7 @@ export default function App() {
         </ErrorBoundary>
       </main>
 
-      {state.pendingEvents.some((p) => p.nationId === pid) && <Suspense fallback={null}><EventModal /></Suspense>}
+      {pendingCount > 0 && <Suspense fallback={null}><EventModal /></Suspense>}
       <LogToast />
       <SocialDock />
 

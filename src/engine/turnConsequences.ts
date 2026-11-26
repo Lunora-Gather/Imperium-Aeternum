@@ -1,14 +1,16 @@
 import type { GameState, NationalTendency } from '../types/game';
 import { clamp } from '../utils/math';
+import { allocateEntityId } from '../utils/id';
 import { mulberry32 } from '../utils/random';
 import { addChronicle } from './chronicle';
 import { provincesOf } from './init';
+import { relocateArmy } from './military';
 
 /**
  * 处理引擎级失败与叛乱后果。
  * 成功条件由 gameplay/ambitions 按剧本体量统一判定。
  */
-export function resolveFailuresAndRebellions(state: GameState, playerId: string): void {
+export function resolveFailuresAndRebellions(state: GameState, playerId: string, startingCapital = state.nations[playerId]?.capital): void {
   if (state.victory.type) return;
   const player = state.nations[playerId];
   if (!player) return;
@@ -30,7 +32,7 @@ export function resolveFailuresAndRebellions(state: GameState, playerId: string)
     }
   } else state.lowStabilityTurns = 0;
 
-  if (player.capital && state.provinces[player.capital]?.ownerId !== playerId) {
+  if (startingCapital && state.provinces[startingCapital]?.ownerId !== playerId) {
     state.victory.type = 'fail_capital_lost';
     return;
   }
@@ -50,8 +52,12 @@ export function resolveFailuresAndRebellions(state: GameState, playerId: string)
   }
 
   const rebellionRng = mulberry32(state.seed ^ (state.turn * 7919));
+  const newRebels: string[] = [];
   for (const province of rebelProvinces) {
-    const rebelId = `rebel_${province.id}`;
+    const originalId = `rebel_${province.id}`;
+    const previous = state.nations[originalId];
+    const rebelId = previous && (previous.defeated || previous.rebelOf !== playerId) ? allocateEntityId(state, 'rebel') : originalId;
+    newRebels.push(rebelId);
     if (!state.nations[rebelId]) {
       state.nations[rebelId] = {
         id: rebelId,
@@ -86,6 +92,7 @@ export function resolveFailuresAndRebellions(state: GameState, playerId: string)
     province.loyalty = 30;
     province.unrest = 60;
     province.ownerId = rebelId;
+    province.isCapital = state.nations[rebelId].capital === province.id;
     province.garrison = 0;
     province.buildings = province.buildings.filter((building) => building.defId === 'farm');
     addChronicle(state, {
@@ -107,16 +114,33 @@ export function resolveFailuresAndRebellions(state: GameState, playerId: string)
     }
   }
 
-  if (rebelProvinces.length >= 3) {
+  if (!newRebels.length) return;
+  if (state.provinces[player.capital]?.ownerId !== playerId) {
+    state.victory.type = 'fail_capital_lost';
+    const fallback = provinces.find(p => p.ownerId === playerId);
+    if (fallback) {
+      player.capital = fallback.id;
+      fallback.isCapital = true;
+    } else {
+      player.defeated = true;
+      player.army = [];
+    }
+  }
+  for (const army of player.army) {
+    if (state.provinces[army.location]?.ownerId !== playerId) relocateArmy(state, player, army, player.capital);
+  }
+  if (player.civilWar?.active) {
+    player.civilWar.rebels = [...new Set([...player.civilWar.rebels, ...newRebels])];
+  } else if (newRebels.length >= 3) {
     player.government.legitimacy = clamp(player.government.legitimacy - 25, 0, 100);
     player.government.stability = clamp(player.government.stability - 15, 0, 100);
-    player.civilWar = { active: true, rebels: rebelProvinces.map((province) => `rebel_${province.id}`) };
+    player.civilWar = { active: true, rebels: newRebels };
     addChronicle(state, {
       id: `civilwar_${playerId}_${state.turn}`,
       turn: state.turn,
       kind: 'milestone_rebellion',
       title: `${player.name} 陷入内战`,
-      desc: `${rebelProvinces.length} 省叛乱，内战爆发。玩家可镇压或谈判。内战期间稳定度持续下降、税收减半。`,
+      desc: `${rebelProvinces.length} 省叛乱，内战爆发。玩家可镇压或谈判。内战期间每年稳定度 -3，税收减少 30%。`,
       actorId: playerId,
     });
   }

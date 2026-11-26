@@ -1,4 +1,4 @@
-import { getLocale, translate, type Locale } from '.';
+import { getLocale, interpolate, translate, type Locale } from '.';
 
 export interface TranslationPattern {
   pattern: RegExp;
@@ -19,33 +19,38 @@ export type Translator = (source: string, values?: Record<string, string | numbe
 function resolveScoped(
   source: string,
   localeCatalog: Readonly<Record<string, string>> | ScopedLocaleCatalog | undefined,
-  includeFragments = true,
 ): string | undefined {
   if (!localeCatalog) return undefined;
-  const structured = 'exact' in localeCatalog || 'patterns' in localeCatalog || 'fragments' in localeCatalog;
-  const exact = structured ? (localeCatalog as ScopedLocaleCatalog).exact : localeCatalog as Readonly<Record<string, string>>;
-  if (exact?.[source] !== undefined) return exact[source];
-  if (!structured) return undefined;
-  for (const rule of (localeCatalog as ScopedLocaleCatalog).patterns ?? []) {
+  const { exact, patterns } = localeCatalog as ScopedLocaleCatalog;
+  const entries = typeof exact === 'object' ? exact : localeCatalog;
+  if (Object.prototype.hasOwnProperty.call(entries, source)) {
+    const value = (entries as Readonly<Record<string, unknown>>)[source];
+    if (typeof value === 'string') return value;
+  }
+  if (!Array.isArray(patterns)) return undefined;
+  for (const rule of patterns) {
     rule.pattern.lastIndex = 0;
     if (rule.pattern.test(source)) {
       rule.pattern.lastIndex = 0;
-      return typeof rule.replacement === 'string'
-        ? source.replace(rule.pattern, rule.replacement)
-        : source.replace(rule.pattern, rule.replacement);
+      return source.replace(rule.pattern, rule.replacement);
     }
-  }
-  const fragments = includeFragments ? (localeCatalog as ScopedLocaleCatalog).fragments : undefined;
-  if (fragments) {
-    let translated = source;
-    for (const [from, to] of Object.entries(fragments).sort(([a], [b]) => b.length - a.length)) translated = translated.split(from).join(to);
-    if (translated !== source) return translated;
   }
   return undefined;
 }
 
-function interpolate(template: string, values: Record<string, string | number>): string {
-  return template.replace(/\{\{(\w+)\}\}/g, (_, key: string) => String(values[key] ?? `{{${key}}}`));
+const orderedFragments = new WeakMap<Readonly<Record<string, string>>, [string, string][]>();
+
+function composeFragments(source: string, fragments: Readonly<Record<string, string>>) {
+  let ordered = orderedFragments.get(fragments);
+  if (!ordered) {
+    ordered = Object.entries(fragments).sort(([a], [b]) => b.length - a.length);
+    orderedFragments.set(fragments, ordered);
+  }
+  let translated = source;
+  for (const [from, to] of ordered) {
+    if (translated.includes(from)) translated = translated.split(from).join(to);
+  }
+  return translated;
 }
 
 export function translateScoped(source: string, catalog: ScopedCatalog, values: Record<string, string | number> = {}, locale: Locale = getLocale()): string {
@@ -54,12 +59,13 @@ export function translateScoped(source: string, catalog: ScopedCatalog, values: 
   // patterns come next because they understand whole runtime sentences (and
   // proper names). Fragment composition is intentionally last: using it first
   // produced hybrids such as "战争机会：可攻 Sidon" in the English UI.
-  const scoped = resolveScoped(source, catalog[locale], false);
+  const dictionary = catalog[locale];
+  const scoped = resolveScoped(source, dictionary);
   if (scoped !== undefined) return interpolate(scoped, values);
   const global = translate(source, values, locale);
   if (global !== interpolate(source, values)) return global;
-  const composed = resolveScoped(source, catalog[locale], true);
-  return composed === undefined ? global : interpolate(composed, values);
+  const fragments = (dictionary as ScopedLocaleCatalog | undefined)?.fragments;
+  return fragments && typeof fragments === 'object' ? interpolate(composeFragments(source, fragments), values) : global;
 }
 
 /**

@@ -1,3 +1,4 @@
+import { operatingNet } from '../gameplay/reportFinances';
 import { registerGovernanceTranslations } from '../i18n/catalogs/governance';
 import { localizeReactTree } from '../i18n/reactTree';
 registerGovernanceTranslations();
@@ -16,13 +17,13 @@ function LineChart({ data, color, label, unit }: { data: { x: number; y: number 
   const yRange = yMax - yMin || 1;
   const sx = (x: number) => PAD + ((x - xMin) / (xMax - xMin || 1)) * (W - PAD * 2);
   const sy = (y: number) => H - PAD - ((y - yMin) / yRange) * (H - PAD * 2);
-  const path = data.map((d, i) => `${i === 0 ? 'M' : 'L'} ${sx(d.x).toFixed(1)} ${sy(d.y).toFixed(1)}`).join(' ');
+  const path = data.map((d, i) => `${i === 0 || data[i - 1].x + 1 !== d.x ? 'M' : 'L'} ${sx(d.x).toFixed(1)} ${sy(d.y).toFixed(1)}`).join(' ');
   const zeroY = sy(0);
   return <Panel title={label}><svg viewBox={`0 0 ${W} ${H}`} width="100%" role="img" aria-label={label} style={{ display: 'block', overflow: 'visible', maxWidth: W, height: 'auto' }}><line x1={PAD} y1={zeroY} x2={W - PAD} y2={zeroY} stroke="var(--border)" strokeWidth={0.5} strokeDasharray="3 3" /><path d={path} fill="none" stroke={color} strokeWidth={1.8} strokeLinejoin="round" strokeLinecap="round" />{data.map((d, i) => <circle key={i} cx={sx(d.x)} cy={sy(d.y)} r={2.5} fill={color} />)}<text x={PAD} y={H - 6} fontSize={9} fill="var(--text-dim)" textAnchor="start">回合 {xMin}</text><text x={W - PAD} y={H - 6} fontSize={9} fill="var(--text-dim)" textAnchor="end">回合 {xMax}</text><text x={4} y={PAD + 4} fontSize={9} fill="var(--text-dim)" textAnchor="start">{yMax.toFixed(0)}{unit}</text><text x={4} y={H - PAD} fontSize={9} fill="var(--text-dim)" textAnchor="start">{yMin.toFixed(0)}{unit}</text></svg></Panel>;
 }
 
 function avg(v: number[]) { return v.length ? v.reduce((s, x) => s + x, 0) / v.length : 0; }
-function trend(v: number[]) { if (v.length < 2) return 0; const n = Math.min(5, v.length); const recent = avg(v.slice(-n)); const before = avg(v.slice(Math.max(0, v.length - n * 2), v.length - n)); return recent - before; }
+function trend(v: number[]) { if (v.length < 2) return 0; const n = Math.min(5, Math.floor(v.length / 2)); const recent = avg(v.slice(-n)); const before = avg(v.slice(v.length - n * 2, v.length - n)); return recent - before; }
 
 export default function StatsScreen() {
   const { state } = useGameStore();
@@ -31,7 +32,8 @@ export default function StatsScreen() {
   const history = state.history.filter((r) => r.nationId === pid);
   if (history.length === 0) return localizeReactTree(<Panel title="统计图表"><p className="dim" style={{ padding: 16 }}>尚无回合数据，推进一步后可见趋势。</p></Panel>);
 
-  const goldData = history.map((r) => ({ x: r.turn, y: r.income.tax + r.income.trade + r.income.building - r.expense.military - r.expense.corruption }));
+  const goldData = history.map((r) => ({ x: r.turn, y: operatingNet(r) }));
+  const treasuryData = history.flatMap((r) => r.goldDelta == null ? [] : [{ x: r.turn, y: r.goldDelta }]);
   const foodData = history.map((r) => ({ x: r.turn, y: r.foodDelta }));
   const popData = history.map((r) => ({ x: r.turn, y: r.popDelta }));
   const stabData = history.map((r) => ({ x: r.turn, y: r.stabilityDelta }));
@@ -74,7 +76,7 @@ export default function StatsScreen() {
 
     <Panel title={`长局体检 · 近 ${campaignHealth.horizon} 回合`} accent actions={<Tag text={`${campaignHealth.score} 分`} tone={campaignHealth.tone} />}>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: 8, marginBottom: 10 }}>
-        <HealthMetric label="平均净收入" value={campaignHealth.averageNetIncome} tone={campaignHealth.averageNetIncome < 0 ? 'danger' : 'good'} />
+        <HealthMetric label="平均常规净收入" value={campaignHealth.averageNetIncome} tone={campaignHealth.averageNetIncome < 0 ? 'danger' : 'good'} />
         <HealthMetric label="赤字回合" value={`${campaignHealth.negativeIncomeTurns}/${campaignHealth.horizon}`} tone={campaignHealth.negativeIncomeTurns > campaignHealth.horizon / 2 ? 'danger' : 'info'} />
         <HealthMetric label="缺粮回合" value={`${campaignHealth.foodDeficitTurns}/${campaignHealth.horizon}`} tone={campaignHealth.foodDeficitTurns > campaignHealth.horizon / 2 ? 'danger' : 'info'} />
         <HealthMetric label="厌战峰值" value={campaignHealth.maxWarExhaustion} tone={campaignHealth.maxWarExhaustion >= 75 ? 'danger' : campaignHealth.maxWarExhaustion >= 55 ? 'warn' : 'good'} />
@@ -86,7 +88,8 @@ export default function StatsScreen() {
     </Panel>
 
     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 520px), 1fr))', gap: 'var(--space-4)', minWidth: 0 }}>
-      <LineChart data={goldData} color="var(--gold)" label="国库净收入（金/年）" unit="" />
+      <LineChart data={goldData} color="var(--gold)" label="常规净收入" unit="" />
+      <LineChart data={treasuryData} color="var(--gold)" label="国库实际变化" unit="" />
       <LineChart data={foodData} color="var(--food)" label="粮食变化（粮/年）" unit="" />
       <LineChart data={popData} color="var(--text-soft)" label="人口变化（人/年）" unit="" />
       <LineChart data={stabData} color="var(--stable)" label="稳定度变化" unit="" />

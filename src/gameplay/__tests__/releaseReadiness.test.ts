@@ -7,10 +7,12 @@ import { buildReleaseReadinessPlan } from '../releaseReadiness';
 describe('system release readiness', () => {
   it('exposes the stable build and current integrity state', () => {
     const state = createInitialState();
-    const plan = buildReleaseReadinessPlan(buildReadinessReport(state));
+    const readiness = buildReadinessReport(state);
+    const plan = buildReleaseReadinessPlan(readiness);
 
+    expect(readiness.devChecks.map((item) => item.id)).toEqual(['ambition-meta-missing']);
     expect(plan.buildMark).toBe(BUILD_MARK);
-    expect(plan.integrityCount).toBe(2);
+    expect(plan.integrityCount).toBe(readiness.devChecks.length);
     expect(plan.tone).toBe('warn');
   });
 

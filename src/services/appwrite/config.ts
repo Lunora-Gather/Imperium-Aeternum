@@ -45,3 +45,9 @@ export const APPWRITE_CONFIG: AppwriteConfig = {
 };
 
 export const isAppwriteConfigured = Object.values(APPWRITE_CONFIG).every((value) => value.trim().length > 0);
+
+/** Appwrite Realtime accepts the same row channel as a string or a Channel builder. */
+export function tableRowChannel(tableId: string, rowId?: string) {
+  const rows = `tablesdb.${APPWRITE_CONFIG.databaseId}.tables.${tableId}.rows`;
+  return rowId ? `${rows}.${rowId}` : rows;
+}

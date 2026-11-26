@@ -17,6 +17,15 @@ describe('lazy scoped translations', () => {
     expect(translateScoped('第 {{year}} 年', catalog, { year: 3 }, 'zh-CN')).toBe('第 3 年');
   });
 
+  it('keeps unlisted names and placeholders intact in screen copy', () => {
+    const flat = { en: { patterns: 'Patterns', exact: 'Exact', name: 'Player {{toString}}' } };
+    expect(translateScoped('patterns', flat, {}, 'en')).toBe('Patterns');
+    expect(translateScoped('toString', flat, {}, 'en')).toBe('toString');
+    expect(translateScoped('name', flat, {}, 'en')).toBe('Player {{toString}}');
+    expect(translateScoped('name', flat, { toString: 'Rome' }, 'en')).toBe('Player Rome');
+    expect(translateScoped('toString', { en: { exact: {} } }, {}, 'en')).toBe('toString');
+  });
+
   it('supports dynamic presentation patterns and deep view-model localization', () => {
     const dynamic = { en: { patterns: [{ pattern: /^体检 (\d+)\/100$/, replacement: 'Check $1/100' }] } };
     expect(localizeDeep({ title: '体检 86/100', nested: ['国政总览'] }, (source) => translateScoped(source, dynamic, {}, 'en'))).toEqual({ title: 'Check 86/100', nested: ['国政总览'] });

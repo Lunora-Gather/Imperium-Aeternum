@@ -73,11 +73,12 @@
 /* ========== 开场页：四列剧本大厅 ========== */
 .ia-menu { width: min(1320px, calc(100vw - 34px)); min-height: 100vh; margin: 0 auto; padding: clamp(18px, 3vw, 34px) 0 40px; }
 .ia-menu-toolbar { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 18px; }
+.ia-menu-controls { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; min-width: 0; }
 .ia-menu-version { display: flex; gap: 6px; flex-wrap: wrap; }
 .ia-theme-switch { display: inline-flex; gap: 4px; padding: 5px; border: 1px solid var(--border); border-radius: 999px; background: color-mix(in srgb, var(--bg-panel) 78%, transparent); box-shadow: inset 0 1px 0 rgba(201,164,78,0.06); }
 .ia-theme-switch button { border: 1px solid transparent; border-radius: 999px; background: transparent; color: var(--text-mute); cursor: pointer; height: 30px; padding: 0 10px; display: inline-flex; align-items: center; gap: 5px; font-size: 12px; }
 .ia-theme-switch button:hover { color: var(--text); background: color-mix(in srgb, var(--bg-inset) 65%, transparent); }
-.ia-theme-switch button.is-active { color: var(--gold); border-color: var(--border-gold); background: rgba(201,164,78,0.08); }
+.ia-theme-switch button[aria-pressed="true"] { color: var(--gold); border-color: var(--border-gold); background: color-mix(in srgb, var(--gold) 9%, var(--bg-panel)); }
 .ia-theme-switch em { font-style: normal; }
 .ia-menu-hero { position: relative; text-align: center; margin: 0 auto 20px; padding: 24px 18px 20px; border: 1px solid var(--border); border-radius: 20px; background: linear-gradient(180deg, color-mix(in srgb, var(--bg-raised) 84%, transparent), color-mix(in srgb, var(--bg-panel) 96%, transparent)); box-shadow: var(--shadow-card), inset 0 1px 0 rgba(201,164,78,0.08); overflow: hidden; }
 .ia-menu-hero::before { content: ''; position: absolute; inset: 0; pointer-events: none; background: radial-gradient(circle at 50% 0%, rgba(201,164,78,0.12), transparent 42%), linear-gradient(90deg, rgba(201,164,78,0.06), transparent 24%, transparent 76%, rgba(201,164,78,0.04)); }
@@ -131,8 +132,10 @@
 .ia-world-svg { width: 100%; height: 560px; display: block; }
 .wm-links line { vector-effect: non-scaling-stroke; }
 .wm-province { cursor: pointer; transition: opacity 0.15s ease; }
-.wm-province:hover { opacity: 1; }
-.wm-capital-label { fill: var(--text-mute); font-family: var(--font-body); font-size: 9px; paint-order: stroke; stroke: rgba(245,236,212,0.55); stroke-width: 2px; pointer-events: none; }
+.wm-selection-ring { visibility: hidden; }
+.wm-province:is(:hover, :focus-visible, [aria-pressed="true"]) .wm-selection-ring { visibility: visible; }
+.ia-map-info select { width: 100%; min-width: 0; }
+.wm-capital-label { fill: var(--text-mute); font-family: var(--font-body); font-size: 9px; paint-order: stroke; stroke: var(--bg-inset); stroke-width: 2px; pointer-events: none; }
 .ia-map-info { display: flex; flex-direction: column; gap: 12px; }
 .ia-map-stat-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
 .ia-map-stat-grid div, .ia-map-detail, .ia-map-legend { border: 1px solid var(--border); border-radius: 14px; background: color-mix(in srgb, var(--bg-panel) 88%, transparent); box-shadow: inset 0 1px 0 rgba(201,164,78,0.05); }
@@ -223,7 +226,7 @@
 .ia-social-tabs { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; margin-top: 18px; padding: 4px; border: 1px solid var(--border); border-radius: 12px; background: var(--bg-inset); }
 .ia-social-tabs button { min-height: 40px; position: relative; border: 0; border-radius: 8px; background: transparent; color: var(--text-mute); cursor: pointer; font: 500 11px var(--font-body); }
 .ia-social-tabs button.is-active { background: var(--bg-raised); color: var(--gold); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--gold) 35%, transparent); }
-.ia-social-tabs button b { min-width: 17px; height: 17px; display: grid; place-items: center; position: absolute; top: 3px; right: 8px; border-radius: 50%; background: var(--danger); color: white; font: 700 8px var(--font-mono); }
+.ia-social-tabs button b { min-width: 17px; height: 17px; display: grid; place-items: center; position: absolute; top: 3px; right: 8px; border-radius: 50%; background: var(--danger); color: var(--on-danger); font: 700 8px var(--font-mono); }
 .ia-social-content { min-height: 370px; padding-top: 14px; }
 .ia-social-discover-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 10px; }
 .ia-social-discover-head strong { color: var(--text); font: 600 14px var(--font-display); }
@@ -301,7 +304,7 @@
 .ia-player-card blockquote p { margin: 3px 0 0; color: var(--text-soft); font-size: 11px; line-height: 1.7; }
 .ia-player-card-meta { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 0 21px; }
 .ia-player-card-meta > div { min-width: 0; display: grid; gap: 5px; padding: 10px 11px; border: 1px solid var(--border); border-radius: 10px; background: color-mix(in srgb, var(--bg-raised) 65%, transparent); }
-.ia-player-card-meta span { overflow: hidden; color: var(--text-dim); font: 7px var(--font-mono); text-overflow: ellipsis; white-space: nowrap; }
+.ia-player-card-meta span { overflow: hidden; color: var(--text-dim); font: 9px var(--font-mono); text-overflow: ellipsis; white-space: nowrap; }
 .ia-player-card-meta strong { overflow: hidden; color: var(--text-mute); font: 10px var(--font-mono); letter-spacing: .08em; text-overflow: ellipsis; white-space: nowrap; }
 .ia-player-card footer { min-height: 68px; display: flex; justify-content: flex-end; align-items: center; gap: 9px; padding: 13px 21px 17px; }
 .ia-player-card-mark { margin-right: auto; color: var(--text-dim); font: 7px var(--font-mono); letter-spacing: .08em; }
@@ -309,7 +312,7 @@
 .ia-social-dock:hover { transform: translateY(-3px); box-shadow: 0 19px 48px rgba(0,0,0,.58); }
 .ia-social-dock > span { font-size: 21px; }
 .ia-social-dock > em { color: var(--text-mute); font-size: 10px; font-style: normal; }
-.ia-social-dock > b { min-width: 20px; height: 20px; display: grid; place-items: center; position: absolute; right: -3px; top: -5px; border: 2px solid var(--bg); border-radius: 50%; background: var(--danger); color: white; font: 700 8px var(--font-mono); }
+.ia-social-dock > b { min-width: 20px; height: 20px; display: grid; place-items: center; position: absolute; right: -3px; top: -5px; border: 2px solid var(--bg-void); border-radius: 50%; background: var(--danger); color: var(--on-danger); font: 700 8px var(--font-mono); }
 .ia-social-dock.has-unread { animation: ia-social-pulse 2.2s ease-in-out infinite; border-color: var(--danger); }
 @keyframes ia-social-pulse { 0%,100% { box-shadow: 0 14px 40px rgba(0,0,0,.5); } 50% { box-shadow: 0 14px 46px color-mix(in srgb, var(--danger) 45%, transparent); } }
 .ia-social-code { display: flex; justify-content: space-between; gap: 16px; align-items: center; margin-top: 16px; padding: 13px; border: 1px solid var(--border); border-radius: 12px; background: var(--bg-inset); }
@@ -342,7 +345,7 @@
 }
 .ia-card { box-shadow: inset 0 1px 0 rgba(201,164,78,0.045); }
 .ia-card:hover { border-color: color-mix(in srgb, var(--border-bright) 72%, var(--border)); }
-button:focus-visible, .ia-btn:focus-visible, .ia-tab-btn:focus-visible, .ia-icon-btn:focus-visible { outline: 2px solid color-mix(in srgb, var(--border-gold) 85%, transparent); outline-offset: 2px; }
+button:focus-visible, .ia-btn:focus-visible, .ia-tab-btn:focus-visible, .ia-icon-btn:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
 
 /* Mobile navigation directory: the horizontal rail stays fast, while every
    screen remains discoverable without knowing that the rail can be swiped. */
@@ -751,22 +754,20 @@ button:focus-visible, .ia-btn:focus-visible, .ia-tab-btn:focus-visible, .ia-icon
 .ia-auth-recovery-head strong { color: var(--text); font-size: 12px; }
 .ia-auth-recovery-head p { margin: 0; color: var(--text-dim); font-size: 9.5px; line-height: 1.45; }
 .ia-auth-status { display: flex; gap: 9px; align-items: flex-start; margin: 10px 24px 0; padding: 10px 12px; border: 1px solid var(--border); border-radius: 10px; background: var(--bg-inset); color: var(--text-mute); }
-.ia-auth-status > span { width: 18px; height: 18px; flex: 0 0 auto; display: grid; place-items: center; border-radius: 50%; background: color-mix(in srgb, var(--gold) 14%, transparent); color: var(--gold); font-size: 10px; }
 .ia-auth-status p { margin: 1px 0 0; font-size: 10.5px; line-height: 1.45; }
 .ia-account-foot { display: flex; justify-content: space-between; gap: 10px; margin-top: 16px; padding: 12px 24px 15px; border-top: 1px solid var(--border); color: var(--text-dim); font-size: 9px; }
 .ia-account-identity { display: flex; align-items: center; gap: 12px; padding: 14px; border: 1px solid var(--border); border-radius: 13px; background: var(--bg-inset); }
 .ia-account-avatar { width: 42px; height: 42px; display: grid; place-items: center; border: 1px solid var(--border-gold); border-radius: 50%; background: color-mix(in srgb, var(--gold) 12%, var(--bg-raised)); color: var(--gold); font: 600 18px var(--font-display); }
-.ia-account-identity > div:nth-child(2) { min-width: 0; flex: 1; display: grid; gap: 4px; }
+.ia-account-identity > div:nth-child(2) { min-width: 0; flex: 1; display: grid; gap: 4px; overflow-wrap: anywhere; }
 .ia-account-identity strong { color: var(--text); }
-.ia-account-identity span { overflow: hidden; color: var(--text-mute); font-size: 10px; text-overflow: ellipsis; }
-.ia-account-benefits { display: grid; grid-template-columns: repeat(3, 1fr); gap: 7px; margin: 10px 0; }
-.ia-account-benefits span { padding: 9px; border: 1px solid var(--border); border-radius: 9px; color: var(--text-mute); font-size: 10px; text-align: center; }
-.ia-account-actions { display: flex; gap: 7px; }
+.ia-account-identity > div:nth-child(2) span { color: var(--text-mute); font-size: 12px; }
+.ia-account-profile { display: grid; gap: 10px; }
+.ia-account-actions { display: flex; flex-wrap: wrap; gap: 7px; }
 .ia-account-profile > p { font-size: 10px; line-height: 1.6; }
 
 .ia-social-entry { position: relative; display: inline-flex; align-items: center; gap: 6px; }
 .ia-social-entry b { font-weight: 500; }
-.ia-social-entry em { min-width: 17px; height: 17px; display: grid; place-items: center; position: absolute; right: -5px; top: -7px; border: 2px solid var(--bg); border-radius: 999px; background: var(--danger); color: white; font: 700 9px var(--font-mono); }
+.ia-social-entry em { min-width: 17px; height: 17px; display: grid; place-items: center; position: absolute; right: -5px; top: -7px; border: 2px solid var(--bg-void); border-radius: 999px; background: var(--danger); color: var(--on-danger); font: 700 9px var(--font-mono); }
 .ia-social-modal > header p { margin: 5px 0 0; color: var(--text-mute); font-size: 10.5px; }
 .ia-direct-chat { display: grid; gap: 10px; margin-top: 14px; }
 .ia-direct-chat > header { display: flex; align-items: center; gap: 11px; padding: 10px; }
@@ -787,7 +788,7 @@ button:focus-visible, .ia-btn:focus-visible, .ia-tab-btn:focus-visible, .ia-icon
 .ia-world-chat-entry strong { font-family: var(--font-display); font-size: 14px; }
 .ia-world-chat-entry em { display: flex; align-items: center; gap: 5px; color: var(--text-dim); font-size: 9.5px; font-style: normal; }
 .ia-world-chat-entry em i { width: 6px; height: 6px; border-radius: 50%; background: var(--good); box-shadow: 0 0 8px color-mix(in srgb, var(--good) 70%, transparent); }
-.ia-world-chat-entry > b { min-width: 22px; height: 22px; display: grid; place-items: center; border-radius: 999px; background: var(--danger); color: white; font: 700 9px var(--font-mono); }
+.ia-world-chat-entry > b { min-width: 22px; height: 22px; display: grid; place-items: center; border-radius: 999px; background: var(--danger); color: var(--on-danger); font: 700 9px var(--font-mono); }
 .ia-chat-chevron { color: var(--gold); font-size: 10px; }
 .ia-world-chat-body { padding: 0 12px 12px; border-top: 1px solid var(--border); }
 .ia-world-chat-head { padding-top: 11px; }
@@ -829,11 +830,11 @@ button:focus-visible, .ia-btn:focus-visible, .ia-tab-btn:focus-visible, .ia-icon
   .ia-account-modal { width: calc(100vw - 16px); max-height: calc(100dvh - 16px); border-radius: 16px; }
   .ia-account-head, .ia-auth-access, .ia-account-profile { padding-left: 15px; padding-right: 15px; }
   .ia-account-head h2 { font-size: 20px; }
-  .ia-auth-grid, .ia-account-benefits { grid-template-columns: 1fr; }
+  .ia-auth-grid { grid-template-columns: 1fr; }
   .ia-account-foot { padding-left: 15px; padding-right: 15px; flex-direction: column; }
   .ia-auth-status { margin-left: 15px; margin-right: 15px; }
-  .ia-account-identity { align-items: flex-start; flex-wrap: wrap; }
-  .ia-account-identity .ia-tag { margin-left: 54px; }
+  .ia-account-identity { display: grid; grid-template-columns: 42px minmax(0, 1fr); gap: 6px 12px; }
+  .ia-account-identity .ia-tag { grid-column: 2; justify-self: start; }
   .ia-world-chat-entry { gap: 8px; }
   .ia-chat-chevron { display: none; }
   .ia-world-chat-head { align-items: flex-start; flex-direction: column; }
@@ -858,12 +859,12 @@ button:focus-visible, .ia-btn:focus-visible, .ia-tab-btn:focus-visible, .ia-icon
 @media (max-width: 1160px) { .ia-scenario-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } .ia-map-layout { grid-template-columns: 1fr; } .ia-map-info { display: grid; grid-template-columns: 260px 1fr; } .ia-map-legend { grid-column: 1 / -1; } }
 @media (max-width: 1040px) { .ia-topbar { grid-template-columns: 1fr; position: relative; } .ia-status-panel { grid-template-columns: repeat(4, minmax(0, 1fr)); } .ia-main-nav { top: 0; } }
 @media (max-width: 760px) { .ia-shell { width: 100%; padding: 10px 10px 28px; } .ia-ruler-card, .ia-status-panel, .ia-main-nav, .ia-content-shell { border-radius: 13px; } .ia-ruler-main { flex-direction: column; } .ia-ruler-title { font-size: 28px; } .ia-header-actions { align-self: stretch; } .ia-status-panel { grid-template-columns: repeat(2, minmax(0, 1fr)); } .ia-main-nav { align-items: flex-start; overflow-x: auto; flex-wrap: nowrap; padding-bottom: 12px; } .ia-nav-group { align-items: flex-start; flex-direction: column; min-width: max-content; } .ia-tab-cluster { flex-wrap: nowrap; } .ia-nav-hint { display: none; } .ia-content-shell { padding: 12px; } .ia-menu { width: calc(100vw - 20px); padding-top: 14px; } .ia-menu-toolbar { align-items: flex-start; flex-direction: column-reverse; } .ia-theme-switch { overflow-x: auto; max-width: 100%; } .ia-scenario-grid, .ia-nation-grid { grid-template-columns: 1fr; } .ia-map-head { flex-direction: column; align-items: stretch; } .ia-map-controls { justify-content: flex-start; } .ia-world-svg, .ia-map-atlas { height: 460px; min-height: 460px; } .ia-map-info { display: flex; } }
-@media (max-width: 520px) { .ia-status-panel { grid-template-columns: 1fr 1fr; } .ia-ruler-subline > span:not(:last-child)::after { display: none; } .ia-tab-btn kbd { display: none; } .ia-menu-hero h1 { font-size: 32px; } .ia-theme-switch em { display: none; } .ia-map-stat-grid { grid-template-columns: 1fr 1fr; } .ia-lever-foot { flex-direction: column; gap: 4px; } .ia-lever-foot span:last-child { text-align: left; } }
+@media (max-width: 520px) { .ia-status-panel { grid-template-columns: 1fr 1fr; } .ia-ruler-subline > span:not(:last-child)::after { display: none; } .ia-tab-btn kbd { display: none; } .ia-menu-hero h1 { font-size: 32px; } .ia-map-stat-grid { grid-template-columns: 1fr 1fr; } .ia-lever-foot { flex-direction: column; gap: 4px; } .ia-lever-foot span:last-child { text-align: left; } }
 .ia-diplomatic-memory {
   margin: 7px 0;
   padding: 8px;
   border: 1px solid var(--border);
-  border-left: 3px solid var(--border-hi);
+  border-left: 3px solid var(--border-bright);
   border-radius: 5px;
   background: var(--bg-inset);
 }

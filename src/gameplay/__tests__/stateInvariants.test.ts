@@ -12,6 +12,18 @@ describe('GameState invariants', () => {
     expect(auditStateInvariants(world)).toEqual([]);
   });
 
+  it('checks capitals without a full map scan per nation', () => {
+    const state = prepareGameState(createWorldState(9103, 'n_ea_qin'));
+    const ruler = state.nations[state.playerNationId];
+    ruler.capital = 'missing-province';
+    let scans = 0;
+    state.provinces = new Proxy(state.provinces, {
+      ownKeys(target) { scans++; return Reflect.ownKeys(target); },
+    });
+    expect(auditStateInvariants(state).map(issue => issue.id)).toEqual(['nation-capital-invalid']);
+    expect(scans).toBeLessThanOrEqual(2);
+  });
+
   it('keeps invariants across several complete classic turns', () => {
     let state = prepareGameState(createInitialState());
     for (let turn = 0; turn < 5; turn += 1) {

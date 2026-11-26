@@ -56,7 +56,7 @@
 .ia-tab-btn {
   border: 0 !important;
   background: transparent !important;
-  color: color-mix(in srgb, var(--text-mute) 88%, transparent) !important;
+  color: var(--text-mute) !important;
 }
 
 .ia-tab-btn.is-active {
@@ -121,7 +121,6 @@
 
 /* 国策焦点：底部细条，不抢视线 */
 .ia-focus-dock {
-  opacity: .72 !important;
   background: color-mix(in srgb, var(--bg-panel) 72%, transparent) !important;
   border-color: color-mix(in srgb, var(--border) 54%, transparent) !important;
   height: 34px !important;
@@ -145,7 +144,7 @@
   height: 24px !important;
   min-width: 42px !important;
   padding: 0 7px !important;
-  color: color-mix(in srgb, var(--text-mute) 78%, transparent) !important;
+  color: var(--text-mute) !important;
 }
 
 .ia-focus-options button.is-active {

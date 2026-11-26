@@ -87,7 +87,7 @@ export const REGIONS: RegionTemplate[] = [
     culture: 'arab', religion: 'monotheism_b',
     terrainBias: ['desert', 'mountain', 'coast'],
     climate: 'arid',
-    nationCount: { S: 0, A: 1, B: 3, C: 6, D: 6 },
+    nationCount: { S: 1, A: 1, B: 3, C: 6, D: 5 },
     nationNamePool: ['波斯', '巴比伦', '亚述', '腓尼基', '帕提亚', '塞琉古', '犹地亚', '纳巴泰', '米底', '埃兰'],
     provinceNamePool: ['巴格达', '大马士革', '耶路撒冷', '安条克', '泰尔', '西顿', '佩特拉', '苏萨', '埃克巴坦那', '尼尼微'],
     rulerNamePool: ['居鲁士', '大流士', '薛西斯', '阿塔薛西斯', '米特里达特', '安条克', '希律', '萨拉丁', '哈伦', '马穆德'],

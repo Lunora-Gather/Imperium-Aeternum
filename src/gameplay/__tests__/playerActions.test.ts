@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { createInitialState } from '../../engine/init';
+import { decayRebelNations } from '../../engine/turnIntel';
+import { resolveFailuresAndRebellions } from '../../engine/turnConsequences';
+import { declareWar } from '../../engine/military';
+import { EVENT_BY_ID } from '../../data/events';
+import { negotiateRebellionAction, suppressRebellionAction } from '../actions/provinceActions';
 import { invariantErrors } from '../stateInvariants';
 import { prepareGameState } from '../turnPipeline';
 import {
@@ -159,4 +164,103 @@ describe('transactional player actions', () => {
     expect(peaceResult.ok).toBe(false);
     expect(peaceResult.state).toBe(foreignWarState);
   });
+});
+
+it('keeps an ongoing research project exclusive and charges a completed purchase once', () => {
+  const { state, player } = playerState();
+  player.tech.agri = 1;
+  Object.assign(player.resources, { sciPt: 400, gold: 100, adminPt: 1 });
+  player.tech.researchProgress = { techId: 'mil_lv2', sciPtInvested: 5 };
+  const ready = structuredClone(state);
+  ready.nations[player.id].tech.researchProgress = null;
+  expect(researchAction(state, 'agri_lv2').state).toBe(state);
+  const result = researchAction(ready, 'agri_lv2');
+  expect(result.ok).toBe(true);
+  expect(result.state.nations[player.id].resources).toMatchObject({ sciPt: 0, gold: 0, adminPt: 0 });
+  expect(researchAction(result.state, 'agri_lv2').state).toBe(result.state);
+});
+
+function civilWarState() {
+  const { state, player } = playerState();
+  const provinces = Object.values(state.provinces).filter((p) => p.ownerId === player.id && p.id !== player.capital).slice(0, 3);
+  for (const province of provinces) Object.assign(province, { rebellionRisk: 100, garrison: 0 });
+  resolveFailuresAndRebellions(state, player.id);
+  const rebels = [...player.civilWar!.rebels];
+  const rebel = rebels[0];
+  const eventId = Object.keys(EVENT_BY_ID)[0];
+  state.triggeredEvents.push({ nationId: rebel, eventId, turn: state.turn, optionIndex: 0 });
+  state.eventCooldowns.push({ nationId: rebel, eventId, lastTriggeredTurn: state.turn });
+  state.pendingEvents.push({ nationId: rebel, eventId });
+  state.pendingEventOptions = { nationId: rebel, eventId, options: [] };
+  state.relations.push(...[[player.id, rebel], [rebel, player.id]].map(([from, to]) => ({
+    from, to, relation: -10, trust: 10, threat: 10, tradeDep: 0, treaty: 'none' as const, truceTurns: 0,
+  })));
+  state._relMap = undefined;
+  declareWar(state, player.id, rebel, provinces[0].id);
+  player.resources.gold = 500;
+  player.resources.adminPt = 5;
+  player.army[0].size = 300;
+  return { state, player, rebels, provinces };
+}
+
+it('ends the civil war when the last rebel returns, including active wars and events', () => {
+  const { state, player, rebels } = civilWarState();
+  state.nations[rebels[0]].rebellionDecay = 1;
+  decayRebelNations(state);
+  expect(player.civilWar).toEqual({ active: true, rebels: rebels.slice(1) });
+  for (let turn = 0; turn < 5; turn++) decayRebelNations(state);
+  expect(player.civilWar).toEqual({ active: false, rebels: [] });
+  expect(invariantErrors(state)).toEqual([]);
+});
+
+it('suppresses the rebellion once even when rebels have wars and event records', () => {
+  const { state, player, provinces } = civilWarState();
+  const result = suppressRebellionAction(state);
+  expect(result.messages).toEqual(['镇压叛乱成功']);
+  expect(result.state.nations[player.id].resources).toMatchObject({ gold: 350, adminPt: 3 });
+  expect(provinces.every((p) => result.state.provinces[p.id].ownerId === player.id)).toBe(true);
+  expect(provinces.every((p) => !result.state.provinces[p.id].isCapital)).toBe(true);
+  expect(suppressRebellionAction(result.state).state).toBe(result.state);
+  expect(invariantErrors(result.state)).toEqual([]);
+});
+
+it('recognizes independent rebels and enforces the negotiated truce past the old return date', () => {
+  const { state, player, rebels, provinces } = civilWarState();
+  const result = negotiateRebellionAction(state);
+  expect(result.ok).toBe(true);
+  const next = structuredClone(result.state);
+  for (let turn = 0; turn < 6; turn++) decayRebelNations(next);
+  expect(provinces.map((p) => next.provinces[p.id].ownerId)).toEqual(rebels);
+  expect(provinces.every((p) => next.provinces[p.id].isCapital)).toBe(true);
+  expect(next.wars).toHaveLength(0);
+  expect(declareWar(next, player.id, rebels[1], provinces[1].id)).toBeNull();
+  expect(invariantErrors(next)).toEqual([]);
+});
+
+it('keeps territory under its living ruler when a rebel return has no surviving parent', () => {
+  const { state, player, rebels, provinces } = civilWarState();
+  for (const p of Object.values(state.provinces)) if (p.ownerId === player.id) p.ownerId = 'barbarian';
+  player.defeated = true;
+  state.nations[rebels[1]].rebelOf = 'missing';
+  for (const id of rebels) state.nations[id].rebellionDecay = 1;
+  decayRebelNations(state);
+  for (const [i, id] of rebels.entries()) {
+    expect(provinces[i].ownerId).toBe(id);
+    expect(state.nations[id].rebelOf).toBeUndefined();
+    expect(state.nations[id].rebellionDecay).toBeUndefined();
+    expect(state.nations[id].name).toBe(provinces[i].name);
+  }
+  expect(player.civilWar?.active).toBe(false);
+});
+
+it('removes a conquered rebel without recording a fictitious return of territory', () => {
+  const { state, rebels, provinces } = civilWarState();
+  const id = rebels[0];
+  provinces[0].ownerId = 'n02';
+  state.nations[id].defeated = true;
+  state.nations[id].rebellionDecay = 1;
+  decayRebelNations(state);
+  expect(provinces[0].ownerId).toBe('n02');
+  expect(state.nations[id]).toBeUndefined();
+  expect(state.chronicle.some(entry => entry.id?.startsWith(`rebel_return_${id}_`))).toBe(false);
 });

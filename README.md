@@ -19,14 +19,14 @@
   <img alt="TypeScript strict" src="https://img.shields.io/badge/TypeScript-strict-3178c6?style=flat-square">
   <img alt="React 18" src="https://img.shields.io/badge/React-18-61dafb?style=flat-square">
   <img alt="Vite 8" src="https://img.shields.io/badge/Vite-8-646cff?style=flat-square">
-  <img alt="Release" src="https://img.shields.io/badge/release-1.1.1_stable-2f855a?style=flat-square">
+  <img alt="Release" src="https://img.shields.io/badge/release-1.1.2_stable-2f855a?style=flat-square">
 </p>
 
-当前为 **1.1.1 正式版**，支持简体中文、繁體中文和 English。游客可以完整游玩单机模式；登录后可使用私有云存档、共享活版图、好友与实时聊天。
+当前为 **1.1.2 正式版**，支持简体中文、繁體中文和 English。无需账号即可玩完整单机，登录后可使用私有云存档、共享活版图和好友聊天。
 
 ## 第一次玩
 
-选择推荐剧本“地中海黎明”，记住这个循环就能开始：
+首次游玩可选择大厅的推荐剧本「地中海黎明」，按以下顺序开始第一年。
 
 | 1 · 看总览 | 2 · 做一件事 | 3 · 存档并推进 |
 | --- | --- | --- |
@@ -37,6 +37,13 @@
 - `?` 新手帮助：用 6 张短说明讲清完整循环。
 - 首局实战引导：带你实际查看经济、省份，完成存档、推进和年报复盘。
 
+## 1.1.2 更新
+
+- 大厅、选国、国政和弹窗采用四套独立主题。暗夜用暖铜，羊皮用纸页与赭墨，竹简用青玉与竖纹，水墨用冷灰与朱印。手机端可直接切换四个主题，选择会在刷新后保留。
+- 私有云存档按槽位比较版本。两台设备同时修改同一槽位时，游戏会保留本地进度，提示比较并确认覆盖。断线期间可继续在本地存档，恢复联网后重新核对。
+- 共享版图会显示国家列表加载状态和年度准备进度。重连会重新读取服务器已确认的回合和命令，避免重复提交。
+- 中文输入法按回车选词时，聊天框保留输入。发送失败后可重试，编辑中的新草稿会继续保留。
+
 ## 核心体验
 
 - **长期治理**：财政、粮食、人口、安定、合法性、腐败和地方不满相互影响。
@@ -46,7 +53,7 @@
 - **有记忆的外交**：使节、贸易、同盟、联姻、间谍、战争与议和都会留下可衰减的善意或旧怨，实际影响 AI 判断。
 - **多条胜利路线**：经营、扩张、外交与长治久安都能成为有效终局目标。
 - **可复盘的历史**：年度报告和帝国史册记录使命成果、危机、战争与继承。
-- **可靠存档**：多槽位本地存档、旧档迁移、损坏检测，以及登录后的 5 个私有云槽位。
+- **可靠存档**：本地有 1 个自动槽位和 4 个手动槽位，支持无损压缩、旧档迁移和损坏检测。标题页可继续最近进度，或从“其他本地存档”选择分支。登录后另有 5 个私有云槽位。换设备时，从标题页打开“账号 / 云存档”，登录并下载对应槽位，再点“继续槽位”。
 - **共享世界**：玩家控制部分国家，其余国家由 AI 统一推进；服务端负责控制权、行动校验和版本化快照。
 - **安全社交**：可直接发现并申请玩家、查看个人名片，也保留好友码；游戏内悬浮消息入口、版图频道、好友私聊和图片消息均经过服务端权限与限流。
 - **可控 AI**：Hugging Face 只负责把规则引擎已计算的外交事实整理成简报；失败时自动回退到本地建议，不参与结算。
@@ -104,35 +111,24 @@ docs/                   当前文档、发布资料与历史记录
 
 ## 开发与验证
 
-要求 Node.js 22 或 24；CI 与正式发布使用 Node.js 24。
+要求 Node.js 22 或 24。CI 与正式发布使用 Node.js 24。
 
 ```bash
 npm ci
 npm run dev
 ```
 
-常用命令：
-
-```bash
-npm run typecheck          # strict + 未使用代码检查
-npm run validate           # 静态游戏数据验证
-npm test                   # 完整 Vitest 回归
-npm run simulate:stability # 长局稳定性模拟
-npm run pages:build        # GitHub Pages 兼容构建
-```
-
-在 Mac 上执行 `npm run test:e2e` 默认使用系统 Safari，也可用 `npm run test:e2e:safari` 明确指定。首次运行需在 Safari「设置 → 开发者」开启「允许远程自动化」。测试使用独立的自动化窗口，覆盖剧本启动、回合推进、存读档、键盘焦点和窄屏布局。
-
-如果开启权限后仍在创建会话时超时，可保存手头的页面，正常退出 Safari，再运行测试，让驱动启动 Safari。
-
-
-合并或发布前只需运行统一门禁：
+运行统一发布检查会验证版本、类型、数据、共享引擎、回归测试、短程模拟和生产包体积。
 
 ```bash
 VITE_BASE=/Imperium-Aeternum/ npm run rc:check
+npm run simulate:stability -- 50 --samples=2
+npm run simulate:long
 ```
 
-它会依次执行类型检查、数据验证、完整测试、稳定性模拟、生产构建和产物体积预算。
+在 Mac 上可用 `npm run test:e2e -- --preview` 检查生产包，覆盖开局、回合推进、存读档、主题对比度和手机布局。首次运行需在 Safari 的「开发者」设置中启用「允许远程自动化」。
+
+双设备云存档测试使用隔离 WebKit 和本地夹具。先执行 `npx playwright-core install webkit`，再运行 `npm run test:e2e:cloud`。命令和多人断线夹具见 [维护脚本](scripts/README.md)。
 
 ## Appwrite 与 Hugging Face
 
@@ -151,9 +147,9 @@ VITE_BASE=/Imperium-Aeternum/ npm run rc:check
 | 项目 | 当前值 |
 | --- | --- |
 | 在线地址 | [lunora-gather.github.io/Imperium-Aeternum](https://lunora-gather.github.io/Imperium-Aeternum/) |
-| 版本 | `1.1.1`（stable） |
+| 版本 | `1.1.2`（stable） |
 | 主分支 | `main` |
 | 部署 | GitHub Actions → GitHub Pages |
 | 线上后端 | Appwrite Cloud |
 
-完整变更见 [1.1.1 发布说明](docs/releases/release-notes-v1.1.1.md) 与 [CHANGELOG](CHANGELOG.md)。`main` 的每次发布都必须通过 `npm run rc:check`。当前风险、验收与后续计划统一收录在 [维护文档](docs/maintenance/README.md)，历史阶段报告不作为当前实现依据。
+GitHub Actions 构建并测试 `main`，发布后逐文件校验线上内容。云函数的版本可在 [Appwrite 部署说明](appwrite/README.md) 中查看。版本详情见 [1.1.2 发布说明](docs/releases/release-notes-v1.1.2.md) 和 [CHANGELOG](CHANGELOG.md)。

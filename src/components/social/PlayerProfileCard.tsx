@@ -1,3 +1,4 @@
+import { useDialogFocus } from '../useDialogFocus';
 import type { GameProfile } from '../../social/types';
 import { Btn, Tag } from '../ui';
 import { useI18n } from '../../i18n';
@@ -26,9 +27,10 @@ export function PlayerProfileCard({ profile, relation, isSelf = false, onAdd, on
   onClose: () => void;
 }) {
   const { t } = useI18n();
+  const dialogRef = useDialogFocus<HTMLElement>(onClose);
   const seen = relativeSeen(profile.lastSeenAt);
   return <div className="ia-profile-backdrop" onClick={(event) => { event.stopPropagation(); onClose(); }}>
-    <section className={`ia-player-card tone-${profile.avatarColor} ia-fade-in`} role="dialog" aria-modal="true" aria-label={t('{{name}} 的玩家名片', { name: profile.displayName })} onClick={(event) => event.stopPropagation()}>
+    <section ref={dialogRef} tabIndex={-1} className={`ia-player-card tone-${profile.avatarColor} ia-fade-in`} role="dialog" aria-modal="true" aria-label={t('{{name}} 的玩家名片', { name: profile.displayName })} onClick={(event) => event.stopPropagation()}>
       <div className="ia-player-card-rail" aria-hidden="true"><strong>IA</strong><i /><span>IDENTITY</span></div>
       <header className="ia-player-card-head">
         <div><span>IMPERIUM AETERNUM</span><strong>{t('统治者档案')}</strong></div>

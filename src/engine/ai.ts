@@ -5,15 +5,17 @@
 import type { GameState, Nation, Province } from '../types/game';
 import type { NationTier, NationDef } from '../data/nations';
 import { NATIONS, AI_NATIONS, PLAYER_ID } from '../data/nations';
-import { provincesOf, getRelationObj } from './init';
-import { makePeace } from './military';
+import { provincesOf, getRelationObj, relationPair } from './init';
+import { declareWar, makePeace, recruit, relocateArmy, warDeclarationBlocker } from './military';
 import { clamp } from '../utils/math';
 import { mulberry32 } from '../utils/random';
 import { allocateEntityId } from '../utils/id';
+import { canAfford, spend } from './economy';
+import { BUILDINGS } from '../data/buildings';
 import { POLICIES } from '../data/policies';
 import { canEnactPolicy, enactPolicy } from './politics';
 import { mergeAiWarActionPlan } from '../gameplay/aiWarActionAdapter';
-import { hasActiveNonAggressionAccord } from './summits';
+import { startResearch } from './technology';
 
 export function defaultAIWeights(tier: NationTier): NationDef['aiWeights'] {
   const base = { taxUp: 1.0, buildFarm: 1.0, suppress: 0.8, expandArmy: 0.8, alliance: 1.0, declareWar: 0.6, research: 1.0 };
@@ -44,17 +46,11 @@ function armySize(nation: Nation | undefined): number {
   return nation ? nation.army.reduce((s, a) => s + a.size, 0) : 0;
 }
 
-function isAttackableProvince(nation: Nation, state: GameState, provinceId: string): Province | null {
+function isAttackableProvince(nation: Nation, state: GameState, provinceId: string, owned?: Province[]): Province | null {
   const target = state.provinces[provinceId];
   if (!target || target.ownerId === nation.id) return null;
-  const defender = state.nations[target.ownerId];
-  if (!defender || defender.defeated) return null;
-  const rel = getRelationObj(nation.id, target.ownerId, state);
-  if (rel?.treaty === 'alliance') return null;
-  if (hasActiveNonAggressionAccord(state, nation.id, target.ownerId)) return null;
-  if (rel?.treaty === 'truce' && rel.truceTurns > 0) return null;
-  if (state.wars.some((w) => (w.attackerId === nation.id && w.defenderId === target.ownerId) || (w.attackerId === target.ownerId && w.defenderId === nation.id))) return null;
-  const ownFront = provincesOf(nation.id, state.provinces).some((p) => p.adjacent.includes(target.id));
+  if (warDeclarationBlocker(state, nation.id, target.ownerId)) return null;
+  const ownFront = (owned ?? provincesOf(nation.id, state.provinces)).some((p) => p.adjacent.includes(target.id));
   return ownFront ? target : null;
 }
 
@@ -73,7 +69,7 @@ function scoreBorderProvince(nation: Nation, state: GameState, province: Provinc
   return richness + hostility + weakness;
 }
 
-function chooseExpansionOpportunity(nation: Nation, state: GameState, w: NationDef['aiWeights']): AIAction | null {
+function chooseExpansionOpportunity(nation: Nation, state: GameState, w: NationDef['aiWeights'], provs: Province[]): AIAction | null {
   const memory = (state as StateWithAIMemory).aiMemory?.[nation.id];
   const preferred: { id?: string; reason: AIAction['reason']; baseWeight: number }[] = [
     { id: memory?.territory?.revengeProvinceId, reason: 'revenge', baseWeight: 11 },
@@ -82,7 +78,7 @@ function chooseExpansionOpportunity(nation: Nation, state: GameState, w: NationD
 
   for (const item of preferred) {
     if (!item.id) continue;
-    const target = isAttackableProvince(nation, state, item.id);
+    const target = isAttackableProvince(nation, state, item.id, provs);
     if (!target) continue;
     if (!hasMilitaryEdge(nation, state.nations[target.ownerId], item.reason === 'revenge' ? 1.2 : 1.35)) continue;
     const pressure = memory?.territory?.pressure ?? 0;
@@ -90,10 +86,9 @@ function chooseExpansionOpportunity(nation: Nation, state: GameState, w: NationD
   }
 
   let best: { province: Province; score: number } | null = null;
-  const provs = provincesOf(nation.id, state.provinces);
   for (const p of provs) {
     for (const adjId of p.adjacent) {
-      const adj = isAttackableProvince(nation, state, adjId);
+      const adj = isAttackableProvince(nation, state, adjId, provs);
       if (!adj) continue;
       const defender = state.nations[adj.ownerId];
       if (!hasMilitaryEdge(nation, defender, 1.5)) continue;
@@ -121,13 +116,15 @@ export function planAITurn(nation: Nation, state: GameState, rng: () => number):
   const lowTech = nation.tech.agri < 3 || nation.tech.mil < 3 || nation.tech.admin < 3 || nation.tech.culture < 3;
 
   if (lowGold) actions.push({ actionId: 'tax_up', weight: 10 * w.taxUp });
-  if (lowFood) actions.push({ actionId: 'build_farm', weight: 12 * w.buildFarm, target: leastFarmProvince(provs) });
+  const farm = BUILDINGS.farm;
+  const farmTarget = lowFood && canAfford(nation, farm.costGold, farm.costWood, farm.costIron) ? leastFarmProvince(provs) : undefined;
+  if (farmTarget) actions.push({ actionId: 'build_farm', weight: 12 * w.buildFarm, target: farmTarget });
   if (hasRebellionRisk) actions.push({ actionId: 'suppress', weight: 8 * w.suppress, target: provs.find((p) => p.rebellionRisk > 50)?.id });
   if (lowStab) actions.push({ actionId: 'appease', weight: 6 });
-  if (lowTech) actions.push({ actionId: 'research', weight: 8 * w.research });
+  if (lowTech && !nation.tech.researchProgress) actions.push({ actionId: 'research', weight: 8 * w.research });
 
   if (!atWar) {
-    const expansion = chooseExpansionOpportunity(nation, state, w);
+    const expansion = chooseExpansionOpportunity(nation, state, w, provs);
     if (expansion) actions.push(expansion);
 
     for (const r of state.relations) {
@@ -137,20 +134,9 @@ export function planAITurn(nation: Nation, state: GameState, rng: () => number):
       }
     }
 
-    let tradeTarget: string | undefined;
-    for (const r of state.relations) {
-      if (r.from === nation.id && r.relation > -10 && r.treaty === 'none') { tradeTarget = r.to; break; }
-    }
-    if (!tradeTarget) {
-      for (const p of provs) {
-        for (const adjId of p.adjacent) {
-          const adj = state.provinces[adjId];
-          if (adj && adj.ownerId !== nation.id && state.nations[adj.ownerId]) { tradeTarget = adj.ownerId; break; }
-        }
-        if (tradeTarget) break;
-      }
-    }
-    if (tradeTarget) actions.push({ actionId: 'establish_trade', weight: 15 * w.alliance, target: tradeTarget });
+    const tradeTarget = nation.resources.influence >= 10 && state.relations.find((r) =>
+      r.from === nation.id && r.treaty === 'none' && r.relation >= -10 && aiTradePair(state, nation, r.to));
+    if (tradeTarget) actions.push({ actionId: 'establish_trade', weight: 15 * w.alliance, target: tradeTarget.to });
   } else {
     if (nation.warExhaustion > 50) actions.push({ actionId: 'make_peace', weight: 8 });
     for (const w of state.wars) {
@@ -170,75 +156,76 @@ export function planAITurn(nation: Nation, state: GameState, rng: () => number):
 
   const planned = !atWar ? mergeAiWarActionPlan(state, nation.id, actions) as AIAction[] : actions;
   planned.sort((a, b) => b.weight - a.weight);
-  const provsAll = provincesOf(nation.id, state.provinces);
-  const foodConsume = provsAll.reduce((s, p) => s + p.population, 0) * 0.1;
+  const foodConsume = provs.reduce((s, p) => s + p.population, 0) * 0.1;
   if (nation.resources.food < foodConsume * 2) {
-    const target = leastFarmProvince(provsAll);
-    if (target) planned.unshift({ actionId: 'build_farm', weight: 99, target });
+    const existingFarm = planned.findIndex((action) => action.actionId === 'build_farm');
+    if (existingFarm >= 0) planned.splice(existingFarm, 1);
+    if (farmTarget) planned.unshift({ actionId: 'build_farm', weight: 99, target: farmTarget });
     if (nation.taxRate > 0.10) planned.push({ actionId: 'tax_down', weight: 50 });
   }
   return planned.slice(0, 3);
 }
 
-function leastFarmProvince(provs: ReturnType<typeof provincesOf>): string | undefined {
-  let best = provs[0];
+function leastFarmProvince(provs: Province[]): string | undefined {
+  let best: string | undefined;
+  let fewest = BUILDINGS.farm.maxPerProvince;
   for (const p of provs) {
-    const farms = p.buildings.filter((b) => b.defId === 'farm').length;
-    const bestFarms = best.buildings.filter((b) => b.defId === 'farm').length;
-    if (farms < bestFarms) best = p;
+    const count = p.buildings.filter((b) => b.defId === 'farm').length;
+    if (count < fewest) { best = p.id; fewest = count; }
   }
-  return best?.id;
+  return best;
+}
+
+function buildAIImprovement(state: GameState, nation: Nation, province: Province | undefined, id: 'farm' | 'market'): void {
+  const def = BUILDINGS[id];
+  if (!province || province.ownerId !== nation.id || province.buildings.filter((b) => b.defId === id).length >= def.maxPerProvince) return;
+  if (!canAfford(nation, def.costGold, def.costWood, def.costIron)) return;
+  spend(nation, def.costGold, def.costWood, def.costIron);
+  province.buildings.push({ id: allocateEntityId(state, 'building'), defId: id, provinceId: province.id, level: 1 });
 }
 
 function moveCapitalArmyToFront(nation: Nation, state: GameState, targetProvinceId: string): void {
   const target = state.provinces[targetProvinceId];
   if (!target) return;
   const provs = provincesOf(nation.id, state.provinces);
-  const frontProv = provs.find((p) => p.adjacent.includes(target.id)) ?? provs[0];
+  const frontProv = provs.find((p) => p.adjacent.includes(target.id));
   if (!frontProv) return;
   const capitalArmy = nation.army.find((a) => a.location === nation.capital && a.size > 0);
   if (!capitalArmy || frontProv.id === capitalArmy.location) return;
-  let dest = nation.army.find((a) => a.location === frontProv.id);
-  if (!dest) {
-    dest = { id: allocateEntityId(state, 'army'), ownerId: nation.id, location: frontProv.id, size: 0, morale: 60, training: 50, equipment: 50, supply: 80 };
-    nation.army.push(dest);
-  }
-  dest.size += capitalArmy.size;
-  nation.army = nation.army.filter((a) => a.id !== capitalArmy.id);
+  relocateArmy(state, nation, capitalArmy, frontProv.id);
+}
+
+function aiTradePair(state: GameState, nation: Nation, target: string) {
+  const partner = state.nations[target];
+  if (!partner || partner.defeated || target === nation.id) return null;
+  const pair = relationPair(state, nation.id, target);
+  return pair?.every((r) => r.treaty === 'none' && r.relation >= -10) ? pair : null;
+}
+
+function signAITrade(state: GameState, nation: Nation, target: string, cost: number): void {
+  const pair = aiTradePair(state, nation, target);
+  if (!pair || nation.resources.influence < cost) return;
+  nation.resources.influence -= cost;
+  for (const r of pair) { r.treaty = 'trade'; r.tradeDep = Math.max(r.tradeDep, 20); }
 }
 
 export function executeAIAction(nation: Nation, action: AIAction, state: GameState): void {
   switch (action.actionId) {
     case 'tax_up': nation.taxRate = clamp(nation.taxRate + 0.02, 0, 0.5); break;
     case 'tax_down': nation.taxRate = clamp(nation.taxRate - 0.02, 0, 0.5); break;
-    case 'build_farm': {
-      if (!action.target) break;
-      const p = state.provinces[action.target];
-      if (p && nation.resources.gold >= 50) { nation.resources.gold -= 50; p.buildings.push({ id: allocateEntityId(state, 'building'), defId: 'farm', provinceId: p.id, level: 1 }); }
+    case 'build_farm':
+    case 'build_market':
+      if (action.target) buildAIImprovement(state, nation, state.provinces[action.target], action.actionId === 'build_farm' ? 'farm' : 'market');
       break;
-    }
-    case 'build_market': {
-      if (!action.target) break;
-      const p = state.provinces[action.target];
-      if (p && nation.resources.gold >= 80) { nation.resources.gold -= 80; p.buildings.push({ id: allocateEntityId(state, 'building'), defId: 'market', provinceId: p.id, level: 1 }); }
-      break;
-    }
     case 'recruit': {
-      if (!action.target) break;
-      const p = state.provinces[action.target];
-      if (p && nation.resources.gold >= 75 && nation.resources.supply >= 10 && p.population > 50) {
-        nation.resources.gold -= 75; nation.resources.supply -= 10; p.population -= 50;
-        let army = nation.army.find((a) => a.location === action.target);
-        if (!army) { army = { id: allocateEntityId(state, 'army'), ownerId: nation.id, location: action.target, size: 0, morale: 60, training: 50, equipment: 50, supply: 80 }; nation.army.push(army); }
-        army.size += 50;
-      }
+      const province = action.target && state.provinces[action.target];
+      if (province && province.population > 50) recruit(state, nation, province, 50);
       break;
     }
     case 'research': {
       const branches = ['agri', 'mil', 'admin', 'culture'] as const;
       const minBranch = branches.reduce((min, b) => nation.tech[b] < nation.tech[min] ? b : min, 'agri' as 'agri');
-      nation.tech[minBranch] = Math.min(8, nation.tech[minBranch] + 1);
-      nation.resources.sciPt = Math.max(0, nation.resources.sciPt - 100);
+      startResearch(nation, `${minBranch}_lv${nation.tech[minBranch] + 1}`);
       break;
     }
     case 'appease': {
@@ -249,32 +236,24 @@ export function executeAIAction(nation: Nation, action: AIAction, state: GameSta
     case 'suppress': {
       if (!action.target) break;
       const p = state.provinces[action.target];
-      if (p && nation.resources.gold >= 50) { nation.resources.gold -= 50; p.unrest = clamp(p.unrest - 15, 0, 100); }
+      if (p?.ownerId === nation.id && nation.resources.gold >= 50) { nation.resources.gold -= 50; p.unrest = clamp(p.unrest - 15, 0, 100); }
       break;
     }
     case 'improve_relation': {
       if (!action.target) break;
-      if (nation.resources.influence >= 20) { nation.resources.influence -= 20; const r = getRelationObj(nation.id, action.target, state); if (r) r.relation = clamp(r.relation + 5, -100, 100); }
+      const pair = relationPair(state, nation.id, action.target);
+      if (nation.resources.influence >= 20 && pair?.every((r) => r.treaty === 'none') && !state.nations[action.target]?.defeated) {
+        nation.resources.influence -= 20;
+        for (const r of pair) r.relation = clamp(r.relation + 5, -100, 100);
+      }
       break;
     }
     case 'declare_war': {
-      const targetProvince = action.targetProvinceId ? isAttackableProvince(nation, state, action.targetProvinceId) : null;
-      const fallbackTarget = !targetProvince && action.target ? provincesOf(nation.id, state.provinces).flatMap((p) => p.adjacent.map((adj) => state.provinces[adj])).find((p) => p && p.ownerId === action.target) : null;
-      const target = targetProvince ?? fallbackTarget ?? null;
-      if (!target) break;
-      const defenderId = target.ownerId;
-      if (state.wars.some((war) => [war.attackerId, war.defenderId].includes(nation.id) && [war.attackerId, war.defenderId].includes(defenderId))) break;
-      if (hasActiveNonAggressionAccord(state, nation.id, defenderId)) break;
-      moveCapitalArmyToFront(nation, state, target.id);
-      state.wars.push({ id: allocateEntityId(state, 'war'), attackerId: nation.id, defenderId, targetProvinceId: target.id, progress: 0, turns: 0, battleReports: [] });
-      nation.atWar = true;
-      const defender = state.nations[defenderId];
-      if (defender) defender.atWar = true;
-      const r = getRelationObj(nation.id, defenderId, state);
-      const rr = getRelationObj(defenderId, nation.id, state);
-      if (r) { r.treaty = 'war'; r.relation = -100; }
-      if (rr) { rr.treaty = 'war'; rr.relation = -100; }
-      state._relMap = undefined;
+      const id = action.targetProvinceId ?? provincesOf(nation.id, state.provinces).flatMap((p) => p.adjacent)
+        .find((id) => state.provinces[id]?.ownerId === action.target);
+      const target = id && isAttackableProvince(nation, state, id);
+      if (!target || (action.target && target.ownerId !== action.target)) break;
+      if (declareWar(state, nation.id, target.ownerId, target.id)) moveCapitalArmyToFront(nation, state, target.id);
       break;
     }
     case 'make_peace': {
@@ -289,17 +268,9 @@ export function executeAIAction(nation: Nation, action: AIAction, state: GameSta
       moveCapitalArmyToFront(nation, state, war.targetProvinceId);
       break;
     }
-    case 'establish_trade': {
-      if (!action.target) break;
-      if (nation.resources.influence >= 10) {
-        nation.resources.influence -= 10;
-        const r = getRelationObj(nation.id, action.target, state);
-        const rr = getRelationObj(action.target, nation.id, state);
-        if (r && r.treaty === 'none' && r.relation >= -10) { r.treaty = 'trade'; r.tradeDep = 20; }
-        if (rr && rr.treaty === 'none' && rr.relation >= -10) { rr.treaty = 'trade'; rr.tradeDep = Math.max(rr.tradeDep, 20); }
-      }
+    case 'establish_trade':
+      if (action.target) signAITrade(state, nation, action.target, 10);
       break;
-    }
     case 'enact_policy': {
       const aiPolicyIds = new Set(['census', 'merchant_guild', 'military_reform', 'infrastructure_plan', 'education_reform', 'welfare']);
       const avail = POLICIES.filter((policy) => aiPolicyIds.has(policy.id) && canEnactPolicy(nation, policy.id).ok);
@@ -326,13 +297,12 @@ export function processAITurnLite(nation: Nation, state: GameState, rng: () => n
     if (provs.length > 0) {
       const p = provs[Math.floor(rng() * provs.length)];
       const bType = rng() > 0.5 ? 'farm' : 'market';
-      p.buildings.push({ id: allocateEntityId(state, 'building'), defId: bType, provinceId: p.id, level: 1 });
-      nation.resources.gold -= 50;
+      buildAIImprovement(state, nation, p, bType);
     }
   }
   if (state.turn % 2 === 0 && nation.resources.influence >= 5) {
-    const ownRels = state.relations.filter((x) => x.from === nation.id && x.treaty === 'none' && x.relation > 0);
-    if (ownRels.length > 0) { const rel = ownRels[0]; rel.treaty = 'trade'; rel.tradeDep = 20; nation.resources.influence -= 5; }
+    const partner = state.relations.find((r) => r.from === nation.id && r.relation > 0 && r.treaty === 'none' && aiTradePair(state, nation, r.to));
+    if (partner) signAITrade(state, nation, partner.to, 5);
   }
 }
 
@@ -366,13 +336,6 @@ function buildPlayerNeighborSet(state: GameState): Set<string> {
   return neighbors;
 }
 
-function isPlayerNeighbor(nationId: string, state: GameState, neighborSet?: Set<string>): boolean {
-  if (neighborSet) return neighborSet.has(nationId);
-  const playerId = state.playerNationId || PLAYER_ID;
-  const playerProvs = provincesOf(playerId, state.provinces);
-  return playerProvs.some((p) => p.adjacent.some((adj) => state.provinces[adj]?.ownerId === nationId));
-}
-
 export function processAITurn(state: GameState, excludedNationIds: ReadonlySet<string> = new Set()): GameState {
   const rng = mulberry32(state.seed ^ 0x5DEECE66D);
   const playerNeighbors = buildPlayerNeighborSet(state);
@@ -380,7 +343,7 @@ export function processAITurn(state: GameState, excludedNationIds: ReadonlySet<s
     if (nation.isPlayer || excludedNationIds.has(nation.id)) continue;
     if (nation.defeated) continue;
     const tier = nation.tier;
-    if (tier === 'S' || tier === 'A' || isPlayerNeighbor(nation.id, state, playerNeighbors)) processAITurnFull(nation, state, rng);
+    if (tier === 'S' || tier === 'A' || playerNeighbors.has(nation.id)) processAITurnFull(nation, state, rng);
     else if (tier === 'B' || tier === 'C') processAITurnLite(nation, state, rng);
     else if (state.turn % 10 === 0) processAITurnStatic(nation, state);
   }

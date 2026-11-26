@@ -1,3 +1,4 @@
+import { operatingNet } from './reportFinances';
 // V27 下一回合预演：在玩家按下“下一回合”前，给出安全性、可能变化和保存建议。
 // 纯函数，不改 GameState，不预测随机事件结果，只基于当前状态做风险预判。
 
@@ -48,7 +49,7 @@ function playerOf(state: GameState): Nation | undefined { return state.nations[s
 function provincesOfPlayer(state: GameState, player?: Nation): Province[] { return player ? Object.values(state.provinces).filter((p) => p.ownerId === player.id) : []; }
 function netOf(state: GameState): number | null {
   const r = state.lastReport;
-  return r ? r.income.tax + r.income.trade + r.income.building - r.expense.military - r.expense.corruption : null;
+  return r ? operatingNet(r) : null;
 }
 function toneFromStatus(status: TurnPreviewStatus): TurnPreviewTone { return status === 'blocked' || status === 'danger' ? 'danger' : status === 'caution' ? 'warn' : 'good'; }
 

@@ -4,28 +4,25 @@
 import type { Nation, GameState } from '../types/game';
 import { computeSciPt, researchCost } from './formulas';
 import { TECHNOLOGIES, TECH_BY_ID } from '../data/technologies';
-import type { TechBranch } from '../data/technologies';
+import type { TechBranch, TechnologyDef } from '../data/technologies';
 
-// 每回合科研点产出 + 累积
-export function settleTechnology(nation: Nation, _state: GameState): void {
-  // 已在 economy.ts 中通过建筑产出 sciPt；这里补充学者产出
-  // 实际 sciPt 已在 economy settleEconomy 中累加，这里不再重复
-  // 处理研发进度：若 researchProgress 存在，扣点推进
-  if (nation.tech.researchProgress) {
-    const tech = TECH_BY_ID[nation.tech.researchProgress.techId];
-    if (!tech) { nation.tech.researchProgress = null; return; }
-    const cost = researchCost(tech.level, tech.costSci, tech.costGold);
-    // 每回合可投入的 sciPt（最多全投入）
-    const invest = Math.min(nation.resources.sciPt, cost.sci - nation.tech.researchProgress.sciPtInvested);
-    nation.tech.researchProgress.sciPtInvested += invest;
-    nation.resources.sciPt -= invest;
-    if (nation.tech.researchProgress.sciPtInvested >= cost.sci && nation.resources.gold >= cost.gold) {
-      // 完成
-      nation.resources.gold -= cost.gold;
-      nation.tech[tech.branch] = Math.max(nation.tech[tech.branch], tech.level);
-      nation.tech.researchProgress = null;
-    }
-  }
+export function settleTechnology(nation: Nation, state: GameState): void {
+  const result = settleTechnologyPure(nation, state);
+  nation.resources.sciPt += result.deltaSciPt;
+  nation.resources.gold += result.deltaGold;
+  nation.tech.researchProgress = result.researchProgressFinal;
+  if (result.techLevelUp) nation.tech[result.techLevelUp.branch] = result.techLevelUp.level;
+}
+
+export function instantResearchBlocker(nation: Nation, tech: TechnologyDef): string | null {
+  if (nation.tech[tech.branch] >= tech.level) return '已学';
+  const prereq = tech.prereqTech && TECH_BY_ID[tech.prereqTech];
+  if (nation.tech[tech.branch] + 1 !== tech.level || (prereq && nation.tech[prereq.branch] < prereq.level)) return '锁定';
+  if (nation.tech.researchProgress) return '研发中';
+  if (nation.resources.sciPt < tech.costSci) return '科研不足';
+  if (nation.resources.gold < tech.costGold) return '金不足';
+  if (nation.resources.adminPt < 1) return '行动点不足（需 1）';
+  return null;
 }
 
 // 启动研发
@@ -72,21 +69,18 @@ export interface TechPartial {
   techLevelUp: { branch: 'agri' | 'mil' | 'admin' | 'culture'; level: number } | null;
 }
 export function settleTechnologyPure(nation: Nation, _state: GameState): TechPartial {
-  if (!nation.tech.researchProgress) {
+  const progress = nation.tech.researchProgress;
+  const tech = progress && TECH_BY_ID[progress.techId];
+  if (!progress || !tech || nation.tech[tech.branch] >= tech.level) {
     return { deltaSciPt: 0, deltaGold: 0, researchProgressFinal: null, techLevelUp: null };
   }
-  const tech = TECH_BY_ID[nation.tech.researchProgress.techId];
-  if (!tech) {
-    return { deltaSciPt: 0, deltaGold: 0, researchProgressFinal: null, techLevelUp: null };
-  }
-  const cost = researchCost(tech.level, tech.costSci, tech.costGold);
-  const invest = Math.min(nation.resources.sciPt, cost.sci - nation.tech.researchProgress.sciPtInvested);
-  const newInvested = nation.tech.researchProgress.sciPtInvested + invest;
-  // 完成判定：注意原函数用 nation.resources.gold（未扣 invest 影响 gold）>= cost.gold
-  if (newInvested >= cost.sci && nation.resources.gold >= cost.gold) {
+  const invested = Math.min(tech.costSci, Math.max(0, Number.isFinite(progress.sciPtInvested) ? progress.sciPtInvested : 0));
+  const invest = Math.min(Math.max(0, nation.resources.sciPt), tech.costSci - invested);
+  const newInvested = invested + invest;
+  if (newInvested >= tech.costSci && nation.resources.gold >= tech.costGold) {
     return {
       deltaSciPt: -invest,
-      deltaGold: -cost.gold,
+      deltaGold: -tech.costGold,
       researchProgressFinal: null,  // 完成，清空
       techLevelUp: { branch: tech.branch, level: tech.level },
     };
@@ -94,7 +88,7 @@ export function settleTechnologyPure(nation: Nation, _state: GameState): TechPar
   return {
     deltaSciPt: -invest,
     deltaGold: 0,
-    researchProgressFinal: { techId: nation.tech.researchProgress.techId, sciPtInvested: newInvested },
+    researchProgressFinal: { techId: tech.id, sciPtInvested: newInvested },
     techLevelUp: null,
   };
 }

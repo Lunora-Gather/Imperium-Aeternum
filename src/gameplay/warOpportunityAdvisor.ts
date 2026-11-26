@@ -1,3 +1,4 @@
+import { warDeclarationBlocker } from '../engine/military';
 // V41 战争机会顾问：扫描玩家/国家相邻目标，给出最值得考虑的战争机会。
 // 纯函数，不改 GameState；可被 Dashboard、军事页和路线图复用。
 
@@ -37,19 +38,6 @@ function ownedProvinces(state: GameState, nationId: string): Province[] {
   return Object.values(state.provinces).filter((p) => p.ownerId === nationId);
 }
 
-function legalTarget(state: GameState, attackerId: string, target: Province): boolean {
-  if (target.ownerId === attackerId) return false;
-  const defender = state.nations[target.ownerId];
-  if (!defender || defender.defeated) return false;
-  const rel = state.relations.find((r) => r.from === attackerId && r.to === target.ownerId);
-  if (rel?.treaty === 'alliance') return false;
-  if (rel?.treaty === 'truce' && rel.truceTurns > 0) return false;
-  return !state.wars.some((w) =>
-    (w.attackerId === attackerId && w.defenderId === target.ownerId) ||
-    (w.attackerId === target.ownerId && w.defenderId === attackerId)
-  );
-}
-
 function candidateScore(a: WarAssessment, p: Province): number {
   const richness = Math.min(18, p.population * 0.01 + p.agriBase * 2 + p.buildings.length * 3 + (p.isCapital ? 8 : 0));
   return n(clamp(a.winChance * 0.36 + a.readiness * 0.28 + (100 - a.diplomaticRisk) * 0.14 + (100 - a.logisticsPressure) * 0.12 + richness));
@@ -69,7 +57,7 @@ export function buildWarOpportunityAdvice(state: GameState, nationId: string = s
     .filter((p) => {
       if (seen.has(p.id)) return false;
       seen.add(p.id);
-      return legalTarget(state, nationId, p);
+      return !warDeclarationBlocker(state, nationId, p.ownerId);
     })
     .map((p) => {
       const assessment = assessWar(state, nationId, p.ownerId, p.id);

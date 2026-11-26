@@ -4,16 +4,23 @@ import { APPWRITE_CONFIG } from './config';
 
 export type AuthUser = Models.User<Models.Preferences>;
 
-async function requireVerifiedUser(user: AuthUser): Promise<AuthUser> {
+async function verifiedUser(expectedId?: string, sessionId?: string): Promise<AuthUser> {
+  const { account } = getAppwriteServices();
+  const user = await account.get();
+  if (expectedId && user.$id !== expectedId) throw new Error('登录账号已更换，请重新确认');
   if (user.emailVerification) return user;
-  await getAppwriteServices().account.deleteSession({ sessionId: 'current' }).catch(() => undefined);
+  // Another tab may have replaced the current session while the account request was in flight.
+  if (!sessionId) {
+    const session = await account.getSession({ sessionId: 'current' });
+    if (session.userId === user.$id) sessionId = session.$id;
+  }
+  if (sessionId) await account.deleteSession({ sessionId }).catch(() => undefined);
   throw new Error('该邮箱尚未验证，请使用邮箱验证码完成验证');
 }
 
 export async function getCurrentUser(): Promise<AuthUser | null> {
-  try {
-    return await requireVerifiedUser(await getAppwriteServices().account.get());
-  } catch (error) {
+  try { return await verifiedUser(); }
+  catch (error) {
     if (error instanceof AppwriteException && error.code === 401) return null;
     throw error;
   }
@@ -21,8 +28,17 @@ export async function getCurrentUser(): Promise<AuthUser | null> {
 
 export async function loginWithPassword(email: string, password: string): Promise<AuthUser> {
   const { account } = getAppwriteServices();
-  await account.createEmailPasswordSession({ email, password });
-  return requireVerifiedUser(await account.get());
+  let session;
+  try { session = await account.createEmailPasswordSession({ email, password }); }
+  catch (error) {
+    if (error instanceof AppwriteException && error.type === 'user_session_already_exists') {
+      const existing = await getCurrentUser();
+      if (existing?.email.toLowerCase() === email.toLowerCase()) return existing;
+      if (existing) throw Object.assign(new Error('当前浏览器已登录其他账号，请先退出登录'), { sessionChanged: true });
+    }
+    throw error;
+  }
+  return verifiedUser(session.userId, session.$id);
 }
 
 export async function requestEmailOtp(email: string): Promise<string> {
@@ -36,28 +52,31 @@ export async function requestEmailOtp(email: string): Promise<string> {
 
 export async function verifyEmailOtp(userId: string, secret: string): Promise<AuthUser> {
   const { account } = getAppwriteServices();
-  await account.createSession({ userId, secret });
-  return requireVerifiedUser(await account.get());
+  const session = await account.createSession({ userId, secret });
+  return verifiedUser(userId, session.$id);
 }
 
 export async function completeVerifiedRegistration(userId: string, secret: string, password: string, name: string): Promise<AuthUser> {
   const { account } = getAppwriteServices();
-  await account.createSession({ userId, secret });
+  const session = await account.createSession({ userId, secret });
   try {
+    const user = await account.get();
+    if (user.$id !== userId || !user.emailVerification) throw new Error('邮箱尚未验证');
+    if (user.passwordUpdate) throw new Error('该邮箱已经注册，请直接登录');
     await account.updateName({ name: name.trim() });
     await account.updatePassword({ password });
-    return await requireVerifiedUser(await account.get());
+    return await verifiedUser(userId, session.$id);
   } catch (error) {
-    await account.deleteSession({ sessionId: 'current' }).catch(() => undefined);
+    await account.deleteSession({ sessionId: session.$id ?? 'current' }).catch(() => undefined);
     throw error;
   }
 }
 
 export async function completePasswordRecovery(userId: string, secret: string, password: string): Promise<AuthUser> {
   const { account, functions } = getAppwriteServices();
-  await account.createSession({ userId, secret });
+  const session = await account.createSession({ userId, secret });
   try {
-    const user = await requireVerifiedUser(await account.get());
+    const user = await verifiedUser(userId, session.$id);
     if (!user.passwordUpdate) throw new Error('该邮箱没有可找回的密码账号，请注册新账号');
     const execution = await functions.createExecution({
       functionId: APPWRITE_CONFIG.accountGatewayFunctionId,
@@ -68,17 +87,33 @@ export async function completePasswordRecovery(userId: string, secret: string, p
     });
     const result = JSON.parse(execution.responseBody || '{}') as { ok?: boolean; message?: string };
     if (!result.ok) throw new Error(result.message || '密码找回失败');
-    return await requireVerifiedUser(await account.get());
+    return await verifiedUser(userId, session.$id);
   } catch (error) {
-    await account.deleteSession({ sessionId: 'current' }).catch(() => undefined);
+    await account.deleteSession({ sessionId: session.$id ?? 'current' }).catch(() => undefined);
     throw error;
   }
 }
 
-export async function logoutCurrentSession(): Promise<void> {
-  // Logging out is also a local state transition. A dropped response must not
-  // leave an unhandled rejection after the account has already been cleared.
-  await getAppwriteServices().account.deleteSession({ sessionId: 'current' }).catch(() => undefined);
+export async function logoutCurrentSession(expectedUserId?: string): Promise<void> {
+  const { account } = getAppwriteServices();
+  let sessionId = 'current';
+  if (expectedUserId) {
+    try {
+      const session = await account.getSession({ sessionId });
+      if (session.userId !== expectedUserId) throw Object.assign(new Error('登录账号已更换，请重新确认'), { sessionChanged: true });
+      sessionId = session.$id;
+    } catch (error) {
+      if (error instanceof AppwriteException && error.code === 401) return;
+      throw error;
+    }
+  }
+  try { await account.deleteSession({ sessionId }); }
+  catch (error) {
+    if (error instanceof AppwriteException && error.code === 401) return;
+    const current = await getCurrentUser();
+    if (expectedUserId && current && current.$id !== expectedUserId) throw Object.assign(new Error('登录账号已更换，请重新确认'), { sessionChanged: true });
+    if (current) throw error;
+  }
 }
 
 export function describeAppwriteError(error: unknown): string {

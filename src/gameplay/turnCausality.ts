@@ -1,5 +1,6 @@
 // 年报因果链：把结算结果压缩为可核对的“来源 → 结果”，不再只展示总涨跌。
 
+import { operatingNet } from './reportFinances';
 import type { GameState } from '../types/game';
 
 export type TurnCauseTone = 'good' | 'warn' | 'info';
@@ -24,9 +25,7 @@ function signed(value: number): string {
 export function buildTurnCausality(state: GameState): TurnCausality | null {
   const report = state.lastReport;
   if (!report) return null;
-  const income = report.income.tax + report.income.trade + report.income.building;
-  const expense = report.expense.military + report.expense.corruption;
-  const netGold = Math.round(income - expense);
+  const netGold = Math.round(operatingNet(report));
   const lines: TurnCauseLine[] = [{
     id: 'finance',
     title: '财政结算',
@@ -43,7 +42,7 @@ export function buildTurnCausality(state: GameState): TurnCausality | null {
     lines.push({ id: `strategy-${index}`, title: '国策与制度', detail: note, tone: 'info' });
   }
   if (report.events.length > 0) {
-    lines.push({ id: 'events', title: '事件影响', detail: `本年 ${report.events.length} 起事件已计入上述资源与社会变化；可在下方逐项核对。`, tone: 'info' });
+    lines.push({ id: 'events', title: '事件影响', detail: `本年触发 ${report.events.length} 起事件，选项效果在做出选择后生效。`, tone: 'info' });
   }
   for (const [index, event] of report.worldEvents.slice(0, 3).entries()) {
     lines.push({ id: `world-${index}`, title: 'AI 与天下大势', detail: event, tone: 'info' });

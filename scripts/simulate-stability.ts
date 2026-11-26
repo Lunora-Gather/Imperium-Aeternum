@@ -44,7 +44,8 @@ function percentile(values: number[], ratio: number): number {
 
 for (const simulation of cases) {
   const measurements: number[] = [];
-  let lastResult: Record<string, unknown> | null = null;
+  const runs = [];
+  let slowestTurn = { sample: 0, turn: 0, ms: 0 };
   for (let sample = 0; sample < sampleCount; sample += 1) {
     let state = prepareGameState(simulation.create(sample));
     const startedAt = performance.now();
@@ -58,9 +59,13 @@ for (const simulation of cases) {
         firstVictory ??= { type: state.victory.type, turn: state.turn };
         state = { ...state, victory: { type: null } };
       }
+      const turnStart = performance.now();
       const advanced = advanceTurnPipeline(state);
       reports.push(advanced.report);
       state = resolvePlayerQueue(advanced.state);
+      const ms = performance.now() - turnStart;
+      measurements.push(ms);
+      if (ms > slowestTurn.ms) slowestTurn = { sample: sample + 1, turn: state.turn, ms };
       const issues = auditStateInvariants(state);
       if (issues.length > 0) {
         throw new Error(`${simulation.id} 样本 ${sample + 1} 第 ${state.turn} 回合：${issues.map((issue) => `${issue.severity}/${issue.id} ${issue.detail}`).join('; ')}`);
@@ -68,36 +73,33 @@ for (const simulation of cases) {
     }
     if (state.victory.type && !firstVictory) firstVictory = { type: state.victory.type, turn: state.turn };
     const elapsedMs = performance.now() - startedAt;
-    const perTurnMs = elapsedMs / Math.max(1, completedTurns);
-    measurements.push(perTurnMs);
-    lastResult = {
-      scenario: simulation.id,
+    runs.push({
+      sample: sample + 1,
       turns: completedTurns,
       elapsedMs: Math.round(elapsedMs),
-      perTurnMs: Math.round(perTurnMs),
       nations: Object.keys(state.nations).length,
       provinces: Object.keys(state.provinces).length,
       firstVictory,
-      finalStateKiB: Math.round(JSON.stringify(state).length / 102.4) / 10,
+      finalStateKiB: Math.round(Buffer.byteLength(JSON.stringify(state), 'utf8') / 1024 * 10) / 10,
       campaignHealth: analyzeCampaignReports(reports),
-    };
+    });
   }
 
   const p95 = percentile(measurements, 0.95);
-  const summary = sampleCount === 1
-    ? lastResult
-    : {
-        ...lastResult,
-        samples: sampleCount,
-        perTurnMs: {
-          min: Math.round(Math.min(...measurements)),
-          p50: Math.round(percentile(measurements, 0.5)),
-          p95: Math.round(p95),
-          max: Math.round(Math.max(...measurements)),
-          avg: Math.round(measurements.reduce((sum, value) => sum + value, 0) / measurements.length),
-        },
-      };
-  console.log(JSON.stringify(summary));
+  console.log(JSON.stringify({
+    scenario: simulation.id,
+    samples: sampleCount,
+    measuredTurns: measurements.length,
+    perTurnMs: {
+      min: Math.round(percentile(measurements, 0)),
+      avg: Math.round(measurements.reduce((sum, ms) => sum + ms, 0) / measurements.length),
+      p50: Math.round(percentile(measurements, 0.5)),
+      p95: Math.round(p95),
+      max: Math.round(slowestTurn.ms),
+    },
+    slowestTurn: { ...slowestTurn, ms: Math.round(slowestTurn.ms) },
+    runs,
+  }));
   if (p95 > simulation.budgetMsPerTurn) {
     throw new Error(`${simulation.id} P95 回合耗时 ${Math.round(p95)}ms，超过预算 ${simulation.budgetMsPerTurn}ms`);
   }

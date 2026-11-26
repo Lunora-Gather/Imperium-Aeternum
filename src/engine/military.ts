@@ -1,39 +1,34 @@
 // Imperium Aeternum — 军事系统 engine
 // 阶段 5b：完整实现 docs/reference/02-system-rules.md §11
 
-import type { GameState, Nation, War, Province, BattleReport, ChronicleEntry } from '../types/game';
+import type { GameState, Nation, War, Province, Army, BattleReport, ChronicleEntry } from '../types/game';
 import { computeCombat, resolveBattle, warCostPerTurn, milTechModifier } from './formulas';
 import { TERRAIN_COMBAT_MOD } from './formulas';
+import { terrainLabel } from '../data/terrain';
 import type { Terrain } from '../data/provinces';
 import { allocateEntityId } from '../utils/id';
 import { clamp } from '../utils/math';
-import { getRelationObj } from './init';
-import { NATIONAL_CHARACTERS } from '../data/national-characters';
-import type { NationalCharacterId, NationalCharacterMods } from '../data/national-characters';
+import { findRelation, relationPair } from './init';
+import { nationalCharacterMods } from '../data/national-characters';
 import { addChronicle } from './chronicle';
 import { hasActiveNonAggressionAccord } from './summits';
 
-// P1-4: 合并激活性格的加成+副作用
-function charMods(nation: Nation): NationalCharacterMods {
-  const merged: NationalCharacterMods = {};
-  for (const cid of nation.activeCharacterBonuses) {
-    const def = NATIONAL_CHARACTERS[cid as NationalCharacterId];
-    if (!def) continue;
-    for (const [k, v] of Object.entries(def.bonuses)) { (merged as Record<string, number>)[k] = ((merged as Record<string, number>)[k] ?? 0) + (v as number); }
-    for (const [k, v] of Object.entries(def.penalties)) { (merged as Record<string, number>)[k] = ((merged as Record<string, number>)[k] ?? 0) + (v as number); }
-  }
-  return merged;
-}
 
 // 宣战
-export function declareWar(state: GameState, attackerId: string, defenderId: string, targetProvinceId: string): War | null {
-  // 不能对停战期国家宣战
-  const rel = getRelationObj(attackerId, defenderId, state);
-  if (hasActiveNonAggressionAccord(state, attackerId, defenderId)) return null;
-  if (rel?.treaty === 'alliance') return null;
-  if (rel && rel.treaty === 'truce' && rel.truceTurns > 0) return null;
-  if (state.wars.some((w) => [w.attackerId, w.defenderId].includes(attackerId) && [w.attackerId, w.defenderId].includes(defenderId))) return null;
+export function warDeclarationBlocker(state: GameState, from: string, to: string): string | null {
+  const attacker = state.nations[from], defender = state.nations[to];
+  if (from === to || !attacker || !defender || attacker.defeated || defender.defeated) return '宣战目标无效';
+  const pair = relationPair(state, from, to);
+  if (!pair) return '缺少外交关系数据';
+  if (pair.some((r) => r.treaty === 'alliance')) return '不能向盟友宣战';
+  if (pair.some((r) => r.treaty === 'truce' && r.truceTurns > 0)) return '停战期内不能宣战';
+  if (hasActiveNonAggressionAccord(state, from, to)) return '双方仍受元首会谈达成的不侵犯协议约束';
+  if (state.wars.some((w) => (w.attackerId === from && w.defenderId === to) || (w.attackerId === to && w.defenderId === from))) return '双方已经处于战争中';
+  return null;
+}
 
+export function declareWar(state: GameState, attackerId: string, defenderId: string, targetProvinceId: string): War | null {
+  if (state.provinces[targetProvinceId]?.ownerId !== defenderId || warDeclarationBlocker(state, attackerId, defenderId)) return null;
   const war: War = {
     id: allocateEntityId(state, 'war'),
     attackerId: attackerId,
@@ -46,15 +41,13 @@ export function declareWar(state: GameState, attackerId: string, defenderId: str
   state.wars.push(war);
 
   // 关系 → 战争状态
-  if (rel) { rel.treaty = 'war'; rel.relation = -100; }
-  const rel2 = getRelationObj(defenderId, attackerId, state);
-  if (rel2) { rel2.treaty = 'war'; rel2.relation = -100; }
-
-  const attacker = state.nations[attackerId];
-  if (attacker) attacker.atWar = true;
-  const defender = state.nations[defenderId];
-  if (defender) defender.atWar = true;
-
+  for (const r of relationPair(state, attackerId, defenderId)!) {
+    r.treaty = 'war';
+    r.relation = -100;
+    r.truceTurns = 0;
+  }
+  state.nations[attackerId].atWar = true;
+  state.nations[defenderId].atWar = true;
   return war;
 }
 
@@ -76,105 +69,34 @@ export function moveArmy(state: GameState, nation: Nation, armyId: string, toPro
   if (nation.resources.gold < goldCost) return { ok: false, reason: `金不足（需 ${goldCost}）` };
   // 调动：扣金、合并到目标省份军队
   nation.resources.gold -= goldCost;
-  let dest = nation.army.find((a) => a.location === toProvinceId);
-  if (!dest) {
-    dest = { id: allocateEntityId(state, 'army'), ownerId: nation.id, location: toProvinceId, size: 0, morale: 60, training: 50, equipment: 50, supply: 80 };
-    nation.army.push(dest);
-  }
-  // 加权合并士气/训练/装备（按兵力加权）
-  const total = army.size + dest.size;
-  dest.morale = Math.round((army.morale * army.size + dest.morale * dest.size) / Math.max(1, total));
-  dest.training = Math.round((army.training * army.size + dest.training * dest.size) / Math.max(1, total));
-  dest.equipment = Math.round((army.equipment * army.size + dest.equipment * dest.size) / Math.max(1, total));
-  dest.size += army.size;
-  // 移除原军队
-  nation.army = nation.army.filter((a) => a.id !== armyId);
+  relocateArmy(state, nation, army, toProvinceId);
   return { ok: true };
 }
 
+export function relocateArmy(state: GameState, nation: Nation, army: Army, destination: string): void {
+  if (army.location === destination) return;
+  const dest = nation.army.find((a) => a.location === destination);
+  if (!dest) {
+    const moved = { ...army, id: allocateEntityId(state, 'army'), location: destination };
+    nation.army = [...nation.army.filter((a) => a.id !== army.id), moved];
+    return;
+  }
+  const total = dest.size + army.size;
+  for (const field of ['morale', 'training', 'equipment', 'supply'] as const) {
+    dest[field] = Math.round((dest[field] * dest.size + army[field] * army.size) / Math.max(1, total));
+  }
+  dest.size = total;
+  nation.army = nation.army.filter((a) => a.id !== army.id);
+}
+
 export function makePeace(state: GameState, war: War): void {
-  const i = state.wars.findIndex((w) => w.id === war.id);
-  if (i < 0) return;
-  state.wars.splice(i, 1);
-
-  // P1-6: 和约条件——按战争进度决定胜负方与惩罚
-  const attacker = state.nations[war.attackerId];
-  const defender = state.nations[war.defenderId];
-  const attackerWon = war.progress >= 60;
-  const defenderWon = war.progress <= 40;
-
-  if (attacker && defender) {
-    if (attackerWon) {
-      // 进攻方胜：割让目标省份 + 赔款
-      const targetProv = state.provinces[war.targetProvinceId];
-      if (targetProv) {
-        targetProv.ownerId = attacker.id;
-        targetProv.loyalty = 30;       // 新征服省忠诚低
-        targetProv.assimilation = 20;
-        targetProv.unrest = 40;
-        targetProv.garrison = 0;
-        addChronicle(state, {
-          id: `peace_win_${war.id}_${state.turn}`,
-          turn: state.turn, kind: 'milestone_war',
-          title: `${attacker.name} 攻占 ${targetProv.name}`,
-          desc: `${defender.name} 割让 ${targetProv.name}。`,
-          actorId: attacker.id,
-        });
-        // A3: 孤儿军队自动撤退——败方军队若 location 指已割省，撤回最近本国省；无本国省则 disbanded
-        const defenderArmies = defender.army.filter((a) => a.location === war.targetProvinceId);
-        for (const army of defenderArmies) {
-          const ownProvs = Object.values(state.provinces).filter((p) => p.ownerId === defender.id);
-          // 找邻接的己省，或首都，或任意己省
-          const adjOwn = ownProvs.find((p) => targetProv.adjacent.includes(p.id));
-          const fallback = adjOwn ?? ownProvs.find((p) => p.id === defender.capital) ?? ownProvs[0];
-          if (fallback) {
-            army.location = fallback.id;
-          } else {
-            // 无本国省，军队解散
-            defender.army = defender.army.filter((a) => a.id !== army.id);
-            addChronicle(state, {
-              id: `orphan_disband_${army.id}_${state.turn}`,
-              turn: state.turn, kind: 'milestone_war',
-              title: `残军溃散`,
-              desc: `${defender.name} 在 ${targetProv.name} 的驻军因无本土可撤，溃散消失。`,
-              actorId: defender.id,
-            });
-          }
-        }
-      }
-      // 赔款（败方付，按财力比例）
-      const tribute = Math.min(Math.max(0, defender.resources.gold), 100 + war.progress);
-      defender.resources.gold -= tribute;
-      attacker.resources.gold += tribute;
-    } else if (defenderWon) {
-      // 防御方胜：进攻方赔款 + 厌战惩罚
-      const indemnity = Math.min(Math.max(0, attacker.resources.gold), 80);
-      attacker.resources.gold -= indemnity;
-      defender.resources.gold += indemnity;
-      attacker.warExhaustion = clamp(attacker.warExhaustion + 10, 0, 100);
-      addChronicle(state, {
-        id: `peace_lose_${war.id}_${state.turn}`,
-        turn: state.turn, kind: 'milestone_war',
-        title: `${attacker.name} 战败`,
-        desc: `${attacker.name} 进攻 ${defender.name} 失败，赔款 ${indemnity} 金。`,
-        actorId: attacker.id,
-      });
-    }
-    // 进度 40-60 之间：白和（无割让无赔款）
-  }
-
-  // 关系 → 停战
-  const r1 = getRelationObj(war.attackerId, war.defenderId, state);
-  if (r1) { r1.treaty = 'truce'; r1.truceTurns = 10; r1.relation = -45; r1.trust = Math.min(clamp(r1.trust - 20, 0, 100), 25); }
-  const r2 = getRelationObj(war.defenderId, war.attackerId, state);
-  if (r2) { r2.treaty = 'truce'; r2.truceTurns = 10; r2.relation = -45; r2.trust = Math.min(clamp(r2.trust - 20, 0, 100), 25); }
-
-  // 检查是否仍有战争
-  const atWarNations = new Set<string>();
-  for (const w of state.wars) { atWarNations.add(w.attackerId); atWarNations.add(w.defenderId); }
-  for (const n of Object.values(state.nations)) {
-    if (!atWarNations.has(n.id)) n.atWar = false;
-  }
+  const current = state.wars.find((w) => w.id === war.id);
+  if (!current) return;
+  const result = emptyWarResult();
+  const outcome = current.progress >= 60 ? 'attacker' : current.progress <= 40 ? 'defender' : 'draw';
+  finishWar(state, result, current, outcome, current.progress);
+  finalizeWars(state, result);
+  applySettleWarsResult(state, result);
 }
 
 // 每回合结算所有战争
@@ -191,12 +113,12 @@ export interface SettleWarsPureResult {
   // 军队覆写值（key=`${nationId}:${armyId}`，含 size/morale final）
   armyFinals: Record<string, { size: number; morale: number }>;
   // 省份覆写值（key=provId，含 ownerId/garrison/assimilation/loyalty/unrest）
-  provFinals: Record<string, { ownerId?: string; garrison?: number; assimilation?: number; loyalty?: number; unrest?: number }>;
+  provFinals: Record<string, { ownerId?: string; isCapital?: boolean; garrison?: number; assimilation?: number; loyalty?: number; unrest?: number }>;
   // 国家 deltas（resources/gov/exhaustion/defeated）
   nationDeltas: Record<string, {
     goldDelta: number; foodDelta: number;
     warExhaustionFinal?: number; stabilityFinal?: number;
-    defeated?: boolean;
+    defeated?: boolean; capital?: string;
     armyRemovals?: string[]; // disbanded army ids
     armyLocationOverrides?: Record<string, string>; // armyId → new location
   }>;
@@ -208,138 +130,174 @@ export interface SettleWarsPureResult {
   atWarClear: string[];
 }
 
-export function settleWarsPure(state: GameState): SettleWarsPureResult {
-  const res: SettleWarsPureResult = {
-    warUpdates: {}, peaceWarIds: [], armyFinals: {}, provFinals: {},
-    nationDeltas: {}, relationFinals: {}, newChronicle: [], atWarClear: [],
-  };
-  // 模拟 makePeace 行为的辅助：收集 peace 后 effects（割让/赔款/孤儿撤退/关系改 truce/编年史/atWar 清除）
-  const applyPeaceEffects = (war: War, peaceProgress: number) => {
-    res.peaceWarIds.push(war.id);
-    const attacker = state.nations[war.attackerId];
-    const defender = state.nations[war.defenderId];
-    const attackerWon = peaceProgress >= 60;
-    const defenderWon = peaceProgress <= 40;
-    if (attacker && defender) {
-      const ndA = res.nationDeltas[attacker.id] ??= { goldDelta: 0, foodDelta: 0 };
-      const ndD = res.nationDeltas[defender.id] ??= { goldDelta: 0, foodDelta: 0 };
-      if (attackerWon) {
-        const targetProv = state.provinces[war.targetProvinceId];
-        if (targetProv) {
-          res.provFinals[targetProv.id] = {
-            ownerId: attacker.id, loyalty: 30, assimilation: 20, unrest: 40, garrison: 0,
-          };
-          res.newChronicle.push({
-            id: `peace_win_${war.id}_${state.turn}`, turn: state.turn, kind: 'milestone_war',
-            title: `${attacker.name} 攻占 ${targetProv.name}`,
-            desc: `${defender.name} 割让 ${targetProv.name}。`, actorId: attacker.id,
-          });
-          // 孤儿军队撤退（败方军队 location 指已割省）
-          const defenderArmies = defender.army.filter((a) => a.location === war.targetProvinceId);
-          for (const army of defenderArmies) {
-            const ownProvs = Object.values(state.provinces).filter((p) => p.ownerId === defender.id);
-            const adjOwn = ownProvs.find((p) => targetProv.adjacent.includes(p.id));
-            const fallback = adjOwn ?? ownProvs.find((p) => p.id === defender.capital) ?? ownProvs[0];
-            if (fallback) {
-              (ndD.armyLocationOverrides ??= {})[army.id] = fallback.id;
-            } else {
-              (ndD.armyRemovals ??= []).push(army.id);
-              res.newChronicle.push({
-                id: `orphan_disband_${army.id}_${state.turn}`, turn: state.turn, kind: 'milestone_war',
-                title: `残军溃散`, desc: `${defender.name} 在 ${targetProv.name} 的驻军因无本土可撤，溃散消失。`, actorId: defender.id,
-              });
-            }
-          }
-        }
-        const tribute = Math.min(Math.max(0, defender.resources.gold + ndD.goldDelta), 100 + peaceProgress);
-        ndD.goldDelta -= tribute;
-        ndA.goldDelta += tribute;
-      } else if (defenderWon) {
-        const indemnity = Math.min(Math.max(0, attacker.resources.gold + ndA.goldDelta), 80);
-        ndA.goldDelta -= indemnity;
-        ndD.goldDelta += indemnity;
-        ndA.warExhaustionFinal = clamp((ndA.warExhaustionFinal ?? attacker.warExhaustion) + 10, 0, 100);
-        res.newChronicle.push({
-          id: `peace_lose_${war.id}_${state.turn}`, turn: state.turn, kind: 'milestone_war',
-          title: `${attacker.name} 战败`,
-          desc: `${attacker.name} 进攻 ${defender.name} 失败，赔款 ${indemnity} 金。`, actorId: attacker.id,
-        });
-      }
-    }
-    // 关系 → 停战（双向）
-    const r1 = getRelationObj(war.attackerId, war.defenderId, state);
-    if (r1) res.relationFinals[`${war.attackerId}->${war.defenderId}`] = { treaty: 'truce', truceTurns: 10, relation: -45, trust: Math.min(clamp(r1.trust - 20, 0, 100), 25) };
-    const r2 = getRelationObj(war.defenderId, war.attackerId, state);
-    if (r2) res.relationFinals[`${war.defenderId}->${war.attackerId}`] = { treaty: 'truce', truceTurns: 10, relation: -45, trust: Math.min(clamp(r2.trust - 20, 0, 100), 25) };
-  };
+function emptyWarResult(): SettleWarsPureResult {
+  return { warUpdates: {}, peaceWarIds: [], armyFinals: {}, provFinals: {}, nationDeltas: {}, relationFinals: {}, newChronicle: [], atWarClear: [] };
+}
 
+function projectedOwner(result: SettleWarsPureResult, province: Province): string {
+  return result.provFinals[province.id]?.ownerId ?? province.ownerId;
+}
+
+function nationDelta(result: SettleWarsPureResult, id: string) {
+  return result.nationDeltas[id] ??= { goldDelta: 0, foodDelta: 0 };
+}
+
+function chargeWarCost(res: SettleWarsPureResult, nation: Nation, size: number) {
+  const cost = warCostPerTurn(size);
+  const delta = nationDelta(res, nation.id);
+  delta.goldDelta -= cost.gold;
+  delta.foodDelta -= cost.food;
+  delta.warExhaustionFinal = clamp((delta.warExhaustionFinal ?? nation.warExhaustion) + cost.exhaustionDelta, 0, 100);
+  return { cost, delta };
+}
+
+function frontArmy(result: SettleWarsPureResult, nation: Nation, onFront: (location: string) => boolean): Army | undefined {
+  const changes = result.nationDeltas[nation.id];
+  for (const army of nation.army) {
+    const location = changes?.armyLocationOverrides?.[army.id] ?? army.location;
+    if (!onFront(location) || changes?.armyRemovals?.includes(army.id)) continue;
+    const final = result.armyFinals[`${nation.id}:${army.id}`];
+    if ((final?.size ?? army.size) > 0) return { ...army, ...final, location };
+  }
+}
+
+function cedeProvince(state: GameState, res: SettleWarsPureResult, target: Province, attacker: Nation, defender: Nation, war: War): void {
+  const changes = nationDelta(res, defender.id);
+  res.provFinals[target.id] = { ownerId: attacker.id, loyalty: 30, assimilation: 20, unrest: 40, garrison: 0, isCapital: false };
+  const remaining = Object.values(state.provinces).filter((p) => projectedOwner(res, p) === defender.id);
+  const capital = changes.capital ?? defender.capital;
+  const fallback = remaining.find((p) => target.adjacent.includes(p.id)) ?? remaining.find((p) => p.id === capital) ?? remaining[0];
+  res.newChronicle.push({
+    id: `peace_win_${war.id}_${state.turn}`, turn: state.turn, kind: 'milestone_war',
+    title: `${attacker.name} 攻占 ${target.name}`, desc: `${defender.name} 割让 ${target.name}。`, actorId: attacker.id,
+  });
+  if (!fallback) {
+    changes.defeated = true;
+    if (attacker.isPlayer || state.sharedChronicles) res.newChronicle.push({
+      turn: state.turn, kind: 'victory', title: `灭 ${defender.name}`,
+      desc: `${defender.name} 国祚终绝，我军攻下其最后一省${target.name}。`, actorId: attacker.id,
+    });
+  } else if (capital === target.id) {
+    changes.capital = fallback.id;
+    (res.provFinals[fallback.id] ??= {}).isCapital = true;
+  }
+  for (const army of defender.army) {
+    const location = changes.armyLocationOverrides?.[army.id] ?? army.location;
+    if (fallback && location !== target.id) continue;
+    if (fallback) (changes.armyLocationOverrides ??= {})[army.id] = fallback.id;
+    else {
+      (changes.armyRemovals ??= []).push(army.id);
+      res.newChronicle.push({
+        id: `orphan_disband_${army.id}_${state.turn}`, turn: state.turn, kind: 'milestone_war',
+        title: '残军溃散', desc: `${defender.name} 在 ${target.name} 的驻军因无本土可撤，溃散消失。`, actorId: defender.id,
+      });
+    }
+  }
+}
+
+function objectiveIsValid(state: GameState, res: SettleWarsPureResult, war: War): boolean {
+  const target = state.provinces[war.targetProvinceId];
+  return !!target && projectedOwner(res, target) === war.defenderId
+    && [war.attackerId, war.defenderId].every((id) => state.nations[id] && !state.nations[id].defeated && !res.nationDeltas[id]?.defeated);
+}
+
+function finishWar(state: GameState, res: SettleWarsPureResult, war: War, outcome: 'attacker' | 'defender' | 'draw', progress: number): void {
+  res.peaceWarIds.push(war.id);
+  if (outcome !== 'draw' && objectiveIsValid(state, res, war)) {
+    const attacker = state.nations[war.attackerId], defender = state.nations[war.defenderId];
+    const a = nationDelta(res, attacker.id), d = nationDelta(res, defender.id);
+    if (outcome === 'attacker') {
+      cedeProvince(state, res, state.provinces[war.targetProvinceId], attacker, defender, war);
+      const tribute = Math.min(Math.max(0, defender.resources.gold + d.goldDelta), 100 + progress);
+      d.goldDelta -= tribute;
+      a.goldDelta += tribute;
+    } else {
+      const indemnity = Math.min(Math.max(0, attacker.resources.gold + a.goldDelta), 80);
+      a.goldDelta -= indemnity;
+      d.goldDelta += indemnity;
+      a.warExhaustionFinal = clamp((a.warExhaustionFinal ?? attacker.warExhaustion) + 10, 0, 100);
+      res.newChronicle.push({
+        id: `peace_lose_${war.id}_${state.turn}`, turn: state.turn, kind: 'milestone_war', title: `${attacker.name} 战败`,
+        desc: `${attacker.name} 进攻 ${defender.name} 失败，赔款 ${indemnity} 金。`, actorId: attacker.id,
+      });
+    }
+  }
+  for (const relation of relationPair(state, war.attackerId, war.defenderId) ?? []) {
+    res.relationFinals[`${relation.from}->${relation.to}`] = { treaty: 'truce', truceTurns: 10, relation: -45, trust: Math.min(clamp(relation.trust - 20, 0, 100), 25) };
+  }
+}
+
+function finalizeWars(state: GameState, res: SettleWarsPureResult): void {
+  const ended = new Set(res.peaceWarIds);
+  const stillFighting = new Set<string>();
+  for (const war of state.wars) {
+    if (ended.has(war.id)) continue;
+    if (!objectiveIsValid(state, res, war)) finishWar(state, res, war, 'draw', war.progress);
+    else { stillFighting.add(war.attackerId); stillFighting.add(war.defenderId); }
+  }
+  res.atWarClear = Object.keys(state.nations).filter((id) => !stillFighting.has(id));
+}
+
+export function settleWarsPure(state: GameState): SettleWarsPureResult {
+  const res = emptyWarResult();
   for (const war of state.wars) {
     const newTurns = war.turns + 1;
     const attacker = state.nations[war.attackerId];
     const defender = state.nations[war.defenderId];
-    if (!attacker || !defender) { applyPeaceEffects(war, war.progress); continue; }
-
-    const targetProv = state.provinces[war.targetProvinceId];
-    const attackerArmy = attacker.army.find((a) =>
-      a.size > 0 && (a.location === war.targetProvinceId ||
-        (targetProv?.adjacent.includes(a.location) && state.provinces[a.location]?.ownerId === attacker.id))
-    );
-    const defenderArmy = defender.army.find((a) => a.location === war.targetProvinceId && a.size > 0);
-
-    if (!attackerArmy) { applyPeaceEffects(war, war.progress); continue; }
+    if (!objectiveIsValid(state, res, war)) { finishWar(state, res, war, 'draw', war.progress); continue; }
 
     const prov = state.provinces[war.targetProvinceId];
+    const attackerArmy = frontArmy(res, attacker, (id) => id === prov.id ||
+      (prov.adjacent.includes(id) && !!state.provinces[id] && projectedOwner(res, state.provinces[id]) === attacker.id));
+    const defenderArmy = frontArmy(res, defender, (id) => id === prov.id);
+    if (!attackerArmy) { finishWar(state, res, war, 'defender', war.progress); continue; }
+    const garrison = res.provFinals[prov.id]?.garrison ?? prov.garrison;
     const terrain: Terrain = prov?.terrain ?? 'plain';
     const terrainMod = TERRAIN_COMBAT_MOD[terrain];
 
     const attPower = computeCombat({
       army: attackerArmy, milLv: attacker.tech.mil,
       general: attacker.ruler.ability, terrainMod,
-    }) * (charMods(attacker).combatMod ?? 1) * (attacker.policyMods?.combatMod ?? 1);
+    }) * (nationalCharacterMods(attacker.activeCharacterBonuses).combatMod ?? 1) * (attacker.policyMods?.combatMod ?? 1);
     const defPower = defenderArmy ? computeCombat({
       army: defenderArmy, milLv: defender.tech.mil,
       general: defender.ruler.ability, terrainMod: terrainMod * 1.1,
-    }) * (charMods(defender).combatMod ?? 1) * (defender.policyMods?.combatMod ?? 1) : (prov?.garrison ?? 0) * 0.5;
+    }) * (nationalCharacterMods(defender.activeCharacterBonuses).combatMod ?? 1) * (defender.policyMods?.combatMod ?? 1) : garrison * 0.5;
 
-    const result = resolveBattle(attPower, defPower, attackerArmy.size, defenderArmy?.size ?? prov?.garrison ?? 0);
+    const result = resolveBattle(attPower, defPower, attackerArmy.size, defenderArmy?.size ?? garrison);
     const newProgress = clamp(war.progress + result.progressDelta, 0, 100);
 
     // 战报
-    const reports = war.battleReports ? [...war.battleReports] : [];
+    const reports = war.battleReports?.slice(-19) ?? [];
     const outcome: BattleReport['outcome'] = result.progressDelta > 5 ? 'advance' : result.progressDelta < -5 ? 'repelled' : 'stalemate';
     const provName = prov?.name ?? war.targetProvinceId;
     const narrative = outcome === 'advance'
-      ? `第${newTurns}年，我军于${provName}${terrain === 'mountain' ? '山地' : terrain === 'forest' ? '林地' : '平原'}推进，斩敌${Math.round(result.defenderLoss)}，士气大振。`
+      ? `第${newTurns}年，我军于${provName}${terrainLabel(terrain)}推进，斩敌${Math.round(result.defenderLoss)}，士气大振。`
       : outcome === 'repelled'
       ? `第${newTurns}年，${provName}攻势受挫，折损${Math.round(result.attackerLoss)}人，敌阵稳固。`
       : `第${newTurns}年，${provName}战事胶着，双方各折${Math.round(result.attackerLoss)}、${Math.round(result.defenderLoss)}人。`;
     reports.push({
-      turn: state.turn, attSize: attackerArmy.size, defSize: defenderArmy?.size ?? prov?.garrison ?? 0,
+      turn: state.turn, attSize: attackerArmy.size, defSize: defenderArmy?.size ?? garrison,
       attLoss: Math.round(result.attackerLoss), defLoss: Math.round(result.defenderLoss),
       progressDelta: Math.round(result.progressDelta), outcome, narrative,
     });
-    const trimmedReports = reports.length > 20 ? reports.slice(-20) : reports;
-    res.warUpdates[war.id] = { turns: newTurns, progress: newProgress, battleReports: trimmedReports };
+    res.warUpdates[war.id] = { turns: newTurns, progress: newProgress, battleReports: reports };
 
     // 兵力损耗（暂存 final，因后续 cost.attrition 还会再扣）
     let attSizeAfterBattle = Math.max(0, Math.round(attackerArmy.size - result.attackerLoss));
-    let attMoraleAfter = clamp(attackerArmy.morale + result.attackerMoraleDelta, 0, 100);
+    const attMoraleAfter = clamp(attackerArmy.morale + result.attackerMoraleDelta, 0, 100);
     if (defenderArmy) {
       res.armyFinals[`${defender.id}:${defenderArmy.id}`] = {
         size: Math.max(0, Math.round(defenderArmy.size - result.defenderLoss)),
         morale: clamp(defenderArmy.morale + result.defenderMoraleDelta, 0, 100),
       };
     } else if (prov) {
-      res.provFinals[prov.id] = { ...res.provFinals[prov.id], garrison: Math.max(0, prov.garrison - Math.round(result.defenderLoss)) };
+      res.provFinals[prov.id] = { ...res.provFinals[prov.id], garrison: Math.max(0, garrison - Math.round(result.defenderLoss)) };
     }
 
     // 战争代价（attacker）
-    const cost = warCostPerTurn(attSizeAfterBattle);
-    const ndA = res.nationDeltas[attacker.id] ??= { goldDelta: 0, foodDelta: 0 };
-    ndA.goldDelta -= cost.gold;
-    ndA.foodDelta -= cost.food;
-    ndA.warExhaustionFinal = clamp(attacker.warExhaustion + cost.exhaustionDelta, 0, 100);
-    ndA.stabilityFinal = clamp(attacker.government.stability + cost.stabilityDelta, 0, 100);
+    const { cost, delta } = chargeWarCost(res, attacker, attSizeAfterBattle);
+    delta.stabilityFinal = clamp((delta.stabilityFinal ?? attacker.government.stability) + cost.stabilityDelta, 0, 100);
     attSizeAfterBattle = Math.max(0, Math.round(attSizeAfterBattle - cost.attrition));
     res.armyFinals[`${attacker.id}:${attackerArmy.id}`] = { size: attSizeAfterBattle, morale: attMoraleAfter };
 
@@ -347,58 +305,13 @@ export function settleWarsPure(state: GameState): SettleWarsPureResult {
     const defenderSizeAfterBattle = defenderArmy
       ? (res.armyFinals[`${defender.id}:${defenderArmy.id}`]?.size ?? defenderArmy.size)
       : (res.provFinals[prov?.id ?? '']?.garrison ?? prov?.garrison ?? 0);
-    const dCost = warCostPerTurn(defenderSizeAfterBattle);
-    const ndD = res.nationDeltas[defender.id] ??= { goldDelta: 0, foodDelta: 0 };
-    ndD.goldDelta -= dCost.gold;
-    ndD.foodDelta -= dCost.food;
-    ndD.warExhaustionFinal = clamp(defender.warExhaustion + dCost.exhaustionDelta, 0, 100);
+    chargeWarCost(res, defender, defenderSizeAfterBattle);
 
-    // 进度判定
-    // 注意：defenderArmyGone 判断需用 final size（已扣 battle loss）
-    const defenderArmyFinalSize = defenderArmy ? (res.armyFinals[`${defender.id}:${defenderArmy.id}`]?.size ?? defenderArmy.size) : undefined;
-    const provGarrisonFinal = res.provFinals[prov?.id ?? '']?.garrison ?? prov?.garrison ?? 0;
-    const defenderArmyGone = !defenderArmy || (defenderArmyFinalSize ?? 0) <= 0;
-    const garrisonGone = !prov || provGarrisonFinal <= 0;
-    if (newProgress >= 100 || (defenderArmyGone && garrisonGone && attSizeAfterBattle > 0)) {
-      // 占领省份
-      if (prov) {
-        const oldOwner = prov.ownerId;
-        const curProvFinal = res.provFinals[prov.id] ?? {};
-        res.provFinals[prov.id] = {
-          ...curProvFinal,
-          ownerId: war.attackerId,
-          garrison: attSizeAfterBattle,
-          assimilation: Math.max(0, (curProvFinal.assimilation ?? prov.assimilation) - 30),
-          loyalty: 30,
-          unrest: clamp((curProvFinal.unrest ?? prov.unrest) + 20, 0, 100),
-        };
-        // 防守方失都 → defeated
-        if (oldOwner === war.defenderId) {
-          const remainingProvs = Object.values(state.provinces).filter((p) => {
-            const finalOwner = res.provFinals[p.id]?.ownerId ?? p.ownerId;
-            return finalOwner === war.defenderId;
-          });
-          if (remainingProvs.length === 0) {
-            (res.nationDeltas[defender.id] ??= { goldDelta: 0, foodDelta: 0 }).defeated = true;
-          }
-        }
-      }
-      applyPeaceEffects(war, newProgress);
-    } else if (newProgress <= 0) {
-      applyPeaceEffects(war, newProgress);
-    }
+    const defendersGone = !frontArmy(res, defender, (id) => id === prov.id) && (res.provFinals[prov.id]?.garrison ?? garrison) <= 0;
+    if (attSizeAfterBattle > 0 && (newProgress >= 100 || defendersGone)) finishWar(state, res, war, 'attacker', newProgress);
+    else if (attSizeAfterBattle === 0 || (newProgress === 0 && result.progressDelta < 0)) finishWar(state, res, war, 'defender', newProgress);
   }
-
-  // atWar 清除：和约后无战争的国家 atWar=false
-  const atWarNations = new Set<string>();
-  for (const w of state.wars) {
-    if (res.peaceWarIds.includes(w.id)) continue;
-    atWarNations.add(w.attackerId); atWarNations.add(w.defenderId);
-  }
-  for (const n of Object.values(state.nations)) {
-    if (!atWarNations.has(n.id)) res.atWarClear.push(n.id);
-  }
-
+  finalizeWars(state, res);
   return res;
 }
 
@@ -421,7 +334,10 @@ export function applySettleWarsResult(state: GameState, result: SettleWarsPureRe
     if (separator < 0) continue;
     const nation = state.nations[key.slice(0, separator)];
     const army = nation?.army.find((entry) => entry.id === key.slice(separator + 1));
-    if (army) Object.assign(army, final);
+    if (army) {
+      if (final.size > 0) Object.assign(army, final);
+      else nation.army = nation.army.filter((a) => a.id !== army.id);
+    }
   }
 
   for (const [provinceId, final] of Object.entries(result.provFinals)) {
@@ -436,6 +352,7 @@ export function applySettleWarsResult(state: GameState, result: SettleWarsPureRe
     nation.resources.food += delta.foodDelta;
     if (delta.warExhaustionFinal !== undefined) nation.warExhaustion = delta.warExhaustionFinal;
     if (delta.stabilityFinal !== undefined) nation.government.stability = delta.stabilityFinal;
+    if (delta.capital !== undefined) nation.capital = delta.capital;
     if (delta.defeated !== undefined) nation.defeated = delta.defeated;
     if (delta.armyLocationOverrides) {
       for (const [armyId, location] of Object.entries(delta.armyLocationOverrides)) {
@@ -452,11 +369,11 @@ export function applySettleWarsResult(state: GameState, result: SettleWarsPureRe
   for (const [key, final] of Object.entries(result.relationFinals)) {
     const separator = key.indexOf('->');
     if (separator < 0) continue;
-    const relation = getRelationObj(key.slice(0, separator), key.slice(separator + 2), state);
+    const relation = findRelation(state.relations, key.slice(0, separator), key.slice(separator + 2));
     if (relation) Object.assign(relation, final);
   }
 
-  state.chronicle.push(...result.newChronicle.map((entry) => ({ ...entry })));
+  for (const entry of result.newChronicle) addChronicle(state, entry);
   for (const nationId of result.atWarClear) {
     const nation = state.nations[nationId];
     if (nation) nation.atWar = false;

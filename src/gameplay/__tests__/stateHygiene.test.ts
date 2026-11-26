@@ -128,3 +128,19 @@ describe('state hygiene repair chain', () => {
     expect(repaired.history).toHaveLength(12);
   });
 });
+
+it('repairs war treaties against the actual wars when loading a campaign', () => {
+  const state = createInitialState();
+  const a = state.playerNationId, b = 'n02', c = 'n03';
+  state.wars = [
+    { id: 'valid', attackerId: a, defenderId: b, targetProvinceId: state.nations[b].capital, progress: 25, turns: 2, battleReports: [] },
+    { id: 'obsolete', attackerId: c, defenderId: b, targetProvinceId: state.nations[a].capital, progress: 70, turns: 4, battleReports: [] },
+  ];
+  state.relations = state.relations.filter((r) => !([r.from, r.to].includes(a) && [r.from, r.to].includes(b)));
+  for (const r of state.relations) if ([r.from, r.to].includes(c) && [r.from, r.to].includes(b)) r.treaty = 'war';
+  const next = sanitizeState(state);
+  expect(next.wars.map((w) => w.id)).toEqual(['valid']);
+  const pair = (x: string, y: string) => next.relations.filter((r) => [r.from, r.to].includes(x) && [r.from, r.to].includes(y));
+  expect(pair(a, b).map((r) => r.treaty)).toEqual(['war', 'war']);
+  expect(pair(b, c).every((r) => r.treaty !== 'war')).toBe(true);
+});

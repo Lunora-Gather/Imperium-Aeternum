@@ -2,11 +2,13 @@
 // Store、测试和未来模拟器都应调用此入口，避免运行时覆盖方法造成顺序漂移。
 
 import type { GameState, TurnReport } from '../types/game';
-import { applyAmbitionsAfterTurn, syncAmbitionMeta } from './ambitions';
-import { processTurn } from '../engine/turn';
-import { sanitizeState } from './stateHygiene';
+import { applyAmbitionsAfterTurn } from './ambitions';
+import { detectMilestones } from '../engine/chronicle';
+import { nationWarnings, processTurn, yearEndChanges } from '../engine/turn';
+import { sanitizeTurnSnapshot } from './stateHygiene';
 import { applyAIStrategy, applyPlayerFocus } from './strategyFocus';
-import { applyNationalPurposeAfterTurn, initializeNationalPurpose } from './nationalPurpose';
+import { settleNationalPurpose } from './nationalPurpose';
+export { prepareGameState } from './prepareGameState';
 
 export interface TurnPipelineResult {
   state: GameState;
@@ -14,13 +16,10 @@ export interface TurnPipelineResult {
   notes: string[];
 }
 
-export function prepareGameState(state: GameState): GameState {
-  return sanitizeState(initializeNationalPurpose(syncAmbitionMeta(state)));
-}
-
 export function advanceTurnPipeline(state: GameState): TurnPipelineResult {
-  const turn = processTurn(state);
-  const purpose = applyNationalPurposeAfterTurn(turn.state);
+  const turn = processTurn(state, { deferNationalMilestones: true });
+  const initialWarnings = nationWarnings(turn.state.nations[turn.state.playerNationId]);
+  const purpose = settleNationalPurpose(turn.state);
   const ambition = applyAmbitionsAfterTurn(purpose.state);
   const notes = [...purpose.notes, ...(ambition.note ? [ambition.note] : [])];
   let next = ambition.state;
@@ -33,12 +32,18 @@ export function advanceTurnPipeline(state: GameState): TurnPipelineResult {
       if (next.lastReport) {
         const strategicNotes = [...(next.lastReport.strategicNotes ?? []), focus.note].slice(-8);
         next.lastReport = { ...next.lastReport, strategicNotes };
-        next.history = next.history.map((report) => report.turn === next.lastReport?.turn ? next.lastReport : report) as TurnReport[];
       }
     }
   }
 
-  const finalState = sanitizeState(next);
-  const finalReport = finalState.lastReport?.turn === turn.report.turn ? finalState.lastReport : turn.report;
+  const finalState = sanitizeTurnSnapshot(next);
+  const id = finalState.playerNationId;
+  const report = finalState.lastReport ?? turn.report;
+  const finalReport = { ...report, ...yearEndChanges(state, finalState, id), warnings: [
+    ...nationWarnings(finalState.nations[id]), ...report.warnings.filter(w => !initialWarnings.includes(w)),
+  ] };
+  finalState.lastReport = finalReport;
+  finalState.history = finalState.history.map((entry) => entry.turn === finalReport.turn && entry.nationId === id ? finalReport : entry);
+  detectMilestones(finalState, state);
   return { state: finalState, report: finalReport, notes };
 }

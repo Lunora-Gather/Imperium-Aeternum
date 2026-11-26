@@ -1,7 +1,7 @@
 // V41 战争评估引擎：统一玩家预演、AI 宣战和战争 UI 的基础判断。
 // 纯函数，不改 GameState；暂不改变现有战争结算和平衡。
 
-import type { GameState, Nation, Province } from '../types/game';
+import type { DiplomaticRelation, GameState, Nation, Province } from '../types/game';
 
 export type WarAssessmentTone = 'good' | 'warn' | 'danger';
 export type WarRecommendation = 'attack_now' | 'prepare' | 'avoid';
@@ -48,20 +48,19 @@ function armyPower(nation?: Nation): number {
   }, 0);
 }
 
-function ownedProvinces(state: GameState, nationId: string): Province[] {
-  return Object.values(state.provinces).filter((p) => p.ownerId === nationId);
-}
-
-function relationScore(state: GameState, from: string, to: string): number {
-  const rel = state.relations.find((r) => r.from === from && r.to === to);
-  if (!rel) return 0;
-  return rel.relation - rel.threat + rel.trust * 0.25 + rel.tradeDep * 0.15;
+/** Snapshot used while evaluating one attacker's candidate provinces. */
+export function warDiplomacy(state: GameState, attackerId: string) {
+  const outgoing = new Map<string, DiplomaticRelation>();
+  const allies = new Map<string, number>();
+  for (const relation of state.relations) {
+    if (relation.from === attackerId && !outgoing.has(relation.to)) outgoing.set(relation.to, relation);
+    if (relation.treaty === 'alliance' && relation.relation >= 50) allies.set(relation.to, (allies.get(relation.to) ?? 0) + 1);
+  }
+  return { outgoing, allies };
 }
 
 function borderAccess(state: GameState, attackerId: string, target?: Province): boolean {
-  if (!target) return false;
-  const attackerProvinceIds = new Set(ownedProvinces(state, attackerId).map((p) => p.id));
-  return target.adjacent.some((id) => attackerProvinceIds.has(id));
+  return target?.adjacent.some((id) => state.provinces[id]?.ownerId === attackerId) ?? false;
 }
 
 function supplyScore(attacker?: Nation, hasBorder = false): number {
@@ -84,13 +83,6 @@ function stabilityScore(attacker?: Nation): number {
   return clamp(attacker.government.stability * 0.7 + attacker.government.legitimacy * 0.2 + attacker.government.efficiency * 0.1 - attacker.warExhaustion * 0.45);
 }
 
-function diplomaticRiskScore(state: GameState, attackerId: string, defenderId: string): number {
-  const rel = relationScore(state, attackerId, defenderId);
-  const defenderAllies = state.relations.filter((r) => r.to === defenderId && r.treaty === 'alliance' && r.relation >= 50).length;
-  const attackerAllies = state.relations.filter((r) => r.to === attackerId && r.treaty === 'alliance' && r.relation >= 50).length;
-  return clamp(42 + defenderAllies * 12 - attackerAllies * 7 + Math.max(0, rel) * 0.25);
-}
-
 function factor(id: string, label: string, value: string, score: number, goodWhenHigh: boolean, detail: string): WarAssessmentFactor {
   const tone: WarAssessmentTone = goodWhenHigh
     ? score >= 65 ? 'good' : score >= 40 ? 'warn' : 'danger'
@@ -104,7 +96,7 @@ function recLabel(rec: WarRecommendation): string {
   return '避免开战';
 }
 
-export function assessWar(state: GameState, attackerId: string, defenderId: string, targetProvinceId: string): WarAssessment {
+export function assessWar(state: GameState, attackerId: string, defenderId: string, targetProvinceId: string, diplomacy = warDiplomacy(state, attackerId)): WarAssessment {
   const attacker = state.nations[attackerId];
   const defender = state.nations[defenderId];
   const target = state.provinces[targetProvinceId];
@@ -115,7 +107,9 @@ export function assessWar(state: GameState, attackerId: string, defenderId: stri
   const logistics = supplyScore(attacker, hasBorder);
   const fiscal = fiscalScore(attacker);
   const stability = stabilityScore(attacker);
-  const diplomaticRisk = diplomaticRiskScore(state, attackerId, defenderId);
+  const relation = diplomacy.outgoing.get(defenderId);
+  const goodwill = relation ? relation.relation - relation.threat + relation.trust * 0.25 + relation.tradeDep * 0.15 : 0;
+  const diplomaticRisk = clamp(42 + (diplomacy.allies.get(defenderId) ?? 0) * 12 - (diplomacy.allies.get(attackerId) ?? 0) * 7 + Math.max(0, goodwill) * 0.25);
   const exhaustionRisk = clamp((attacker?.warExhaustion ?? 100) + Math.max(0, 55 - stability) * 0.45 + (hasBorder ? 0 : 12));
   const readiness = clamp(powerRatio * 0.42 + logistics * 0.22 + fiscal * 0.16 + stability * 0.14 + (100 - diplomaticRisk) * 0.06);
   const winChance = clamp(30 + powerRatio * 0.48 + logistics * 0.12 + stability * 0.08 - diplomaticRisk * 0.08);

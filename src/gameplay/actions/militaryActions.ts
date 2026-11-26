@@ -1,13 +1,12 @@
 import {
-  declareWar as engineDeclareWar,
+  declareWar as engineDeclareWar, warDeclarationBlocker,
   makePeace as engineMakePeace,
   moveArmy as engineMoveArmy,
   recruit as engineRecruit,
 } from '../../engine/military';
 import type { GameState } from '../../types/game';
-import { hasActiveNonAggressionAccord } from '../../engine/summits';
 import { recordDiplomaticIncident } from '../diplomaticMemory';
-import { failure, relationPair, runGameAction, spendAdmin, success, validForeignTarget } from './actionCore';
+import { failure, runGameAction, spendAdmin, success, validForeignTarget } from './actionCore';
 
 export function recruitAction(state: GameState, provinceId: string, count: number) {
   return runGameAction(state, (working, player) => {
@@ -27,14 +26,8 @@ export function declareWarAction(state: GameState, targetId: string, provinceId:
     const target = validForeignTarget(working, player, targetId);
     const targetProvince = working.provinces[provinceId];
     if (!target || !targetProvince || targetProvince.ownerId !== target.id) return failure('宣战目标无效');
-    const pair = relationPair(working, player.id, target.id);
-    if (!pair) return failure('缺少外交关系数据');
-    if (pair.some((relation) => relation.treaty === 'alliance')) return failure('不能向盟友宣战');
-    if (pair.some((relation) => relation.treaty === 'truce' && relation.truceTurns > 0)) return failure('停战期内不能宣战');
-    if (hasActiveNonAggressionAccord(working, player.id, target.id)) return failure('双方仍受元首会谈达成的不侵犯协议约束');
-    if (working.wars.some((war) => [war.attackerId, war.defenderId].includes(player.id) && [war.attackerId, war.defenderId].includes(target.id))) {
-      return failure('双方已经处于战争中');
-    }
+    const blocker = warDeclarationBlocker(working, player.id, target.id);
+    if (blocker) return failure(blocker);
     const bordersTarget = Object.values(working.provinces)
       .filter((province) => province.ownerId === player.id)
       .some((province) => province.adjacent.includes(targetProvince.id));
@@ -48,7 +41,7 @@ export function declareWarAction(state: GameState, targetId: string, provinceId:
   });
 }
 
-export function makePeaceAction(state: GameState, warId: string) {
+export function makePeaceAction(state: GameState, warId: string, sharedWorld = false) {
   return runGameAction(state, (working, player) => {
     const war = working.wars.find((entry) => entry.id === warId);
     if (!war || (war.attackerId !== player.id && war.defenderId !== player.id)) return failure('无法处理不属于玩家的战争');
@@ -57,15 +50,9 @@ export function makePeaceAction(state: GameState, warId: string) {
     if (apFailure) return apFailure;
     player.resources.influence -= 30;
     const otherId = war.attackerId === player.id ? war.defenderId : war.attackerId;
+    const startingCapital = player.capital;
     engineMakePeace(working, war);
-    const pair = relationPair(working, player.id, otherId);
-    if (pair) {
-      for (const relation of pair) {
-        relation.treaty = 'truce';
-        relation.truceTurns = Math.max(relation.truceTurns, 10);
-        relation.relation = Math.min(relation.relation, -35);
-      }
-    }
+    if (!sharedWorld && working.provinces[startingCapital]?.ownerId !== player.id) working.victory.type = 'fail_capital_lost';
     recordDiplomaticIncident(working, otherId, player.id, 'peace', 5, '接受议和并进入停战期');
     return success(`与 ${working.nations[otherId]?.name ?? otherId} 议和完成`);
   });

@@ -1,3 +1,4 @@
+import { isModifiedOrRepeatedKey } from '../gameplay/navigationTabs';
 import { registerGovernanceTranslations } from '../i18n/catalogs/governance';
 import { localizeReactTree } from '../i18n/reactTree';
 registerGovernanceTranslations();
@@ -108,7 +109,9 @@ export default function EventModal() {
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (!pending || !ev) return;
+      if (!pending || !ev || isModifiedOrRepeatedKey(e)) return;
+      const activeDialog = e.target instanceof Element && e.target.closest('[role="dialog"]');
+      if (activeDialog && activeDialog !== dialogRef.current) return;
       if (e.key === '1' && ev.options.length >= 1) { e.preventDefault(); choose(0); }
       else if (e.key === '2' && ev.options.length >= 2) { e.preventDefault(); choose(1); }
       else if (e.key === '3' && ev.options.length >= 3) { e.preventDefault(); choose(2); }

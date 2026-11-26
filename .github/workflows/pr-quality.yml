@@ -95,13 +95,20 @@ jobs:
         run: npx vitest run src/engine/__tests__/longRunSimulation.test.ts
       - name: Full regression suite
         run: npm run test
-      - run: sudo safaridriver --enable
-      - run: npm run test:e2e
       - name: Data and scenario validation
         run: npm run validate
       - name: Shared-world engine parity
         run: npm run check:shared-world-engine
       - name: Pages-compatible production build
         run: npm run pages:build
+        env:
+          VITE_BASE: /Imperium-Aeternum/
+      - run: sudo safaridriver --enable
+      - name: Smoke test the built Pages candidate
+        run: npm run test:e2e -- --preview
+      - name: Two-device cloud save recovery
+        run: |
+          npx playwright-core install webkit
+          npm run test:e2e:cloud
         env:
           VITE_BASE: /Imperium-Aeternum/

@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { createInitialState } from '../../engine/init';
 import { invariantErrors } from '../../gameplay/stateInvariants';
+import { SCENARIOS } from '../scenarioCatalog';
 import { useGameStore } from '../gameStore';
 
 describe('GameStore explicit pipeline integration', () => {
@@ -25,6 +26,28 @@ describe('GameStore explicit pipeline integration', () => {
     expect(advanced.justProcessedTurn).toBe(true);
     expect(advanced.state.lastReport).toEqual(report);
     expect(invariantErrors(advanced.state)).toEqual([]);
+  });
+
+  it.each(SCENARIOS.flatMap(scenario => (scenario.playableNations ?? []).map(nation => ({
+    id: scenario.id, nation: nation.id, name: nation.name, tier: nation.tier,
+  }))))('starts $id as the advertised $name', ({ id, nation, name, tier }) => {
+    useGameStore.getState().startScenario(id, nation);
+    const { state, scene } = useGameStore.getState();
+    expect(scene).toBe('playing');
+    expect(state.scenarioId).toBe(id);
+    expect(state.playerNationId).toBe(nation);
+    expect(state.nations[nation]).toMatchObject({ name, tier, isPlayer: true });
+    expect(state.provinces[state.nations[nation].capital].ownerId).toBe(nation);
+    expect(Object.values(state.nations).filter(n => n.isPlayer)).toHaveLength(1);
+  });
+
+  it('keeps the two-step choice and rejects a nation outside the selected scenario', () => {
+    const store = useGameStore.getState();
+    store.startScenario('w6_americas');
+    store.startWithNation('n_med_rome');
+    expect(useGameStore.getState().scene).toBe('menu');
+    store.startWithNation('n_am_maya');
+    expect(useGameStore.getState().state.playerNationId).toBe('n_am_maya');
   });
 
   it('stores and applies a typed strategy focus', () => {

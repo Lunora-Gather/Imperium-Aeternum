@@ -54,6 +54,7 @@ export interface NationControl {
   nationName: string;
   controllerUserId: string | null;
   status: NationControlStatus;
+  unavailable?: 'defeated' | 'missing';
   claimedAt: string | null;
   releasedAt: string | null;
   leaseExpiresAt: string | null;

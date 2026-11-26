@@ -52,8 +52,9 @@ describe('shared world gateway policy', () => {
 
   it('requires real activity during the planning window before scheduled progress', () => {
     const world = { pauseWhenEmpty: true, planningDeadlineAt: '2026-07-23T00:00:00.000Z', planningWindowSeconds: 3600 };
-    expect(wasWorldActiveDuringWindow(world, [{ lastSeenAt: '2026-07-22T23:30:00.000Z' }])).toBe(true);
-    expect(wasWorldActiveDuringWindow(world, [{ lastSeenAt: '2026-07-22T22:30:00.000Z' }])).toBe(false);
+    expect(wasWorldActiveDuringWindow(world, [{ lastActiveAt: '2026-07-22T23:30:00.000Z' }])).toBe(true);
+    expect(wasWorldActiveDuringWindow(world, [{ lastActiveAt: '2026-07-22T22:30:00.000Z' }])).toBe(false);
+    expect(wasWorldActiveDuringWindow(world, [{ claimedAt: '2026-07-22T23:30:00.000Z' }])).toBe(true);
   });
 
   it('only schedules initialized planning worlds after their deadline', () => {

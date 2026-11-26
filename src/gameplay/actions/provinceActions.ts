@@ -2,8 +2,9 @@ import { BUILDINGS } from '../../data/buildings';
 import type { BuildingId } from '../../data/buildings';
 import { establishTradeRoute as engineEstablishTradeRoute } from '../../engine/economy';
 import { addChronicle } from '../../engine/chronicle';
+import { recognizeRebelIndependence, removeRebelNations, syncWarFlags } from '../../engine/turnIntel';
 import { allocateEntityId } from '../../utils/id';
-import type { GameState } from '../../types/game';
+import type { GameState, Province } from '../../types/game';
 import { clamp, failure, runGameAction, spendAdmin, success } from './actionCore';
 
 export type ProvinceDevelopmentKind = 'reclaim' | 'garrison_deploy' | 'garrison_recall' | 'neutral_negotiate' | 'neutral_colonize' | 'neutral_occupy';
@@ -31,6 +32,14 @@ export function embargoTradeRouteAction(state: GameState, routeId: string) {
   });
 }
 
+export function bordersNation(province: Province, provinces: GameState['provinces'], nationId: string): boolean {
+  return province.adjacent.some((id) => provinces[id]?.ownerId === nationId);
+}
+
+export function occupationTroops(province: Province): number {
+  return Math.max(100, province.garrison + 50);
+}
+
 export function developProvinceAction(state: GameState, provinceId: string, kind: ProvinceDevelopmentKind) {
   return runGameAction(state, (working, player) => {
     const province = working.provinces[provinceId];
@@ -38,11 +47,11 @@ export function developProvinceAction(state: GameState, provinceId: string, kind
     const neutralAction = kind === 'neutral_negotiate' || kind === 'neutral_colonize' || kind === 'neutral_occupy';
     if (neutralAction) {
       if (working.nations[province.ownerId]) return failure('该省份已有国家统治，应通过外交或战争处理');
-      if (!province.adjacent.some((id) => working.provinces[id]?.ownerId === player.id)) return failure('只能拓展与本国接壤的中立省份');
+      if (!bordersNation(province, working.provinces, player.id)) return failure('只能拓展与本国接壤的中立省份');
       if (kind === 'neutral_negotiate' && (player.resources.gold < 80 || player.resources.influence < 40)) return failure('交涉需要 80 金与 40 影响力');
       if (kind === 'neutral_colonize' && (player.resources.gold < 120 || player.resources.food < 150)) return failure('移民开拓需要 120 金与 150 粮');
       const armySize = player.army.reduce((total, army) => total + army.size, 0);
-      if (kind === 'neutral_occupy' && (player.resources.supply < 60 || armySize < Math.max(100, province.garrison + 50))) return failure('军事占领需要 60 补给与足够军力');
+      if (kind === 'neutral_occupy' && (player.resources.supply < 60 || armySize < occupationTroops(province))) return failure('军事占领需要 60 补给与足够军力');
       const apFailure = spendAdmin(player, kind === 'neutral_occupy' ? 1 : 2);
       if (apFailure) return apFailure;
 
@@ -144,15 +153,14 @@ export function suppressRebellionAction(state: GameState) {
     const apFailure = spendAdmin(player, 2);
     if (apFailure) return apFailure;
     player.resources.gold -= 150;
-    for (const rebelId of player.civilWar.rebels) {
-      Object.values(working.provinces).forEach((province) => {
-        if (province.ownerId === rebelId) province.ownerId = player.id;
-      });
-      delete working.nations[rebelId];
-      working.relations = working.relations.filter((relation) => relation.from !== rebelId && relation.to !== rebelId);
-      working.wars = working.wars.filter((war) => war.attackerId !== rebelId && war.defenderId !== rebelId);
+    const rebels = player.civilWar.rebels;
+    for (const province of Object.values(working.provinces)) {
+      if (rebels.includes(province.ownerId)) {
+        province.ownerId = player.id;
+        province.isCapital = province.id === player.capital;
+      }
     }
-    player.civilWar = { active: false, rebels: [] };
+    removeRebelNations(working, rebels);
     player.government.stability = clamp(player.government.stability - 10, 0, 100);
     addChronicle(working, { turn: working.turn, kind: 'milestone_rebellion', title: '内战平定', desc: '玩家以武力镇压叛乱。', actorId: player.id });
     return success('镇压叛乱成功');
@@ -164,7 +172,24 @@ export function negotiateRebellionAction(state: GameState) {
     if (!player.civilWar?.active) return failure('未处于内战');
     const apFailure = spendAdmin(player, 2);
     if (apFailure) return apFailure;
-    const rebelCount = player.civilWar.rebels.length;
+    const rebels = player.civilWar.rebels;
+    for (const id of rebels) {
+      const rebel = working.nations[id];
+      if (!rebel) continue;
+      recognizeRebelIndependence(rebel);
+      for (const [from, to] of [[player.id, id], [id, player.id]]) {
+        const relation = working.relations.find((r) => r.from === from && r.to === to);
+        if (relation) {
+          relation.treaty = 'truce';
+          relation.truceTurns = 10;
+        } else {
+          working.relations.push({ from, to, treaty: 'truce', truceTurns: 10, relation: -45, trust: 0, threat: 0, tradeDep: 0 });
+        }
+      }
+    }
+    working.wars = working.wars.filter((war) => !(war.attackerId === player.id && rebels.includes(war.defenderId))
+      && !(war.defenderId === player.id && rebels.includes(war.attackerId)));
+    syncWarFlags(working);
     player.civilWar = { active: false, rebels: [] };
     player.government.legitimacy = clamp(player.government.legitimacy - 15, 0, 100);
     player.government.stability = clamp(player.government.stability + 15, 0, 100);
@@ -172,7 +197,7 @@ export function negotiateRebellionAction(state: GameState) {
       turn: working.turn,
       kind: 'milestone_rebellion',
       title: '内战和议',
-      desc: `朝廷承认 ${rebelCount} 个叛乱政权的既成地位，换取停战。`,
+      desc: `朝廷承认 ${rebels.length} 个叛乱政权的既成地位，换取停战。`,
       actorId: player.id,
     });
     return success('已通过谈判结束内战');
