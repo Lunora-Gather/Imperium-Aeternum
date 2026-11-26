@@ -44,7 +44,7 @@ export default function ScenarioSelect({ theme, applyTheme }: ThemeControls) {
   const handbook = useMemo(() => buildLaunchHandbook(), []);
   useEffect(() => {
     if (!libraryOpen) return;
-    const frame = window.requestAnimationFrame(() => document.getElementById('scenario-library')?.scrollIntoView({ behavior: 'smooth', block: 'start' }));
+    const frame = window.requestAnimationFrame(() => document.getElementById('scenario-library')?.scrollIntoView({ block: 'start' }));
     return () => window.cancelAnimationFrame(frame);
   }, [libraryOpen]);
 
@@ -62,16 +62,16 @@ export default function ScenarioSelect({ theme, applyTheme }: ThemeControls) {
     const id = focusAfterStep.current;
     if (!id) return;
     focusAfterStep.current = '';
-    // Wait for WebKit to lay out the new step after the roster is removed.
-    const frame = window.requestAnimationFrame(() => {
-      const target = document.getElementById(id);
-      if (!target) return;
-      if (id === 'campaign-step-title') window.scrollTo({ top: 0, behavior: 'instant' });
-      target.focus({ preventScroll: true });
-      const { top, bottom } = target.getBoundingClientRect();
-      if (top < 0 || bottom > window.innerHeight) {
-        target.scrollIntoView({ block: 'nearest', behavior: 'instant' });
-      }
+    // Allow the replaced step and its scroll position to settle before focusing.
+    let frame = window.requestAnimationFrame(() => {
+      frame = window.requestAnimationFrame(() => {
+        const target = document.getElementById(id);
+        if (!target) return;
+        if (id === 'campaign-step-title') window.scrollTo(0, 0);
+        target.focus();
+        const { top, bottom } = target.getBoundingClientRect();
+        if (top < 0 || bottom > window.innerHeight) target.scrollIntoView({ block: 'nearest' });
+      });
     });
     return () => window.cancelAnimationFrame(frame);
   }, [selected, pickedNation]);
