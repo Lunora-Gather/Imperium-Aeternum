@@ -541,7 +541,7 @@ try {
   await browser.waitFor(`document.activeElement.id === 'nation-n_we_frank'`, 'Reselect lost the previously chosen nation');
   assert(await browser.evaluate(clickButton('剧本大厅')), 'Could not return to the mobile campaign library');
   await browser.waitFor(`document.activeElement.id === 'scenario-world'`, 'Back to lobby lost the scenario that opened the roster');
-  assert(await browser.evaluate(clickButton('继续最佳存档')), 'Mobile continue button was not found');
+  await browser.waitFor(clickButton('继续最佳存档'), 'Mobile continue button was not available after checking local saves');
   await browser.waitFor(`document.body?.innerText.includes('本回合简报')`, 'Mobile dashboard did not load');
   const mobile = await browser.evaluate(`(() => ({
     statusHidden: getComputedStyle(document.querySelector('.ia-status-panel')).display === 'none',
@@ -613,7 +613,7 @@ try {
   const changedTax = await browser.evaluate(`${taxBar}.getAttribute('aria-valuenow')`);
   await browser.navigate(`${APP_URL}?e2e=resume`);
   await browser.waitFor(`!!document.querySelector('#scenario-library')`, 'Refresh did not return to the lobby');
-  assert(await browser.evaluate(clickButton('继续最佳存档')), 'No recovery checkpoint was offered');
+  await browser.waitFor(clickButton('继续最佳存档'), 'No recovery checkpoint was offered after checking local saves');
   await browser.waitFor(`!!document.querySelector('.ia-ruler-subline')`, 'Recovery checkpoint did not open');
   assert(await browser.evaluate(clickNavigationTab('economy')), 'Could not verify the recovered tax rate');
   await browser.waitFor(`${taxBar}?.getAttribute('aria-valuenow') === ${JSON.stringify(changedTax)}`, 'Refresh lost the latest unsaved tax change');
