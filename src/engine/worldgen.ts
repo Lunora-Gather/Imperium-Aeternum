@@ -2,6 +2,7 @@
 // DEC-011: 从区域模板 + 国家模板 seeded 生成 192 国 / 600 省
 // S/A 级手写覆盖，B/C/D 级模板生成
 
+import type { GameState, Province } from '../types/game';
 import type { NationDef, NationTier } from '../data/nations';
 import type { ProvinceDef } from '../data/provinces';
 import type { GovernmentId } from '../data/governments';
@@ -236,14 +237,15 @@ function addProvince(nation: NationDef, region: RegionTemplate, rng: () => numbe
   const provId = `p_${idOffset + provIdx + 1}`;
   const nameIdx = Math.floor(rng() * region.provinceNamePool.length);
   const terrainIdx = Math.floor(rng() * region.terrainBias.length);
-  const terrain = region.terrainBias[terrainIdx];
+  const drawnTerrain = region.terrainBias[terrainIdx];
+  const terrain = isCapital && drawnTerrain === 'ocean' ? 'coast' : drawnTerrain;
   const x = lerp(region.xRange[0], region.xRange[1], rng());
   const y = lerp(region.yRange[0], region.yRange[1], rng());
   const pop = isCapital ? Math.round(lerp(800, 2000, rng()) * (nation.tier === 'S' ? 2 : 1)) : Math.round(lerp(200, 800, rng()));
   result.push({
     id: provId, name: `${region.provinceNamePool[nameIdx % region.provinceNamePool.length]}${!isCapital ? ` ${provIdx}` : ''}`,
     terrain, type: isCapital ? 'capital' : (terrain === 'ocean' ? 'ocean' : 'land'),
-    ownerId: nation.id, isCapital, agriBase: terrain === 'ocean' ? 0 : lerp(0.5, 1.5, rng()),
+    ownerId: nation.id, isCapital, agriBase: drawnTerrain === 'ocean' ? Number(isCapital) : lerp(0.5, 1.5, rng()),
     culture: region.culture, religion: region.religion, initPop: terrain === 'ocean' ? 0 : pop,
     initClassRatio: terrain === 'ocean' ? { peasants: 0, workers: 0, merchants: 0, soldiers: 0, scholars: 0, nobles: 0, clergy: 0 } : { peasants: 0.5, workers: 0.2, merchants: 0.1, soldiers: 0.08, scholars: 0.04, nobles: 0.04, clergy: 0.04 },
     baseResources: { wood: Math.round(rng() * 5), iron: Math.round(rng() * 3) },
@@ -332,4 +334,14 @@ export function worldStats(result: WorldGenResult): string {
   const tierCounts: Record<string, number> = {};
   for (const n of result.nations) tierCounts[n.tier] = (tierCounts[n.tier] ?? 0) + 1;
   return `${result.nations.length} 国 / ${result.provinces.length} 省 / ${result.relations.length} 外交关系 | S:${tierCounts['S'] ?? 0} A:${tierCounts['A'] ?? 0} B:${tierCounts['B'] ?? 0} C:${tierCounts['C'] ?? 0} D:${tierCounts['D'] ?? 0}`;
+}
+
+/** Early generated maps sometimes assigned open water to an inhabited nation's seat. */
+export function legacyOceanCapital(state: GameState, p: Province): boolean {
+  return p.terrain === 'ocean' && p.id.startsWith('p_') && state.nations[p.ownerId]?.capital === p.id;
+}
+
+export function restoreCapitalTerrain(p: Province): void {
+  p.terrain = 'coast';
+  p.agriBase = Math.max(1, p.agriBase);
 }

@@ -2,6 +2,7 @@
 // 阶段 5b：完整实现 docs/reference/02-system-rules.md §11
 
 import type { GameState, Nation, War, Province, Army, BattleReport, ChronicleEntry } from '../types/game';
+import { setProvincePopulation } from './provincePopulation';
 import { computeCombat, resolveBattle, warCostPerTurn, milTechModifier } from './formulas';
 import { TERRAIN_COMBAT_MOD } from './formulas';
 import { terrainLabel } from '../data/terrain';
@@ -22,7 +23,7 @@ export function warDeclarationBlocker(state: GameState, from: string, to: string
   if (!pair) return '缺少外交关系数据';
   if (pair.some((r) => r.treaty === 'alliance')) return '不能向盟友宣战';
   if (pair.some((r) => r.treaty === 'truce' && r.truceTurns > 0)) return '停战期内不能宣战';
-  if (hasActiveNonAggressionAccord(state, from, to)) return '双方仍受元首会谈达成的不侵犯协议约束';
+  if (hasActiveNonAggressionAccord(state, from, to)) return '双方仍受不侵犯协议约束';
   if (state.wars.some((w) => (w.attackerId === from && w.defenderId === to) || (w.attackerId === to && w.defenderId === from))) return '双方已经处于战争中';
   return null;
 }
@@ -394,7 +395,7 @@ export function recruit(state: GameState, nation: Nation, province: Province, co
   const actualCount = Math.round(count * milBonus * (nation.policyMods?.mobilizationMod ?? 1));
   if (province.population < actualCount) return { ok: false, reason: `人口不足（实际需 ${actualCount}）` };
 
-  province.population -= actualCount;
+  setProvincePopulation(province, province.population - actualCount);
   nation.resources.gold -= goldCost;
   nation.resources.supply -= supplyCost;
 

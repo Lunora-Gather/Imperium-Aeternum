@@ -55,6 +55,7 @@ export interface PolicyDef {
     combatMod?: number;           // 战斗力
     mobilizationMod?: number;     // 征兵速度
     assimilationMod?: number;     // 同化速度
+    foodOutputMod?: number;      // Domestic food production multiplier
     popGrowthMod?: number;        // 人口增长
     influenceMod?: number;        // 外交影响力产出
   };
@@ -149,14 +150,14 @@ export const POLICIES: PolicyDef[] = [
   { id: 'civil_service_exam', name: '科举制', description: '以考试选拔官吏，行政大升。需行政 Lv3。', costAction: 2, costGold: 250, allowedGovernments: ['empire', 'monarchy'], effects: { efficiencyMod: 15, corruptionMod: -8 }, factionReaction: { nobles: -18, commoners: 10 }, prereqTech: 'admin_lv3' },
   { id: 'military_reform', name: '军事改革', description: '重组军制，战斗力升但耗金。', costAction: 2, costGold: 200, allowedGovernments: ['empire', 'monarchy', 'junta'], effects: { combatMod: 1.15, mobilizationMod: 1.20 }, factionReaction: { military: 20, commoners: -8 } },
   { id: 'naval_expansion', name: '扩张舰队', description: '大力发展海军，海上贸易与战力升。', costAction: 2, costGold: 180, allowedGovernments: ['republic', 'merchant_republic', 'empire'], effects: { influenceMod: 1.10, combatMod: 1.10 }, factionReaction: { military: 12, merchants: 10 } },
-  { id: 'agrarian_reform', name: '农本政策', description: '重农抑商，粮产升但贸易降。', costAction: 1, costGold: 100, allowedGovernments: ['empire', 'monarchy'], effects: { popGrowthMod: 1.06, taxRateMod: -0.01 }, factionReaction: { commoners: 12, merchants: -15 } },
+  { id: 'agrarian_reform', name: '农本政策', description: '人口增长加快 6%，税率降低 1 个百分点。', costAction: 1, costGold: 100, allowedGovernments: ['empire', 'monarchy'], effects: { popGrowthMod: 1.06, taxRateMod: -0.01 }, factionReaction: { commoners: 12, merchants: -15 } },
   { id: 'infrastructure_plan', name: '基建振兴', description: '全国修路建桥，行政与贸易升。需行政 Lv2。', costAction: 2, costGold: 220, allowedGovernments: [], effects: { efficiencyMod: 8, taxEffMod: 1.05 }, factionReaction: { commoners: 8, merchants: 8 }, prereqTech: 'admin_lv2' },
   { id: 'census', name: '编户齐民', description: '普查人口，税收效率升。需行政 Lv2。', costAction: 1, costGold: 150, allowedGovernments: ['empire', 'monarchy'], effects: { taxEffMod: 1.10, efficiencyMod: 5 }, factionReaction: { nobles: -8 }, prereqTech: 'admin_lv2' },
   { id: 'diplomatic_corps', name: '外交使团', description: '设立专职外交机构，影响力产出升。', costAction: 1, costGold: 130, allowedGovernments: [], effects: { influenceMod: 1.15 }, factionReaction: { nobles: 5, merchants: 5 } },
   { id: 'cultural_patronage', name: '文化赞助', description: '赞助艺术学术，威望与同化升。', costAction: 1, costGold: 110, allowedGovernments: [], effects: { influenceMod: 1.08, assimilationMod: 3 }, factionReaction: { clergy: 5, commoners: 3 } },
   { id: 'succession_law', name: '继承法', description: '确立继承顺序，合法性大升但限制君主。', costAction: 2, costGold: 200, allowedGovernments: ['monarchy', 'empire'], effects: { stabilityMod: 8 }, factionReaction: { nobles: 15, military: -5 } },
   // ── D2 扩充：4 个质变政策，绑定 Lv5 科技解锁 ──
-  { id: 'crop_rotation', name: '轮作政策', description: '科学轮作养地，粮产 +15%。需农业 Lv5。', costAction: 2, costGold: 280, allowedGovernments: [], effects: { popGrowthMod: 1.15 }, factionReaction: { commoners: 15, nobles: -5 }, prereqTech: 'agri_lv5' },
+  { id: 'crop_rotation', name: '轮作政策', description: '科学轮作养地，粮产 +15%。需农业 Lv5。', costAction: 2, costGold: 280, allowedGovernments: [], effects: { foodOutputMod: 1.15 }, factionReaction: { commoners: 15, nobles: -5 }, prereqTech: 'agri_lv5' },
   { id: 'total_mobilization', name: '总动员', description: '全国动员，征兵 ×2 但厌战 +15。需军事 Lv5。', costAction: 3, costGold: 350, allowedGovernments: ['empire', 'junta', 'monarchy'], effects: { mobilizationMod: 2.0 }, factionReaction: { military: 25, commoners: -20 }, prereqTech: 'mil_lv5' },
   { id: 'civil_service_reform', name: '科举改革', description: '深化科举，腐败 -10、行政 +10。需行政 Lv5。', costAction: 3, costGold: 320, allowedGovernments: ['empire', 'monarchy', 'republic'], effects: { corruptionMod: -10, efficiencyMod: 10 }, factionReaction: { nobles: -22, commoners: 12, clergy: 5 }, prereqTech: 'admin_lv5' },
   { id: 'cultural_export', name: '文化输出', description: '向诸邦输出文化，影响力 +25%、外交 +10。需文化 Lv5。', costAction: 2, costGold: 260, allowedGovernments: [], effects: { influenceMod: 1.25, assimilationMod: 8 }, factionReaction: { clergy: 8, commoners: 5 }, prereqTech: 'culture_lv5' },

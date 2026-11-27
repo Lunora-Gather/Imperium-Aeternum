@@ -6,7 +6,7 @@ import { enactPolicy } from '../../engine/politics';
 import { processTurn } from '../../engine/turn';
 import { clearAllSaves, snapshotSaveList, compactGameStateForSave, loadGameFromSlot, migrate, readSaveGameFromSlot, saveGameToSlot, deleteSlot, storedSlotRaw, importSaveGameToSlot } from '../persistence';
 import { SAVE_VERSION, type SaveGame, type TurnReport } from '../../types/game';
-import { checkpointBeforeUnload, saveCampaignForExit, useGameStore } from '../gameStore';
+import { checkpointBeforeUnload, clearCampaignSaves, saveCampaignForExit, useGameStore } from '../gameStore';
 import { operatingNet } from '../../gameplay/reportFinances';
 import { allocateEntityId } from '../../utils/id';
 
@@ -25,6 +25,29 @@ beforeEach(() => {
 });
 
 describe('persistence roundtrip', () => {
+  it.each(['slot', 'all', 'partial'])('can save again after deleting the autosave in this campaign (%s)', mode => {
+    const game = useGameStore.getState();
+    game.newGame();
+    expect(game.save().ok).toBe(true);
+    if (mode === 'slot') game.deleteSlotSave(0, { stored: localStorage.getItem('imperium-aeternum-save-0') });
+    else {
+      expect(game.saveToSlot(1).ok).toBe(true);
+      if (mode === 'partial') {
+        const remove = localStorage.removeItem.bind(localStorage);
+        vi.spyOn(localStorage, 'removeItem').mockImplementation(key => {
+          if (key.endsWith('-1')) throw new Error('storage unavailable');
+          remove(key);
+        });
+      }
+      expect(clearCampaignSaves(snapshotSaveList())).toBe(mode === 'all');
+    }
+    checkpointBeforeUnload();
+    expect(storedSlotRaw(0)).toBeNull();
+    game.setTaxRate(0.31);
+    expect(game.save().ok).toBe(true);
+    expect(loadGameFromSlot(0)?.nations.n01.taxRate).toBe(0.31);
+  });
+
   it.each(['replaced', 'deleted'])('preserves a checkpoint %s in another tab through refresh and save-and-exit', (change) => {
     const store = useGameStore.getState();
     store.newGame();

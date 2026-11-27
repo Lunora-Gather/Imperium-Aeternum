@@ -111,8 +111,10 @@ export function buildContextualGuidance(state: GameState): ContextualGuidance {
     tips.push(tip({ id: 'economy-low', category: 'economy', title: '国库偏薄', body: '国库还没崩，但安全垫不足。和平期优先补金库，战前一定先存档。', action: '补财政安全垫', tab: 'economy', tone: 'warn', priority: 55 }));
   }
 
-  if (n.resources.food < 0 || (state.lastReport?.foodDelta ?? 0) < -45) {
-    tips.push(tip({ id: 'food-red', category: 'food', title: '第一次粮食危机', body: '粮食正在下滑。先看省份生产、人口压力和不满，不要只靠下一回合硬熬。', action: '去省份页查粮食与不满', tab: 'province', tone: 'danger', priority: 90 }));
+  const foodRisk = preview.likelyChanges.find(item => item.id === 'food-drop');
+  if (foodRisk) {
+    tips.push(tip({ id: 'food-red', category: 'food', title: foodRisk.title, body: foodRisk.body,
+      action: '查看粮食收支', tab: 'economy', tone: foodRisk.tone === 'danger' ? 'danger' : 'warn', priority: foodRisk.tone === 'danger' ? 90 : 58 }));
   }
 
   if (n.government.stability < 35 || unrest > 0) {

@@ -2,6 +2,8 @@
 // V15：导出纯函数，不污染输入；新局、选国、读档、槽位读档、每回合后都统一走安全修复。
 
 import type { DiplomaticRelation, GameState, Province, War } from '../types/game';
+import { legacyOceanCapital, restoreCapitalTerrain } from '../engine/worldgen';
+import { setProvincePopulation } from '../engine/provincePopulation';
 import { buildTendency } from '../engine/init';
 import { cloneGameState } from '../engine/stateClone';
 import { syncWarFlags } from '../engine/turnIntel';
@@ -110,7 +112,9 @@ export function sanitizeState(state: GameState, resourcePrecision: 'round' | 'pr
     if (nation.civilWar && !Array.isArray(nation.civilWar.rebels)) nation.civilWar.rebels = [];
   }
   for (const province of Object.values(next.provinces)) {
+    if (legacyOceanCapital(next, province)) restoreCapitalTerrain(province);
     if (!Array.isArray(province.classes)) province.classes = [];
+    setProvincePopulation(province, finite(province.population));
     if (!Array.isArray(province.buildings)) province.buildings = [];
     province.baseResources ??= {};
   }

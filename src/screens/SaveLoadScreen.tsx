@@ -1,5 +1,5 @@
 import { registerGovernanceTranslations } from '../i18n/catalogs/governance';
-import { translate } from '../i18n';
+import { getLocale, translate } from '../i18n';
 import { localizeReactTree } from '../i18n/reactTree';
 registerGovernanceTranslations();
 // SaveLoad v16 — 存档恢复预检 + 多槽位管理 + 自动修复可视化
@@ -64,7 +64,7 @@ export default function SaveLoadScreen() {
   });
   useEffect(() => { void account.initialize(); }, [account.initialize]);
 
-  const fmtTime = (iso: string) => { const d = new Date(iso); if (Number.isNaN(d.getTime())) return '未知时间'; return d.toLocaleString('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' }); };
+  const fmtTime = (iso: string) => { const d = new Date(iso); if (Number.isNaN(d.getTime())) return '未知时间'; return d.toLocaleString(getLocale(), { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' }); };
   const doClearAll = () => clearReviewed(translate('确认删除全部浏览器本地存档？此操作不能恢复。'));
   const filled = slots.filter((s) => s.status !== 'empty').length;
   const empty = slots.filter((s) => s.status === 'empty' && s.slot !== 0).length;
@@ -73,7 +73,8 @@ export default function SaveLoadScreen() {
   const risky = slots.filter((s) => s.status === 'risky').length;
   const broken = slots.filter((s) => s.status === 'broken').length;
   const riskyNow = (player?.resources.gold ?? 0) < 0 || (player?.resources.food ?? 0) < 0 || (player?.government.stability ?? 100) < 35 || state.wars.some((w) => w.attackerId === pid || w.defenderId === pid);
-  const advice = broken > 0 ? { text: `${broken} 个槽位无法恢复，请删除或覆盖。`, tone: 'danger' as const }
+  const advice = shared ? { text: '共享进度由服务器保存。这里可以管理单人存档。', tone: 'info' as const }
+    : broken > 0 ? { text: `${broken} 个槽位无法恢复，请删除或覆盖。`, tone: 'danger' as const }
     : risky > 0 ? { text: `${risky} 个存档可读但仍有风险，读档后先看“下一回合前检查”。`, tone: 'warn' as const }
       : repairable > 0 ? { text: `${repairable} 个存档读档时会自动修复并写回。`, tone: 'warn' as const }
         : manual === 0 ? { text: '还没有手动存档，建议立刻存到槽位 1-4。', tone: 'danger' as const }
@@ -109,7 +110,7 @@ export default function SaveLoadScreen() {
       <Divider label="操作" />
       <div style={{ display: 'flex', gap: 8, marginBottom: 12, flexWrap: 'wrap' }}><CampaignExitControl presentation="save" /><Btn label="刷新体检" variant="ghost" onClick={refresh} /><Btn label="清空全部存档" warn disabled={checking} onClick={doClearAll} /></div>
       <Divider label="存档槽位（槽位 0 = 自动存档）" />
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(250px, 1fr))', gap: 10, marginBottom: 12 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 250px), 1fr))', gap: 10, marginBottom: 12 }}>
         {slots.map((preview) => {
           const { slot, status, version } = preview;
           const isAuto = slot === 0;
@@ -135,7 +136,7 @@ export default function SaveLoadScreen() {
               </div>
             </>}
             {occupied && <RecoveryMini preview={preview} />}
-            {!occupied && !shared && <div style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 8 }}>空槽位，可保存当前路线。</div>}
+            {!occupied && !shared && !isAuto && <div style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 8 }}>空槽位，可保存当前路线。</div>}
             <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
               {!isAuto && !shared && <Btn
                 label={occupied ? confirming ? '确认覆盖' : '存档' : '存档到此'}
@@ -149,7 +150,7 @@ export default function SaveLoadScreen() {
           </div>;
         })}
       </div>
-      <div className="ia-card" style={{ background: 'rgba(245,166,35,0.06)', borderColor: 'var(--warn)' }}><p className="dim" style={{ fontSize: 11, margin: 0, lineHeight: 1.6 }}>ℹ 槽位体检是只读预检，不会提前改写 localStorage。点击“修复并读档”后才会迁移、净化并写回存档。关键节点建议手动存档到槽位 1-4。</p></div>
+      {!shared && <div className="ia-card" style={{ background: 'rgba(245,166,35,0.06)', borderColor: 'var(--warn)' }}><p className="dim" style={{ fontSize: 11, margin: 0, lineHeight: 1.6 }}>ℹ 槽位体检是只读预检，不会提前改写 localStorage。点击“修复并读档”后才会迁移、净化并写回存档。关键节点建议手动存档到槽位 1-4。</p></div>}
     </Panel>
   </div>);
 }

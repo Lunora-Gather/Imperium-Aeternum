@@ -1,3 +1,4 @@
+import { operatingRoutes } from '../engine/tradeNetwork';
 import type {
   GameState,
   NationalCrisisKind,
@@ -104,7 +105,7 @@ export function initializeNationalPurpose(state: GameState): GameState {
 }
 
 function pct(value: number, target: number): number {
-  return clamp(Math.round((value / Math.max(1, target)) * 100));
+  return clamp(Math.floor((value / Math.max(1, target)) * 100));
 }
 
 function routeMetrics(state: GameState, meta: NationalMissionMeta) {
@@ -118,10 +119,13 @@ function routeMetrics(state: GameState, meta: NationalMissionMeta) {
     middle: Math.min(pct(growth, 2), pct(armyTotal(nation), Math.max(200, meta.startArmy * 1.15))),
     legacy: Math.min(pct(growth, 4), pct(nation.government.stability, 45)),
   };
-  if (meta.id === 'prosperity') return {
-    middle: Math.min(pct(nation.resources.gold - meta.startGold, 300), pct(tradeCount, 1)),
-    legacy: Math.min(pct(nation.resources.gold - meta.startGold, 1200), pct(tradeCount, 2)),
-  };
+  if (meta.id === 'prosperity') {
+    const routes = operatingRoutes(nation, state).length;
+    return {
+      middle: Math.min(pct(nation.resources.gold - meta.startGold, 300), pct(tradeCount, 1), pct(routes, 1)),
+      legacy: Math.min(pct(nation.resources.gold - meta.startGold, 1200), pct(tradeCount, 2), pct(routes, 2)),
+    };
+  }
   if (meta.id === 'enlightenment') return {
     middle: Math.min(pct(techGrowth, 2), pct(nation.resources.sciPt, 30)),
     legacy: Math.min(pct(techGrowth, 5), pct(nation.government.efficiency, 55)),
@@ -163,7 +167,7 @@ export function getNationalMissionView(state: GameState): NationalMissionView {
 
 function routeBody(id: NationalMissionId, legacy: boolean): string {
   if (id === 'imperial') return legacy ? '扩张至少 4 省，并将安定维持在 45 以上。' : '扩张 2 省，并建立足以守边的常备军。';
-  if (id === 'prosperity') return legacy ? '比开局多积累 1200 金，并维持至少 2 个贸易伙伴。' : '比开局多积累 300 金，并建立第一条对外贸易关系。';
+  if (id === 'prosperity') return legacy ? '比开局多积累 1200 金，维持两个贸易伙伴和两条运营商路。' : '比开局多积累 300 金，取得贸易伙伴并开通一条商路。';
   if (id === 'enlightenment') return legacy ? '累计提升 5 级科技，并把治能提高到 55。' : '累计提升 2 级科技，并储备 30 科研点。';
   if (id === 'concord') return legacy ? '建立 3 个盟约或贸易伙伴，并积累 140 影响力。' : '获得 2 个可信友邦，并积累 80 影响力。';
   return legacy ? '将安定提高到 70、法统提高到 65，并把腐败压到 35 以下。' : '将安定提高到 60、治能提高到 55。';
@@ -271,8 +275,8 @@ export function settleNationalPurpose(next: GameState): { state: GameState; note
   const mission = getNationalMissionView(next);
 
   if (meta.lastEvaluatedTurn !== next.turn) {
-    const completed = mission.stages.find((stage) => !stage.done && stage.progress >= 100);
-    if (completed) {
+    const completed = mission.stages.find((stage) => !stage.done);
+    if (completed && completed.progress >= 100) {
       meta.completedStages.push(completed.id);
       grantMissionReward(next, completed.id);
       const note = `国家使命完成：${completed.title}；奖励已发放（${completed.reward}）。`;

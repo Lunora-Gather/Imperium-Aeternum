@@ -12,11 +12,12 @@ import { GOVERNMENTS } from '../data/governments';
 import { FACTIONS } from '../data/factions';
 import { NATIONAL_CHARACTERS } from '../data/national-characters';
 import { generateWorld } from './worldgen';
+import { setProvincePopulation } from './provincePopulation';
 import { clamp } from '../utils/math';
 
-function buildClasses(totalPop: number, ratio: ProvinceDef['initClassRatio']): PopulationGroup[] {
+function buildClasses(ratio: ProvinceDef['initClassRatio']): PopulationGroup[] {
   return CLASS_IDS.map(classId => ({
-    classId, count: Math.round(totalPop * ratio[classId]), satisfaction: 50,
+    classId, weight: ratio[classId], count: 0, satisfaction: 50,
   }));
 }
 
@@ -82,7 +83,7 @@ function buildProvinces(definitions: ProvinceDef[], rulers: NationDef[], playerI
       ownerId: p.ownerId, isCapital: p.isCapital,
       agriBase: p.agriBase, culture: p.culture, religion: p.religion,
       population: p.initPop,
-      classes: buildClasses(p.initPop, p.initClassRatio),
+      classes: buildClasses(p.initClassRatio),
       assimilation: p.ownerId === playerId ? 100 : 50,
       loyalty: p.ownerId === playerId ? 70 : 50,
       unrest: 0, rebellionRisk: 0,
@@ -92,6 +93,7 @@ function buildProvinces(definitions: ProvinceDef[], rulers: NationDef[], playerI
       distToPlayerCapital: p.distToPlayerCapital,
       x: p.x, y: p.y,
     };
+    setProvincePopulation(out[p.id], p.initPop);
   }
   // 首都驻初始军队
   for (const n of rulers) {

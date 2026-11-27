@@ -80,6 +80,7 @@ export function SummitPanel({ state, target, onClose, onConvene }: Props) {
     {active && <div style={{ padding: 8, marginBottom: 10, border: '1px solid var(--good)', borderRadius: 6 }}>
       <Tag text="生效中" tone="good" /> <strong style={{ fontSize: 12 }}>{SUMMIT_AGENDAS[active.agenda].agreementName}</strong>
       <span className="dim" style={{ fontSize: 11 }}> · 至第 {active.expiresTurn + 1} 年 · {active.strength === 2 ? '强化协议' : '基础协议'}</span>
+      {active.tradeYears !== undefined && active.expiresTurn === 5 && <div>{t('已交货 {{years}} / 2 年', { years: Math.min(2, active.tradeYears) })}</div>}
     </div>}
 
     <div style={{ fontSize: 11, color: 'var(--text-mute)', marginBottom: 5 }}>商谈议题</div>

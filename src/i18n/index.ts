@@ -8,6 +8,12 @@ const STORAGE_KEY = 'ia-locale';
 const SUPPORTED: readonly Locale[] = ['zh-CN', 'zh-TW', 'en'];
 
 const en: Record<string, string> = {
+  '预计口粮不足': 'Ration shortage expected', '本年需动用粮储': 'Grain reserves will cover the deficit',
+  '常规口粮充足': 'Rations are covered', '查看粮食收支': 'Review the grain budget',
+  '按当前收支结算，余粮将低于人口所需，影响各阶层满意度。': 'After routine settlement, reserves will fall below the population’s needs, lowering class satisfaction.',
+  '库存可承担本年口粮。可在省份开垦或建设农田，缩小年度缺口。': 'Reserves cover this year’s rations. Reclaim land or build farms to reduce the annual deficit.',
+  '本年常规粮食收入足以支付居民和军队口粮。': 'This year’s recurring grain receipts cover civilian and army rations.',
+  '本年粮储下降': 'Grain reserves fell this year', '可在经济页核对下年的粮食收入、居民口粮和军粮。': 'Open Economy to check next year’s grain receipts and rations for civilians and troops.',
   '云端存档已变化，请比较后重新确认': 'The cloud save changed. Compare the versions and confirm your choice.',
   '存档已变化，请比较后确认用云端覆盖本地': 'The save changed. Compare the versions before replacing the local save.',
   '本地存档已变化，请重新确认': 'The local save changed. Confirm your choice again.',
@@ -18,7 +24,7 @@ const en: Record<string, string> = {
   '登录账号已更换，请重新同步': 'The signed-in account changed. Sync again.',
   '登录账号已更换，请重新确认': 'The signed-in account changed. Confirm your choice again.',
   '当前浏览器已登录其他账号，请先退出登录': 'Another account is signed in. Sign out to switch accounts.',
-  '地中海黎明': 'Mediterranean Dawn', '经典小局，节奏快，适合熟悉系统。': 'A fast classic campaign designed for learning the systems.', '万邦纪元': 'Age of Nations', '完整世界剧本，适合长期经营。': 'A complete world campaign for long-term governance.', '东方破晓': 'Eastern Dawn', '秦、汉、匈奴、孔雀同台。': 'Qin, Han, Xiongnu, and Maurya share the stage.', '东亚风云': 'East Asian Struggle', '东亚、中亚、南亚三洲角逐。': 'A contest spanning East, Central, and South Asia.', '地中海争霸': 'Mediterranean Rivalry', '罗马、迦太基、波斯、努米底亚争霸。': 'Rome, Carthage, Persia, and Numidia compete for dominance.', '新大陆崛起': 'Rise of the Americas', '美洲文明独立发展线。': 'An independent development path for American civilizations.', '随机大陆': 'Random Continent', '随机抽取一洲开局，每次不同。': 'Begin on a randomly selected continent each time.', '欧洲封建': 'Feudal Europe', '欧洲多国封建争霸。': 'Feudal powers compete across Europe.', '印度洋贸易': 'Indian Ocean Trade', '南亚、北非、中东和大洋洲围绕海贸争霸。': 'South Asia, North Africa, the Middle East, and Oceania compete over maritime trade.', '帝国黄昏': 'Twilight of Empire', '资源匮乏、叛乱高发、外交孤立。': 'Scarce resources, frequent rebellion, and diplomatic isolation.',
+  '地中海黎明': 'Mediterranean Dawn', '经典小局，节奏快，适合熟悉系统。': 'A fast classic campaign designed for learning the systems.', '万邦纪元': 'Age of Nations', '完整世界剧本，适合长期经营。': 'A complete world campaign for long-term governance.', '东方破晓': 'Eastern Dawn', '开局决定田税由朝廷清查，还是交给地方征收。': 'Open by funding a land survey or delegating tax collection.', '东亚风云': 'East Asian Struggle', '邻国携五年和约来访，你可签约稳住边境，也可转向备战。': 'A neighbor offers five years of peace. Sign the pact or prepare your border defenses.', '地中海争霸': 'Mediterranean Rivalry', '罗马、迦太基、波斯、努米底亚争霸。': 'Rome, Carthage, Persia, and Numidia compete for dominance.', '新大陆崛起': 'Rise of the Americas', '美洲文明独立发展线。': 'An independent development path for American civilizations.', '随机大陆': 'Random Continent', '随机抽取一洲开局，每次不同。': 'Begin on a randomly selected continent each time.', '欧洲封建': 'Feudal Europe', '欧洲多国封建争霸。': 'Feudal powers compete across Europe.', '印度洋贸易': 'Indian Ocean Trade', '从签订贸易协定起步，在输入口粮与输出余粮之间选择。': 'Begin with a trade agreement, then choose between importing grain and selling your surplus.', '帝国黄昏': 'Twilight of Empire', '资源匮乏、叛乱高发、外交孤立。': 'Scarce resources, frequent rebellion, and diplomatic isolation.',
   '选择存档': 'Choose a save', '本局已结束，请查看结局或读取存档。': 'This campaign has ended. Review the ending or load a save.', '此页面将在联网后打开。': 'This page will open when you reconnect.', '常规净收入': 'Operating balance', '平均常规净收入': 'Average operating balance', '国库实际变化': 'Treasury change', '其他结算差额': 'Other settlement adjustments', '差额包括战事、国策等其他结算，以及分项取整的影响。': 'The difference includes other settlements, such as wars and national policies, and rounding of individual entries.', '旧年报未记录国库实际变化。': 'This older report did not record the treasury change.',
   '无需前置经验。': 'No prior experience required.', '通常不是被打崩，而是忽略年报和财政趋势。': 'The usual danger is ignoring reports and fiscal trends, not military defeat.', '先看路线图和情境提示': 'Read the roadmap and guidance first', '第一年后读年报复盘': 'Review the annual report after year one',
   '推荐按挑战阶梯逐步解锁：先学财政和省份，再学战争外交，最后进入完整世界或硬核生存。': 'Advance through the ladder: learn finance and provinces, then war and diplomacy, and finally the full world or survival challenge.',
@@ -79,6 +85,7 @@ const enLaunch: Record<string, string> = {
   '查看结局 · 槽位 {{slot}}': 'Review ending · Slot {{slot}}', '战局结局：槽位 {{slot}} · {{nation}} · 第 {{year}} 年': 'Campaign ending: slot {{slot}} · {{nation}} · year {{year}}', '查看战局结局': 'Review campaign ending',
   '删除失败，请刷新存档体检。': 'Deletion failed. Refresh the save slots.', '部分存档未能删除，请查看剩余槽位。': 'Some saves could not be deleted. Check the remaining slots.',
   '无法读取本地存档。': 'Could not read local saves.', '槽位已变化，请在存档页核对或另存。': 'Slot changed. Review it in Saves or choose another slot.',
+  '共享操作正在提交，请等待确认后再读档。': 'A shared-world action is pending. Wait for confirmation, then load your save.',
   '执政官布鲁图': 'Consul Brutus',
   '先读懂总览': 'Understand the overview first',
   '找到“行动中心”和“下一回合前检查”。先处理红色阻断，再考虑黄色建议。': 'Find the Action Center and Pre-turn Review. Resolve red blockers before considering yellow recommendations.',

@@ -57,7 +57,7 @@ export interface ProvinceDef {
 }
 
 // 工具：默认陆地阶层比例
-const LAND_RATIO = {
+export const LAND_RATIO = {
   peasants: 0.55, workers: 0.15, merchants: 0.10, soldiers: 0.08, scholars: 0.04, nobles: 0.05, clergy: 0.03,
 };
 const POOR_RATIO = {

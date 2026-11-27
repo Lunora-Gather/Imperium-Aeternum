@@ -48,9 +48,9 @@ export function runAITurnPhase(state: GameState, playerId: string, rng: () => nu
     const provinces = provincesByOwner.get(nation.id) ?? [];
     if (provinces.length === 0) continue;
 
-    settleEconomy(nation, state, provinces, relationsBySource.get(nation.id) ?? []);
-    const totalPopulation = provinces.reduce((sum, province) => sum + province.population, 0);
-    settlePopulation(nation, provinces, nation.resources.food < totalPopulation * 0.4, true, nation.atWar, false);
+    const economy = settleEconomy(nation, state, provinces, relationsBySource.get(nation.id) ?? []);
+    for (const province of provinces) if (province.priorAgriBase !== undefined) delete province.priorAgriBase;
+    settlePopulation(nation, provinces, economy.grain.shortageExpected, true, nation.atWar, false);
     settlePolitics(nation, state, provinces);
     lawPerTurnEffects(nation, provinces);
     settleTechnology(nation, state);

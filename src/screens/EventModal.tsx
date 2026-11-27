@@ -6,6 +6,9 @@ registerGovernanceTranslations();
 import { useCallback, useEffect, useRef } from 'react';
 import { useGameStore } from '../store/gameStore';
 import { EVENT_BY_ID } from '../engine/events';
+import { useI18n } from '../i18n';
+import { pactTerms } from '../gameplay/borderPact';
+import { decisionBlocker } from '../gameplay/campaignDecisions';
 import { Tag } from '../components/ui';
 import type { EventEffect } from '../data/events';
 import { discardPendingEvent } from '../gameplay/pendingEventResolution';
@@ -83,6 +86,7 @@ function consequenceText(eff: EventEffect): string | null {
 
 export default function EventModal() {
   const { state, logMsg, resolveEvent } = useGameStore();
+  const { t } = useI18n();
   const pid = state.playerNationId;
   const pending = state.pendingEvents.find((p) => p.nationId === pid) ?? null;
   const ev = pending ? EVENT_BY_ID[pending.eventId] : null;
@@ -96,9 +100,9 @@ export default function EventModal() {
   }, [pending, pid]);
 
   const choose = useCallback((idx: number) => {
-    if (!pending || !ev) return;
+    if (!pending || !ev || decisionBlocker(state, pending, idx)) return;
     resolveEvent(pending.eventId, idx);
-  }, [ev, pending, resolveEvent]);
+  }, [ev, pending, resolveEvent, state]);
 
   useEffect(() => {
     if (pending && !ev) {
@@ -131,6 +135,9 @@ export default function EventModal() {
 
   if (!pending || !ev) return null;
 
+  const partner = pending.partnerId && state.nations[pending.partnerId];
+  const works = pending.works;
+  const province = works && state.provinces[works.provinceId];
   const tone = CATEGORY_TONE[ev.category] ?? 'info';
   const icon = CATEGORY_ICON[ev.category] ?? '📢';
   const playerEvents = state.pendingEvents.filter((event) => event.nationId === pid);
@@ -163,11 +170,29 @@ export default function EventModal() {
           <p id="event-dialog-description" className="ia-event-description">{ev.description}</p>
           <div className="ia-event-options">
           {ev.options.map((opt, i) => {
+            const blocked = decisionBlocker(state, pending, i);
+            let terms: string | undefined;
+            if (partner && i === 0 && ev.id === 'evt_eastern_envoy') terms = t('缔约国：{{partner}}。两年实际交货有利于续约。', { partner: t(partner.name) });
+            if (partner && i === 0 && pending.renewal) {
+              const offer = pactTerms[pending.renewal.terms];
+              if (offer) terms = t(offer.reason) + ' ' + t('与{{partner}}续约 {{years}} 年，礼金 {{gold}} 金。', {
+                partner: t(partner.name), years: offer.years, gold: offer.gold,
+              });
+            }
+            if (works && ev.id === 'evt_grain_budget') {
+              if (i === 0 && partner) terms = t('每年向{{partner}}交付最多 {{food}} 粮，每粮 2 金。优先保留口粮，交战时终止。', {
+                partner: t(partner.name), food: works.quantity,
+              });
+              if (i === 1 && province) terms = t('{{province}}修渠需 {{gold}} 金，农业基础 +{{gain}}', {
+                province: t(province.name), gold: works.price, gain: Math.min(2, 12 - province.agriBase),
+              });
+            }
             const sums = effectSummary(opt.effects);
             const note = consequenceText(opt.effects);
             return (
               <button
                 key={i}
+                disabled={!!blocked}
                 className="ia-event-option"
                 onClick={() => choose(i)}
                 title={`快捷键 ${i + 1}`}
@@ -178,6 +203,8 @@ export default function EventModal() {
                   <strong>{opt.text}</strong>
                   <span className="ia-event-select"><span>选择</span><b aria-hidden="true">→</b></span>
                 </div>
+                {terms && <div>{terms}</div>}
+                {blocked && <div>{t(blocked)}</div>}
                 {sums.length > 0 && (
                   <div className="ia-event-impact">
                     <span className="ia-event-section-label">即时影响</span>

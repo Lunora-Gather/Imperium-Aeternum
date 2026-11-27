@@ -1,10 +1,12 @@
 import { spawn } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import { launchSafari } from './lib/safari-e2e.mjs';
+import { launchWebKit } from './lib/webkit-e2e.mjs';
 import { join } from 'node:path';
 import net from 'node:net';
 
 const HOST = '127.0.0.1';
+const nativeSafari = process.argv.includes('--safari');
 const requestedAppUrl = process.env.E2E_URL?.trim();
 const previewBuild = !requestedAppUrl && process.argv.includes('--preview');
 const localBase = previewBuild ? (process.env.VITE_BASE || '/Imperium-Aeternum/') : '/';
@@ -142,7 +144,7 @@ function clickButton(text) {
     const buttons = [...document.querySelectorAll('button')];
     const button = buttons.find((item) => item.textContent?.trim() === ${JSON.stringify(text)})
       ?? buttons.find((item) => item.textContent?.trim().includes(${JSON.stringify(text)}));
-    if (!button) return false;
+    if (!button || button.disabled) return false;
     button.click();
     return true;
   })()`;
@@ -263,7 +265,7 @@ const server = useLocalServer ? spawn(process.execPath, [viteEntry, ...viteArgs,
 let browser;
 try {
   await waitForHttp(APP_URL);
-  browser = withPageChecks(await launchSafari());
+  browser = withPageChecks(nativeSafari ? await launchSafari() : await launchWebKit());
   await browser.navigate(APP_URL);
   await browser.waitFor(`document.readyState === 'complete' && !!document.querySelector('#scenario-library, .ia-ruler-subline')`, 'App did not finish loading the first screen');
   await browser.evaluate(`(() => { localStorage.clear(); localStorage.setItem('ia-tutorial-done', '1'); localStorage.setItem('ia-locale', 'zh-CN'); })()`);
@@ -293,6 +295,20 @@ try {
     const state = JSON.parse(localStorage.getItem('imperium-aeternum-save-0')).gameState;
     return state.scenarioId === 'w8_indianocean' && state.playerNationId === 'n_oc_srivijaya' && state.nations[state.playerNationId].name === '室利佛逝';
   })()`), 'The saved ruler differs from the confirmed nation');
+  assert(await browser.evaluate(clickNavigationTab('map')), 'Could not open the trade map');
+  await browser.waitFor(`!!document.querySelector('.ia-map-layout')`, 'Trade map did not load');
+  assert(await browser.evaluate(clickButton('商路')), 'Trade map filter is missing');
+  await browser.waitFor(`document.querySelectorAll('line[stroke-dasharray="6 3"]').length > 0`, 'Trade map has no connections');
+  assert(await browser.evaluate(clickButton('管理商路')), 'Trade management is unreachable from the map');
+  await browser.waitFor(clickButton('签订贸易协定（30影响力 · 1行动点）'), 'The maritime opening has no accessible trade partner');
+  await browser.waitFor(clickButton('建立'), 'Signing the treaty did not unlock the route');
+  await browser.waitFor(`!!document.querySelector('[data-route-id] .ia-tag')?.textContent.includes('运营中')`, 'The newly opened route is not operating');
+  assert(await browser.evaluate(clickNavigationTab('dashboard')), 'Could not return to the ruler dashboard');
+  await browser.waitFor(clickButton('下一回合'), 'Could not settle the first shipment');
+  await browser.waitFor(`!!document.querySelector('[aria-label="本年经营回报"]')?.textContent.includes('粮食输入线')`, 'The annual report omitted the first delivery');
+  while (await browser.evaluate(`!!document.querySelector('.ia-event-option:not([disabled])')`)) {
+    await browser.evaluate(`document.querySelector('.ia-event-option:not([disabled])').click()`);
+  }
   await browser.evaluate(`document.querySelector('button[aria-label="返回标题页"]').click()`);
   assert(await browser.evaluate(clickButton('不保存，返回大厅')), 'Could not leave the completed scenario selection check');
   await browser.waitFor(`!!document.querySelector('#scenario-library')`, 'Selected nation did not return to the lobby');
@@ -618,7 +634,30 @@ try {
   assert(await browser.evaluate(clickNavigationTab('economy')), 'Could not verify the recovered tax rate');
   await browser.waitFor(`${taxBar}?.getAttribute('aria-valuenow') === ${JSON.stringify(changedTax)}`, 'Refresh lost the latest unsaved tax change');
 
-  console.log(`Browser E2E passed [Safari] (${useLocalServer ? 'local' : APP_URL}): construction, research, event queue, declaration, negotiated peace, keyboard shortcuts, turn advance, treasury reconciliation, ending recovery, save/load, accessibility and mobile layout.`);
+  assert(await browser.evaluate(clickNavigationTab('save')), 'Save management was unavailable');
+  await browser.waitFor(clickButton('清空全部存档'), 'Could not review all local slots');
+  await browser.waitFor(clickButton('确认删除'), 'Bulk deletion was not confirmed');
+  await browser.waitFor(`[0,1,2,3,4].every(slot => localStorage.getItem('imperium-aeternum-save-' + slot) === null)`, 'Clear left a local slot behind');
+  assert(await browser.evaluate(clickNavigationTab('dashboard')), 'Could not return to the same campaign');
+  await browser.waitFor(clickButton('存档'), 'Could not save after clearing local slots');
+  await browser.waitFor(`localStorage.getItem('imperium-aeternum-save-0') !== null`, 'Clearing slots prevented a new autosave');
+
+  if (!nativeSafari) await browser.setMobileViewport(320);
+  await browser.waitFor(clickButton('全部页面'), 'Mobile page directory unavailable');
+  const language = `document.querySelector('#mobile-page-navigation button[title="English"]')`;
+  await browser.waitFor(`!!${language}?.getClientRects().length`, 'Language switch was hidden in the mobile directory');
+  await browser.evaluate(`${language}.click()`);
+  await browser.waitFor(`document.documentElement.lang === 'en'`, 'Mobile language switch did not take effect');
+  await browser.evaluate(key('document.activeElement', { key: 'Escape' }));
+  for (const [tab, target] of [['tech', '.ia-tech-row'], ['diplomacy', '[id^="diplo-"]'], ['population', '.ia-card--raised'], ['save', '.ia-card']]) {
+    await browser.evaluate(clickNavigationTab(tab));
+    await browser.waitFor(`document.querySelector('[data-navigation-tab="${tab}"]')?.classList.contains('is-active') && !!document.querySelector('main ${target}')`, 'Missing mobile screen ' + tab);
+    const overflow = await browser.evaluate(`[...document.querySelectorAll('main .ia-panel, main .ia-card, main .ia-card--raised, main .ia-tech-row, main .ia-num')].filter(el => el.clientWidth && el.scrollWidth > el.clientWidth + 2).map(el => el.innerText.slice(0, 60))`);
+    assert(!overflow.length, `Clipped mobile ${tab} content: ${JSON.stringify(overflow)}`);
+  }
+
+  assert(!browser.runtimeErrors?.length, `Browser errors: ${JSON.stringify(browser.runtimeErrors)}`);
+  console.log(`Browser E2E passed [${nativeSafari ? 'Safari' : 'headless WebKit'}] (${useLocalServer ? 'local' : APP_URL}): construction, research, event queue, declaration, negotiated peace, keyboard shortcuts, turn advance, treasury reconciliation, ending recovery, save/load, accessibility and mobile layout.`);
 } finally {
   try { await browser?.close(); } finally { await stopChild(server); }
 }

@@ -60,7 +60,7 @@ export default function PoliticsScreen() {
           </div>
           <p className="dim" style={{ fontSize: 12, margin: 0 }}>{govDef.description}</p>
         </div>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 230px), 1fr))', gap: 16 }}>
           <div><StatRow label="稳定度" value={player.government.stability} kind="high" warn={player.government.stability < 30} /><StatRow label="合法性" value={player.government.legitimacy} kind="high" warn={player.government.legitimacy < 30} /></div>
           <div><StatRow label="行政能力" value={player.government.efficiency} kind="high" /><StatRow label="腐败" value={player.government.corruption} kind="low" warn={player.government.corruption > 50} /></div>
         </div>
@@ -87,7 +87,7 @@ export default function PoliticsScreen() {
             {player.activePolicies.length === 0 ? <span className="dim">无</span> : <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>{player.activePolicies.map((p) => { const def = POLICIES.find((x) => x.id === p.policyId); return <Tag key={p.policyId} text={def?.name ?? p.policyId} tone="good" />; })}</div>}
           </Panel>
           <Panel title="可推行政策">
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: 10 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 300px), 1fr))', gap: 10 }}>
               {POLICIES.map((p) => {
                 const already = activePolicyIds.has(p.id);
                 const govOk = p.allowedGovernments.length === 0 || p.allowedGovernments.includes(player.government.type);
@@ -112,7 +112,7 @@ export default function PoliticsScreen() {
           </Panel>
           {(['civil', 'criminal', 'administrative'] as LawCategory[]).map((cat) => (
             <Panel key={cat} title={`${LAW_CATEGORY_LABEL[cat]}（${LAWS_BY_CATEGORY[cat].length}）`}>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 8 }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 280px), 1fr))', gap: 8 }}>
                 {LAWS_BY_CATEGORY[cat].map((l) => {
                   const already = activeLawIds.has(l.id);
                   const govOk = l.allowedGovernments.length === 0 || l.allowedGovernments.includes(player.government.type);

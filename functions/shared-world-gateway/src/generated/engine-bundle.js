@@ -2139,7 +2139,8 @@ function addProvince(nation, region, rng, idOffset, provIdx, result, isCapital) 
   const provId = `p_${idOffset + provIdx + 1}`;
   const nameIdx = Math.floor(rng() * region.provinceNamePool.length);
   const terrainIdx = Math.floor(rng() * region.terrainBias.length);
-  const terrain = region.terrainBias[terrainIdx];
+  const drawnTerrain = region.terrainBias[terrainIdx];
+  const terrain = isCapital && drawnTerrain === "ocean" ? "coast" : drawnTerrain;
   const x = lerp(region.xRange[0], region.xRange[1], rng());
   const y = lerp(region.yRange[0], region.yRange[1], rng());
   const pop = isCapital ? Math.round(lerp(800, 2e3, rng()) * (nation.tier === "S" ? 2 : 1)) : Math.round(lerp(200, 800, rng()));
@@ -2150,7 +2151,7 @@ function addProvince(nation, region, rng, idOffset, provIdx, result, isCapital) 
     type: isCapital ? "capital" : terrain === "ocean" ? "ocean" : "land",
     ownerId: nation.id,
     isCapital,
-    agriBase: terrain === "ocean" ? 0 : lerp(0.5, 1.5, rng()),
+    agriBase: drawnTerrain === "ocean" ? Number(isCapital) : lerp(0.5, 1.5, rng()),
     culture: region.culture,
     religion: region.religion,
     initPop: terrain === "ocean" ? 0 : pop,
@@ -2221,6 +2222,43 @@ function generateRegionProvinces(region, regionNations, rng, idOffset) {
 function lerp(a, b, t) {
   return a + (b - a) * t;
 }
+function legacyOceanCapital(state, p) {
+  return p.terrain === "ocean" && p.id.startsWith("p_") && state.nations[p.ownerId]?.capital === p.id;
+}
+function restoreCapitalTerrain(p) {
+  p.terrain = "coast";
+  p.agriBase = Math.max(1, p.agriBase);
+}
+
+// src/engine/provincePopulation.ts
+function setProvincePopulation(province, population) {
+  const total = province.terrain === "ocean" ? 0 : Math.max(0, Math.round(population));
+  province.population = total;
+  if (!province.classes.length && total > 0) {
+    province.classes = CLASS_IDS.map((classId) => ({ classId, count: 0, satisfaction: 50 }));
+  }
+  let weightSum = 0;
+  for (const group of province.classes) {
+    if (group.weight === void 0 || !Number.isFinite(group.weight) || group.weight < 0) {
+      group.weight = Number.isFinite(group.count) ? Math.max(0, group.count) : 0;
+    }
+    weightSum += group.weight;
+  }
+  if (weightSum === 0 && total > 0) {
+    for (const group of province.classes) {
+      group.weight = LAND_RATIO[group.classId];
+      weightSum += group.weight;
+    }
+  }
+  let cumulativeWeight = 0;
+  let assigned = 0;
+  for (const group of province.classes) {
+    cumulativeWeight += group.weight ?? 0;
+    const throughGroup = weightSum > 0 ? Math.round(total * (cumulativeWeight / weightSum)) : 0;
+    group.count = throughGroup - assigned;
+    assigned = throughGroup;
+  }
+}
 
 // src/utils/math.ts
 function clamp(v, min, max) {
@@ -2228,10 +2266,11 @@ function clamp(v, min, max) {
 }
 
 // src/engine/init.ts
-function buildClasses(totalPop, ratio) {
+function buildClasses(ratio) {
   return CLASS_IDS.map((classId) => ({
     classId,
-    count: Math.round(totalPop * ratio[classId]),
+    weight: ratio[classId],
+    count: 0,
     satisfaction: 50
   }));
 }
@@ -2312,7 +2351,7 @@ function buildProvinces(definitions, rulers, playerId2) {
       culture: p.culture,
       religion: p.religion,
       population: p.initPop,
-      classes: buildClasses(p.initPop, p.initClassRatio),
+      classes: buildClasses(p.initClassRatio),
       assimilation: p.ownerId === playerId2 ? 100 : 50,
       loyalty: p.ownerId === playerId2 ? 70 : 50,
       unrest: 0,
@@ -2325,6 +2364,7 @@ function buildProvinces(definitions, rulers, playerId2) {
       x: p.x,
       y: p.y
     };
+    setProvincePopulation(out[p.id], p.initPop);
   }
   for (const n3 of rulers) {
     if (n3.capital && out[n3.capital]) {
@@ -2735,6 +2775,9 @@ function removeRebelNations(state, ids) {
 
 // src/data/events.ts
 var fr = (faction, delta) => [{ faction, delta }];
+var commonersReaction = (delta) => fr("commoners", delta);
+var noblesReaction = (delta) => fr("nobles", delta);
+var militaryReaction = (delta) => fr("military", delta);
 var fra = (...items) => items;
 function option(text, effects, aiWeight) {
   return { text, effects, aiWeight };
@@ -2747,789 +2790,1209 @@ function oneTime(weight, cooldown) {
 }
 var followUp = recurring(0, 0);
 var uniqueFollowUp = oneTime(0, 0);
+function fromTurn(minTurn, conditions) {
+  return { minTurn, ...conditions };
+}
+function defineEvent(id, title, description, category, trigger, frequency, options) {
+  return { id, title, description, category, trigger, ...frequency, options };
+}
 var EVENTS = [
-  // ── 危机类 ──
-  {
-    id: "evt_famine",
-    title: "\u7CAE\u98DF\u5371\u673A",
-    description: "\u591A\u5730\u7CAE\u4ED3\u544A\u6025\uFF0C\u7CAE\u4EF7\u98DE\u6DA8\uFF0C\u6C11\u4F17\u60F6\u6050\u3002",
-    category: "crisis",
-    trigger: { maxFoodRatio: 0.6 },
-    ...recurring(10, 15),
-    options: [
-      option("\u7D27\u6025\u5F00\u4ED3\u653E\u7CAE", { food: -100, stability: 5, factionSat: fr("commoners", 10) }, 2),
-      option("\u4ECE\u90BB\u56FD\u9AD8\u4EF7\u8D2D\u7CAE", { gold: -150, food: 80, influence: -3 }, 3),
-      option("\u5750\u89C6\u4E0D\u7BA1", { stability: -10, population: -50, factionSat: fr("commoners", -15) }, 1)
+  defineEvent(
+    "evt_eastern_reform",
+    "\u5F00\u56FD\u8BAE\u653F",
+    "\u5730\u65B9\u7A0E\u518C\u591A\u5E74\u672A\u5398\u6E05\u3002\u671D\u5EF7\u8981\u62E8\u6B3E\u6E05\u67E5\u7530\u4EA9\uFF0C\u8FD8\u662F\u628A\u5F81\u6536\u6743\u4EA4\u7ED9\u5730\u65B9\uFF1F",
+    "politics",
+    {},
+    uniqueFollowUp,
+    [
+      option("\u62E8\u6B3E\u4E08\u91CF\u7530\u4EA9", { gold: -80, efficiency: 8, corruption: -4, factionSat: noblesReaction(-8) }, 1),
+      option("\u8BF7\u5730\u65B9\u4EE3\u5F81", { gold: 80, legitimacy: 5, efficiency: -4, factionSat: noblesReaction(8) }, 1)
     ]
-  },
-  {
-    id: "evt_plague",
-    title: "\u761F\u75AB",
-    description: "\u761F\u75AB\u8513\u5EF6\uFF0C\u4EBA\u53E3\u9AA4\u51CF\u3002",
-    category: "crisis",
-    trigger: { minTurn: 20 },
-    ...recurring(4, 40),
-    options: [
+  ),
+  defineEvent(
+    "evt_eastern_envoy",
+    "\u8FB9\u5883\u4F7F\u56E2",
+    "\u90BB\u56FD\u4F7F\u8282\u5E26\u6765\u4E94\u5E74\u4E92\u4E0D\u4FB5\u72AF\u7684\u63D0\u8BAE\u3002\u7B7E\u7EA6\u53EF\u5B89\u5B9A\u8FB9\u5883\uFF0C\u53CC\u65B9\u4E5F\u5C06\u6682\u65F6\u653E\u5F03\u5411\u5BF9\u65B9\u5BA3\u6218\u3002",
+    "diplomacy",
+    {},
+    uniqueFollowUp,
+    [
+      option("\u7B7E\u4E0B\u4E94\u5E74\u7EA6\u4E66", { gold: -50, stability: 4 }, 1),
+      option("\u5A49\u62D2\u5E76\u6574\u5907\u8FB9\u9632", { iron: 20, stability: -2, factionSat: militaryReaction(8) }, 1)
+    ]
+  ),
+  defineEvent(
+    "evt_eastern_renewal",
+    "\u8FB9\u7EA6\u671F\u6EE1",
+    "\u4E94\u5E74\u4E4B\u7EA6\u5C06\u6EE1\uFF0C\u6614\u65E5\u7684\u4F7F\u8282\u5E26\u6765\u4E86\u65B0\u7684\u6761\u4EF6\u3002",
+    "diplomacy",
+    {},
+    uniqueFollowUp,
+    [option("\u63A5\u53D7\u7EED\u7EA6", {}, 1), option("\u8BA9\u539F\u7EA6\u671F\u6EE1", {}, 1)]
+  ),
+  defineEvent(
+    "evt_grain_budget",
+    "\u4F59\u7CAE\u7684\u53BB\u5411",
+    "\u5883\u5916\u5546\u4EBA\u613F\u4EE5\u6BCF\u77F3\u4E8C\u91D1\u6536\u8D2D\u4E09\u5E74\u7CAE\u98DF\u3002\u5730\u65B9\u4E5F\u5728\u8BF7\u6B3E\u4FEE\u6E20\uFF0C\u5E0C\u671B\u628A\u76C8\u4F59\u7559\u7ED9\u4E0B\u4E00\u5B63\u6536\u6210\u3002",
+    "economy",
+    {},
+    uniqueFollowUp,
+    [
+      option("\u627F\u63A5\u4E09\u5E74\u4F9B\u7CAE\u7EA6", {}, 1),
+      option("\u51FA\u8D44\u4FEE\u6E20", {}, 1),
+      option("\u6682\u7559\u7CAE\u6B3E", {}, 1)
+    ]
+  ),
+  // ── 危机类 ──
+  defineEvent(
+    "evt_famine",
+    "\u7CAE\u98DF\u5371\u673A",
+    "\u591A\u5730\u7CAE\u4ED3\u544A\u6025\uFF0C\u7CAE\u4EF7\u98DE\u6DA8\uFF0C\u6C11\u4F17\u60F6\u6050\u3002",
+    "crisis",
+    { maxFoodRatio: 0.6 },
+    recurring(10, 15),
+    [
+      option("\u7D27\u6025\u5F00\u4ED3\u653E\u7CAE", { food: -100, stability: 5, factionSat: commonersReaction(10) }, 2),
+      option("\u4ECE\u90BB\u56FD\u9AD8\u4EF7\u8D2D\u7CAE", { gold: -150, food: 80, influence: -3 }, 3),
+      option("\u5750\u89C6\u4E0D\u7BA1", { stability: -10, population: -50, factionSat: commonersReaction(-15) }, 1)
+    ]
+  ),
+  defineEvent(
+    "evt_plague",
+    "\u761F\u75AB",
+    "\u761F\u75AB\u8513\u5EF6\uFF0C\u4EBA\u53E3\u9AA4\u51CF\u3002",
+    "crisis",
+    fromTurn(20),
+    recurring(4, 40),
+    [
       option("\u9694\u79BB\u75AB\u533A", { population: -80, stability: -5, gold: -50 }, 3),
       option("\u7948\u795E\u79B3\u707E", { population: -150, factionSat: fr("clergy", 10) }, 2),
       option("\u53EC\u96C6\u5B66\u8005\u7814\u7A76", { population: -60, sciPt: 5, gold: -80 }, 2)
     ]
-  },
-  {
-    id: "evt_drought",
-    title: "\u65F1\u707E",
-    description: "\u6301\u7EED\u5E72\u65F1\uFF0C\u7CAE\u98DF\u51CF\u4EA7\u3002",
-    category: "crisis",
-    trigger: {},
-    ...recurring(6, 20),
-    options: [
-      option("\u51CF\u514D\u519C\u7A0E", { taxRate: -0.02, food: -50, factionSat: fr("commoners", 10) }, 3),
-      option("\u5F3A\u884C\u5F81\u7CAE", { food: 50, stability: -8, factionSat: fr("commoners", -15) }, 2)
+  ),
+  defineEvent(
+    "evt_drought",
+    "\u65F1\u707E",
+    "\u6301\u7EED\u5E72\u65F1\uFF0C\u7CAE\u98DF\u51CF\u4EA7\u3002",
+    "crisis",
+    {},
+    recurring(6, 20),
+    [
+      option("\u51CF\u514D\u519C\u7A0E", { taxRate: -0.02, food: -50, factionSat: commonersReaction(10) }, 3),
+      option("\u5F3A\u884C\u5F81\u7CAE", { food: 50, stability: -8, factionSat: commonersReaction(-15) }, 2)
     ]
-  },
+  ),
   // ── 政治类 ──
-  {
-    id: "evt_noble_coup",
-    title: "\u8D35\u65CF\u903C\u5BAB",
-    description: "\u4E0D\u6EE1\u7684\u8D35\u65CF\u5BC6\u8C0B\u53CD\u5BF9\u4F60\u7684\u7EDF\u6CBB\u3002",
-    category: "politics",
-    trigger: { factionSatBelow: { faction: "nobles", threshold: 20 } },
-    ...recurring(8, 25),
-    options: [
-      option("\u8BA9\u6B65\u5206\u6743", { legitimacy: -10, efficiency: -5, factionSat: fr("nobles", 20) }, 3),
+  defineEvent(
+    "evt_noble_coup",
+    "\u8D35\u65CF\u903C\u5BAB",
+    "\u4E0D\u6EE1\u7684\u8D35\u65CF\u5BC6\u8C0B\u53CD\u5BF9\u4F60\u7684\u7EDF\u6CBB\u3002",
+    "politics",
+    { factionSatBelow: { faction: "nobles", threshold: 20 } },
+    recurring(8, 25),
+    [
+      option("\u8BA9\u6B65\u5206\u6743", { legitimacy: -10, efficiency: -5, factionSat: noblesReaction(20) }, 3),
       option("\u94C1\u8155\u9547\u538B", { stability: -10, legitimacy: -5, factionSat: fra({ faction: "nobles", delta: -10 }, { faction: "military", delta: 5 }) }, 2)
     ]
-  },
-  {
-    id: "evt_merchant_strike",
-    title: "\u5546\u4EBA\u7F62\u5E02",
-    description: "\u5546\u4EBA\u5173\u95ED\u5E97\u94FA\u6297\u8BAE\u7A0E\u653F\u3002",
-    category: "politics",
-    trigger: { factionSatBelow: { faction: "merchants", threshold: 20 } },
-    ...recurring(8, 25),
-    options: [
+  ),
+  defineEvent(
+    "evt_merchant_strike",
+    "\u5546\u4EBA\u7F62\u5E02",
+    "\u5546\u4EBA\u5173\u95ED\u5E97\u94FA\u6297\u8BAE\u7A0E\u653F\u3002",
+    "politics",
+    { factionSatBelow: { faction: "merchants", threshold: 20 } },
+    recurring(8, 25),
+    [
       option("\u51CF\u514D\u5546\u7A0E", { taxRate: -0.02, gold: -50, factionSat: fr("merchants", 20) }, 3),
       option("\u5F3A\u5236\u5F00\u5E02", { gold: -100, stability: -5, factionSat: fr("merchants", -10) }, 2)
     ]
-  },
-  {
-    id: "evt_military_unrest",
-    title: "\u519B\u65B9\u4E0D\u6EE1",
-    description: "\u6B20\u9977\u7684\u519B\u961F\u9A9A\u52A8\u4E0D\u5B89\u3002",
-    category: "politics",
-    trigger: { factionSatBelow: { faction: "military", threshold: 20 } },
-    ...recurring(9, 20),
-    options: [
-      option("\u8865\u53D1\u519B\u9977", { gold: -120, factionSat: fr("military", 25) }, 3),
-      option("\u88C1\u64A4\u8001\u5175", { population: -30, stability: -5, factionSat: fr("military", -10) }, 2)
+  ),
+  defineEvent(
+    "evt_military_unrest",
+    "\u519B\u65B9\u4E0D\u6EE1",
+    "\u6B20\u9977\u7684\u519B\u961F\u9A9A\u52A8\u4E0D\u5B89\u3002",
+    "politics",
+    { factionSatBelow: { faction: "military", threshold: 20 } },
+    recurring(9, 20),
+    [
+      option("\u8865\u53D1\u519B\u9977", { gold: -120, factionSat: militaryReaction(25) }, 3),
+      option("\u88C1\u64A4\u8001\u5175", { population: -30, stability: -5, factionSat: militaryReaction(-10) }, 2)
     ]
-  },
-  {
-    id: "evt_peasant_uprising",
-    title: "\u519C\u6C11\u8D77\u4E49",
-    description: "\u4E0D\u582A\u91CD\u7A0E\u7684\u519C\u6C11\u63ED\u7AFF\u800C\u8D77\u3002",
-    category: "politics",
-    trigger: { factionSatBelow: { faction: "commoners", threshold: 20 } },
-    ...recurring(9, 20),
-    options: [
+  ),
+  defineEvent(
+    "evt_peasant_uprising",
+    "\u519C\u6C11\u8D77\u4E49",
+    "\u4E0D\u582A\u91CD\u7A0E\u7684\u519C\u6C11\u63ED\u7AFF\u800C\u8D77\u3002",
+    "politics",
+    { factionSatBelow: { faction: "commoners", threshold: 20 } },
+    recurring(9, 20),
+    [
       option("\u9547\u538B\u8D77\u4E49", { gold: -80, population: -40, stability: -5, factionSat: fra({ faction: "commoners", delta: -15 }, { faction: "military", delta: 5 }) }, 3),
-      option("\u5141\u8BFA\u51CF\u7A0E", { taxRate: -0.03, gold: -30, factionSat: fr("commoners", 25) }, 2)
+      option("\u5141\u8BFA\u51CF\u7A0E", { taxRate: -0.03, gold: -30, factionSat: commonersReaction(25) }, 2)
     ]
-  },
-  {
-    id: "evt_clergy_interference",
-    title: "\u795E\u804C\u5E72\u653F",
-    description: "\u795E\u804C\u4EBA\u5458\u8981\u6C42\u66F4\u5927\u7684\u5B97\u6559\u8BDD\u8BED\u6743\u3002",
-    category: "politics",
-    trigger: { factionSatBelow: { faction: "clergy", threshold: 30 }, minCorruption: 30 },
-    ...recurring(5, 30),
-    options: [
+  ),
+  defineEvent(
+    "evt_clergy_interference",
+    "\u795E\u804C\u5E72\u653F",
+    "\u795E\u804C\u4EBA\u5458\u8981\u6C42\u66F4\u5927\u7684\u5B97\u6559\u8BDD\u8BED\u6743\u3002",
+    "politics",
+    { factionSatBelow: { faction: "clergy", threshold: 30 }, minCorruption: 30 },
+    recurring(5, 30),
+    [
       option("\u6388\u4E88\u5B97\u6559\u7279\u6743", { influence: 5, efficiency: -5, factionSat: fra({ faction: "clergy", delta: 20 }, { faction: "merchants", delta: -5 }) }, 3),
       option("\u62D2\u7EDD\u5E76\u9650\u5236\u6559\u6743", { stability: -3, legitimacy: -3, factionSat: fr("clergy", -15) }, 2)
     ]
-  },
-  {
-    id: "evt_succession_crisis",
-    title: "\u738B\u4F4D\u7EE7\u627F\u5371\u673A",
-    description: "\u7EE7\u627F\u5408\u6CD5\u6027\u53D7\u5230\u8D28\u7591\u3002",
-    category: "politics",
-    trigger: { maxLegitimacy: 25 },
-    ...recurring(12, 30),
-    options: [
-      option("\u4E89\u53D6\u8D35\u65CF\u652F\u6301", { gold: -100, legitimacy: 15, factionSat: fr("nobles", 15) }, 3),
+  ),
+  defineEvent(
+    "evt_succession_crisis",
+    "\u738B\u4F4D\u7EE7\u627F\u5371\u673A",
+    "\u7EE7\u627F\u5408\u6CD5\u6027\u53D7\u5230\u8D28\u7591\u3002",
+    "politics",
+    { maxLegitimacy: 25 },
+    recurring(12, 30),
+    [
+      option("\u4E89\u53D6\u8D35\u65CF\u652F\u6301", { gold: -100, legitimacy: 15, factionSat: noblesReaction(15) }, 3),
       option("\u6C11\u4F17\u62E5\u6234\u8DEF\u7EBF", { gold: -80, legitimacy: 10, factionSat: fra({ faction: "commoners", delta: 15 }, { faction: "nobles", delta: -5 }) }, 2)
     ]
-  },
-  {
-    id: "evt_corruption_scandal",
-    title: "\u8150\u8D25\u4E11\u95FB",
-    description: "\u9AD8\u5B98\u8D2A\u8150\u6848\u66DD\u5149\uFF0C\u671D\u91CE\u9707\u52A8\u3002",
-    category: "politics",
-    trigger: { minCorruption: 60 },
-    ...recurring(8, 20),
-    options: [
-      option("\u4E25\u60E9\u6D89\u6848\u5B98\u5458", { corruption: -10, gold: -50, factionSat: fr("nobles", -10) }, 3),
-      option("\u5927\u4E8B\u5316\u5C0F", { corruption: 5, legitimacy: -5, factionSat: fr("commoners", -10) }, 2)
+  ),
+  defineEvent(
+    "evt_corruption_scandal",
+    "\u8150\u8D25\u4E11\u95FB",
+    "\u9AD8\u5B98\u8D2A\u8150\u6848\u66DD\u5149\uFF0C\u671D\u91CE\u9707\u52A8\u3002",
+    "politics",
+    { minCorruption: 60 },
+    recurring(8, 20),
+    [
+      option("\u4E25\u60E9\u6D89\u6848\u5B98\u5458", { corruption: -10, gold: -50, factionSat: noblesReaction(-10) }, 3),
+      option("\u5927\u4E8B\u5316\u5C0F", { corruption: 5, legitimacy: -5, factionSat: commonersReaction(-10) }, 2)
     ]
-  },
+  ),
   // ── 经济类 ──
-  {
-    id: "evt_treasury_alarm",
-    title: "\u56FD\u5E93\u544A\u6025",
-    description: "\u56FD\u5E93\u5373\u5C06\u89C1\u5E95\uFF0C\u8D22\u653F\u544A\u6025\u3002",
-    category: "economy",
-    trigger: { minTurn: 1 },
-    ...recurring(7, 15),
-    options: [
-      option("\u4E34\u65F6\u52A0\u5F81\u7279\u522B\u7A0E", { gold: 100, stability: -5, factionSat: fr("commoners", -10) }, 3),
+  defineEvent(
+    "evt_treasury_alarm",
+    "\u56FD\u5E93\u544A\u6025",
+    "\u56FD\u5E93\u5373\u5C06\u89C1\u5E95\uFF0C\u8D22\u653F\u544A\u6025\u3002",
+    "economy",
+    fromTurn(1),
+    recurring(7, 15),
+    [
+      option("\u4E34\u65F6\u52A0\u5F81\u7279\u522B\u7A0E", { gold: 100, stability: -5, factionSat: commonersReaction(-10) }, 3),
       option("\u51FA\u552E\u738B\u5BA4\u73CD\u85CF", { gold: 150, legitimacy: -3 }, 2)
     ]
-  },
-  {
-    id: "evt_trade_route_open",
-    title: "\u5546\u8DEF\u5F00\u901A",
-    description: "\u4E00\u6761\u65B0\u7684\u5546\u8DEF\u88AB\u53D1\u73B0\u3002",
-    category: "economy",
-    trigger: { notAtWar: true },
-    ...recurring(5, 30),
-    options: [
+  ),
+  defineEvent(
+    "evt_trade_route_open",
+    "\u5546\u8DEF\u5F00\u901A",
+    "\u4E00\u6761\u65B0\u7684\u5546\u8DEF\u88AB\u53D1\u73B0\u3002",
+    "economy",
+    { notAtWar: true },
+    recurring(5, 30),
+    [
       option("\u9F13\u52B1\u5546\u4EBA\u5F00\u62D3", { gold: 50, influence: 3, factionSat: fr("merchants", 10) }, 3),
       option("\u738B\u5BA4\u5784\u65AD\u8D38\u6613", { gold: 100, factionSat: fr("merchants", -10) }, 2)
     ]
-  },
-  {
-    id: "evt_mineral_discovery",
-    title: "\u77FF\u85CF\u53D1\u73B0",
-    description: "\u52D8\u63A2\u8005\u53D1\u73B0\u65B0\u77FF\u85CF\u3002",
-    category: "economy",
-    trigger: {},
-    ...recurring(4, 40),
-    options: [
+  ),
+  defineEvent(
+    "evt_mineral_discovery",
+    "\u77FF\u85CF\u53D1\u73B0",
+    "\u52D8\u63A2\u8005\u53D1\u73B0\u65B0\u77FF\u85CF\u3002",
+    "economy",
+    {},
+    recurring(4, 40),
+    [
       option("\u7ACB\u5373\u5F00\u91C7", { iron: 50, gold: -30 }, 3),
       option("\u957F\u671F\u5F00\u53D1", { iron: 20, gold: 20 }, 2)
     ]
-  },
-  {
-    id: "evt_harvest_bumper",
-    title: "\u4E30\u6536",
-    description: "\u4ECA\u5E74\u98CE\u8C03\u96E8\u987A\uFF0C\u7CAE\u98DF\u5927\u4E30\u3002",
-    category: "economy",
-    trigger: {},
-    ...recurring(5, 15),
-    options: [
+  ),
+  defineEvent(
+    "evt_harvest_bumper",
+    "\u4E30\u6536",
+    "\u4ECA\u5E74\u98CE\u8C03\u96E8\u987A\uFF0C\u7CAE\u98DF\u5927\u4E30\u3002",
+    "economy",
+    {},
+    recurring(5, 15),
+    [
       option("\u5145\u5B9E\u7CAE\u4ED3", { food: 200, stability: 3 }, 3),
       option("\u51FA\u53E3\u6362\u91D1", { food: 100, gold: 80 }, 2)
     ]
-  },
+  ),
   // ── 军事类 ──
-  {
-    id: "evt_war_weariness",
-    title: "\u538C\u6218\u6C11\u53D8",
-    description: "\u957F\u671F\u6218\u4E89\u5F15\u53D1\u6C11\u4F17\u538C\u6218\u6297\u8BAE\u3002",
-    category: "military",
-    trigger: { minWarExhaustion: 70 },
-    ...recurring(10, 20),
-    options: [
-      option("\u627F\u8BFA\u5C3D\u5FEB\u505C\u6218", { warExhaustion: -10, factionSat: fr("commoners", 10) }, 3),
-      option("\u5F3A\u786C\u9547\u538B\u53CD\u6218", { stability: -10, warExhaustion: -5, factionSat: fr("commoners", -15) }, 2)
+  defineEvent(
+    "evt_war_weariness",
+    "\u538C\u6218\u6C11\u53D8",
+    "\u957F\u671F\u6218\u4E89\u5F15\u53D1\u6C11\u4F17\u538C\u6218\u6297\u8BAE\u3002",
+    "military",
+    { minWarExhaustion: 70 },
+    recurring(10, 20),
+    [
+      option("\u627F\u8BFA\u5C3D\u5FEB\u505C\u6218", { warExhaustion: -10, factionSat: commonersReaction(10) }, 3),
+      option("\u5F3A\u786C\u9547\u538B\u53CD\u6218", { stability: -10, warExhaustion: -5, factionSat: commonersReaction(-15) }, 2)
     ]
-  },
-  {
-    id: "evt_peace_proposal",
-    title: "\u548C\u8C08\u63D0\u8BAE",
-    description: "\u654C\u65B9\u6D3E\u51FA\u4F7F\u8005\u63D0\u8BAE\u505C\u6218\u3002",
-    category: "military",
-    trigger: { atWar: true },
-    ...recurring(8, 15),
-    options: [
+  ),
+  defineEvent(
+    "evt_peace_proposal",
+    "\u548C\u8C08\u63D0\u8BAE",
+    "\u654C\u65B9\u6D3E\u51FA\u4F7F\u8005\u63D0\u8BAE\u505C\u6218\u3002",
+    "military",
+    { atWar: true },
+    recurring(8, 15),
+    [
       option("\u63A5\u53D7\u548C\u8C08", { influence: 10, warExhaustion: -20 }, 3),
-      option("\u62D2\u7EDD\u7EE7\u7EED\u6218\u4E89", { stability: -3, factionSat: fr("military", 5) }, 2)
+      option("\u62D2\u7EDD\u7EE7\u7EED\u6218\u4E89", { stability: -3, factionSat: militaryReaction(5) }, 2)
     ]
-  },
-  {
-    id: "evt_new_territory",
-    title: "\u65B0\u9886\u571F\u6CBB\u7406",
-    description: "\u521A\u5360\u9886\u7684\u7701\u4EFD\u9700\u8981\u6CBB\u7406\u65B9\u6848\u3002",
-    category: "military",
-    trigger: { hasNewTerritory: true },
-    ...recurring(12, 5),
-    options: [
+  ),
+  defineEvent(
+    "evt_new_territory",
+    "\u65B0\u9886\u571F\u6CBB\u7406",
+    "\u521A\u5360\u9886\u7684\u7701\u4EFD\u9700\u8981\u6CBB\u7406\u65B9\u6848\u3002",
+    "military",
+    { hasNewTerritory: true },
+    recurring(12, 5),
+    [
       option("\u6000\u67D4\u5B89\u629A", { gold: -80, stability: 3, influence: 5 }, 3),
-      option("\u9A7B\u519B\u9547\u538B", { gold: -40, stability: -3, factionSat: fr("military", 5) }, 2)
+      option("\u9A7B\u519B\u9547\u538B", { gold: -40, stability: -3, factionSat: militaryReaction(5) }, 2)
     ]
-  },
+  ),
   // ── 外交类 ──
-  {
-    id: "evt_border_clash",
-    title: "\u8FB9\u5883\u5916\u4EA4\u5371\u673A",
-    description: "\u4E0E\u90BB\u56FD\u8FB9\u5883\u53D1\u751F\u5C0F\u89C4\u6A21\u51B2\u7A81\u3002",
-    category: "diplomacy",
-    trigger: { relationBelow: { target: "n02", threshold: -30 } },
-    ...recurring(7, 20),
-    options: [
+  defineEvent(
+    "evt_border_clash",
+    "\u8FB9\u5883\u5916\u4EA4\u5371\u673A",
+    "\u4E0E\u90BB\u56FD\u8FB9\u5883\u53D1\u751F\u5C0F\u89C4\u6A21\u51B2\u7A81\u3002",
+    "diplomacy",
+    { relationBelow: { target: "n02", threshold: -30 } },
+    recurring(7, 20),
+    [
       option("\u5916\u4EA4\u65A1\u65CB", { influence: -10, relation: { target: "n02", delta: 10 } }, 3),
-      option("\u5F3A\u786C\u53CD\u5236", { relation: { target: "n02", delta: -15 }, factionSat: fr("military", 8) }, 2)
+      option("\u5F3A\u786C\u53CD\u5236", { relation: { target: "n02", delta: -15 }, factionSat: militaryReaction(8) }, 2)
     ]
-  },
-  {
-    id: "evt_foreign_envoy",
-    title: "\u5916\u56FD\u4F7F\u56E2\u5230\u8BBF",
-    description: "\u90BB\u56FD\u6D3E\u51FA\u4F7F\u56E2\u5BFB\u6C42\u5408\u4F5C\u3002",
-    category: "diplomacy",
-    trigger: { notAtWar: true, minTurn: 5 },
-    ...recurring(5, 25),
-    options: [
+  ),
+  defineEvent(
+    "evt_foreign_envoy",
+    "\u5916\u56FD\u4F7F\u56E2\u5230\u8BBF",
+    "\u90BB\u56FD\u6D3E\u51FA\u4F7F\u56E2\u5BFB\u6C42\u5408\u4F5C\u3002",
+    "diplomacy",
+    { notAtWar: true, minTurn: 5 },
+    recurring(5, 25),
+    [
       option("\u70ED\u60C5\u63A5\u5F85", { gold: -30, influence: 8, relation: { target: "n03", delta: 5 } }, 3),
       option("\u51B7\u6DE1\u56DE\u7EDD", { influence: -3, relation: { target: "n03", delta: -5 } }, 2)
     ]
-  },
-  {
-    id: "evt_neighbor_threat",
-    title: "\u90BB\u56FD\u5A01\u80C1",
-    description: "\u90BB\u56FD\u9648\u5175\u8FB9\u5883\u53D1\u51FA\u5A01\u80C1\u3002",
-    category: "diplomacy",
-    trigger: { minTurn: 10 },
-    ...recurring(6, 30),
-    options: [
+  ),
+  defineEvent(
+    "evt_neighbor_threat",
+    "\u90BB\u56FD\u5A01\u80C1",
+    "\u90BB\u56FD\u9648\u5175\u8FB9\u5883\u53D1\u51FA\u5A01\u80C1\u3002",
+    "diplomacy",
+    fromTurn(10),
+    recurring(6, 30),
+    [
       option("\u5916\u4EA4\u59A5\u534F", { influence: -5, gold: -50, relation: { target: "n04", delta: 10 } }, 3),
-      option("\u6269\u519B\u5907\u6218", { gold: -100, factionSat: fr("military", 10), relation: { target: "n04", delta: -10 } }, 2)
+      option("\u6269\u519B\u5907\u6218", { gold: -100, factionSat: militaryReaction(10), relation: { target: "n04", delta: -10 } }, 2)
     ]
-  },
+  ),
   // ── 宗教类 ──
-  {
-    id: "evt_religion_dispute",
-    title: "\u5B97\u6559\u4E89\u7AEF",
-    description: "\u4E0D\u540C\u4FE1\u4EF0\u8005\u53D1\u751F\u51B2\u7A81\u3002",
-    category: "religion",
-    trigger: { provinceCultureDiff: true },
-    ...recurring(6, 25),
-    options: [
+  defineEvent(
+    "evt_religion_dispute",
+    "\u5B97\u6559\u4E89\u7AEF",
+    "\u4E0D\u540C\u4FE1\u4EF0\u8005\u53D1\u751F\u51B2\u7A81\u3002",
+    "religion",
+    { provinceCultureDiff: true },
+    recurring(6, 25),
+    [
       option("\u63A8\u884C\u5BBD\u5BB9\u653F\u7B56", { stability: 3, influence: 3, factionSat: fr("clergy", -10) }, 3),
       option("\u652F\u6301\u56FD\u6559\u538B\u5236", { stability: -5, factionSat: fra({ faction: "clergy", delta: 15 }, { faction: "commoners", delta: -10 }) }, 2)
     ]
-  },
+  ),
   // ── 科技类 ──
-  {
-    id: "evt_tech_breakthrough",
-    title: "\u79D1\u6280\u7A81\u7834",
-    description: "\u5B66\u8005\u53D6\u5F97\u91CD\u5927\u7A81\u7834\uFF01",
-    category: "science",
-    trigger: { techLevelAbove: { branch: "admin", level: 2 } },
-    ...recurring(3, 20),
-    options: [
+  defineEvent(
+    "evt_tech_breakthrough",
+    "\u79D1\u6280\u7A81\u7834",
+    "\u5B66\u8005\u53D6\u5F97\u91CD\u5927\u7A81\u7834\uFF01",
+    "science",
+    { techLevelAbove: { branch: "admin", level: 2 } },
+    recurring(3, 20),
+    [
       option("\u63A8\u5E7F\u65B0\u6280\u672F", { sciPt: 20, gold: -50 }, 3),
-      option("\u4FDD\u5BC6\u5FA1\u7528", { sciPt: 10, legitimacy: 3, factionSat: fr("nobles", 5) }, 2)
+      option("\u4FDD\u5BC6\u5FA1\u7528", { sciPt: 10, legitimacy: 3, factionSat: noblesReaction(5) }, 2)
     ]
-  },
-  {
-    id: "evt_scholar_petition",
-    title: "\u5B66\u8005\u8BF7\u613F",
-    description: "\u5B66\u8005\u8BF7\u6C42\u52A0\u5927\u79D1\u7814\u6295\u5165\u3002",
-    category: "science",
-    trigger: { minTurn: 5 },
-    ...recurring(4, 25),
-    options: [
+  ),
+  defineEvent(
+    "evt_scholar_petition",
+    "\u5B66\u8005\u8BF7\u613F",
+    "\u5B66\u8005\u8BF7\u6C42\u52A0\u5927\u79D1\u7814\u6295\u5165\u3002",
+    "science",
+    fromTurn(5),
+    recurring(4, 25),
+    [
       option("\u62E8\u91D1\u652F\u6301", { gold: -80, sciPt: 10 }, 3),
-      option("\u5A49\u62D2", { factionSat: fr("commoners", -5) }, 2)
+      option("\u5A49\u62D2", { factionSat: commonersReaction(-5) }, 2)
     ]
-  },
+  ),
   // ── 机会类 ──
-  {
-    id: "evt_reform_call",
-    title: "\u6539\u9769\u547C\u58F0",
-    description: "\u6C11\u4F17\u4E0E\u5546\u4EBA\u547C\u5401\u4F53\u5236\u6539\u9769\u3002",
-    category: "opportunity",
-    trigger: { minTurn: 15, maxStability: 40 },
-    ...recurring(5, 30),
-    options: [
+  defineEvent(
+    "evt_reform_call",
+    "\u6539\u9769\u547C\u58F0",
+    "\u6C11\u4F17\u4E0E\u5546\u4EBA\u547C\u5401\u4F53\u5236\u6539\u9769\u3002",
+    "opportunity",
+    fromTurn(15, { maxStability: 40 }),
+    recurring(5, 30),
+    [
       option("\u542F\u52A8\u6E10\u8FDB\u6539\u9769", { legitimacy: -5, stability: 5, factionSat: fra({ faction: "commoners", delta: 15 }, { faction: "nobles", delta: -10 }) }, 3),
-      option("\u62D2\u7EDD\u6539\u9769", { stability: -5, factionSat: fr("commoners", -10) }, 2)
+      option("\u62D2\u7EDD\u6539\u9769", { stability: -5, factionSat: commonersReaction(-10) }, 2)
     ]
-  },
-  {
-    id: "evt_coup_risk",
-    title: "\u519B\u4E8B\u653F\u53D8\u98CE\u9669",
-    description: "\u519B\u65B9\u5BC6\u8C0B\u53D1\u52A8\u653F\u53D8\uFF01",
-    category: "politics",
-    trigger: { factionSatBelow: { faction: "military", threshold: 10 }, maxLegitimacy: 40 },
-    ...recurring(8, 50),
-    options: [
-      option("\u5BC6\u8C0B\u5206\u5316\u5C06\u9886", { gold: -150, legitimacy: -5, factionSat: fr("military", 15) }, 3),
-      option("\u5148\u53D1\u5236\u4EBA\u6E05\u6D17", { stability: -15, legitimacy: -10, factionSat: fr("military", -20) }, 1)
+  ),
+  defineEvent(
+    "evt_coup_risk",
+    "\u519B\u4E8B\u653F\u53D8\u98CE\u9669",
+    "\u519B\u65B9\u5BC6\u8C0B\u53D1\u52A8\u653F\u53D8\uFF01",
+    "politics",
+    { factionSatBelow: { faction: "military", threshold: 10 }, maxLegitimacy: 40 },
+    recurring(8, 50),
+    [
+      option("\u5BC6\u8C0B\u5206\u5316\u5C06\u9886", { gold: -150, legitimacy: -5, factionSat: militaryReaction(15) }, 3),
+      option("\u5148\u53D1\u5236\u4EBA\u6E05\u6D17", { stability: -15, legitimacy: -10, factionSat: militaryReaction(-20) }, 1)
     ]
-  },
+  ),
   // ── 扩展事件 26-55（世界级） ──
-  { id: "evt_gold_rush", title: "\u6DD8\u91D1\u70ED", description: "\u8FB9\u5883\u53D1\u73B0\u91D1\u77FF\uFF01", category: "economy", trigger: { minTurn: 10 }, ...recurring(3, 40), options: [option("\u5F00\u91C7", { gold: 200, corruption: 5 }, 3), option("\u9650\u5236\u5F00\u91C7", { gold: 50, stability: 3 }, 2)] },
-  { id: "evt_trade_boom", title: "\u8D38\u6613\u7E41\u8363", description: "\u5546\u8DEF\u7545\u901A\uFF0C\u8D38\u6613\u91CF\u6FC0\u589E\uFF01", category: "economy", trigger: { minTurn: 5, notAtWar: true }, ...recurring(4, 25), options: [option("\u9F13\u52B1\u8D38\u6613", { gold: 100, factionSat: fr("merchants", 10) }, 3), option("\u5F81\u6536\u5546\u7A0E", { gold: 150, factionSat: fr("merchants", -8) }, 2)] },
-  { id: "evt_drought_severe", title: "\u5927\u65F1", description: "\u4E45\u65F1\u4E0D\u96E8\uFF0C\u7CAE\u98DF\u51CF\u4EA7\uFF01", category: "crisis", trigger: { minTurn: 3 }, ...recurring(5, 30), options: [option("\u5F00\u4ED3\u653E\u7CAE", { food: -100, stability: 5 }, 3), option("\u52A0\u91CD\u8D4B\u7A0E\u6551\u707E", { gold: -80, food: 50, factionSat: fr("commoners", -10) }, 2)] },
-  { id: "evt_refugee_wave", title: "\u8FB9\u5883\u96BE\u6C11\u6F6E", description: "\u90BB\u56FD\u6218\u4E71\uFF0C\u96BE\u6C11\u6D8C\u5165\u8FB9\u5883\uFF01", category: "crisis", trigger: { minTurn: 10 }, ...recurring(4, 35), options: [option("\u63A5\u7EB3\u5B89\u7F6E", { population: 500, food: -50, stability: -3 }, 2), option("\u5173\u95ED\u8FB9\u5883", { legitimacy: -5, factionSat: fr("commoners", 5) }, 3)] },
-  { id: "evt_merchant_guild", title: "\u5546\u4EBA\u884C\u4F1A", description: "\u5546\u4EBA\u7EC4\u5EFA\u884C\u4F1A\u8981\u6C42\u7279\u6743\uFF01", category: "politics", trigger: { minTurn: 8 }, ...recurring(4, 30), options: [option("\u6388\u4E88\u7279\u6743", { gold: 80, factionSat: fra({ faction: "merchants", delta: 15 }, { faction: "nobles", delta: -8 }) }, 3), option("\u62D2\u7EDD", { factionSat: fr("merchants", -12) }, 2)] },
-  { id: "evt_military_reform", title: "\u519B\u4E8B\u6539\u9769", description: "\u5C06\u9886\u63D0\u8BAE\u6539\u9769\u519B\u5236\uFF01", category: "military", trigger: { minTurn: 10 }, ...recurring(3, 40), options: [option("\u63A8\u884C\u6539\u9769", { gold: -120, factionSat: fr("military", 10), stability: -3 }, 3), option("\u7EF4\u6301\u73B0\u72B6", { factionSat: fr("military", -5) }, 2)] },
-  { id: "evt_cultural_flourish", title: "\u6587\u5316\u7E41\u8363", description: "\u5B66\u8005\u827A\u672F\u5BB6\u6C47\u805A\uFF0C\u6587\u5316\u660C\u76DB\uFF01", category: "culture", trigger: { minTurn: 15, minStability: 40 }, ...recurring(3, 30), options: [option("\u5927\u529B\u8D44\u52A9", { gold: -80, sciPt: 15, legitimacy: 5 }, 3), option("\u9002\u5EA6\u652F\u6301", { gold: -30, sciPt: 5 }, 2)] },
-  { id: "evt_border_incident", title: "\u8FB9\u519B\u51B2\u7A81", description: "\u8FB9\u9632\u519B\u4E0E\u90BB\u56FD\u53D1\u751F\u5C0F\u89C4\u6A21\u51B2\u7A81\uFF01", category: "military", trigger: { minTurn: 5 }, ...recurring(5, 20), options: [option("\u5F3A\u786C\u56DE\u5E94", { stability: 3, factionSat: fra({ faction: "military", delta: 8 }, { faction: "merchants", delta: -5 }) }, 2), option("\u5916\u4EA4\u65A1\u65CB", { gold: -30, legitimacy: 3 }, 3)] },
-  { id: "evt_earthquake", title: "\u5730\u9707", description: "\u5F3A\u70C8\u5730\u9707\u88AD\u51FB\u7701\u4EFD\uFF01", category: "crisis", trigger: { minTurn: 3 }, ...recurring(3, 50), options: [option("\u5168\u529B\u6551\u707E", { gold: -150, food: -50, stability: 5 }, 3), option("\u6709\u9650\u6551\u63F4", { gold: -50, stability: -5 }, 2)] },
-  { id: "evt_tax_evasion", title: "\u5927\u89C4\u6A21\u9003\u7A0E", description: "\u5BCC\u5546\u5927\u65CF\u9003\u7A0E\u4E25\u91CD\uFF01", category: "economy", trigger: { minCorruption: 30 }, ...recurring(5, 25), options: [option("\u4E25\u67E5\u91CD\u7F5A", { gold: 100, factionSat: fr("nobles", -10), corruption: -5 }, 2), option("\u4ECE\u8F7B\u53D1\u843D", { factionSat: fr("nobles", 5), corruption: 3 }, 3)] },
-  { id: "evt_succession_war", title: "\u7EE7\u627F\u5371\u673A", description: "\u591A\u4F4D\u7EE7\u627F\u4EBA\u9009\u4E89\u593A\u5927\u4F4D\uFF01", category: "politics", trigger: { maxLegitimacy: 50 }, ...recurring(6, 40), options: [option("\u7ACB\u957F\u5B50", { legitimacy: 10, stability: -5 }, 3), option("\u62E9\u8D24\u7ACB", { legitimacy: 5, stability: -8, factionSat: fr("nobles", -10) }, 2)] },
-  { id: "evt_foreign_aid", title: "\u5916\u56FD\u63F4\u52A9", description: "\u53CB\u90A6\u9001\u6765\u7269\u8D44\u63F4\u52A9\uFF01", category: "economy", trigger: { minTurn: 10, notAtWar: true }, ...recurring(3, 30), options: [option("\u6B23\u7136\u63A5\u53D7", { gold: 80, food: 60 }, 3), option("\u5A49\u62D2\u4EE5\u4FDD\u72EC\u7ACB", { legitimacy: 5 }, 2)] },
-  { id: "evt_pop_boom", title: "\u4EBA\u53E3\u6FC0\u589E", description: "\u4E30\u6536\u5E26\u6765\u4EBA\u53E3\u5FEB\u901F\u589E\u957F\uFF01", category: "population", trigger: { minTurn: 8, minStability: 50 }, ...recurring(3, 30), options: [option("\u9F13\u52B1\u589E\u957F", { population: 300, food: -30 }, 3), option("\u9002\u5EA6\u63A7\u5236", { population: 100 }, 2)] },
-  { id: "evt_slave_revolt", title: "\u5974\u5F79\u8D77\u4E49", description: "\u88AB\u538B\u8FEB\u8005\u63ED\u7AFF\u800C\u8D77\uFF01", category: "crisis", trigger: { minTurn: 10, maxStability: 40 }, ...recurring(5, 35), options: [option("\u9547\u538B", { gold: -80, stability: -5, factionSat: fr("military", 5) }, 2), option("\u9002\u5EA6\u6539\u9769", { gold: -50, legitimacy: 5, factionSat: fr("nobles", -8) }, 3)] },
-  { id: "evt_spy_scandal", title: "\u95F4\u8C0D\u4E11\u95FB", description: "\u5916\u56FD\u95F4\u8C0D\u88AB\u6293\u83B7\uFF01", category: "diplomacy", trigger: { minTurn: 5 }, ...recurring(4, 25), options: [option("\u516C\u5F00\u5904\u5211", { legitimacy: 5, stability: -3 }, 2), option("\u79D8\u5BC6\u5229\u7528", { gold: 50, corruption: 3 }, 3)] },
-  { id: "evt_temple_dispute", title: "\u5BFA\u5E99\u4E89\u7AEF", description: "\u5B97\u6559\u56E2\u4F53\u95F4\u7206\u53D1\u51B2\u7A81\uFF01", category: "religion", trigger: { minTurn: 5, provinceCultureDiff: true }, ...recurring(4, 30), options: [option("\u4EF2\u88C1\u8C03\u505C", { gold: -30, stability: 3 }, 3), option("\u652F\u6301\u4E00\u65B9", { factionSat: fr("clergy", 10), stability: -5 }, 2)] },
-  { id: "evt_road_building", title: "\u4FEE\u8DEF\u70ED\u6F6E", description: "\u5404\u65B9\u8981\u6C42\u4FEE\u5EFA\u9053\u8DEF\uFF01", category: "economy", trigger: { minTurn: 8, notAtWar: true }, ...recurring(4, 25), options: [option("\u5927\u5174\u571F\u6728", { gold: -120, stability: 3, factionSat: fr("merchants", 8) }, 3), option("\u91CF\u529B\u800C\u884C", { gold: -40 }, 2)] },
-  { id: "evt_weapon_advance", title: "\u6B66\u5668\u9769\u65B0", description: "\u5DE5\u5320\u53D1\u660E\u65B0\u578B\u6B66\u5668\uFF01", category: "military", trigger: { techLevelAbove: { branch: "mil", level: 2 } }, ...recurring(3, 35), options: [option("\u88C5\u5907\u5168\u519B", { gold: -100, iron: -20, factionSat: fr("military", 12) }, 3), option("\u9650\u91CF\u88C5\u5907", { gold: -40, factionSat: fr("military", 5) }, 2)] },
-  { id: "evt_noble_feud", title: "\u8D35\u65CF\u5185\u6597", description: "\u4E24\u5927\u8D35\u65CF\u5BB6\u65CF\u516C\u5F00\u5BF9\u7ACB\uFF01", category: "politics", trigger: { minTurn: 5 }, ...recurring(4, 20), options: [option("\u5C45\u4E2D\u8C03\u505C", { gold: -50, stability: 3 }, 3), option("\u652F\u6301\u5F3A\u52BF\u65B9", { factionSat: fr("nobles", -8), legitimacy: -3 }, 2)] },
-  { id: "evt_harvest_festival", title: "\u4E30\u6536\u8282", description: "\u4E94\u8C37\u4E30\u767B\uFF0C\u4E07\u6C11\u540C\u5E86\uFF01", category: "culture", trigger: { minTurn: 5, notAtWar: true, minStability: 30 }, ...recurring(5, 15), options: [option("\u5927\u8086\u5E86\u795D", { gold: -50, food: -20, stability: 5, factionSat: fr("commoners", 10) }, 3), option("\u7B80\u6734\u4ECE\u4E8B", { stability: 2 }, 2)] },
-  { id: "evt_corruption_expose", title: "\u8D2A\u8150\u66DD\u5149", description: "\u5927\u81E3\u8D2A\u58A8\u88AB\u63ED\u53D1\uFF01", category: "politics", trigger: { minCorruption: 40 }, ...recurring(5, 25), options: [option("\u4E25\u60E9\u4E0D\u8D37", { corruption: -8, legitimacy: 5, factionSat: fr("nobles", -12) }, 3), option("\u7F5A\u9152\u4E09\u676F", { corruption: -2, legitimacy: -3 }, 2)] },
-  { id: "evt_bandit_outbreak", title: "\u76D7\u532A\u7316\u7357", description: "\u76D7\u532A\u5360\u636E\u5C71\u5934\u52AB\u63A0\u5546\u8DEF\uFF01", category: "crisis", trigger: { maxStability: 50 }, ...recurring(5, 20), options: [option("\u6D3E\u5175\u6E05\u527F", { gold: -60, stability: 5, factionSat: fr("military", 5) }, 3), option("\u62DB\u5B89\u5B89\u629A", { gold: -30, corruption: 3 }, 2)] },
-  { id: "evt_foreign_merchants", title: "\u5916\u5546\u6D8C\u5165", description: "\u5916\u56FD\u5546\u4EBA\u5E26\u6765\u65B0\u5947\u5546\u54C1\uFF01", category: "economy", trigger: { minTurn: 8, notAtWar: true }, ...recurring(3, 25), options: [option("\u5F00\u653E\u5E02\u573A", { gold: 60, factionSat: fra({ faction: "merchants", delta: 8 }, { faction: "commoners", delta: -3 }) }, 3), option("\u9650\u5236\u51C6\u5165", { factionSat: fr("merchants", -5) }, 2)] },
-  { id: "evt_land_reform", title: "\u571F\u5730\u6539\u9769", description: "\u519C\u6C11\u8981\u6C42\u91CD\u65B0\u5206\u914D\u571F\u5730\uFF01", category: "politics", trigger: { minTurn: 15, factionSatBelow: { faction: "commoners", threshold: 30 } }, ...recurring(5, 40), options: [option("\u63A8\u884C\u6539\u9769", { gold: -100, stability: -8, factionSat: fra({ faction: "commoners", delta: 20 }, { faction: "nobles", delta: -15 }) }, 2), option("\u62D2\u7EDD", { factionSat: fr("commoners", -10), stability: -3 }, 3)] },
-  { id: "evt_witch_hunt", title: "\u730E\u5DEB\u8FD0\u52A8", description: "\u6C11\u95F4\u6380\u8D77\u730E\u5DEB\u72C2\u6F6E\uFF01", category: "religion", trigger: { maxStability: 40 }, ...recurring(4, 30), options: [option("\u987A\u4ECE\u6C11\u610F", { stability: 3, legitimacy: -3, population: -100 }, 2), option("\u7981\u6B62\u8FEB\u5BB3", { stability: -5, factionSat: fr("clergy", -8) }, 3)] },
-  { id: "evt_diplomatic_envoy", title: "\u5916\u4EA4\u4F7F\u56E2", description: "\u4ED6\u56FD\u6D3E\u9063\u4F7F\u56E2\u6765\u8BBF\uFF01", category: "diplomacy", trigger: { minTurn: 5, notAtWar: true }, ...recurring(4, 20), options: [option("\u9686\u91CD\u63A5\u5F85", { gold: -40, legitimacy: 3, influence: 5 }, 3), option("\u51B7\u6DE1\u5E94\u5BF9", { legitimacy: -2 }, 2)] },
-  { id: "evt_mint_debasement", title: "\u52A3\u5E01\u94F8\u9020\u4E4B\u8BAE", description: "\u56FD\u5E93\u5403\u7D27\uFF0C\u6709\u4EBA\u5EFA\u8BAE\u94F8\u52A3\u5E01\uFF01", category: "economy", trigger: { minTurn: 10 }, ...recurring(4, 30), options: [option("\u94F8\u52A3\u5E01", { gold: 150, corruption: 8, legitimacy: -8 }, 2), option("\u7EF4\u6301\u4FE1\u7528", { legitimacy: 5 }, 3)] },
-  { id: "evt_wall_construction", title: "\u57CE\u5899\u4FEE\u5EFA", description: "\u8FB9\u5883\u7701\u4EFD\u8BF7\u6C42\u4FEE\u7B51\u57CE\u5899\uFF01", category: "economy", trigger: { minTurn: 10 }, ...recurring(3, 30), options: [option("\u62E8\u6B3E\u4FEE\u5899", { gold: -100, stability: 3, factionSat: fr("military", 5) }, 3), option("\u6682\u7F13", { stability: -2 }, 2)] },
-  { id: "evt_scholar_exchange", title: "\u5B66\u8005\u4EA4\u6D41", description: "\u5F02\u56FD\u5B66\u8005\u524D\u6765\u4EA4\u6D41\uFF01", category: "science", trigger: { minTurn: 10, notAtWar: true }, ...recurring(3, 25), options: [option("\u70ED\u60C5\u63A5\u5F85", { sciPt: 15, gold: -30 }, 3), option("\u8C28\u614E\u5BF9\u5F85", { sciPt: 5 }, 2)] },
-  { id: "evt_granary_fire", title: "\u7CAE\u4ED3\u706B\u707E", description: "\u4E3B\u8981\u7CAE\u4ED3\u7A81\u53D1\u5927\u706B\uFF01", category: "crisis", trigger: { minTurn: 5 }, ...recurring(4, 40), options: [option("\u5168\u529B\u62A2\u6551", { food: -80, gold: -30 }, 3), option("\u542C\u4E4B\u4EFB\u4E4B", { food: -150, stability: -5 }, 1)] },
-  { id: "evt_naval_discovery", title: "\u822A\u6D77\u53D1\u73B0", description: "\u63A2\u9669\u8239\u961F\u53D1\u73B0\u65B0\u5C9B\u5C7F\uFF01", category: "science", trigger: { minTurn: 20, techLevelAbove: { branch: "admin", level: 2 } }, ...recurring(2, 50), options: [option("\u5EFA\u7ACB\u636E\u70B9", { gold: -100, influence: 10, food: 40 }, 3), option("\u53EA\u7ED8\u56FE\u8BB0\u5F55", { sciPt: 10 }, 2)] },
-  { id: "evt_conscription_unrest", title: "\u5F81\u5175\u66B4\u52A8", description: "\u5F3A\u5236\u5F81\u5175\u5F15\u53D1\u6C11\u4F17\u6297\u8BAE\uFF01", category: "crisis", trigger: { minTurn: 5, atWar: true }, ...recurring(5, 20), options: [option("\u575A\u6301\u5F81\u5175", { stability: -8, factionSat: fra({ faction: "military", delta: 5 }, { faction: "commoners", delta: -12 }) }, 2), option("\u51CF\u5C11\u5F81\u5175", { factionSat: fra({ faction: "commoners", delta: 8 }, { faction: "military", delta: -5 }) }, 3)] },
+  defineEvent("evt_gold_rush", "\u6DD8\u91D1\u70ED", "\u8FB9\u5883\u53D1\u73B0\u91D1\u77FF\uFF01", "economy", fromTurn(10), recurring(3, 40), [option("\u5F00\u91C7", { gold: 200, corruption: 5 }, 3), option("\u9650\u5236\u5F00\u91C7", { gold: 50, stability: 3 }, 2)]),
+  defineEvent("evt_trade_boom", "\u8D38\u6613\u7E41\u8363", "\u5546\u8DEF\u7545\u901A\uFF0C\u8D38\u6613\u91CF\u6FC0\u589E\uFF01", "economy", fromTurn(5, { notAtWar: true }), recurring(4, 25), [option("\u9F13\u52B1\u8D38\u6613", { gold: 100, factionSat: fr("merchants", 10) }, 3), option("\u5F81\u6536\u5546\u7A0E", { gold: 150, factionSat: fr("merchants", -8) }, 2)]),
+  defineEvent("evt_drought_severe", "\u5927\u65F1", "\u4E45\u65F1\u4E0D\u96E8\uFF0C\u7CAE\u98DF\u51CF\u4EA7\uFF01", "crisis", fromTurn(3), recurring(5, 30), [option("\u5F00\u4ED3\u653E\u7CAE", { food: -100, stability: 5 }, 3), option("\u52A0\u91CD\u8D4B\u7A0E\u6551\u707E", { gold: -80, food: 50, factionSat: commonersReaction(-10) }, 2)]),
+  defineEvent("evt_refugee_wave", "\u8FB9\u5883\u96BE\u6C11\u6F6E", "\u90BB\u56FD\u6218\u4E71\uFF0C\u96BE\u6C11\u6D8C\u5165\u8FB9\u5883\uFF01", "crisis", fromTurn(10), recurring(4, 35), [option("\u63A5\u7EB3\u5B89\u7F6E", { population: 500, food: -50, stability: -3 }, 2), option("\u5173\u95ED\u8FB9\u5883", { legitimacy: -5, factionSat: commonersReaction(5) }, 3)]),
+  defineEvent("evt_merchant_guild", "\u5546\u4EBA\u884C\u4F1A", "\u5546\u4EBA\u7EC4\u5EFA\u884C\u4F1A\u8981\u6C42\u7279\u6743\uFF01", "politics", fromTurn(8), recurring(4, 30), [option("\u6388\u4E88\u7279\u6743", { gold: 80, factionSat: fra({ faction: "merchants", delta: 15 }, { faction: "nobles", delta: -8 }) }, 3), option("\u62D2\u7EDD", { factionSat: fr("merchants", -12) }, 2)]),
+  defineEvent("evt_military_reform", "\u519B\u4E8B\u6539\u9769", "\u5C06\u9886\u63D0\u8BAE\u6539\u9769\u519B\u5236\uFF01", "military", fromTurn(10), recurring(3, 40), [option("\u63A8\u884C\u6539\u9769", { gold: -120, factionSat: militaryReaction(10), stability: -3 }, 3), option("\u7EF4\u6301\u73B0\u72B6", { factionSat: militaryReaction(-5) }, 2)]),
+  defineEvent("evt_cultural_flourish", "\u6587\u5316\u7E41\u8363", "\u5B66\u8005\u827A\u672F\u5BB6\u6C47\u805A\uFF0C\u6587\u5316\u660C\u76DB\uFF01", "culture", fromTurn(15, { minStability: 40 }), recurring(3, 30), [option("\u5927\u529B\u8D44\u52A9", { gold: -80, sciPt: 15, legitimacy: 5 }, 3), option("\u9002\u5EA6\u652F\u6301", { gold: -30, sciPt: 5 }, 2)]),
+  defineEvent("evt_border_incident", "\u8FB9\u519B\u51B2\u7A81", "\u8FB9\u9632\u519B\u4E0E\u90BB\u56FD\u53D1\u751F\u5C0F\u89C4\u6A21\u51B2\u7A81\uFF01", "military", fromTurn(5), recurring(5, 20), [option("\u5F3A\u786C\u56DE\u5E94", { stability: 3, factionSat: fra({ faction: "military", delta: 8 }, { faction: "merchants", delta: -5 }) }, 2), option("\u5916\u4EA4\u65A1\u65CB", { gold: -30, legitimacy: 3 }, 3)]),
+  defineEvent("evt_earthquake", "\u5730\u9707", "\u5F3A\u70C8\u5730\u9707\u88AD\u51FB\u7701\u4EFD\uFF01", "crisis", fromTurn(3), recurring(3, 50), [option("\u5168\u529B\u6551\u707E", { gold: -150, food: -50, stability: 5 }, 3), option("\u6709\u9650\u6551\u63F4", { gold: -50, stability: -5 }, 2)]),
+  defineEvent("evt_tax_evasion", "\u5927\u89C4\u6A21\u9003\u7A0E", "\u5BCC\u5546\u5927\u65CF\u9003\u7A0E\u4E25\u91CD\uFF01", "economy", { minCorruption: 30 }, recurring(5, 25), [option("\u4E25\u67E5\u91CD\u7F5A", { gold: 100, factionSat: noblesReaction(-10), corruption: -5 }, 2), option("\u4ECE\u8F7B\u53D1\u843D", { factionSat: noblesReaction(5), corruption: 3 }, 3)]),
+  defineEvent("evt_succession_war", "\u7EE7\u627F\u5371\u673A", "\u591A\u4F4D\u7EE7\u627F\u4EBA\u9009\u4E89\u593A\u5927\u4F4D\uFF01", "politics", { maxLegitimacy: 50 }, recurring(6, 40), [option("\u7ACB\u957F\u5B50", { legitimacy: 10, stability: -5 }, 3), option("\u62E9\u8D24\u7ACB", { legitimacy: 5, stability: -8, factionSat: noblesReaction(-10) }, 2)]),
+  defineEvent("evt_foreign_aid", "\u5916\u56FD\u63F4\u52A9", "\u53CB\u90A6\u9001\u6765\u7269\u8D44\u63F4\u52A9\uFF01", "economy", fromTurn(10, { notAtWar: true }), recurring(3, 30), [option("\u6B23\u7136\u63A5\u53D7", { gold: 80, food: 60 }, 3), option("\u5A49\u62D2\u4EE5\u4FDD\u72EC\u7ACB", { legitimacy: 5 }, 2)]),
+  defineEvent("evt_pop_boom", "\u4EBA\u53E3\u6FC0\u589E", "\u4E30\u6536\u5E26\u6765\u4EBA\u53E3\u5FEB\u901F\u589E\u957F\uFF01", "population", fromTurn(8, { minStability: 50 }), recurring(3, 30), [option("\u9F13\u52B1\u589E\u957F", { population: 300, food: -30 }, 3), option("\u9002\u5EA6\u63A7\u5236", { population: 100 }, 2)]),
+  defineEvent("evt_slave_revolt", "\u5974\u5F79\u8D77\u4E49", "\u88AB\u538B\u8FEB\u8005\u63ED\u7AFF\u800C\u8D77\uFF01", "crisis", fromTurn(10, { maxStability: 40 }), recurring(5, 35), [option("\u9547\u538B", { gold: -80, stability: -5, factionSat: militaryReaction(5) }, 2), option("\u9002\u5EA6\u6539\u9769", { gold: -50, legitimacy: 5, factionSat: noblesReaction(-8) }, 3)]),
+  defineEvent("evt_spy_scandal", "\u95F4\u8C0D\u4E11\u95FB", "\u5916\u56FD\u95F4\u8C0D\u88AB\u6293\u83B7\uFF01", "diplomacy", fromTurn(5), recurring(4, 25), [option("\u516C\u5F00\u5904\u5211", { legitimacy: 5, stability: -3 }, 2), option("\u79D8\u5BC6\u5229\u7528", { gold: 50, corruption: 3 }, 3)]),
+  defineEvent("evt_temple_dispute", "\u5BFA\u5E99\u4E89\u7AEF", "\u5B97\u6559\u56E2\u4F53\u95F4\u7206\u53D1\u51B2\u7A81\uFF01", "religion", fromTurn(5, { provinceCultureDiff: true }), recurring(4, 30), [option("\u4EF2\u88C1\u8C03\u505C", { gold: -30, stability: 3 }, 3), option("\u652F\u6301\u4E00\u65B9", { factionSat: fr("clergy", 10), stability: -5 }, 2)]),
+  defineEvent("evt_road_building", "\u4FEE\u8DEF\u70ED\u6F6E", "\u5404\u65B9\u8981\u6C42\u4FEE\u5EFA\u9053\u8DEF\uFF01", "economy", fromTurn(8, { notAtWar: true }), recurring(4, 25), [option("\u5927\u5174\u571F\u6728", { gold: -120, stability: 3, factionSat: fr("merchants", 8) }, 3), option("\u91CF\u529B\u800C\u884C", { gold: -40 }, 2)]),
+  defineEvent("evt_weapon_advance", "\u6B66\u5668\u9769\u65B0", "\u5DE5\u5320\u53D1\u660E\u65B0\u578B\u6B66\u5668\uFF01", "military", { techLevelAbove: { branch: "mil", level: 2 } }, recurring(3, 35), [option("\u88C5\u5907\u5168\u519B", { gold: -100, iron: -20, factionSat: militaryReaction(12) }, 3), option("\u9650\u91CF\u88C5\u5907", { gold: -40, factionSat: militaryReaction(5) }, 2)]),
+  defineEvent("evt_noble_feud", "\u8D35\u65CF\u5185\u6597", "\u4E24\u5927\u8D35\u65CF\u5BB6\u65CF\u516C\u5F00\u5BF9\u7ACB\uFF01", "politics", fromTurn(5), recurring(4, 20), [option("\u5C45\u4E2D\u8C03\u505C", { gold: -50, stability: 3 }, 3), option("\u652F\u6301\u5F3A\u52BF\u65B9", { factionSat: noblesReaction(-8), legitimacy: -3 }, 2)]),
+  defineEvent("evt_harvest_festival", "\u4E30\u6536\u8282", "\u4E94\u8C37\u4E30\u767B\uFF0C\u4E07\u6C11\u540C\u5E86\uFF01", "culture", fromTurn(5, { notAtWar: true, minStability: 30 }), recurring(5, 15), [option("\u5927\u8086\u5E86\u795D", { gold: -50, food: -20, stability: 5, factionSat: commonersReaction(10) }, 3), option("\u7B80\u6734\u4ECE\u4E8B", { stability: 2 }, 2)]),
+  defineEvent("evt_corruption_expose", "\u8D2A\u8150\u66DD\u5149", "\u5927\u81E3\u8D2A\u58A8\u88AB\u63ED\u53D1\uFF01", "politics", { minCorruption: 40 }, recurring(5, 25), [option("\u4E25\u60E9\u4E0D\u8D37", { corruption: -8, legitimacy: 5, factionSat: noblesReaction(-12) }, 3), option("\u7F5A\u9152\u4E09\u676F", { corruption: -2, legitimacy: -3 }, 2)]),
+  defineEvent("evt_bandit_outbreak", "\u76D7\u532A\u7316\u7357", "\u76D7\u532A\u5360\u636E\u5C71\u5934\u52AB\u63A0\u5546\u8DEF\uFF01", "crisis", { maxStability: 50 }, recurring(5, 20), [option("\u6D3E\u5175\u6E05\u527F", { gold: -60, stability: 5, factionSat: militaryReaction(5) }, 3), option("\u62DB\u5B89\u5B89\u629A", { gold: -30, corruption: 3 }, 2)]),
+  defineEvent("evt_foreign_merchants", "\u5916\u5546\u6D8C\u5165", "\u5916\u56FD\u5546\u4EBA\u5E26\u6765\u65B0\u5947\u5546\u54C1\uFF01", "economy", fromTurn(8, { notAtWar: true }), recurring(3, 25), [option("\u5F00\u653E\u5E02\u573A", { gold: 60, factionSat: fra({ faction: "merchants", delta: 8 }, { faction: "commoners", delta: -3 }) }, 3), option("\u9650\u5236\u51C6\u5165", { factionSat: fr("merchants", -5) }, 2)]),
+  defineEvent("evt_land_reform", "\u571F\u5730\u6539\u9769", "\u519C\u6C11\u8981\u6C42\u91CD\u65B0\u5206\u914D\u571F\u5730\uFF01", "politics", { minTurn: 15, factionSatBelow: { faction: "commoners", threshold: 30 } }, recurring(5, 40), [option("\u63A8\u884C\u6539\u9769", { gold: -100, stability: -8, factionSat: fra({ faction: "commoners", delta: 20 }, { faction: "nobles", delta: -15 }) }, 2), option("\u62D2\u7EDD", { factionSat: commonersReaction(-10), stability: -3 }, 3)]),
+  defineEvent("evt_witch_hunt", "\u730E\u5DEB\u8FD0\u52A8", "\u6C11\u95F4\u6380\u8D77\u730E\u5DEB\u72C2\u6F6E\uFF01", "religion", { maxStability: 40 }, recurring(4, 30), [option("\u987A\u4ECE\u6C11\u610F", { stability: 3, legitimacy: -3, population: -100 }, 2), option("\u7981\u6B62\u8FEB\u5BB3", { stability: -5, factionSat: fr("clergy", -8) }, 3)]),
+  defineEvent("evt_diplomatic_envoy", "\u5916\u4EA4\u4F7F\u56E2", "\u4ED6\u56FD\u6D3E\u9063\u4F7F\u56E2\u6765\u8BBF\uFF01", "diplomacy", fromTurn(5, { notAtWar: true }), recurring(4, 20), [option("\u9686\u91CD\u63A5\u5F85", { gold: -40, legitimacy: 3, influence: 5 }, 3), option("\u51B7\u6DE1\u5E94\u5BF9", { legitimacy: -2 }, 2)]),
+  defineEvent("evt_mint_debasement", "\u52A3\u5E01\u94F8\u9020\u4E4B\u8BAE", "\u56FD\u5E93\u5403\u7D27\uFF0C\u6709\u4EBA\u5EFA\u8BAE\u94F8\u52A3\u5E01\uFF01", "economy", fromTurn(10), recurring(4, 30), [option("\u94F8\u52A3\u5E01", { gold: 150, corruption: 8, legitimacy: -8 }, 2), option("\u7EF4\u6301\u4FE1\u7528", { legitimacy: 5 }, 3)]),
+  defineEvent("evt_wall_construction", "\u57CE\u5899\u4FEE\u5EFA", "\u8FB9\u5883\u7701\u4EFD\u8BF7\u6C42\u4FEE\u7B51\u57CE\u5899\uFF01", "economy", fromTurn(10), recurring(3, 30), [option("\u62E8\u6B3E\u4FEE\u5899", { gold: -100, stability: 3, factionSat: militaryReaction(5) }, 3), option("\u6682\u7F13", { stability: -2 }, 2)]),
+  defineEvent("evt_scholar_exchange", "\u5B66\u8005\u4EA4\u6D41", "\u5F02\u56FD\u5B66\u8005\u524D\u6765\u4EA4\u6D41\uFF01", "science", fromTurn(10, { notAtWar: true }), recurring(3, 25), [option("\u70ED\u60C5\u63A5\u5F85", { sciPt: 15, gold: -30 }, 3), option("\u8C28\u614E\u5BF9\u5F85", { sciPt: 5 }, 2)]),
+  defineEvent("evt_granary_fire", "\u7CAE\u4ED3\u706B\u707E", "\u4E3B\u8981\u7CAE\u4ED3\u7A81\u53D1\u5927\u706B\uFF01", "crisis", fromTurn(5), recurring(4, 40), [option("\u5168\u529B\u62A2\u6551", { food: -80, gold: -30 }, 3), option("\u542C\u4E4B\u4EFB\u4E4B", { food: -150, stability: -5 }, 1)]),
+  defineEvent("evt_naval_discovery", "\u822A\u6D77\u53D1\u73B0", "\u63A2\u9669\u8239\u961F\u53D1\u73B0\u65B0\u5C9B\u5C7F\uFF01", "science", { minTurn: 20, techLevelAbove: { branch: "admin", level: 2 } }, recurring(2, 50), [option("\u5EFA\u7ACB\u636E\u70B9", { gold: -100, influence: 10, food: 40 }, 3), option("\u53EA\u7ED8\u56FE\u8BB0\u5F55", { sciPt: 10 }, 2)]),
+  defineEvent("evt_conscription_unrest", "\u5F81\u5175\u66B4\u52A8", "\u5F3A\u5236\u5F81\u5175\u5F15\u53D1\u6C11\u4F17\u6297\u8BAE\uFF01", "crisis", fromTurn(5, { atWar: true }), recurring(5, 20), [option("\u575A\u6301\u5F81\u5175", { stability: -8, factionSat: fra({ faction: "military", delta: 5 }, { faction: "commoners", delta: -12 }) }, 2), option("\u51CF\u5C11\u5F81\u5175", { factionSat: fra({ faction: "commoners", delta: 8 }, { faction: "military", delta: -5 }) }, 3)]),
   // ── B 扩展：35 个新事件，补齐 culture/population/opportunity 等 ──
-  { id: "evt_culture_flourish", title: "\u6587\u6CBB\u9F0E\u76DB", description: "\u8BD7\u4EBA\u5B66\u8005\u4E91\u96C6\u4EAC\u757F\uFF0C\u6587\u8FD0\u660C\u9686\uFF01", category: "culture", trigger: { minTurn: 15, notAtWar: true, minStability: 50 }, ...recurring(4, 30), options: [option("\u8BBE\u7ACB\u7FF0\u6797\u9662", { gold: -80, sciPt: 20, legitimacy: 8, factionSat: fr("clergy", 15) }, 3), option("\u6C11\u95F4\u81EA\u6D41", { sciPt: 5, stability: 3 }, 2)] },
-  { id: "evt_culture_patron", title: "\u827A\u5320\u6C42\u5E87", description: "\u540D\u5320\u5BFB\u6C42\u7687\u5BA4\u5E87\u62A4\uFF0C\u732E\u4E0A\u5947\u6280\uFF01", category: "culture", trigger: { minTurn: 10, notAtWar: true }, ...recurring(3, 25), options: [option("\u91CD\u91D1\u793C\u9047", { gold: -60, influence: 5, factionSat: fr("clergy", 8) }, 3), option("\u5A49\u62D2", { influence: -2 }, 2)] },
-  { id: "evt_culture_renaissance", title: "\u53E4\u5178\u6587\u827A\u590D\u5174", description: "\u53E4\u5178\u5B66\u672F\u590D\u5174\uFF0C\u65B0\u601D\u6F6E\u6D8C\u52A8\uFF01", category: "culture", trigger: { minTurn: 30, techLevelAbove: { branch: "admin", level: 3 } }, ...oneTime(2, 60), options: [option("\u5927\u529B\u5021\u5BFC", { gold: -150, sciPt: 40, stability: 5, factionSat: fra({ faction: "merchants", delta: 20 }, { faction: "clergy", delta: -8 }) }, 3), option("\u987A\u5176\u81EA\u7136", { sciPt: 15 }, 2)] },
-  { id: "evt_culture_ban", title: "\u5F02\u7AEF\u5B66\u8BF4", description: "\u65B0\u5947\u5B66\u8BF4\u6311\u6218\u4F20\u7EDF\uFF0C\u6559\u4F1A\u8981\u6C42\u67E5\u7981\uFF01", category: "culture", trigger: { minTurn: 20, techLevelAbove: { branch: "admin", level: 2 } }, ...recurring(4, 35), options: [option("\u67E5\u7981\u5F02\u7AEF", { stability: 3, sciPt: -10, factionSat: fra({ faction: "clergy", delta: 12 }, { faction: "merchants", delta: -15 }) }, 2), option("\u4FDD\u62A4\u5B66\u672F", { stability: -4, sciPt: 15, factionSat: fr("clergy", -10) }, 3)] },
-  { id: "evt_culture_festival", title: "\u8BF8\u90A6\u671D\u8D3A", description: "\u8BF8\u90A6\u9063\u4F7F\u671D\u8D3A\uFF0C\u56FD\u5A01\u8FDC\u626C\uFF01", category: "culture", trigger: { minTurn: 25, notAtWar: true, minStability: 60 }, ...recurring(3, 50), options: [option("\u76DB\u5178\u793C\u4E4B", { gold: -120, legitimacy: 10, influence: 15 }, 3), option("\u7B80\u793C\u76F8\u5F85", { legitimacy: 3, influence: 5 }, 2)] },
-  { id: "evt_pop_boom2", title: "\u4EBA\u4E01\u5174\u65FA", description: "\u8FDE\u5E74\u4E30\u7A14\uFF0C\u4EBA\u53E3\u6FC0\u589E\uFF01", category: "population", trigger: { minTurn: 10, notAtWar: true }, ...recurring(4, 30), options: [option("\u9F13\u52B1\u751F\u80B2", { food: -50, population: 200, stability: 3 }, 3), option("\u987A\u5176\u81EA\u7136", { population: 100 }, 2)] },
-  { id: "evt_pop_migration", title: "\u6D41\u6C11\u6D8C\u5165", description: "\u90BB\u90A6\u6218\u4E71\uFF0C\u5927\u6279\u6D41\u6C11\u6D8C\u5165\u8FB9\u5883\uFF01", category: "population", trigger: { minTurn: 8 }, ...recurring(4, 25), options: [option("\u7F16\u6237\u9F50\u6C11", { population: 150, food: -40, stability: -3, factionSat: fr("commoners", -5) }, 3), option("\u9A71\u9010\u51FA\u5883", { influence: -5, stability: 2 }, 2)] },
-  { id: "evt_pop_urban", title: "\u57CE\u5E02\u81A8\u80C0", description: "\u90FD\u57CE\u4EBA\u53E3\u8FC7\u8F7D\uFF0C\u574A\u5E02\u62E5\u6324\uFF01", category: "population", trigger: { minTurn: 20, techLevelAbove: { branch: "admin", level: 2 } }, ...recurring(3, 40), options: [option("\u6269\u5EFA\u57CE\u90ED", { gold: -100, population: 100, stability: 3 }, 3), option("\u9650\u5236\u6D41\u5165", { stability: -2, factionSat: fr("merchants", -8) }, 2)] },
-  { id: "evt_pop_plague_end", title: "\u75AB\u540E\u4F59\u751F", description: "\u5927\u75AB\u5E73\u606F\uFF0C\u5E78\u5B58\u8005\u4F11\u517B\u751F\u606F\uFF01", category: "population", trigger: { minTurn: 30, maxStability: 60 }, ...recurring(3, 50), options: [option("\u8F7B\u5FAD\u8584\u8D4B", { gold: -30, population: 100, stability: 5, factionSat: fr("commoners", 10) }, 3), option("\u5E38\u6001\u6CBB\u7406", { population: 50 }, 2)] },
-  { id: "evt_pop_labor_short", title: "\u6218\u540E\u52B3\u529B\u77ED\u7F3A", description: "\u6218\u4E71\u540E\u7530\u5730\u8352\u829C\uFF0C\u52B3\u529B\u532E\u4E4F\uFF01", category: "population", trigger: { minTurn: 15, atWar: true }, ...recurring(4, 30), options: [option("\u62DB\u52DF\u6D41\u6C11", { gold: -50, population: 80, food: 20 }, 3), option("\u5F3A\u5236\u5F81\u53D1", { population: 50, stability: -5, factionSat: fr("commoners", -10) }, 1)] },
-  { id: "evt_opp_ancient_treasure", title: "\u53E4\u5893\u73B0\u5B9D", description: "\u519C\u592B\u6398\u51FA\u4E0A\u53E4\u5B9D\u85CF\uFF01", category: "opportunity", trigger: { minTurn: 10 }, ...recurring(2, 50), options: [option("\u5145\u516C\u56FD\u5E93", { gold: 200, legitimacy: 3 }, 3), option("\u8D4F\u8D50\u519C\u592B", { gold: 50, stability: 5, factionSat: fr("commoners", 8) }, 2)] },
-  { id: "evt_opp_strategic_location", title: "\u9669\u9698\u5F52\u9644", description: "\u8FB9\u5883\u9669\u9698\u5B88\u5C06\u732E\u5173\u6295\u8BDA\uFF01", category: "opportunity", trigger: { minTurn: 15, notAtWar: true }, ...recurring(2, 60), options: [option("\u7EB3\u964D\u91CD\u8D4F", { gold: -80, influence: 10, stability: 3 }, 3), option("\u8C28\u614E\u63A5\u7EB3", { influence: 3 }, 2)] },
-  { id: "evt_opp_talent", title: "\u8D24\u624D\u6295\u6548", description: "\u5F02\u56FD\u540D\u58EB\u6155\u540D\u6765\u6295\uFF01", category: "opportunity", trigger: { minTurn: 12, notAtWar: true }, ...recurring(3, 40), options: [option("\u7834\u683C\u5F55\u7528", { gold: -40, sciPt: 15, efficiency: 3 }, 3), option("\u8003\u5BDF\u540E\u7528", { sciPt: 5 }, 2)] },
-  { id: "evt_opp_good_omen", title: "\u7965\u745E\u964D\u4E34", description: "\u5929\u73B0\u7965\u745E\uFF0C\u4E07\u6C11\u79F0\u5E86\uFF01", category: "opportunity", trigger: { minTurn: 20, notAtWar: true, minStability: 40 }, ...recurring(2, 50), options: [option("\u662D\u544A\u5929\u4E0B", { legitimacy: 8, stability: 5, influence: 5 }, 3), option("\u79D8\u800C\u4E0D\u5BA3", { legitimacy: 2 }, 2)] },
-  { id: "evt_opp_trade_windfall", title: "\u5546\u8DEF\u66B4\u5229", description: "\u7F55\u89C1\u5546\u961F\u5E26\u6765\u5DE8\u989D\u5229\u6DA6\uFF01", category: "opportunity", trigger: { minTurn: 15, notAtWar: true }, ...recurring(2, 45), options: [option("\u62BD\u53D6\u91CD\u7A0E", { gold: 180, factionSat: fr("merchants", -5) }, 3), option("\u8F7B\u7A0E\u60E0\u6C11", { gold: 80, factionSat: fr("merchants", 10) }, 2)] },
-  { id: "evt_opp_mercenary", title: "\u96C7\u4F63\u519B\u6765\u6295", description: "\u767E\u6218\u96C7\u4F63\u519B\u5BFB\u6C42\u6548\u547D\uFF01", category: "opportunity", trigger: { minTurn: 10, atWar: true }, ...recurring(3, 30), options: [option("\u9AD8\u4EF7\u96C7\u4F63", { gold: -100, factionSat: fr("military", 10) }, 3), option("\u5A49\u62D2", { stability: 2 }, 2)] },
-  { id: "evt_opp_dynastic_match", title: "\u8054\u59FB\u826F\u7F18", description: "\u5F3A\u56FD\u738B\u5BA4\u63D0\u8BAE\u8054\u59FB\uFF01", category: "opportunity", trigger: { minTurn: 18, notAtWar: true }, ...recurring(3, 40), options: [option("\u6B23\u7136\u5141\u8BFA", { gold: -60, influence: 15, legitimacy: 5 }, 3), option("\u5A49\u8A00\u8C22\u7EDD", { influence: -3 }, 2)] },
-  { id: "evt_relig_heresy", title: "\u5F02\u7AEF\u8513\u5EF6", description: "\u5F02\u7AEF\u6559\u6D3E\u5728\u6C11\u95F4\u6269\u6563\uFF01", category: "religion", trigger: { minTurn: 20, maxStability: 60 }, ...recurring(4, 35), options: [option("\u5B97\u6559\u88C1\u5224", { stability: 3, population: -50, factionSat: fra({ faction: "clergy", delta: 12 }, { faction: "commoners", delta: -10 }) }, 2), option("\u8FA9\u8BBA\u611F\u5316", { sciPt: 8, stability: -2 }, 3)] },
-  { id: "evt_relig_temple_grant", title: "\u5BFA\u5E99\u8BF7\u7530", description: "\u5927\u5BFA\u8BF7\u6C42\u8D50\u7530\u517B\u50E7\uFF01", category: "religion", trigger: { minTurn: 15, notAtWar: true }, ...recurring(3, 40), options: [option("\u6177\u6168\u8D50\u7530", { gold: -50, food: -30, legitimacy: 5, factionSat: fr("clergy", 15) }, 2), option("\u9650\u7530\u6291\u5BFA", { factionSat: fra({ faction: "clergy", delta: -12 }, { faction: "nobles", delta: 5 }) }, 3)] },
-  { id: "evt_relig_pilgrimage", title: "\u671D\u5723\u70ED\u6F6E", description: "\u4FE1\u4F17\u6380\u8D77\u671D\u5723\u70ED\u6F6E\uFF01", category: "religion", trigger: { minTurn: 20, notAtWar: true }, ...recurring(3, 30), options: [option("\u5B98\u65B9\u62A4\u6301", { gold: -40, legitimacy: 5, influence: 3, factionSat: fr("clergy", 8) }, 3), option("\u6C11\u95F4\u81EA\u7406", { stability: 2 }, 2)] },
-  { id: "evt_relig_schism", title: "\u6559\u6D3E\u5206\u88C2", description: "\u5B97\u6559\u5185\u90E8\u7206\u53D1\u6559\u4E49\u4E4B\u4E89\uFF01", category: "religion", trigger: { minTurn: 30 }, ...recurring(3, 50), options: [option("\u652F\u6301\u6B63\u7EDF", { stability: 3, factionSat: fra({ faction: "clergy", delta: 10 }, { faction: "commoners", delta: -5 }) }, 2), option("\u4FDD\u6301\u4E2D\u7ACB", { stability: -3, factionSat: fr("clergy", -8) }, 3)] },
-  { id: "evt_relig_conversion", title: "\u5F02\u6559\u5F52\u5316", description: "\u8FB9\u5883\u5F02\u6559\u90E8\u843D\u8BF7\u6C42\u5F52\u5316\uFF01", category: "religion", trigger: { minTurn: 15, hasNewTerritory: true }, ...recurring(3, 40), options: [option("\u9686\u91CD\u53D7\u793C", { gold: -30, legitimacy: 5, stability: 3, factionSat: fr("clergy", 12) }, 3), option("\u56E0\u4FD7\u800C\u6CBB", { stability: 2, factionSat: fr("clergy", -5) }, 2)] },
-  { id: "evt_sci_astronomy", title: "\u5929\u6587\u5F02\u8C61", description: "\u5BA2\u661F\u663C\u89C1\uFF0C\u53F8\u5929\u76D1\u8BF7\u89E3\uFF01", category: "science", trigger: { minTurn: 15, techLevelAbove: { branch: "admin", level: 2 } }, ...recurring(3, 40), options: [option("\u8BE6\u8BB0\u89C2\u6D4B", { sciPt: 20, gold: -20 }, 3), option("\u89C6\u4E3A\u5929\u8C34", { stability: -3, legitimacy: -3, factionSat: fr("clergy", 8) }, 1)] },
-  { id: "evt_sci_invention", title: "\u5DE7\u5320\u732E\u5668", description: "\u5DE5\u5320\u53D1\u660E\u65B0\u5F0F\u5668\u68B0\uFF01", category: "science", trigger: { minTurn: 20, techLevelAbove: { branch: "agri", level: 2 } }, ...recurring(3, 35), options: [option("\u63A8\u5E7F\u6C11\u7528", { gold: -60, food: 30, sciPt: 10 }, 3), option("\u519B\u7528\u4FDD\u5BC6", { gold: -40, factionSat: fr("military", 8) }, 2)] },
-  { id: "evt_sci_academy", title: "\u5B66\u9662\u7B79\u5EFA", description: "\u5B66\u8005\u8BF7\u6C42\u8BBE\u7ACB\u7687\u5BB6\u5B66\u9662\uFF01", category: "science", trigger: { minTurn: 25, techLevelAbove: { branch: "admin", level: 3 } }, ...oneTime(2, 60), options: [option("\u62E8\u6B3E\u5174\u5EFA", { gold: -200, sciPt: 50, efficiency: 5, factionSat: fr("clergy", 20) }, 3), option("\u6682\u7F13", { factionSat: fr("clergy", -8) }, 2)] },
-  { id: "evt_sci_translation", title: "\u8BD1\u7ECF\u8FD0\u52A8", description: "\u5F02\u57DF\u5178\u7C4D\u4F20\u5165\uFF0C\u8BF7\u65E8\u7FFB\u8BD1\uFF01", category: "science", trigger: { minTurn: 20, notAtWar: true }, ...recurring(3, 40), options: [option("\u8BBE\u8BD1\u573A", { gold: -80, sciPt: 25, factionSat: fra({ faction: "clergy", delta: 12 }, { faction: "merchants", delta: 5 }) }, 3), option("\u6C11\u95F4\u81EA\u8BD1", { sciPt: 8 }, 2)] },
-  { id: "evt_dip_alliance_proposal", title: "\u7ED3\u76DF\u4E4B\u8BAE", description: "\u5F3A\u56FD\u4E3B\u52A8\u63D0\u8BAE\u7ED3\u76DF\uFF01", category: "diplomacy", trigger: { minTurn: 12, notAtWar: true }, ...recurring(3, 30), options: [option("\u6B23\u7136\u7ED3\u76DF", { influence: 10, legitimacy: 3, gold: -30 }, 3), option("\u4FDD\u6301\u72EC\u7ACB", { influence: -2 }, 2)] },
-  { id: "evt_dip_hostage", title: "\u8D28\u5B50\u4E4B\u7EA6", description: "\u90BB\u56FD\u63D0\u8BAE\u4E92\u9001\u8D28\u5B50\u4EE5\u56FA\u76DF\u7EA6\uFF01", category: "diplomacy", trigger: { minTurn: 15, notAtWar: true }, ...recurring(3, 40), options: [option("\u63A5\u53D7", { influence: 8, legitimacy: -3, stability: -2 }, 2), option("\u62D2\u7EDD", { influence: -5 }, 3)] },
-  { id: "evt_dip_trade_embassy", title: "\u901A\u5546\u4F7F\u56E2", description: "\u8FDC\u65B9\u56FD\u5EA6\u9063\u901A\u5546\u4F7F\u56E2\uFF01", category: "diplomacy", trigger: { minTurn: 18, notAtWar: true }, ...recurring(3, 35), options: [option("\u7B7E\u8BA2\u6761\u7EA6", { gold: 80, influence: 5, factionSat: fr("merchants", 12) }, 3), option("\u89C2\u671B", { influence: 2 }, 2)] },
-  { id: "evt_dip_border_incident", title: "\u8FB9\u5883\u4E8B\u4EF6", description: "\u8FB9\u519B\u8BEF\u5165\u90BB\u90A6\u5F15\u53D1\u7EA0\u7EB7\uFF01", category: "diplomacy", trigger: { minTurn: 8 }, ...recurring(4, 25), options: [option("\u9063\u4F7F\u81F4\u6B49", { gold: -30, influence: 3 }, 3), option("\u5F3A\u786C\u7ACB\u573A", { influence: -5, stability: 3, factionSat: fr("military", 8) }, 2)] },
-  { id: "evt_dip_refugee_crisis", title: "\u5916\u4EA4\u96BE\u6C11\u5371\u673A", description: "\u90BB\u90A6\u5185\u4E71\uFF0C\u96BE\u6C11\u6D8C\u5165\uFF01", category: "diplomacy", trigger: { minTurn: 20 }, ...recurring(3, 35), options: [option("\u8BBE\u8425\u5B89\u7F6E", { gold: -80, food: -40, population: 100, influence: 8 }, 3), option("\u5C01\u95ED\u8FB9\u5883", { influence: -8, stability: 2 }, 2)] },
-  { id: "evt_mil_traitor", title: "\u53DB\u5C06\u6295\u654C", description: "\u8FB9\u5173\u5B88\u5C06\u53DB\u9003\u654C\u56FD\uFF01", category: "military", trigger: { minTurn: 15, maxStability: 60 }, ...recurring(3, 40), options: [option("\u60AC\u8D4F\u7F09\u62FF", { gold: -50, influence: 3, factionSat: fr("military", 5) }, 3), option("\u7533\u65A5\u8FB9\u9547", { stability: -5, factionSat: fr("military", -8) }, 2)] },
-  { id: "evt_mil_victory_parade", title: "\u51EF\u65CB\u732E\u4FD8", description: "\u5927\u519B\u51EF\u65CB\uFF0C\u8BF7\u884C\u732E\u4FD8\u793C\uFF01", category: "military", trigger: { minTurn: 10, notAtWar: true }, ...recurring(3, 30), options: [option("\u9686\u91CD\u732E\u4FD8", { gold: -40, legitimacy: 8, factionSat: fr("military", 15) }, 3), option("\u4F4E\u8C03\u5904\u7F6E", { legitimacy: 2 }, 2)] },
-  { id: "evt_mil_supply_line", title: "\u7CAE\u9053\u88AB\u65AD", description: "\u654C\u519B\u88AD\u6270\u7CAE\u9053\uFF0C\u524D\u7EBF\u544A\u6025\uFF01", category: "military", trigger: { minTurn: 10, atWar: true }, ...recurring(4, 25), options: [option("\u91CD\u5175\u62A4\u7CAE", { gold: -80, food: -30, factionSat: fr("military", 8) }, 3), option("\u5C31\u5730\u5F81\u7CAE", { food: 20, stability: -8, factionSat: fr("commoners", -15) }, 1)] },
-  { id: "evt_mil_defection", title: "\u654C\u5C06\u6765\u6295", description: "\u654C\u56FD\u540D\u5C06\u7387\u90E8\u6765\u964D\uFF01", category: "military", trigger: { minTurn: 15, atWar: true }, ...recurring(3, 40), options: [option("\u539A\u793C\u63A5\u7EB3", { gold: -60, factionSat: fr("military", 12), influence: 5 }, 3), option("\u7591\u800C\u4E0D\u7528", { stability: -2 }, 2)] },
-  { id: "evt_mil_fortress_siege", title: "\u5B64\u57CE\u6B7B\u5B88", description: "\u8FB9\u57CE\u88AB\u56F4\uFF0C\u5B88\u5C06\u8BF7\u63F4\uFF01", category: "military", trigger: { minTurn: 12, atWar: true }, ...recurring(4, 30), options: [option("\u503E\u56FD\u9A70\u63F4", { gold: -100, food: -50, factionSat: fr("military", 10) }, 3), option("\u5F03\u8F66\u4FDD\u5E05", { stability: -10, legitimacy: -5, factionSat: fr("military", -12) }, 1)] },
-  { id: "evt_mil_weapon_upgrade", title: "\u519B\u68B0\u9769\u65B0", description: "\u5DE5\u574A\u732E\u4E0A\u65B0\u5F0F\u5175\u5668\uFF01", category: "military", trigger: { minTurn: 20, techLevelAbove: { branch: "mil", level: 2 } }, ...recurring(3, 40), options: [option("\u5168\u519B\u6362\u88C5", { gold: -150, factionSat: fr("military", 15) }, 3), option("\u5C40\u90E8\u8BD5\u7528", { gold: -50, factionSat: fr("military", 5) }, 2)] },
+  defineEvent("evt_culture_flourish", "\u6587\u6CBB\u9F0E\u76DB", "\u8BD7\u4EBA\u5B66\u8005\u4E91\u96C6\u4EAC\u757F\uFF0C\u6587\u8FD0\u660C\u9686\uFF01", "culture", fromTurn(15, { notAtWar: true, minStability: 50 }), recurring(4, 30), [option("\u8BBE\u7ACB\u7FF0\u6797\u9662", { gold: -80, sciPt: 20, legitimacy: 8, factionSat: fr("clergy", 15) }, 3), option("\u6C11\u95F4\u81EA\u6D41", { sciPt: 5, stability: 3 }, 2)]),
+  defineEvent("evt_culture_patron", "\u827A\u5320\u6C42\u5E87", "\u540D\u5320\u5BFB\u6C42\u7687\u5BA4\u5E87\u62A4\uFF0C\u732E\u4E0A\u5947\u6280\uFF01", "culture", fromTurn(10, { notAtWar: true }), recurring(3, 25), [option("\u91CD\u91D1\u793C\u9047", { gold: -60, influence: 5, factionSat: fr("clergy", 8) }, 3), option("\u5A49\u62D2", { influence: -2 }, 2)]),
+  defineEvent("evt_culture_renaissance", "\u53E4\u5178\u6587\u827A\u590D\u5174", "\u53E4\u5178\u5B66\u672F\u590D\u5174\uFF0C\u65B0\u601D\u6F6E\u6D8C\u52A8\uFF01", "culture", { minTurn: 30, techLevelAbove: { branch: "admin", level: 3 } }, oneTime(2, 60), [option("\u5927\u529B\u5021\u5BFC", { gold: -150, sciPt: 40, stability: 5, factionSat: fra({ faction: "merchants", delta: 20 }, { faction: "clergy", delta: -8 }) }, 3), option("\u987A\u5176\u81EA\u7136", { sciPt: 15 }, 2)]),
+  defineEvent("evt_culture_ban", "\u5F02\u7AEF\u5B66\u8BF4", "\u65B0\u5947\u5B66\u8BF4\u6311\u6218\u4F20\u7EDF\uFF0C\u6559\u4F1A\u8981\u6C42\u67E5\u7981\uFF01", "culture", { minTurn: 20, techLevelAbove: { branch: "admin", level: 2 } }, recurring(4, 35), [option("\u67E5\u7981\u5F02\u7AEF", { stability: 3, sciPt: -10, factionSat: fra({ faction: "clergy", delta: 12 }, { faction: "merchants", delta: -15 }) }, 2), option("\u4FDD\u62A4\u5B66\u672F", { stability: -4, sciPt: 15, factionSat: fr("clergy", -10) }, 3)]),
+  defineEvent("evt_culture_festival", "\u8BF8\u90A6\u671D\u8D3A", "\u8BF8\u90A6\u9063\u4F7F\u671D\u8D3A\uFF0C\u56FD\u5A01\u8FDC\u626C\uFF01", "culture", fromTurn(25, { notAtWar: true, minStability: 60 }), recurring(3, 50), [option("\u76DB\u5178\u793C\u4E4B", { gold: -120, legitimacy: 10, influence: 15 }, 3), option("\u7B80\u793C\u76F8\u5F85", { legitimacy: 3, influence: 5 }, 2)]),
+  defineEvent("evt_pop_boom2", "\u4EBA\u4E01\u5174\u65FA", "\u8FDE\u5E74\u4E30\u7A14\uFF0C\u4EBA\u53E3\u6FC0\u589E\uFF01", "population", fromTurn(10, { notAtWar: true }), recurring(4, 30), [option("\u9F13\u52B1\u751F\u80B2", { food: -50, population: 200, stability: 3 }, 3), option("\u987A\u5176\u81EA\u7136", { population: 100 }, 2)]),
+  defineEvent("evt_pop_migration", "\u6D41\u6C11\u6D8C\u5165", "\u90BB\u90A6\u6218\u4E71\uFF0C\u5927\u6279\u6D41\u6C11\u6D8C\u5165\u8FB9\u5883\uFF01", "population", fromTurn(8), recurring(4, 25), [option("\u7F16\u6237\u9F50\u6C11", { population: 150, food: -40, stability: -3, factionSat: commonersReaction(-5) }, 3), option("\u9A71\u9010\u51FA\u5883", { influence: -5, stability: 2 }, 2)]),
+  defineEvent("evt_pop_urban", "\u57CE\u5E02\u81A8\u80C0", "\u90FD\u57CE\u4EBA\u53E3\u8FC7\u8F7D\uFF0C\u574A\u5E02\u62E5\u6324\uFF01", "population", { minTurn: 20, techLevelAbove: { branch: "admin", level: 2 } }, recurring(3, 40), [option("\u6269\u5EFA\u57CE\u90ED", { gold: -100, population: 100, stability: 3 }, 3), option("\u9650\u5236\u6D41\u5165", { stability: -2, factionSat: fr("merchants", -8) }, 2)]),
+  defineEvent("evt_pop_plague_end", "\u75AB\u540E\u4F59\u751F", "\u5927\u75AB\u5E73\u606F\uFF0C\u5E78\u5B58\u8005\u4F11\u517B\u751F\u606F\uFF01", "population", fromTurn(30, { maxStability: 60 }), recurring(3, 50), [option("\u8F7B\u5FAD\u8584\u8D4B", { gold: -30, population: 100, stability: 5, factionSat: commonersReaction(10) }, 3), option("\u5E38\u6001\u6CBB\u7406", { population: 50 }, 2)]),
+  defineEvent("evt_pop_labor_short", "\u6218\u540E\u52B3\u529B\u77ED\u7F3A", "\u6218\u4E71\u540E\u7530\u5730\u8352\u829C\uFF0C\u52B3\u529B\u532E\u4E4F\uFF01", "population", fromTurn(15, { atWar: true }), recurring(4, 30), [option("\u62DB\u52DF\u6D41\u6C11", { gold: -50, population: 80, food: 20 }, 3), option("\u5F3A\u5236\u5F81\u53D1", { population: 50, stability: -5, factionSat: commonersReaction(-10) }, 1)]),
+  defineEvent("evt_opp_ancient_treasure", "\u53E4\u5893\u73B0\u5B9D", "\u519C\u592B\u6398\u51FA\u4E0A\u53E4\u5B9D\u85CF\uFF01", "opportunity", fromTurn(10), recurring(2, 50), [option("\u5145\u516C\u56FD\u5E93", { gold: 200, legitimacy: 3 }, 3), option("\u8D4F\u8D50\u519C\u592B", { gold: 50, stability: 5, factionSat: commonersReaction(8) }, 2)]),
+  defineEvent("evt_opp_strategic_location", "\u9669\u9698\u5F52\u9644", "\u8FB9\u5883\u9669\u9698\u5B88\u5C06\u732E\u5173\u6295\u8BDA\uFF01", "opportunity", fromTurn(15, { notAtWar: true }), recurring(2, 60), [option("\u7EB3\u964D\u91CD\u8D4F", { gold: -80, influence: 10, stability: 3 }, 3), option("\u8C28\u614E\u63A5\u7EB3", { influence: 3 }, 2)]),
+  defineEvent("evt_opp_talent", "\u8D24\u624D\u6295\u6548", "\u5F02\u56FD\u540D\u58EB\u6155\u540D\u6765\u6295\uFF01", "opportunity", fromTurn(12, { notAtWar: true }), recurring(3, 40), [option("\u7834\u683C\u5F55\u7528", { gold: -40, sciPt: 15, efficiency: 3 }, 3), option("\u8003\u5BDF\u540E\u7528", { sciPt: 5 }, 2)]),
+  defineEvent("evt_opp_good_omen", "\u7965\u745E\u964D\u4E34", "\u5929\u73B0\u7965\u745E\uFF0C\u4E07\u6C11\u79F0\u5E86\uFF01", "opportunity", fromTurn(20, { notAtWar: true, minStability: 40 }), recurring(2, 50), [option("\u662D\u544A\u5929\u4E0B", { legitimacy: 8, stability: 5, influence: 5 }, 3), option("\u79D8\u800C\u4E0D\u5BA3", { legitimacy: 2 }, 2)]),
+  defineEvent("evt_opp_trade_windfall", "\u5546\u8DEF\u66B4\u5229", "\u7F55\u89C1\u5546\u961F\u5E26\u6765\u5DE8\u989D\u5229\u6DA6\uFF01", "opportunity", fromTurn(15, { notAtWar: true }), recurring(2, 45), [option("\u62BD\u53D6\u91CD\u7A0E", { gold: 180, factionSat: fr("merchants", -5) }, 3), option("\u8F7B\u7A0E\u60E0\u6C11", { gold: 80, factionSat: fr("merchants", 10) }, 2)]),
+  defineEvent("evt_opp_mercenary", "\u96C7\u4F63\u519B\u6765\u6295", "\u767E\u6218\u96C7\u4F63\u519B\u5BFB\u6C42\u6548\u547D\uFF01", "opportunity", fromTurn(10, { atWar: true }), recurring(3, 30), [option("\u9AD8\u4EF7\u96C7\u4F63", { gold: -100, factionSat: militaryReaction(10) }, 3), option("\u5A49\u62D2", { stability: 2 }, 2)]),
+  defineEvent("evt_opp_dynastic_match", "\u8054\u59FB\u826F\u7F18", "\u5F3A\u56FD\u738B\u5BA4\u63D0\u8BAE\u8054\u59FB\uFF01", "opportunity", fromTurn(18, { notAtWar: true }), recurring(3, 40), [option("\u6B23\u7136\u5141\u8BFA", { gold: -60, influence: 15, legitimacy: 5 }, 3), option("\u5A49\u8A00\u8C22\u7EDD", { influence: -3 }, 2)]),
+  defineEvent("evt_relig_heresy", "\u5F02\u7AEF\u8513\u5EF6", "\u5F02\u7AEF\u6559\u6D3E\u5728\u6C11\u95F4\u6269\u6563\uFF01", "religion", fromTurn(20, { maxStability: 60 }), recurring(4, 35), [option("\u5B97\u6559\u88C1\u5224", { stability: 3, population: -50, factionSat: fra({ faction: "clergy", delta: 12 }, { faction: "commoners", delta: -10 }) }, 2), option("\u8FA9\u8BBA\u611F\u5316", { sciPt: 8, stability: -2 }, 3)]),
+  defineEvent("evt_relig_temple_grant", "\u5BFA\u5E99\u8BF7\u7530", "\u5927\u5BFA\u8BF7\u6C42\u8D50\u7530\u517B\u50E7\uFF01", "religion", fromTurn(15, { notAtWar: true }), recurring(3, 40), [option("\u6177\u6168\u8D50\u7530", { gold: -50, food: -30, legitimacy: 5, factionSat: fr("clergy", 15) }, 2), option("\u9650\u7530\u6291\u5BFA", { factionSat: fra({ faction: "clergy", delta: -12 }, { faction: "nobles", delta: 5 }) }, 3)]),
+  defineEvent("evt_relig_pilgrimage", "\u671D\u5723\u70ED\u6F6E", "\u4FE1\u4F17\u6380\u8D77\u671D\u5723\u70ED\u6F6E\uFF01", "religion", fromTurn(20, { notAtWar: true }), recurring(3, 30), [option("\u5B98\u65B9\u62A4\u6301", { gold: -40, legitimacy: 5, influence: 3, factionSat: fr("clergy", 8) }, 3), option("\u6C11\u95F4\u81EA\u7406", { stability: 2 }, 2)]),
+  defineEvent("evt_relig_schism", "\u6559\u6D3E\u5206\u88C2", "\u5B97\u6559\u5185\u90E8\u7206\u53D1\u6559\u4E49\u4E4B\u4E89\uFF01", "religion", fromTurn(30), recurring(3, 50), [option("\u652F\u6301\u6B63\u7EDF", { stability: 3, factionSat: fra({ faction: "clergy", delta: 10 }, { faction: "commoners", delta: -5 }) }, 2), option("\u4FDD\u6301\u4E2D\u7ACB", { stability: -3, factionSat: fr("clergy", -8) }, 3)]),
+  defineEvent("evt_relig_conversion", "\u5F02\u6559\u5F52\u5316", "\u8FB9\u5883\u5F02\u6559\u90E8\u843D\u8BF7\u6C42\u5F52\u5316\uFF01", "religion", fromTurn(15, { hasNewTerritory: true }), recurring(3, 40), [option("\u9686\u91CD\u53D7\u793C", { gold: -30, legitimacy: 5, stability: 3, factionSat: fr("clergy", 12) }, 3), option("\u56E0\u4FD7\u800C\u6CBB", { stability: 2, factionSat: fr("clergy", -5) }, 2)]),
+  defineEvent("evt_sci_astronomy", "\u5929\u6587\u5F02\u8C61", "\u5BA2\u661F\u663C\u89C1\uFF0C\u53F8\u5929\u76D1\u8BF7\u89E3\uFF01", "science", { minTurn: 15, techLevelAbove: { branch: "admin", level: 2 } }, recurring(3, 40), [option("\u8BE6\u8BB0\u89C2\u6D4B", { sciPt: 20, gold: -20 }, 3), option("\u89C6\u4E3A\u5929\u8C34", { stability: -3, legitimacy: -3, factionSat: fr("clergy", 8) }, 1)]),
+  defineEvent("evt_sci_invention", "\u5DE7\u5320\u732E\u5668", "\u5DE5\u5320\u53D1\u660E\u65B0\u5F0F\u5668\u68B0\uFF01", "science", { minTurn: 20, techLevelAbove: { branch: "agri", level: 2 } }, recurring(3, 35), [option("\u63A8\u5E7F\u6C11\u7528", { gold: -60, food: 30, sciPt: 10 }, 3), option("\u519B\u7528\u4FDD\u5BC6", { gold: -40, factionSat: militaryReaction(8) }, 2)]),
+  defineEvent("evt_sci_academy", "\u5B66\u9662\u7B79\u5EFA", "\u5B66\u8005\u8BF7\u6C42\u8BBE\u7ACB\u7687\u5BB6\u5B66\u9662\uFF01", "science", { minTurn: 25, techLevelAbove: { branch: "admin", level: 3 } }, oneTime(2, 60), [option("\u62E8\u6B3E\u5174\u5EFA", { gold: -200, sciPt: 50, efficiency: 5, factionSat: fr("clergy", 20) }, 3), option("\u6682\u7F13", { factionSat: fr("clergy", -8) }, 2)]),
+  defineEvent("evt_sci_translation", "\u8BD1\u7ECF\u8FD0\u52A8", "\u5F02\u57DF\u5178\u7C4D\u4F20\u5165\uFF0C\u8BF7\u65E8\u7FFB\u8BD1\uFF01", "science", fromTurn(20, { notAtWar: true }), recurring(3, 40), [option("\u8BBE\u8BD1\u573A", { gold: -80, sciPt: 25, factionSat: fra({ faction: "clergy", delta: 12 }, { faction: "merchants", delta: 5 }) }, 3), option("\u6C11\u95F4\u81EA\u8BD1", { sciPt: 8 }, 2)]),
+  defineEvent("evt_dip_alliance_proposal", "\u7ED3\u76DF\u4E4B\u8BAE", "\u5F3A\u56FD\u4E3B\u52A8\u63D0\u8BAE\u7ED3\u76DF\uFF01", "diplomacy", fromTurn(12, { notAtWar: true }), recurring(3, 30), [option("\u6B23\u7136\u7ED3\u76DF", { influence: 10, legitimacy: 3, gold: -30 }, 3), option("\u4FDD\u6301\u72EC\u7ACB", { influence: -2 }, 2)]),
+  defineEvent("evt_dip_hostage", "\u8D28\u5B50\u4E4B\u7EA6", "\u90BB\u56FD\u63D0\u8BAE\u4E92\u9001\u8D28\u5B50\u4EE5\u56FA\u76DF\u7EA6\uFF01", "diplomacy", fromTurn(15, { notAtWar: true }), recurring(3, 40), [option("\u63A5\u53D7", { influence: 8, legitimacy: -3, stability: -2 }, 2), option("\u62D2\u7EDD", { influence: -5 }, 3)]),
+  defineEvent("evt_dip_trade_embassy", "\u901A\u5546\u4F7F\u56E2", "\u8FDC\u65B9\u56FD\u5EA6\u9063\u901A\u5546\u4F7F\u56E2\uFF01", "diplomacy", fromTurn(18, { notAtWar: true }), recurring(3, 35), [option("\u7B7E\u8BA2\u6761\u7EA6", { gold: 80, influence: 5, factionSat: fr("merchants", 12) }, 3), option("\u89C2\u671B", { influence: 2 }, 2)]),
+  defineEvent("evt_dip_border_incident", "\u8FB9\u5883\u4E8B\u4EF6", "\u8FB9\u519B\u8BEF\u5165\u90BB\u90A6\u5F15\u53D1\u7EA0\u7EB7\uFF01", "diplomacy", fromTurn(8), recurring(4, 25), [option("\u9063\u4F7F\u81F4\u6B49", { gold: -30, influence: 3 }, 3), option("\u5F3A\u786C\u7ACB\u573A", { influence: -5, stability: 3, factionSat: militaryReaction(8) }, 2)]),
+  defineEvent("evt_dip_refugee_crisis", "\u5916\u4EA4\u96BE\u6C11\u5371\u673A", "\u90BB\u90A6\u5185\u4E71\uFF0C\u96BE\u6C11\u6D8C\u5165\uFF01", "diplomacy", fromTurn(20), recurring(3, 35), [option("\u8BBE\u8425\u5B89\u7F6E", { gold: -80, food: -40, population: 100, influence: 8 }, 3), option("\u5C01\u95ED\u8FB9\u5883", { influence: -8, stability: 2 }, 2)]),
+  defineEvent("evt_mil_traitor", "\u53DB\u5C06\u6295\u654C", "\u8FB9\u5173\u5B88\u5C06\u53DB\u9003\u654C\u56FD\uFF01", "military", fromTurn(15, { maxStability: 60 }), recurring(3, 40), [option("\u60AC\u8D4F\u7F09\u62FF", { gold: -50, influence: 3, factionSat: militaryReaction(5) }, 3), option("\u7533\u65A5\u8FB9\u9547", { stability: -5, factionSat: militaryReaction(-8) }, 2)]),
+  defineEvent("evt_mil_victory_parade", "\u51EF\u65CB\u732E\u4FD8", "\u5927\u519B\u51EF\u65CB\uFF0C\u8BF7\u884C\u732E\u4FD8\u793C\uFF01", "military", fromTurn(10, { notAtWar: true }), recurring(3, 30), [option("\u9686\u91CD\u732E\u4FD8", { gold: -40, legitimacy: 8, factionSat: militaryReaction(15) }, 3), option("\u4F4E\u8C03\u5904\u7F6E", { legitimacy: 2 }, 2)]),
+  defineEvent("evt_mil_supply_line", "\u7CAE\u9053\u88AB\u65AD", "\u654C\u519B\u88AD\u6270\u7CAE\u9053\uFF0C\u524D\u7EBF\u544A\u6025\uFF01", "military", fromTurn(10, { atWar: true }), recurring(4, 25), [option("\u91CD\u5175\u62A4\u7CAE", { gold: -80, food: -30, factionSat: militaryReaction(8) }, 3), option("\u5C31\u5730\u5F81\u7CAE", { food: 20, stability: -8, factionSat: commonersReaction(-15) }, 1)]),
+  defineEvent("evt_mil_defection", "\u654C\u5C06\u6765\u6295", "\u654C\u56FD\u540D\u5C06\u7387\u90E8\u6765\u964D\uFF01", "military", fromTurn(15, { atWar: true }), recurring(3, 40), [option("\u539A\u793C\u63A5\u7EB3", { gold: -60, factionSat: militaryReaction(12), influence: 5 }, 3), option("\u7591\u800C\u4E0D\u7528", { stability: -2 }, 2)]),
+  defineEvent("evt_mil_fortress_siege", "\u5B64\u57CE\u6B7B\u5B88", "\u8FB9\u57CE\u88AB\u56F4\uFF0C\u5B88\u5C06\u8BF7\u63F4\uFF01", "military", fromTurn(12, { atWar: true }), recurring(4, 30), [option("\u503E\u56FD\u9A70\u63F4", { gold: -100, food: -50, factionSat: militaryReaction(10) }, 3), option("\u5F03\u8F66\u4FDD\u5E05", { stability: -10, legitimacy: -5, factionSat: militaryReaction(-12) }, 1)]),
+  defineEvent("evt_mil_weapon_upgrade", "\u519B\u68B0\u9769\u65B0", "\u5DE5\u574A\u732E\u4E0A\u65B0\u5F0F\u5175\u5668\uFF01", "military", { minTurn: 20, techLevelAbove: { branch: "mil", level: 2 } }, recurring(3, 40), [option("\u5168\u519B\u6362\u88C5", { gold: -150, factionSat: militaryReaction(15) }, 3), option("\u5C40\u90E8\u8BD5\u7528", { gold: -50, factionSat: militaryReaction(5) }, 2)]),
   // ── C1 事件链（3 条链 × 3 事件 = 9 事件）──
   // 链 1：瘟疫链——爆发→蔓延→余波
-  { id: "evt_chain_plague_1", title: "\u761F\u75AB\u7206\u53D1", description: "\u8FB9\u9547\u7A81\u53D1\u602A\u75C5\uFF0C\u6B7B\u8005\u751A\u4F17\uFF01\u592A\u533B\u8BF7\u65E8\u5904\u7F6E\u3002", category: "crisis", trigger: { minTurn: 15, maxFoodRatio: 0.8 }, ...recurring(4, 60), options: [
-    option("\u5C01\u9501\u75AB\u533A", { stability: -5, population: -100, triggerEvent: "evt_chain_plague_2" }, 3),
-    option("\u8BF7\u795E\u7948\u798F", { gold: -50, stability: 3, factionSat: fr("clergy", 10), triggerEvent: "evt_chain_plague_2" }, 2)
-  ] },
-  { id: "evt_chain_plague_2", title: "\u761F\u75AB\u8513\u5EF6", description: "\u75AB\u75C5\u8513\u5EF6\u81F3\u4EAC\u757F\uFF0C\u4EBA\u5FC3\u60F6\u60F6\uFF01", category: "crisis", trigger: { minTurn: 15 }, ...followUp, options: [
-    option("\u9694\u79BB\u6551\u6CBB", { gold: -120, population: -200, stability: -3, triggerEvent: "evt_chain_plague_3" }, 3),
-    option("\u5F03\u57CE\u907F\u75AB", { gold: -30, stability: -15, legitimacy: -10, population: -150, triggerEvent: "evt_chain_plague_3" }, 1)
-  ] },
-  { id: "evt_chain_plague_3", title: "\u761F\u75AB\u4F59\u6CE2", description: "\u75AB\u75C5\u7EC8\u4E8E\u5E73\u606F\uFF0C\u4F46\u6C11\u751F\u51CB\u655D\uFF0C\u8BF7\u65E8\u5584\u540E\u3002", category: "crisis", trigger: { minTurn: 15 }, ...uniqueFollowUp, options: [
-    option("\u51CF\u514D\u8D4B\u7A0E", { gold: -80, stability: 8, factionSat: fr("commoners", 15), legitimacy: 5 }, 3),
-    option("\u5982\u5E38\u5F81\u8D4B", { stability: -5, factionSat: fr("commoners", -12) }, 2)
-  ] },
+  defineEvent(
+    "evt_chain_plague_1",
+    "\u761F\u75AB\u7206\u53D1",
+    "\u8FB9\u9547\u7A81\u53D1\u602A\u75C5\uFF0C\u6B7B\u8005\u751A\u4F17\uFF01\u592A\u533B\u8BF7\u65E8\u5904\u7F6E\u3002",
+    "crisis",
+    fromTurn(15, { maxFoodRatio: 0.8 }),
+    recurring(4, 60),
+    [
+      option("\u5C01\u9501\u75AB\u533A", { stability: -5, population: -100, triggerEvent: "evt_chain_plague_2" }, 3),
+      option("\u8BF7\u795E\u7948\u798F", { gold: -50, stability: 3, factionSat: fr("clergy", 10), triggerEvent: "evt_chain_plague_2" }, 2)
+    ]
+  ),
+  defineEvent(
+    "evt_chain_plague_2",
+    "\u761F\u75AB\u8513\u5EF6",
+    "\u75AB\u75C5\u8513\u5EF6\u81F3\u4EAC\u757F\uFF0C\u4EBA\u5FC3\u60F6\u60F6\uFF01",
+    "crisis",
+    fromTurn(15),
+    followUp,
+    [
+      option("\u9694\u79BB\u6551\u6CBB", { gold: -120, population: -200, stability: -3, triggerEvent: "evt_chain_plague_3" }, 3),
+      option("\u5F03\u57CE\u907F\u75AB", { gold: -30, stability: -15, legitimacy: -10, population: -150, triggerEvent: "evt_chain_plague_3" }, 1)
+    ]
+  ),
+  defineEvent(
+    "evt_chain_plague_3",
+    "\u761F\u75AB\u4F59\u6CE2",
+    "\u75AB\u75C5\u7EC8\u4E8E\u5E73\u606F\uFF0C\u4F46\u6C11\u751F\u51CB\u655D\uFF0C\u8BF7\u65E8\u5584\u540E\u3002",
+    "crisis",
+    fromTurn(15),
+    uniqueFollowUp,
+    [
+      option("\u51CF\u514D\u8D4B\u7A0E", { gold: -80, stability: 8, factionSat: commonersReaction(15), legitimacy: 5 }, 3),
+      option("\u5982\u5E38\u5F81\u8D4B", { stability: -5, factionSat: commonersReaction(-12) }, 2)
+    ]
+  ),
   // 链 2：王位继承链——储君薨→争夺→新朝
-  { id: "evt_chain_heir_1", title: "\u50A8\u541B\u66B4\u85A8", description: "\u592A\u5B50\u65E0\u75BE\u800C\u7EC8\uFF01\u8BF8\u7687\u5B50\u6697\u4E2D\u4E89\u4F4D\u3002", category: "politics", trigger: { minTurn: 20, maxLegitimacy: 70 }, ...recurring(3, 80), options: [
-    option("\u7ACB\u6B21\u5B50\u4E3A\u50A8", { legitimacy: -5, stability: -3, triggerEvent: "evt_chain_heir_2" }, 3),
-    option("\u6682\u4E0D\u7ACB\u50A8", { legitimacy: -10, stability: -8, factionSat: fr("nobles", -8), triggerEvent: "evt_chain_heir_2" }, 1)
-  ] },
-  { id: "evt_chain_heir_2", title: "\u593A\u4F4D\u4E4B\u4E89", description: "\u8BF8\u7687\u5B50\u660E\u4E89\u6697\u6597\uFF0C\u671D\u81E3\u5404\u7ACB\u5176\u4E3B\uFF01", category: "politics", trigger: { minTurn: 20 }, ...followUp, options: [
-    option("\u5F3A\u7ACB\u4E00\u7CFB", { gold: -100, legitimacy: 5, stability: -5, factionSat: fr("nobles", -10), triggerEvent: "evt_chain_heir_3" }, 2),
-    option("\u5EF7\u8BAE\u516C\u63A8", { gold: -50, legitimacy: 8, stability: 3, efficiency: -3, triggerEvent: "evt_chain_heir_3" }, 3)
-  ] },
-  { id: "evt_chain_heir_3", title: "\u65B0\u50A8\u5373\u4F4D", description: "\u65B0\u50A8\u767B\u57FA\uFF0C\u5927\u8D66\u5929\u4E0B\u4EE5\u56FA\u4F4D\u3002", category: "politics", trigger: { minTurn: 20 }, ...uniqueFollowUp, options: [
-    option("\u5927\u8D66\u5929\u4E0B", { gold: -60, legitimacy: 15, stability: 10, factionSat: fra({ faction: "commoners", delta: 12 }, { faction: "nobles", delta: 5 }) }, 3),
-    option("\u4F4E\u8C03\u5373\u4F4D", { legitimacy: 5, stability: 2 }, 2),
-    // P3 继承链内战结局——强压异议触发宗室起兵
-    option("\u5F3A\u538B\u5F02\u8BAE", { legitimacy: -10, stability: -8, factionSat: fr("military", 15), triggerEvent: "evt_chain_heir_civil" }, 1)
-  ] },
+  defineEvent(
+    "evt_chain_heir_1",
+    "\u50A8\u541B\u66B4\u85A8",
+    "\u592A\u5B50\u65E0\u75BE\u800C\u7EC8\uFF01\u8BF8\u7687\u5B50\u6697\u4E2D\u4E89\u4F4D\u3002",
+    "politics",
+    fromTurn(20, { maxLegitimacy: 70 }),
+    recurring(3, 80),
+    [
+      option("\u7ACB\u6B21\u5B50\u4E3A\u50A8", { legitimacy: -5, stability: -3, triggerEvent: "evt_chain_heir_2" }, 3),
+      option("\u6682\u4E0D\u7ACB\u50A8", { legitimacy: -10, stability: -8, factionSat: noblesReaction(-8), triggerEvent: "evt_chain_heir_2" }, 1)
+    ]
+  ),
+  defineEvent(
+    "evt_chain_heir_2",
+    "\u593A\u4F4D\u4E4B\u4E89",
+    "\u8BF8\u7687\u5B50\u660E\u4E89\u6697\u6597\uFF0C\u671D\u81E3\u5404\u7ACB\u5176\u4E3B\uFF01",
+    "politics",
+    fromTurn(20),
+    followUp,
+    [
+      option("\u5F3A\u7ACB\u4E00\u7CFB", { gold: -100, legitimacy: 5, stability: -5, factionSat: noblesReaction(-10), triggerEvent: "evt_chain_heir_3" }, 2),
+      option("\u5EF7\u8BAE\u516C\u63A8", { gold: -50, legitimacy: 8, stability: 3, efficiency: -3, triggerEvent: "evt_chain_heir_3" }, 3)
+    ]
+  ),
+  defineEvent(
+    "evt_chain_heir_3",
+    "\u65B0\u50A8\u5373\u4F4D",
+    "\u65B0\u50A8\u767B\u57FA\uFF0C\u5927\u8D66\u5929\u4E0B\u4EE5\u56FA\u4F4D\u3002",
+    "politics",
+    fromTurn(20),
+    uniqueFollowUp,
+    [
+      option("\u5927\u8D66\u5929\u4E0B", { gold: -60, legitimacy: 15, stability: 10, factionSat: fra({ faction: "commoners", delta: 12 }, { faction: "nobles", delta: 5 }) }, 3),
+      option("\u4F4E\u8C03\u5373\u4F4D", { legitimacy: 5, stability: 2 }, 2),
+      // P3 继承链内战结局——强压异议触发宗室起兵
+      option("\u5F3A\u538B\u5F02\u8BAE", { legitimacy: -10, stability: -8, factionSat: militaryReaction(15), triggerEvent: "evt_chain_heir_civil" }, 1)
+    ]
+  ),
   // P3 继承链内战结局——宗室起兵→决战→新朝或割据
-  { id: "evt_chain_heir_civil", title: "\u5B97\u5BA4\u8D77\u5175", description: "\u4E0D\u6EE1\u65B0\u50A8\u7684\u5B97\u5BA4\u85E9\u9547\u4E3E\u5175\u5411\u9619\uFF01\u5929\u4E0B\u9707\u52A8\uFF0C\u793E\u7A37\u5371\u6B86\uFF01", category: "crisis", trigger: { minTurn: 20, maxLegitimacy: 50 }, ...followUp, options: [
-    option("\u5FA1\u9A7E\u4EB2\u5F81", { gold: -200, stability: -10, legitimacy: 8, factionSat: fra({ faction: "military", delta: 20 }, { faction: "commoners", delta: -15 }), triggerEvent: "evt_chain_heir_civil_2" }, 2),
-    option("\u5272\u5730\u5B89\u629A", { gold: -100, stability: 5, legitimacy: -15, influence: -10, factionSat: fr("nobles", 10), triggerEvent: "evt_chain_heir_civil_2" }, 3)
-  ] },
-  { id: "evt_chain_heir_civil_2", title: "\u5185\u6218\u7EC8\u5C40", description: "\u53DB\u4E71\u5E73\u5B9A\u6216\u5272\u636E\u6210\u5B9A\u5C40\uFF0C\u65B0\u671D\u683C\u5C40\u5DF2\u6210\u3002", category: "politics", trigger: { minTurn: 20 }, ...uniqueFollowUp, options: [
-    option("\u91CD\u6574\u5C71\u6CB3", { gold: -150, stability: 15, legitimacy: 20, efficiency: 5, factionSat: fra({ faction: "commoners", delta: 10 }, { faction: "nobles", delta: -8 }) }, 3),
-    option("\u9ED8\u8BB8\u5272\u636E", { stability: -20, legitimacy: -25, corruption: 10, factionSat: fr("nobles", 15) }, 1)
-  ] },
+  defineEvent(
+    "evt_chain_heir_civil",
+    "\u5B97\u5BA4\u8D77\u5175",
+    "\u4E0D\u6EE1\u65B0\u50A8\u7684\u5B97\u5BA4\u85E9\u9547\u4E3E\u5175\u5411\u9619\uFF01\u5929\u4E0B\u9707\u52A8\uFF0C\u793E\u7A37\u5371\u6B86\uFF01",
+    "crisis",
+    fromTurn(20, { maxLegitimacy: 50 }),
+    followUp,
+    [
+      option("\u5FA1\u9A7E\u4EB2\u5F81", { gold: -200, stability: -10, legitimacy: 8, factionSat: fra({ faction: "military", delta: 20 }, { faction: "commoners", delta: -15 }), triggerEvent: "evt_chain_heir_civil_2" }, 2),
+      option("\u5272\u5730\u5B89\u629A", { gold: -100, stability: 5, legitimacy: -15, influence: -10, factionSat: noblesReaction(10), triggerEvent: "evt_chain_heir_civil_2" }, 3)
+    ]
+  ),
+  defineEvent(
+    "evt_chain_heir_civil_2",
+    "\u5185\u6218\u7EC8\u5C40",
+    "\u53DB\u4E71\u5E73\u5B9A\u6216\u5272\u636E\u6210\u5B9A\u5C40\uFF0C\u65B0\u671D\u683C\u5C40\u5DF2\u6210\u3002",
+    "politics",
+    fromTurn(20),
+    uniqueFollowUp,
+    [
+      option("\u91CD\u6574\u5C71\u6CB3", { gold: -150, stability: 15, legitimacy: 20, efficiency: 5, factionSat: fra({ faction: "commoners", delta: 10 }, { faction: "nobles", delta: -8 }) }, 3),
+      option("\u9ED8\u8BB8\u5272\u636E", { stability: -20, legitimacy: -25, corruption: 10, factionSat: noblesReaction(15) }, 1)
+    ]
+  ),
   // 链 3：边境冲突链——摩擦→升级→议和
-  { id: "evt_chain_border_1", title: "\u8FB9\u6C11\u51B2\u7A81", description: "\u8FB9\u6C11\u8D8A\u754C\u8015\u7267\uFF0C\u4E0E\u90BB\u90A6\u8D77\u4E89\u6267\uFF01", category: "diplomacy", trigger: { minTurn: 10, notAtWar: true }, ...recurring(4, 50), options: [
-    option("\u9063\u4F7F\u4EA4\u6D89", { gold: -20, influence: 3, triggerEvent: "evt_chain_border_2" }, 3),
-    option("\u5F3A\u786C\u9A71\u8D76", { influence: -3, stability: 2, factionSat: fr("military", 8), triggerEvent: "evt_chain_border_2" }, 2)
-  ] },
-  { id: "evt_chain_border_2", title: "\u8FB9\u519B\u5BF9\u5CD9", description: "\u53CC\u65B9\u8FB9\u519B\u5BF9\u5CD9\uFF0C\u5251\u62D4\u5F29\u5F20\uFF01", category: "diplomacy", trigger: { minTurn: 10 }, ...followUp, options: [
-    option("\u4E3B\u52A8\u64A4\u519B", { influence: -5, stability: 3, triggerEvent: "evt_chain_border_3" }, 3),
-    option("\u589E\u5175\u65BD\u538B", { gold: -80, factionSat: fr("military", 12), influence: 2, stability: -2, triggerEvent: "evt_chain_border_3" }, 2)
-  ] },
-  { id: "evt_chain_border_3", title: "\u8FB9\u5883\u8BAE\u548C", description: "\u53CC\u65B9\u9063\u4F7F\u8BAE\u548C\uFF0C\u91CD\u5B9A\u7586\u754C\u3002", category: "diplomacy", trigger: { minTurn: 10 }, ...uniqueFollowUp, options: [
-    option("\u7F14\u7ED3\u548C\u7EA6", { gold: -40, influence: 8, legitimacy: 3, stability: 5 }, 3),
-    option("\u6682\u7F6E\u4E0D\u8BAE", { stability: -2, influence: -2 }, 2)
-  ] },
+  defineEvent(
+    "evt_chain_border_1",
+    "\u8FB9\u6C11\u51B2\u7A81",
+    "\u8FB9\u6C11\u8D8A\u754C\u8015\u7267\uFF0C\u4E0E\u90BB\u90A6\u8D77\u4E89\u6267\uFF01",
+    "diplomacy",
+    fromTurn(10, { notAtWar: true }),
+    recurring(4, 50),
+    [
+      option("\u9063\u4F7F\u4EA4\u6D89", { gold: -20, influence: 3, triggerEvent: "evt_chain_border_2" }, 3),
+      option("\u5F3A\u786C\u9A71\u8D76", { influence: -3, stability: 2, factionSat: militaryReaction(8), triggerEvent: "evt_chain_border_2" }, 2)
+    ]
+  ),
+  defineEvent(
+    "evt_chain_border_2",
+    "\u8FB9\u519B\u5BF9\u5CD9",
+    "\u53CC\u65B9\u8FB9\u519B\u5BF9\u5CD9\uFF0C\u5251\u62D4\u5F29\u5F20\uFF01",
+    "diplomacy",
+    fromTurn(10),
+    followUp,
+    [
+      option("\u4E3B\u52A8\u64A4\u519B", { influence: -5, stability: 3, triggerEvent: "evt_chain_border_3" }, 3),
+      option("\u589E\u5175\u65BD\u538B", { gold: -80, factionSat: militaryReaction(12), influence: 2, stability: -2, triggerEvent: "evt_chain_border_3" }, 2)
+    ]
+  ),
+  defineEvent(
+    "evt_chain_border_3",
+    "\u8FB9\u5883\u8BAE\u548C",
+    "\u53CC\u65B9\u9063\u4F7F\u8BAE\u548C\uFF0C\u91CD\u5B9A\u7586\u754C\u3002",
+    "diplomacy",
+    fromTurn(10),
+    uniqueFollowUp,
+    [
+      option("\u7F14\u7ED3\u548C\u7EA6", { gold: -40, influence: 8, legitimacy: 3, stability: 5 }, 3),
+      option("\u6682\u7F6E\u4E0D\u8BAE", { stability: -2, influence: -2 }, 2)
+    ]
+  ),
   // ── E15 扩展事件链（2 条 × 3 事件 = 6 事件）──
   // 链 4：旱灾链——大旱→饥荒→流民
-  { id: "evt_chain_drought_1", title: "\u8D64\u5730\u5343\u91CC", description: "\u8FDE\u6708\u4E0D\u96E8\uFF0C\u79BE\u82D7\u67AF\u7126\uFF0C\u8D64\u5730\u5343\u91CC\uFF01\u592A\u53F2\u594F\u65F1\u3002", category: "crisis", trigger: { minTurn: 8, maxFoodRatio: 0.9 }, ...recurring(5, 70), options: [
-    option("\u5F00\u4ED3\u8D48\u707E", { food: -120, stability: 5, factionSat: fr("commoners", 8), triggerEvent: "evt_chain_drought_2" }, 3),
-    option("\u7948\u96E8\u796D\u5929", { gold: -60, legitimacy: 3, stability: 2, factionSat: fr("clergy", 10), triggerEvent: "evt_chain_drought_2" }, 2)
-  ] },
-  { id: "evt_chain_drought_2", title: "\u9965\u8352\u8513\u5EF6", description: "\u7CAE\u4EF7\u98DE\u6DA8\uFF0C\u997F\u6B8D\u904D\u91CE\uFF0C\u9965\u6C11\u805A\u4F17\u6C42\u98DF\uFF01", category: "crisis", trigger: { minTurn: 8 }, ...followUp, options: [
-    option("\u5F3A\u5236\u5E73\u7C9C", { gold: -100, stability: 3, factionSat: fra({ faction: "commoners", delta: 10 }, { faction: "merchants", delta: -15 }), triggerEvent: "evt_chain_drought_3" }, 3),
-    option("\u653E\u4EFB\u7CAE\u4EF7", { population: -300, stability: -10, factionSat: fr("commoners", -20), triggerEvent: "evt_chain_drought_3" }, 1)
-  ] },
-  { id: "evt_chain_drought_3", title: "\u6D41\u6C11\u56DB\u6563", description: "\u707E\u6C11\u80CC\u4E95\u79BB\u4E61\uFF0C\u6D41\u6C11\u6F6E\u5E2D\u5377\u8BF8\u7701\uFF01", category: "crisis", trigger: { minTurn: 8 }, ...uniqueFollowUp, options: [
-    option("\u7F16\u6237\u5B89\u7F6E", { gold: -80, food: -40, stability: 8, population: 200, factionSat: fr("commoners", 12) }, 3),
-    option("\u9063\u6563\u56DE\u4E61", { population: -150, stability: -5, legitimacy: -5 }, 2)
-  ] },
+  defineEvent(
+    "evt_chain_drought_1",
+    "\u8D64\u5730\u5343\u91CC",
+    "\u8FDE\u6708\u4E0D\u96E8\uFF0C\u79BE\u82D7\u67AF\u7126\uFF0C\u8D64\u5730\u5343\u91CC\uFF01\u592A\u53F2\u594F\u65F1\u3002",
+    "crisis",
+    fromTurn(8, { maxFoodRatio: 0.9 }),
+    recurring(5, 70),
+    [
+      option("\u5F00\u4ED3\u8D48\u707E", { food: -120, stability: 5, factionSat: commonersReaction(8), triggerEvent: "evt_chain_drought_2" }, 3),
+      option("\u7948\u96E8\u796D\u5929", { gold: -60, legitimacy: 3, stability: 2, factionSat: fr("clergy", 10), triggerEvent: "evt_chain_drought_2" }, 2)
+    ]
+  ),
+  defineEvent(
+    "evt_chain_drought_2",
+    "\u9965\u8352\u8513\u5EF6",
+    "\u7CAE\u4EF7\u98DE\u6DA8\uFF0C\u997F\u6B8D\u904D\u91CE\uFF0C\u9965\u6C11\u805A\u4F17\u6C42\u98DF\uFF01",
+    "crisis",
+    fromTurn(8),
+    followUp,
+    [
+      option("\u5F3A\u5236\u5E73\u7C9C", { gold: -100, stability: 3, factionSat: fra({ faction: "commoners", delta: 10 }, { faction: "merchants", delta: -15 }), triggerEvent: "evt_chain_drought_3" }, 3),
+      option("\u653E\u4EFB\u7CAE\u4EF7", { population: -300, stability: -10, factionSat: commonersReaction(-20), triggerEvent: "evt_chain_drought_3" }, 1)
+    ]
+  ),
+  defineEvent(
+    "evt_chain_drought_3",
+    "\u6D41\u6C11\u56DB\u6563",
+    "\u707E\u6C11\u80CC\u4E95\u79BB\u4E61\uFF0C\u6D41\u6C11\u6F6E\u5E2D\u5377\u8BF8\u7701\uFF01",
+    "crisis",
+    fromTurn(8),
+    uniqueFollowUp,
+    [
+      option("\u7F16\u6237\u5B89\u7F6E", { gold: -80, food: -40, stability: 8, population: 200, factionSat: commonersReaction(12) }, 3),
+      option("\u9063\u6563\u56DE\u4E61", { population: -150, stability: -5, legitimacy: -5 }, 2)
+    ]
+  ),
   // 链 5：盛世衰落链——奢靡→乱政→中兴
-  { id: "evt_chain_decline_1", title: "\u5962\u9761\u4E4B\u98CE", description: "\u5BAB\u5EF7\u5962\u9761\uFF0C\u6743\u8D35\u6597\u5BCC\uFF0C\u6C11\u98CE\u6E10\u6D6E\uFF01", category: "politics", trigger: { minTurn: 25, minStability: 50, minGold: 500 }, ...recurring(3, 100), options: [
-    option("\u63D0\u5021\u8282\u4FED", { stability: 5, legitimacy: 5, factionSat: fr("nobles", -10), triggerEvent: "evt_chain_decline_2" }, 3),
-    option("\u7EB5\u5BB9\u6D6E\u534E", { gold: -100, corruption: 8, stability: -3, factionSat: fr("nobles", 12), triggerEvent: "evt_chain_decline_2" }, 1)
-  ] },
-  { id: "evt_chain_decline_2", title: "\u540F\u6CBB\u8D25\u574F", description: "\u8D2A\u58A8\u6A2A\u884C\uFF0C\u653F\u4EE4\u4E0D\u51FA\u4EAC\u757F\uFF0C\u884C\u653F\u762B\u75EA\uFF01", category: "politics", trigger: { minTurn: 25, minCorruption: 40 }, ...followUp, options: [
-    option("\u4E25\u60E9\u8D2A\u540F", { gold: -120, corruption: -10, stability: -5, factionSat: fr("nobles", -15), triggerEvent: "evt_chain_decline_3" }, 3),
-    option("\u5F97\u8FC7\u4E14\u8FC7", { corruption: 5, efficiency: -5, legitimacy: -8, triggerEvent: "evt_chain_decline_3" }, 1)
-  ] },
-  { id: "evt_chain_decline_3", title: "\u4E2D\u5174\u4E4B\u673A", description: "\u4E71\u8C61\u6BD5\u9732\uFF0C\u671D\u91CE\u547C\u5401\u6539\u9769\u56FE\u5F3A\uFF01", category: "opportunity", trigger: { minTurn: 25 }, ...uniqueFollowUp, options: [
-    option("\u529B\u884C\u65B0\u653F", { gold: -200, stability: -8, legitimacy: 15, efficiency: 8, factionSat: fra({ faction: "commoners", delta: 15 }, { faction: "nobles", delta: -10 }) }, 3),
-    option("\u5F90\u56FE\u6574\u987F", { gold: -80, stability: 3, efficiency: 3, legitimacy: 5 }, 2)
-  ] },
+  defineEvent(
+    "evt_chain_decline_1",
+    "\u5962\u9761\u4E4B\u98CE",
+    "\u5BAB\u5EF7\u5962\u9761\uFF0C\u6743\u8D35\u6597\u5BCC\uFF0C\u6C11\u98CE\u6E10\u6D6E\uFF01",
+    "politics",
+    fromTurn(25, { minStability: 50, minGold: 500 }),
+    recurring(3, 100),
+    [
+      option("\u63D0\u5021\u8282\u4FED", { stability: 5, legitimacy: 5, factionSat: noblesReaction(-10), triggerEvent: "evt_chain_decline_2" }, 3),
+      option("\u7EB5\u5BB9\u6D6E\u534E", { gold: -100, corruption: 8, stability: -3, factionSat: noblesReaction(12), triggerEvent: "evt_chain_decline_2" }, 1)
+    ]
+  ),
+  defineEvent(
+    "evt_chain_decline_2",
+    "\u540F\u6CBB\u8D25\u574F",
+    "\u8D2A\u58A8\u6A2A\u884C\uFF0C\u653F\u4EE4\u4E0D\u51FA\u4EAC\u757F\uFF0C\u884C\u653F\u762B\u75EA\uFF01",
+    "politics",
+    fromTurn(25, { minCorruption: 40 }),
+    followUp,
+    [
+      option("\u4E25\u60E9\u8D2A\u540F", { gold: -120, corruption: -10, stability: -5, factionSat: noblesReaction(-15), triggerEvent: "evt_chain_decline_3" }, 3),
+      option("\u5F97\u8FC7\u4E14\u8FC7", { corruption: 5, efficiency: -5, legitimacy: -8, triggerEvent: "evt_chain_decline_3" }, 1)
+    ]
+  ),
+  defineEvent(
+    "evt_chain_decline_3",
+    "\u4E2D\u5174\u4E4B\u673A",
+    "\u4E71\u8C61\u6BD5\u9732\uFF0C\u671D\u91CE\u547C\u5401\u6539\u9769\u56FE\u5F3A\uFF01",
+    "opportunity",
+    fromTurn(25),
+    uniqueFollowUp,
+    [
+      option("\u529B\u884C\u65B0\u653F", { gold: -200, stability: -8, legitimacy: 15, efficiency: 8, factionSat: fra({ faction: "commoners", delta: 15 }, { faction: "nobles", delta: -10 }) }, 3),
+      option("\u5F90\u56FE\u6574\u987F", { gold: -80, stability: 3, efficiency: 3, legitimacy: 5 }, 2)
+    ]
+  ),
   // ── E15 王朝继位玩家干预事件（dynasty 引擎触发）──
-  { id: "evt_dynasty_heir_birth", title: "\u50A8\u541B\u964D\u751F", description: "\u540E\u5BAB\u8BDE\u4E0B\u9F99\u88D4\uFF0C\u4E3E\u56FD\u6B22\u5E86\uFF01\u8BF7\u5B9A\u50A8\u541B\u4E4B\u540D\u3002", category: "politics", trigger: { minTurn: 1 }, ...followUp, options: [
-    option("\u7ACB\u4E3A\u50A8\u541B", { legitimacy: 10, stability: 5, factionSat: fr("nobles", 12) }, 3),
-    option("\u6682\u4E0D\u7ACB\u50A8", { legitimacy: -3, stability: -2, factionSat: fr("nobles", -8) }, 1)
-  ] },
-  { id: "evt_dynasty_ruler_decline", title: "\u541B\u738B\u8001\u8FC8", description: "\u4E3B\u6625\u79CB\u5E74\u8FC8\uFF0C\u7CBE\u529B\u6E10\u8870\uFF0C\u671D\u81E3\u8BF7\u9884\u7ACB\u50A8\u4EE5\u56FA\u56FD\u672C\u3002", category: "politics", trigger: { minTurn: 30 }, ...followUp, options: [
-    option("\u7985\u8BA9\u50A8\u541B", { legitimacy: 5, stability: 8, factionSat: fr("nobles", 10) }, 3),
-    option("\u52C9\u529B\u89C6\u671D", { stability: -3, legitimacy: -5, factionSat: fr("nobles", -5) }, 2)
-  ] },
+  defineEvent(
+    "evt_dynasty_heir_birth",
+    "\u50A8\u541B\u964D\u751F",
+    "\u540E\u5BAB\u8BDE\u4E0B\u9F99\u88D4\uFF0C\u4E3E\u56FD\u6B22\u5E86\uFF01\u8BF7\u5B9A\u50A8\u541B\u4E4B\u540D\u3002",
+    "politics",
+    fromTurn(1),
+    followUp,
+    [
+      option("\u7ACB\u4E3A\u50A8\u541B", { legitimacy: 10, stability: 5, factionSat: noblesReaction(12) }, 3),
+      option("\u6682\u4E0D\u7ACB\u50A8", { legitimacy: -3, stability: -2, factionSat: noblesReaction(-8) }, 1)
+    ]
+  ),
+  defineEvent(
+    "evt_dynasty_ruler_decline",
+    "\u541B\u738B\u8001\u8FC8",
+    "\u4E3B\u6625\u79CB\u5E74\u8FC8\uFF0C\u7CBE\u529B\u6E10\u8870\uFF0C\u671D\u81E3\u8BF7\u9884\u7ACB\u50A8\u4EE5\u56FA\u56FD\u672C\u3002",
+    "politics",
+    fromTurn(30),
+    followUp,
+    [
+      option("\u7985\u8BA9\u50A8\u541B", { legitimacy: 5, stability: 8, factionSat: noblesReaction(10) }, 3),
+      option("\u52C9\u529B\u89C6\u671D", { stability: -3, legitimacy: -5, factionSat: noblesReaction(-5) }, 2)
+    ]
+  ),
   // ── P3 扩展事件链 6-9 + 独立事件（目标 150+）──
   // 链 6：科技突破链——灵感→试验→应用或事故
-  { id: "evt_chain_tech_1", title: "\u5F02\u8C61\u542F\u601D", description: "\u591C\u89C2\u661F\u8C61\uFF0C\u5B66\u8005\u5FFD\u5F97\u7075\u611F\uFF0C\u79F0\u53EF\u9769\u65B0\u519C\u5177\uFF01", category: "science", trigger: { minTurn: 12, techLevelAbove: { branch: "agri", level: 1 } }, ...recurring(4, 80), options: [
-    option("\u62E8\u91D1\u8D44\u52A9", { gold: -80, sciPt: 10, factionSat: fr("clergy", -5), triggerEvent: "evt_chain_tech_2" }, 3),
-    option("\u89C2\u5176\u81EA\u6210", { sciPt: 3, triggerEvent: "evt_chain_tech_2" }, 2)
-  ] },
-  { id: "evt_chain_tech_2", title: "\u5DE5\u574A\u8BD5\u9A8C", description: "\u5B66\u8005\u4E8E\u5DE5\u574A\u4E2D\u53CD\u590D\u8BD5\u9A8C\uFF0C\u6210\u8D25\u53C2\u534A\uFF01", category: "science", trigger: { minTurn: 12 }, ...followUp, options: [
-    option("\u8FFD\u52A0\u6295\u5165", { gold: -120, sciPt: 8, efficiency: 3, triggerEvent: "evt_chain_tech_3" }, 3),
-    option("\u8C28\u614E\u63A8\u8FDB", { gold: -40, sciPt: 4, triggerEvent: "evt_chain_tech_3" }, 2)
-  ] },
-  { id: "evt_chain_tech_3", title: "\u9769\u65B0\u95EE\u4E16", description: "\u65B0\u519C\u5177\u95EE\u4E16\uFF0C\u7CAE\u4EA7\u53EF\u671F\uFF01\u7136\u65E7\u5320\u62B5\u5236\u65B0\u6280\u672F\u3002", category: "opportunity", trigger: { minTurn: 12 }, ...uniqueFollowUp, options: [
-    option("\u5168\u9762\u63A8\u5E7F", { gold: -60, food: 80, factionSat: fra({ faction: "commoners", delta: 12 }, { faction: "nobles", delta: -8 }) }, 3),
-    option("\u7F13\u6162\u6E17\u900F", { food: 30, sciPt: 5 }, 2)
-  ] },
+  defineEvent(
+    "evt_chain_tech_1",
+    "\u5F02\u8C61\u542F\u601D",
+    "\u591C\u89C2\u661F\u8C61\uFF0C\u5B66\u8005\u5FFD\u5F97\u7075\u611F\uFF0C\u79F0\u53EF\u9769\u65B0\u519C\u5177\uFF01",
+    "science",
+    { minTurn: 12, techLevelAbove: { branch: "agri", level: 1 } },
+    recurring(4, 80),
+    [
+      option("\u62E8\u91D1\u8D44\u52A9", { gold: -80, sciPt: 10, factionSat: fr("clergy", -5), triggerEvent: "evt_chain_tech_2" }, 3),
+      option("\u89C2\u5176\u81EA\u6210", { sciPt: 3, triggerEvent: "evt_chain_tech_2" }, 2)
+    ]
+  ),
+  defineEvent(
+    "evt_chain_tech_2",
+    "\u5DE5\u574A\u8BD5\u9A8C",
+    "\u5B66\u8005\u4E8E\u5DE5\u574A\u4E2D\u53CD\u590D\u8BD5\u9A8C\uFF0C\u6210\u8D25\u53C2\u534A\uFF01",
+    "science",
+    fromTurn(12),
+    followUp,
+    [
+      option("\u8FFD\u52A0\u6295\u5165", { gold: -120, sciPt: 8, efficiency: 3, triggerEvent: "evt_chain_tech_3" }, 3),
+      option("\u8C28\u614E\u63A8\u8FDB", { gold: -40, sciPt: 4, triggerEvent: "evt_chain_tech_3" }, 2)
+    ]
+  ),
+  defineEvent(
+    "evt_chain_tech_3",
+    "\u9769\u65B0\u95EE\u4E16",
+    "\u65B0\u519C\u5177\u95EE\u4E16\uFF0C\u7CAE\u4EA7\u53EF\u671F\uFF01\u7136\u65E7\u5320\u62B5\u5236\u65B0\u6280\u672F\u3002",
+    "opportunity",
+    fromTurn(12),
+    uniqueFollowUp,
+    [
+      option("\u5168\u9762\u63A8\u5E7F", { gold: -60, food: 80, factionSat: fra({ faction: "commoners", delta: 12 }, { faction: "nobles", delta: -8 }) }, 3),
+      option("\u7F13\u6162\u6E17\u900F", { food: 30, sciPt: 5 }, 2)
+    ]
+  ),
   // 链 7：文化输入链——异邦艺术→风靡→本土化或文化冲突
-  { id: "evt_chain_culture_1", title: "\u5F02\u90A6\u732E\u827A", description: "\u5F02\u90A6\u4F7F\u56E2\u732E\u4E0A\u5947\u73CD\u4E50\u821E\uFF0C\u671D\u91CE\u4E3A\u4E4B\u503E\u5012\uFF01", category: "culture", trigger: { minTurn: 15, notAtWar: true }, ...recurring(4, 90), options: [
-    option("\u76DB\u60C5\u63A5\u7EB3", { gold: -40, influence: 5, legitimacy: 3, triggerEvent: "evt_chain_culture_2" }, 3),
-    option("\u8C28\u614E\u89C2\u8D4F", { influence: 2, triggerEvent: "evt_chain_culture_2" }, 2)
-  ] },
-  { id: "evt_chain_culture_2", title: "\u98CE\u5C1A\u98CE\u9761", description: "\u5F02\u90A6\u827A\u672F\u5728\u4E0A\u6D41\u793E\u4F1A\u98CE\u9761\uFF0C\u672C\u571F\u827A\u4EBA\u6297\u8BAE\u58F0\u8D77\uFF01", category: "culture", trigger: { minTurn: 15 }, ...followUp, options: [
-    option("\u63D0\u5021\u878D\u5408", { gold: -60, influence: 8, factionSat: fr("clergy", -8), triggerEvent: "evt_chain_culture_3" }, 3),
-    option("\u538B\u5236\u5F02\u98CE", { influence: -5, stability: 3, factionSat: fr("clergy", 10), triggerEvent: "evt_chain_culture_3" }, 2)
-  ] },
-  { id: "evt_chain_culture_3", title: "\u6587\u5316\u5B9A\u8C03", description: "\u98CE\u6C14\u4E4B\u4E89\u7EC8\u6709\u5B9A\u8BBA\uFF0C\u5E1D\u56FD\u6587\u5316\u8D70\u5411\u4F55\u65B9\uFF1F", category: "culture", trigger: { minTurn: 15 }, ...uniqueFollowUp, options: [
-    option("\u517C\u5BB9\u5E76\u84C4", { gold: -80, influence: 12, legitimacy: 8, assimilationMod: 1 }, 3),
-    option("\u56FA\u5B88\u6B63\u7EDF", { legitimacy: 5, influence: -3, factionSat: fr("clergy", 15) }, 2)
-  ] },
+  defineEvent(
+    "evt_chain_culture_1",
+    "\u5F02\u90A6\u732E\u827A",
+    "\u5F02\u90A6\u4F7F\u56E2\u732E\u4E0A\u5947\u73CD\u4E50\u821E\uFF0C\u671D\u91CE\u4E3A\u4E4B\u503E\u5012\uFF01",
+    "culture",
+    fromTurn(15, { notAtWar: true }),
+    recurring(4, 90),
+    [
+      option("\u76DB\u60C5\u63A5\u7EB3", { gold: -40, influence: 5, legitimacy: 3, triggerEvent: "evt_chain_culture_2" }, 3),
+      option("\u8C28\u614E\u89C2\u8D4F", { influence: 2, triggerEvent: "evt_chain_culture_2" }, 2)
+    ]
+  ),
+  defineEvent(
+    "evt_chain_culture_2",
+    "\u98CE\u5C1A\u98CE\u9761",
+    "\u5F02\u90A6\u827A\u672F\u5728\u4E0A\u6D41\u793E\u4F1A\u98CE\u9761\uFF0C\u672C\u571F\u827A\u4EBA\u6297\u8BAE\u58F0\u8D77\uFF01",
+    "culture",
+    fromTurn(15),
+    followUp,
+    [
+      option("\u63D0\u5021\u878D\u5408", { gold: -60, influence: 8, factionSat: fr("clergy", -8), triggerEvent: "evt_chain_culture_3" }, 3),
+      option("\u538B\u5236\u5F02\u98CE", { influence: -5, stability: 3, factionSat: fr("clergy", 10), triggerEvent: "evt_chain_culture_3" }, 2)
+    ]
+  ),
+  defineEvent(
+    "evt_chain_culture_3",
+    "\u6587\u5316\u5B9A\u8C03",
+    "\u98CE\u6C14\u4E4B\u4E89\u7EC8\u6709\u5B9A\u8BBA\uFF0C\u5E1D\u56FD\u6587\u5316\u8D70\u5411\u4F55\u65B9\uFF1F",
+    "culture",
+    fromTurn(15),
+    uniqueFollowUp,
+    [
+      option("\u517C\u5BB9\u5E76\u84C4", { gold: -80, influence: 12, legitimacy: 8, assimilationMod: 1 }, 3),
+      option("\u56FA\u5B88\u6B63\u7EDF", { legitimacy: 5, influence: -3, factionSat: fr("clergy", 15) }, 2)
+    ]
+  ),
   // 链 8：联盟瓦解链——盟国生疑→摩擦→决裂或修复
-  { id: "evt_chain_alliance_1", title: "\u76DF\u56FD\u751F\u7591", description: "\u76DF\u56FD\u4F7F\u81E3\u65C1\u6572\u4FA7\u51FB\uFF0C\u7591\u4F60\u6709\u80CC\u76DF\u4E4B\u610F\uFF01", category: "diplomacy", trigger: { minTurn: 10, notAtWar: true }, ...recurring(4, 70), options: [
-    option("\u9063\u4F7F\u91CD\u7533\u76DF\u7EA6", { gold: -50, influence: 5, triggerEvent: "evt_chain_alliance_2" }, 3),
-    option("\u7F6E\u4E4B\u4E0D\u7406", { influence: -8, stability: 2, triggerEvent: "evt_chain_alliance_2" }, 2)
-  ] },
-  { id: "evt_chain_alliance_2", title: "\u8FB9\u5883\u6469\u64E6", description: "\u76DF\u56FD\u8FB9\u519B\u4E0E\u5DF1\u65B9\u5546\u961F\u53D1\u751F\u6469\u64E6\uFF01", category: "diplomacy", trigger: { minTurn: 10 }, ...followUp, options: [
-    option("\u8D54\u793C\u9053\u6B49", { gold: -80, influence: 3, legitimacy: -3, triggerEvent: "evt_chain_alliance_3" }, 3),
-    option("\u5F3A\u786C\u7D22\u8D54", { gold: 30, influence: -10, factionSat: fr("military", 8), triggerEvent: "evt_chain_alliance_3" }, 2)
-  ] },
-  { id: "evt_chain_alliance_3", title: "\u76DF\u7EA6\u6289\u62E9", description: "\u76DF\u56FD\u9012\u4EA4\u6700\u540E\u901A\u7252\uFF0C\u662F\u548C\u662F\u88C2\uFF1F", category: "diplomacy", trigger: { minTurn: 10 }, ...uniqueFollowUp, options: [
-    option("\u4FEE\u590D\u76DF\u7EA6", { gold: -100, influence: 10, legitimacy: 5, factionSat: fr("merchants", 8) }, 3),
-    option("\u542C\u4EFB\u51B3\u88C2", { influence: -15, stability: 5, factionSat: fr("military", 12) }, 2)
-  ] },
+  defineEvent(
+    "evt_chain_alliance_1",
+    "\u76DF\u56FD\u751F\u7591",
+    "\u76DF\u56FD\u4F7F\u81E3\u65C1\u6572\u4FA7\u51FB\uFF0C\u7591\u4F60\u6709\u80CC\u76DF\u4E4B\u610F\uFF01",
+    "diplomacy",
+    fromTurn(10, { notAtWar: true }),
+    recurring(4, 70),
+    [
+      option("\u9063\u4F7F\u91CD\u7533\u76DF\u7EA6", { gold: -50, influence: 5, triggerEvent: "evt_chain_alliance_2" }, 3),
+      option("\u7F6E\u4E4B\u4E0D\u7406", { influence: -8, stability: 2, triggerEvent: "evt_chain_alliance_2" }, 2)
+    ]
+  ),
+  defineEvent(
+    "evt_chain_alliance_2",
+    "\u8FB9\u5883\u6469\u64E6",
+    "\u76DF\u56FD\u8FB9\u519B\u4E0E\u5DF1\u65B9\u5546\u961F\u53D1\u751F\u6469\u64E6\uFF01",
+    "diplomacy",
+    fromTurn(10),
+    followUp,
+    [
+      option("\u8D54\u793C\u9053\u6B49", { gold: -80, influence: 3, legitimacy: -3, triggerEvent: "evt_chain_alliance_3" }, 3),
+      option("\u5F3A\u786C\u7D22\u8D54", { gold: 30, influence: -10, factionSat: militaryReaction(8), triggerEvent: "evt_chain_alliance_3" }, 2)
+    ]
+  ),
+  defineEvent(
+    "evt_chain_alliance_3",
+    "\u76DF\u7EA6\u6289\u62E9",
+    "\u76DF\u56FD\u9012\u4EA4\u6700\u540E\u901A\u7252\uFF0C\u662F\u548C\u662F\u88C2\uFF1F",
+    "diplomacy",
+    fromTurn(10),
+    uniqueFollowUp,
+    [
+      option("\u4FEE\u590D\u76DF\u7EA6", { gold: -100, influence: 10, legitimacy: 5, factionSat: fr("merchants", 8) }, 3),
+      option("\u542C\u4EFB\u51B3\u88C2", { influence: -15, stability: 5, factionSat: militaryReaction(12) }, 2)
+    ]
+  ),
   // 链 9：移民潮链——流民入境→安置压力→同化或排斥
-  { id: "evt_chain_migrate_1", title: "\u6D41\u6C11\u53E9\u8FB9", description: "\u90BB\u90A6\u5927\u4E71\uFF0C\u6570\u4E07\u6D41\u6C11\u53E9\u5173\u6C42\u9644\uFF01", category: "population", trigger: { minTurn: 12 }, ...recurring(5, 80), options: [
-    option("\u5F00\u5173\u7EB3\u4E4B", { food: -80, population: 400, stability: -3, triggerEvent: "evt_chain_migrate_2" }, 2),
-    option("\u95ED\u5173\u62D2\u4E4B", { legitimacy: -5, influence: -3, factionSat: fr("commoners", 5), triggerEvent: "evt_chain_migrate_2" }, 3)
-  ] },
-  { id: "evt_chain_migrate_2", title: "\u5B89\u7F6E\u4E4B\u56F0", description: "\u6D41\u6C11\u805A\u5C45\u8FB9\u7701\uFF0C\u4E0E\u672C\u5730\u6C11\u4F17\u4E89\u7530\u4E89\u6C34\uFF01", category: "population", trigger: { minTurn: 12 }, ...followUp, options: [
-    option("\u7F16\u6237\u9F50\u6C11", { gold: -100, food: -40, population: 200, efficiency: 3, triggerEvent: "evt_chain_migrate_3" }, 3),
-    option("\u8BBE\u6805\u9694\u79BB", { gold: -30, stability: -5, factionSat: fr("commoners", -10), triggerEvent: "evt_chain_migrate_3" }, 2)
-  ] },
-  { id: "evt_chain_migrate_3", title: "\u878D\u5408\u6216\u6392\u65A5", description: "\u6D41\u6C11\u95EE\u9898\u7EC8\u987B\u89E3\u51B3\uFF0C\u5E1D\u56FD\u5305\u5BB9\u6027\u9762\u4E34\u8003\u9A8C\u3002", category: "population", trigger: { minTurn: 12 }, ...uniqueFollowUp, options: [
-    option("\u4E00\u89C6\u540C\u4EC1", { gold: -60, population: 150, influence: 8, assimilationMod: 1, factionSat: fr("commoners", 8) }, 3),
-    option("\u533A\u522B\u5BF9\u5F85", { stability: -8, corruption: 5, factionSat: fr("nobles", 8) }, 2)
-  ] },
+  defineEvent(
+    "evt_chain_migrate_1",
+    "\u6D41\u6C11\u53E9\u8FB9",
+    "\u90BB\u90A6\u5927\u4E71\uFF0C\u6570\u4E07\u6D41\u6C11\u53E9\u5173\u6C42\u9644\uFF01",
+    "population",
+    fromTurn(12),
+    recurring(5, 80),
+    [
+      option("\u5F00\u5173\u7EB3\u4E4B", { food: -80, population: 400, stability: -3, triggerEvent: "evt_chain_migrate_2" }, 2),
+      option("\u95ED\u5173\u62D2\u4E4B", { legitimacy: -5, influence: -3, factionSat: commonersReaction(5), triggerEvent: "evt_chain_migrate_2" }, 3)
+    ]
+  ),
+  defineEvent(
+    "evt_chain_migrate_2",
+    "\u5B89\u7F6E\u4E4B\u56F0",
+    "\u6D41\u6C11\u805A\u5C45\u8FB9\u7701\uFF0C\u4E0E\u672C\u5730\u6C11\u4F17\u4E89\u7530\u4E89\u6C34\uFF01",
+    "population",
+    fromTurn(12),
+    followUp,
+    [
+      option("\u7F16\u6237\u9F50\u6C11", { gold: -100, food: -40, population: 200, efficiency: 3, triggerEvent: "evt_chain_migrate_3" }, 3),
+      option("\u8BBE\u6805\u9694\u79BB", { gold: -30, stability: -5, factionSat: commonersReaction(-10), triggerEvent: "evt_chain_migrate_3" }, 2)
+    ]
+  ),
+  defineEvent(
+    "evt_chain_migrate_3",
+    "\u878D\u5408\u6216\u6392\u65A5",
+    "\u6D41\u6C11\u95EE\u9898\u7EC8\u987B\u89E3\u51B3\uFF0C\u5E1D\u56FD\u5305\u5BB9\u6027\u9762\u4E34\u8003\u9A8C\u3002",
+    "population",
+    fromTurn(12),
+    uniqueFollowUp,
+    [
+      option("\u4E00\u89C6\u540C\u4EC1", { gold: -60, population: 150, influence: 8, assimilationMod: 1, factionSat: commonersReaction(8) }, 3),
+      option("\u533A\u522B\u5BF9\u5F85", { stability: -8, corruption: 5, factionSat: noblesReaction(8) }, 2)
+    ]
+  ),
   // ── 独立事件扩展（覆盖 science/culture/population/diplomacy 稀缺分类）──
-  { id: "evt_library_fire", title: "\u5B66\u9662\u5931\u706B", description: "\u7687\u5BB6\u5B66\u9662\u6DF1\u591C\u5931\u706B\uFF0C\u5178\u7C4D\u4ED8\u4E4B\u4E00\u70AC\uFF01", category: "science", trigger: { minTurn: 10, techLevelAbove: { branch: "admin", level: 2 } }, ...recurring(3, 50), options: [option("\u5168\u529B\u62A2\u6551", { gold: -100, sciPt: -10, stability: 3 }, 3), option("\u542C\u4E4B\u4EFB\u4E4B", { sciPt: -25, legitimacy: -5 }, 2)] },
-  { id: "evt_scientist_defect", title: "\u5B66\u8005\u6295\u5954", description: "\u5F02\u90A6\u77E5\u540D\u5B66\u8005\u8BF7\u6C42\u653F\u6CBB\u5E87\u62A4\uFF01", category: "science", trigger: { minTurn: 12, notAtWar: true }, ...recurring(3, 40), options: [option("\u63A5\u7EB3\u91CD\u7528", { gold: 50, sciPt: 20, influence: -3 }, 3), option("\u5A49\u62D2\u9063\u8FD4", { influence: 5, legitimacy: 3 }, 2)] },
-  { id: "evt_alchemy_craze", title: "\u70BC\u91D1\u72C2\u70ED", description: "\u5BAB\u5EF7\u5174\u8D77\u70BC\u91D1\u70ED\u6F6E\uFF0C\u65B9\u58EB\u58F0\u79F0\u80FD\u70B9\u77F3\u6210\u91D1\uFF01", category: "science", trigger: { minTurn: 15 }, ...recurring(4, 35), options: [option("\u8D44\u52A9\u8BD5\u9A8C", { gold: -150, corruption: 5, factionSat: fr("clergy", -10) }, 2), option("\u65A5\u4E3A\u90AA\u672F", { legitimacy: 3, factionSat: fr("clergy", 12) }, 3)] },
-  { id: "evt_cultural_revival", title: "\u6587\u5316\u590D\u5174\u8FD0\u52A8", description: "\u53E4\u5178\u6587\u5316\u590D\u5174\u8FD0\u52A8\u5E2D\u5377\u5B66\u754C\uFF01", category: "culture", trigger: { minTurn: 20, minStability: 50, techLevelAbove: { branch: "culture", level: 2 } }, ...recurring(3, 60), options: [option("\u5927\u529B\u5021\u5BFC", { gold: -100, influence: 15, legitimacy: 8, sciPt: 10 }, 3), option("\u987A\u5176\u81EA\u7136", { influence: 5, sciPt: 3 }, 2)] },
-  { id: "evt_temple_construction", title: "\u5E99\u5B87\u5927\u5174", description: "\u795E\u804C\u56E2\u4F53\u8BF7\u5EFA\u5927\u5E99\uFF0C\u4FE1\u4F17\u8E0A\u8DC3\u6350\u8D44\uFF01", category: "culture", trigger: { minTurn: 10, minStability: 40 }, ...recurring(4, 40), options: [option("\u94A6\u51C6\u7763\u5EFA", { gold: -80, legitimacy: 8, influence: 5, factionSat: fr("clergy", 15) }, 3), option("\u6C11\u529E\u5B98\u52A9", { gold: -30, factionSat: fr("clergy", 8) }, 2)] },
-  { id: "evt_festival_grand", title: "\u5E1D\u56FD\u5927\u5178", description: "\u85E9\u5C5E\u9063\u4F7F\u671D\u8D3A\uFF0C\u5E1D\u56FD\u5A01\u4EEA\u8FDC\u64AD\uFF01", category: "culture", trigger: { minTurn: 25, minStability: 60, notAtWar: true }, ...recurring(3, 50), options: [option("\u76DB\u5927\u5E86\u8D3A", { gold: -150, influence: 20, legitimacy: 10, factionSat: fr("nobles", 10) }, 3), option("\u7B80\u793C\u76F8\u5F85", { gold: -40, influence: 8 }, 2)] },
-  { id: "evt_plague_quarantine", title: "\u68C0\u75AB\u4E4B\u4E89", description: "\u8FB9\u5883\u53D1\u73B0\u75AB\u75C5\uFF0C\u662F\u5426\u5C01\u9501\u8FB9\u5883\uFF1F", category: "population", trigger: { minTurn: 15 }, ...recurring(4, 40), options: [option("\u4E25\u683C\u9694\u79BB", { gold: -60, population: -50, stability: -3, factionSat: fr("merchants", -12) }, 3), option("\u6709\u9650\u68C0\u67E5", { population: -150, stability: 2 }, 2)] },
-  { id: "evt_diplomatic_marriage", title: "\u548C\u4EB2\u4E4B\u8BAE", description: "\u5F3A\u56FD\u9063\u4F7F\u6C42\u548C\u4EB2\uFF0C\u6B32\u7ED3\u79E6\u664B\u4E4B\u597D\uFF01", category: "diplomacy", trigger: { minTurn: 15, notAtWar: true }, ...recurring(4, 50), options: [option("\u5141\u8BFA\u548C\u4EB2", { gold: 100, influence: 15, legitimacy: -3, factionSat: fr("nobles", -8) }, 3), option("\u5A49\u8A00\u8C22\u7EDD", { influence: -5, stability: 3 }, 2)] },
-  { id: "evt_trade_embargo", title: "\u4ED6\u56FD\u7981\u8FD0", description: "\u90BB\u90A6\u8054\u5408\u5BF9\u4F60\u7684\u5546\u54C1\u5B9E\u65BD\u7981\u8FD0\uFF01", category: "diplomacy", trigger: { minTurn: 18 }, ...recurring(5, 40), options: [option("\u5BFB\u6C42\u65B0\u5546\u8DEF", { gold: -100, influence: 5, factionSat: fr("merchants", 8) }, 3), option("\u53CD\u5236\u7981\u8FD0", { gold: -50, influence: -8, stability: 3 }, 2)] },
-  { id: "evt_border_demarcate", title: "\u52D8\u754C\u5B9A\u7586", description: "\u4E0E\u90BB\u56FD\u52D8\u5B9A\u8FB9\u754C\uFF0C\u4E89\u8BAE\u4E4B\u5730\u5982\u4F55\u5904\u7F6E\uFF1F", category: "diplomacy", trigger: { minTurn: 10, notAtWar: true }, ...recurring(3, 50), options: [option("\u636E\u7406\u529B\u4E89", { gold: -40, influence: 5, factionSat: fr("military", 8) }, 2), option("\u4E92\u8BA9\u59A5\u534F", { gold: 20, influence: 8, legitimacy: 3 }, 3)] },
-  { id: "evt_secret_treaty", title: "\u5BC6\u7EA6\u66DD\u5149", description: "\u4F60\u4E0E\u4ED6\u56FD\u7684\u79D8\u5BC6\u6761\u7EA6\u88AB\u6CC4\u9732\uFF0C\u671D\u91CE\u54D7\u7136\uFF01", category: "diplomacy", trigger: { minTurn: 20 }, ...recurring(4, 60), options: [option("\u516C\u5F00\u627F\u8BA4", { legitimacy: -8, influence: 5, stability: -3 }, 2), option("\u77E2\u53E3\u5426\u8BA4", { legitimacy: -3, influence: -10, corruption: 3 }, 3)] },
+  defineEvent("evt_library_fire", "\u5B66\u9662\u5931\u706B", "\u7687\u5BB6\u5B66\u9662\u6DF1\u591C\u5931\u706B\uFF0C\u5178\u7C4D\u4ED8\u4E4B\u4E00\u70AC\uFF01", "science", { minTurn: 10, techLevelAbove: { branch: "admin", level: 2 } }, recurring(3, 50), [option("\u5168\u529B\u62A2\u6551", { gold: -100, sciPt: -10, stability: 3 }, 3), option("\u542C\u4E4B\u4EFB\u4E4B", { sciPt: -25, legitimacy: -5 }, 2)]),
+  defineEvent("evt_scientist_defect", "\u5B66\u8005\u6295\u5954", "\u5F02\u90A6\u77E5\u540D\u5B66\u8005\u8BF7\u6C42\u653F\u6CBB\u5E87\u62A4\uFF01", "science", fromTurn(12, { notAtWar: true }), recurring(3, 40), [option("\u63A5\u7EB3\u91CD\u7528", { gold: 50, sciPt: 20, influence: -3 }, 3), option("\u5A49\u62D2\u9063\u8FD4", { influence: 5, legitimacy: 3 }, 2)]),
+  defineEvent("evt_alchemy_craze", "\u70BC\u91D1\u72C2\u70ED", "\u5BAB\u5EF7\u5174\u8D77\u70BC\u91D1\u70ED\u6F6E\uFF0C\u65B9\u58EB\u58F0\u79F0\u80FD\u70B9\u77F3\u6210\u91D1\uFF01", "science", fromTurn(15), recurring(4, 35), [option("\u8D44\u52A9\u8BD5\u9A8C", { gold: -150, corruption: 5, factionSat: fr("clergy", -10) }, 2), option("\u65A5\u4E3A\u90AA\u672F", { legitimacy: 3, factionSat: fr("clergy", 12) }, 3)]),
+  defineEvent("evt_cultural_revival", "\u6587\u5316\u590D\u5174\u8FD0\u52A8", "\u53E4\u5178\u6587\u5316\u590D\u5174\u8FD0\u52A8\u5E2D\u5377\u5B66\u754C\uFF01", "culture", { minTurn: 20, minStability: 50, techLevelAbove: { branch: "culture", level: 2 } }, recurring(3, 60), [option("\u5927\u529B\u5021\u5BFC", { gold: -100, influence: 15, legitimacy: 8, sciPt: 10 }, 3), option("\u987A\u5176\u81EA\u7136", { influence: 5, sciPt: 3 }, 2)]),
+  defineEvent("evt_temple_construction", "\u5E99\u5B87\u5927\u5174", "\u795E\u804C\u56E2\u4F53\u8BF7\u5EFA\u5927\u5E99\uFF0C\u4FE1\u4F17\u8E0A\u8DC3\u6350\u8D44\uFF01", "culture", fromTurn(10, { minStability: 40 }), recurring(4, 40), [option("\u94A6\u51C6\u7763\u5EFA", { gold: -80, legitimacy: 8, influence: 5, factionSat: fr("clergy", 15) }, 3), option("\u6C11\u529E\u5B98\u52A9", { gold: -30, factionSat: fr("clergy", 8) }, 2)]),
+  defineEvent("evt_festival_grand", "\u5E1D\u56FD\u5927\u5178", "\u85E9\u5C5E\u9063\u4F7F\u671D\u8D3A\uFF0C\u5E1D\u56FD\u5A01\u4EEA\u8FDC\u64AD\uFF01", "culture", fromTurn(25, { minStability: 60, notAtWar: true }), recurring(3, 50), [option("\u76DB\u5927\u5E86\u8D3A", { gold: -150, influence: 20, legitimacy: 10, factionSat: noblesReaction(10) }, 3), option("\u7B80\u793C\u76F8\u5F85", { gold: -40, influence: 8 }, 2)]),
+  defineEvent("evt_plague_quarantine", "\u68C0\u75AB\u4E4B\u4E89", "\u8FB9\u5883\u53D1\u73B0\u75AB\u75C5\uFF0C\u662F\u5426\u5C01\u9501\u8FB9\u5883\uFF1F", "population", fromTurn(15), recurring(4, 40), [option("\u4E25\u683C\u9694\u79BB", { gold: -60, population: -50, stability: -3, factionSat: fr("merchants", -12) }, 3), option("\u6709\u9650\u68C0\u67E5", { population: -150, stability: 2 }, 2)]),
+  defineEvent("evt_diplomatic_marriage", "\u548C\u4EB2\u4E4B\u8BAE", "\u5F3A\u56FD\u9063\u4F7F\u6C42\u548C\u4EB2\uFF0C\u6B32\u7ED3\u79E6\u664B\u4E4B\u597D\uFF01", "diplomacy", fromTurn(15, { notAtWar: true }), recurring(4, 50), [option("\u5141\u8BFA\u548C\u4EB2", { gold: 100, influence: 15, legitimacy: -3, factionSat: noblesReaction(-8) }, 3), option("\u5A49\u8A00\u8C22\u7EDD", { influence: -5, stability: 3 }, 2)]),
+  defineEvent("evt_trade_embargo", "\u4ED6\u56FD\u7981\u8FD0", "\u90BB\u90A6\u8054\u5408\u5BF9\u4F60\u7684\u5546\u54C1\u5B9E\u65BD\u7981\u8FD0\uFF01", "diplomacy", fromTurn(18), recurring(5, 40), [option("\u5BFB\u6C42\u65B0\u5546\u8DEF", { gold: -100, influence: 5, factionSat: fr("merchants", 8) }, 3), option("\u53CD\u5236\u7981\u8FD0", { gold: -50, influence: -8, stability: 3 }, 2)]),
+  defineEvent("evt_border_demarcate", "\u52D8\u754C\u5B9A\u7586", "\u4E0E\u90BB\u56FD\u52D8\u5B9A\u8FB9\u754C\uFF0C\u4E89\u8BAE\u4E4B\u5730\u5982\u4F55\u5904\u7F6E\uFF1F", "diplomacy", fromTurn(10, { notAtWar: true }), recurring(3, 50), [option("\u636E\u7406\u529B\u4E89", { gold: -40, influence: 5, factionSat: militaryReaction(8) }, 2), option("\u4E92\u8BA9\u59A5\u534F", { gold: 20, influence: 8, legitimacy: 3 }, 3)]),
+  defineEvent("evt_secret_treaty", "\u5BC6\u7EA6\u66DD\u5149", "\u4F60\u4E0E\u4ED6\u56FD\u7684\u79D8\u5BC6\u6761\u7EA6\u88AB\u6CC4\u9732\uFF0C\u671D\u91CE\u54D7\u7136\uFF01", "diplomacy", fromTurn(20), recurring(4, 60), [option("\u516C\u5F00\u627F\u8BA4", { legitimacy: -8, influence: 5, stability: -3 }, 2), option("\u77E2\u53E3\u5426\u8BA4", { legitimacy: -3, influence: -10, corruption: 3 }, 3)]),
   // ── P-fix 补齐事件到 150（覆盖 science/culture/population/diplomacy/opportunity）──
-  { id: "evt_sci_observatory", title: "\u89C2\u661F\u53F0", description: "\u5929\u6587\u5B66\u5BB6\u8BF7\u5EFA\u89C2\u661F\u53F0\uFF0C\u89C2\u6D4B\u661F\u8C61\u4EE5\u63A8\u5386\u6CD5\uFF01", category: "science", trigger: { minTurn: 18, techLevelAbove: { branch: "admin", level: 2 } }, ...recurring(3, 50), options: [option("\u62E8\u6B3E\u5174\u5EFA", { gold: -120, sciPt: 30, influence: 5 }, 3), option("\u6C11\u95F4\u89C2\u6D4B", { sciPt: 8 }, 2)] },
-  { id: "evt_sci_water_mill", title: "\u6C34\u529B\u78E8\u574A", description: "\u5DE5\u5320\u53D1\u660E\u6C34\u529B\u78E8\u574A\uFF0C\u7CAE\u4EA7\u52A0\u5DE5\u6548\u7387\u5927\u589E\uFF01", category: "science", trigger: { minTurn: 14, techLevelAbove: { branch: "agri", level: 2 } }, ...recurring(4, 40), options: [option("\u63A8\u5E7F\u5168\u56FD", { gold: -80, food: 50, factionSat: fr("commoners", 8) }, 3), option("\u9650\u7687\u5BB6\u4E13\u7528", { gold: -30, food: 15 }, 2)] },
-  { id: "evt_sci_medical_text", title: "\u533B\u5178\u7F16\u7E82", description: "\u592A\u533B\u5949\u65E8\u7F16\u7E82\u533B\u5178\uFF0C\u6C47\u5929\u4E0B\u65B9\u672F\uFF01", category: "science", trigger: { minTurn: 20, techLevelAbove: { branch: "admin", level: 3 } }, ...recurring(3, 50), options: [option("\u9881\u884C\u5929\u4E0B", { gold: -100, sciPt: 20, stability: 5, population: 100 }, 3), option("\u79D8\u85CF\u5185\u5E9C", { sciPt: 10, factionSat: fr("clergy", 5) }, 2)] },
-  { id: "evt_culture_poet", title: "\u8BD7\u4EBA\u732E\u8D4B", description: "\u540D\u8BD7\u4EBA\u732E\u9882\u8D4B\uFF0C\u8F9E\u85FB\u534E\u7F8E\uFF0C\u671D\u91CE\u4F20\u8BF5\uFF01", category: "culture", trigger: { minTurn: 12, minStability: 40 }, ...recurring(4, 30), options: [option("\u539A\u8D4F\u8D50\u7235", { gold: -40, legitimacy: 5, influence: 3, factionSat: fr("clergy", 8) }, 3), option("\u53E3\u5934\u5609\u5956", { legitimacy: 2 }, 2)] },
-  { id: "evt_culture_architecture", title: "\u5BAB\u5BA4\u8425\u5EFA", description: "\u5320\u5E08\u732E\u65B0\u56FE\u6837\uFF0C\u8BF7\u5EFA\u5B8F\u4F1F\u5BAB\u5BA4\u4EE5\u5F70\u56FD\u5A01\uFF01", category: "culture", trigger: { minTurn: 22, minStability: 50, minGold: 300 }, ...recurring(3, 60), options: [option("\u5927\u5174\u571F\u6728", { gold: -250, legitimacy: 10, influence: 8, factionSat: fr("nobles", 12) }, 2), option("\u7B80\u6734\u4ECE\u4E8B", { legitimacy: 3, factionSat: fr("commoners", 5) }, 3)] },
-  { id: "evt_culture_relic", title: "\u53E4\u5BFA\u5723\u7269\u51FA\u571F", description: "\u53E4\u5BFA\u51FA\u571F\u5723\u7269\uFF0C\u4FE1\u4F17\u8702\u62E5\u671D\u62DC\uFF01", category: "culture", trigger: { minTurn: 18, notAtWar: true }, ...recurring(3, 50), options: [option("\u8FCE\u5165\u4EAC\u757F", { gold: -60, legitimacy: 8, factionSat: fr("clergy", 15), influence: 5 }, 3), option("\u7559\u5BFA\u4F9B\u5949", { stability: 3, factionSat: fr("clergy", 8) }, 2)] },
-  { id: "evt_pop_urbanization", title: "\u5E02\u4E95\u7E41\u5174", description: "\u90FD\u57CE\u5546\u5E02\u7E41\u5174\uFF0C\u767E\u4E1A\u4E91\u96C6\uFF01", category: "population", trigger: { minTurn: 16, minStability: 50, techLevelAbove: { branch: "admin", level: 2 } }, ...recurring(3, 40), options: [option("\u89C4\u8303\u5E02\u574A", { gold: 60, efficiency: 3, factionSat: fr("merchants", 10) }, 3), option("\u4EFB\u5176\u53D1\u5C55", { gold: 40, corruption: 3 }, 2)] },
-  { id: "evt_pop_infant", title: "\u5A74\u6B87\u4E4B\u75DB", description: "\u90FD\u57CE\u5A74\u592D\u7387\u9AD8\uFF0C\u592A\u533B\u8BF7\u8BBE\u80B2\u5A74\u5C40\uFF01", category: "population", trigger: { minTurn: 14 }, ...recurring(4, 40), options: [option("\u8BBE\u5C40\u54FA\u80B2", { gold: -80, population: 80, stability: 3, factionSat: fr("commoners", 12) }, 3), option("\u542C\u5929\u7531\u547D", { population: -50, factionSat: fr("commoners", -8) }, 2)] },
-  { id: "evt_dip_tribute", title: "\u85E9\u5C5E\u671D\u8D21", description: "\u8FDC\u65B9\u85E9\u5C5E\u9063\u4F7F\u671D\u8D21\u73CD\u5F02\u7269\u4EA7\uFF01", category: "diplomacy", trigger: { minTurn: 20, notAtWar: true, minStability: 50 }, ...recurring(3, 40), options: [option("\u539A\u5F80\u8584\u6765", { gold: -100, influence: 15, legitimacy: 8 }, 3), option("\u5E38\u793C\u76F8\u5F85", { gold: -30, influence: 5 }, 2)] },
-  { id: "evt_dip_mediation", title: "\u90BB\u90A6\u8BF7\u8C03", description: "\u4E24\u90BB\u90A6\u5F00\u6218\uFF0C\u53CC\u65B9\u7686\u8BF7\u6211\u56FD\u8C03\u505C\uFF01", category: "diplomacy", trigger: { minTurn: 18, notAtWar: true }, ...recurring(3, 50), options: [option("\u51FA\u9762\u65A1\u65CB", { gold: -60, influence: 20, legitimacy: 5, sciPt: 5 }, 3), option("\u4FDD\u6301\u4E2D\u7ACB", { influence: -3, stability: 2 }, 2)] },
-  { id: "evt_opp_granary_surplus", title: "\u7CAE\u4ED3\u5145\u76C8", description: "\u8FDE\u5E74\u4E30\u6536\uFF0C\u7CAE\u4ED3\u6EE1\u6EA2\uFF0C\u5982\u4F55\u5904\u7F6E\uFF1F", category: "opportunity", trigger: { minTurn: 12, notAtWar: true }, ...recurring(3, 30), options: [option("\u5E73\u4EF7\u51FA\u7C9C", { gold: 100, food: -80, factionSat: fr("merchants", 8) }, 3), option("\u5907\u8352\u50A8\u5907", { stability: 5, factionSat: fr("commoners", 5) }, 2)] },
-  { id: "evt_opp_mercenary_captain", title: "\u96C7\u4F63\u5175\u9996\u9886", description: "\u767E\u6218\u96C7\u4F63\u5175\u9996\u9886\u7387\u90E8\u6765\u6295\uFF0C\u613F\u4E3A\u524D\u950B\uFF01", category: "opportunity", trigger: { minTurn: 14, atWar: true }, ...recurring(3, 40), options: [option("\u59D4\u4EE5\u91CD\u4EFB", { gold: -80, factionSat: fr("military", 15), influence: 3 }, 3), option("\u5B58\u7591\u4E0D\u7528", { stability: -2, factionSat: fr("military", -5) }, 2)] },
-  { id: "evt_opp_good_harvest_chain", title: "\u8FDE\u5E74\u4E30\u7A14", description: "\u8FDE\u7EED\u4E30\u6536\uFF0C\u767E\u59D3\u5BCC\u8DB3\uFF0C\u56FD\u5E93\u5145\u76C8\uFF01", category: "opportunity", trigger: { minTurn: 16, notAtWar: true, minStability: 60 }, ...recurring(2, 60), options: [option("\u51CF\u514D\u8D4B\u7A0E", { gold: -100, stability: 8, factionSat: fr("commoners", 15), legitimacy: 5 }, 3), option("\u5145\u5B9E\u56FD\u5E93", { gold: 200, factionSat: fr("commoners", -5) }, 2)] },
+  defineEvent("evt_sci_observatory", "\u89C2\u661F\u53F0", "\u5929\u6587\u5B66\u5BB6\u8BF7\u5EFA\u89C2\u661F\u53F0\uFF0C\u89C2\u6D4B\u661F\u8C61\u4EE5\u63A8\u5386\u6CD5\uFF01", "science", { minTurn: 18, techLevelAbove: { branch: "admin", level: 2 } }, recurring(3, 50), [option("\u62E8\u6B3E\u5174\u5EFA", { gold: -120, sciPt: 30, influence: 5 }, 3), option("\u6C11\u95F4\u89C2\u6D4B", { sciPt: 8 }, 2)]),
+  defineEvent("evt_sci_water_mill", "\u6C34\u529B\u78E8\u574A", "\u5DE5\u5320\u53D1\u660E\u6C34\u529B\u78E8\u574A\uFF0C\u7CAE\u4EA7\u52A0\u5DE5\u6548\u7387\u5927\u589E\uFF01", "science", { minTurn: 14, techLevelAbove: { branch: "agri", level: 2 } }, recurring(4, 40), [option("\u63A8\u5E7F\u5168\u56FD", { gold: -80, food: 50, factionSat: commonersReaction(8) }, 3), option("\u9650\u7687\u5BB6\u4E13\u7528", { gold: -30, food: 15 }, 2)]),
+  defineEvent("evt_sci_medical_text", "\u533B\u5178\u7F16\u7E82", "\u592A\u533B\u5949\u65E8\u7F16\u7E82\u533B\u5178\uFF0C\u6C47\u5929\u4E0B\u65B9\u672F\uFF01", "science", { minTurn: 20, techLevelAbove: { branch: "admin", level: 3 } }, recurring(3, 50), [option("\u9881\u884C\u5929\u4E0B", { gold: -100, sciPt: 20, stability: 5, population: 100 }, 3), option("\u79D8\u85CF\u5185\u5E9C", { sciPt: 10, factionSat: fr("clergy", 5) }, 2)]),
+  defineEvent("evt_culture_poet", "\u8BD7\u4EBA\u732E\u8D4B", "\u540D\u8BD7\u4EBA\u732E\u9882\u8D4B\uFF0C\u8F9E\u85FB\u534E\u7F8E\uFF0C\u671D\u91CE\u4F20\u8BF5\uFF01", "culture", fromTurn(12, { minStability: 40 }), recurring(4, 30), [option("\u539A\u8D4F\u8D50\u7235", { gold: -40, legitimacy: 5, influence: 3, factionSat: fr("clergy", 8) }, 3), option("\u53E3\u5934\u5609\u5956", { legitimacy: 2 }, 2)]),
+  defineEvent("evt_culture_architecture", "\u5BAB\u5BA4\u8425\u5EFA", "\u5320\u5E08\u732E\u65B0\u56FE\u6837\uFF0C\u8BF7\u5EFA\u5B8F\u4F1F\u5BAB\u5BA4\u4EE5\u5F70\u56FD\u5A01\uFF01", "culture", fromTurn(22, { minStability: 50, minGold: 300 }), recurring(3, 60), [option("\u5927\u5174\u571F\u6728", { gold: -250, legitimacy: 10, influence: 8, factionSat: noblesReaction(12) }, 2), option("\u7B80\u6734\u4ECE\u4E8B", { legitimacy: 3, factionSat: commonersReaction(5) }, 3)]),
+  defineEvent("evt_culture_relic", "\u53E4\u5BFA\u5723\u7269\u51FA\u571F", "\u53E4\u5BFA\u51FA\u571F\u5723\u7269\uFF0C\u4FE1\u4F17\u8702\u62E5\u671D\u62DC\uFF01", "culture", fromTurn(18, { notAtWar: true }), recurring(3, 50), [option("\u8FCE\u5165\u4EAC\u757F", { gold: -60, legitimacy: 8, factionSat: fr("clergy", 15), influence: 5 }, 3), option("\u7559\u5BFA\u4F9B\u5949", { stability: 3, factionSat: fr("clergy", 8) }, 2)]),
+  defineEvent("evt_pop_urbanization", "\u5E02\u4E95\u7E41\u5174", "\u90FD\u57CE\u5546\u5E02\u7E41\u5174\uFF0C\u767E\u4E1A\u4E91\u96C6\uFF01", "population", { minTurn: 16, minStability: 50, techLevelAbove: { branch: "admin", level: 2 } }, recurring(3, 40), [option("\u89C4\u8303\u5E02\u574A", { gold: 60, efficiency: 3, factionSat: fr("merchants", 10) }, 3), option("\u4EFB\u5176\u53D1\u5C55", { gold: 40, corruption: 3 }, 2)]),
+  defineEvent("evt_pop_infant", "\u5A74\u6B87\u4E4B\u75DB", "\u90FD\u57CE\u5A74\u592D\u7387\u9AD8\uFF0C\u592A\u533B\u8BF7\u8BBE\u80B2\u5A74\u5C40\uFF01", "population", fromTurn(14), recurring(4, 40), [option("\u8BBE\u5C40\u54FA\u80B2", { gold: -80, population: 80, stability: 3, factionSat: commonersReaction(12) }, 3), option("\u542C\u5929\u7531\u547D", { population: -50, factionSat: commonersReaction(-8) }, 2)]),
+  defineEvent("evt_dip_tribute", "\u85E9\u5C5E\u671D\u8D21", "\u8FDC\u65B9\u85E9\u5C5E\u9063\u4F7F\u671D\u8D21\u73CD\u5F02\u7269\u4EA7\uFF01", "diplomacy", fromTurn(20, { notAtWar: true, minStability: 50 }), recurring(3, 40), [option("\u539A\u5F80\u8584\u6765", { gold: -100, influence: 15, legitimacy: 8 }, 3), option("\u5E38\u793C\u76F8\u5F85", { gold: -30, influence: 5 }, 2)]),
+  defineEvent("evt_dip_mediation", "\u90BB\u90A6\u8BF7\u8C03", "\u4E24\u90BB\u90A6\u5F00\u6218\uFF0C\u53CC\u65B9\u7686\u8BF7\u6211\u56FD\u8C03\u505C\uFF01", "diplomacy", fromTurn(18, { notAtWar: true }), recurring(3, 50), [option("\u51FA\u9762\u65A1\u65CB", { gold: -60, influence: 20, legitimacy: 5, sciPt: 5 }, 3), option("\u4FDD\u6301\u4E2D\u7ACB", { influence: -3, stability: 2 }, 2)]),
+  defineEvent("evt_opp_granary_surplus", "\u7CAE\u4ED3\u5145\u76C8", "\u8FDE\u5E74\u4E30\u6536\uFF0C\u7CAE\u4ED3\u6EE1\u6EA2\uFF0C\u5982\u4F55\u5904\u7F6E\uFF1F", "opportunity", fromTurn(12, { notAtWar: true }), recurring(3, 30), [option("\u5E73\u4EF7\u51FA\u7C9C", { gold: 100, food: -80, factionSat: fr("merchants", 8) }, 3), option("\u5907\u8352\u50A8\u5907", { stability: 5, factionSat: commonersReaction(5) }, 2)]),
+  defineEvent("evt_opp_mercenary_captain", "\u96C7\u4F63\u5175\u9996\u9886", "\u767E\u6218\u96C7\u4F63\u5175\u9996\u9886\u7387\u90E8\u6765\u6295\uFF0C\u613F\u4E3A\u524D\u950B\uFF01", "opportunity", fromTurn(14, { atWar: true }), recurring(3, 40), [option("\u59D4\u4EE5\u91CD\u4EFB", { gold: -80, factionSat: militaryReaction(15), influence: 3 }, 3), option("\u5B58\u7591\u4E0D\u7528", { stability: -2, factionSat: militaryReaction(-5) }, 2)]),
+  defineEvent("evt_opp_good_harvest_chain", "\u8FDE\u5E74\u4E30\u7A14", "\u8FDE\u7EED\u4E30\u6536\uFF0C\u767E\u59D3\u5BCC\u8DB3\uFF0C\u56FD\u5E93\u5145\u76C8\uFF01", "opportunity", fromTurn(16, { notAtWar: true, minStability: 60 }), recurring(2, 60), [option("\u51CF\u514D\u8D4B\u7A0E", { gold: -100, stability: 8, factionSat: commonersReaction(15), legitimacy: 5 }, 3), option("\u5145\u5B9E\u56FD\u5E93", { gold: 200, factionSat: commonersReaction(-5) }, 2)]),
   // ── D1: 扩充至 300+ 事件（每类别 ≥8） ──
-  { id: "evt_locust", title: "\u8757\u707E", description: "\u8757\u866B\u8FC7\u5883\uFF0C\u5BF8\u8349\u4E0D\u751F\uFF01", category: "crisis", trigger: { minTurn: 8 }, ...recurring(4, 35), options: [option("\u7EC4\u7EC7\u706D\u8757", { gold: -60, food: -80, stability: 3 }, 3), option("\u7948\u5929\u6C42\u96E8", { food: -120, legitimacy: -3 }, 2)] },
-  { id: "evt_flood", title: "\u6D2A\u6D9D", description: "\u66B4\u96E8\u6210\u707E\uFF0C\u826F\u7530\u88AB\u6DF9\uFF01", category: "crisis", trigger: { minTurn: 6 }, ...recurring(5, 30), options: [option("\u7B51\u5824\u6551\u707E", { gold: -100, food: -60, stability: 4 }, 3), option("\u8F6C\u79FB\u9AD8\u5730", { food: -40, population: -80 }, 2)] },
-  { id: "evt_blight", title: "\u75AB\u75C5\u4FB5\u88AD\u5E84\u7A3C", description: "\u4F5C\u7269\u5927\u9762\u79EF\u67AF\u840E\uFF01", category: "crisis", trigger: { minTurn: 10 }, ...recurring(3, 40), options: [option("\u711A\u7530\u9632\u75AB", { food: -150, stability: -3 }, 2), option("\u5BFB\u6C42\u826F\u79CD", { gold: -50, food: -80 }, 3)] },
-  { id: "evt_hail", title: "\u51B0\u96F9", description: "\u7A81\u964D\u51B0\u96F9\uFF0C\u6BC1\u574F\u5E84\u7A3C\uFF01", category: "crisis", trigger: {}, ...recurring(3, 50), options: [option("\u5F00\u4ED3\u8D48\u6D4E", { food: -60, gold: -40, stability: 5 }, 3), option("\u81EA\u529B\u66F4\u751F", { food: -100, stability: -3 }, 2)] },
-  { id: "evt_famine_riot", title: "\u9965\u6C11\u66B4\u52A8", description: "\u9965\u997F\u7684\u6C11\u4F17\u51B2\u51FB\u7CAE\u4ED3\uFF01", category: "crisis", trigger: { maxFoodRatio: 0.4 }, ...recurring(8, 20), options: [option("\u9547\u538B", { gold: -40, stability: -5, factionSat: fr("military", 5) }, 2), option("\u653E\u7CAE\u5B89\u629A", { food: -100, stability: 5, factionSat: fr("commoners", 10) }, 3)] },
-  { id: "evt_wolf_plague", title: "\u517D\u75AB", description: "\u7272\u755C\u5927\u6279\u6B7B\u4EA1\uFF01", category: "crisis", trigger: { minTurn: 12 }, ...recurring(3, 40), options: [option("\u9694\u79BB\u711A\u70E7", { food: -50, gold: -30 }, 3), option("\u6C42\u533B\u95EE\u836F", { gold: -60, food: -30 }, 2)] },
-  { id: "evt_noble_exile", title: "\u8D35\u65CF\u6D41\u4EA1", description: "\u5931\u52BF\u8D35\u65CF\u9003\u4EA1\u4ED6\u56FD\uFF01", category: "politics", trigger: { maxLegitimacy: 30 }, ...recurring(4, 30), options: [option("\u901A\u7F09\u8FFD\u56DE", { gold: -50, legitimacy: 3 }, 2), option("\u4EFB\u5176\u53BB\u7559", { factionSat: fr("nobles", -8), stability: 2 }, 3)] },
-  { id: "evt_noble_marriage", title: "\u8D35\u65CF\u8054\u59FB", description: "\u4E24\u5927\u8D35\u65CF\u5BB6\u65CF\u8054\u59FB\uFF0C\u52BF\u529B\u5750\u5927\uFF01", category: "politics", trigger: { minTurn: 10 }, ...recurring(3, 35), options: [option("\u8D50\u5A5A\u652F\u6301", { gold: -40, factionSat: fr("nobles", 12), legitimacy: 3 }, 3), option("\u4ECE\u4E2D\u4F5C\u6897", { factionSat: fr("nobles", -10), stability: -3 }, 2)] },
-  { id: "evt_noble_disinherit", title: "\u593A\u7235", description: "\u8D35\u65CF\u5B50\u5F1F\u88AB\u593A\u7235\uFF0C\u5F15\u53D1\u4E89\u8BAE\uFF01", category: "politics", trigger: { minTurn: 8 }, ...recurring(4, 25), options: [option("\u7EF4\u6301\u539F\u5224", { factionSat: fr("nobles", -12), legitimacy: 5 }, 2), option("\u6062\u590D\u7235\u4F4D", { factionSat: fr("nobles", 8), gold: -60 }, 3)] },
-  { id: "evt_faction_civil_war", title: "\u6D3E\u7CFB\u5185\u6218", description: "\u4E24\u5927\u6D3E\u7CFB\u516C\u5F00\u51B2\u7A81\uFF01", category: "politics", trigger: { maxStability: 35 }, ...recurring(7, 20), options: [option("\u652F\u6301\u4E00\u65B9", { stability: -8, legitimacy: -5 }, 2), option("\u8C03\u505C", { gold: -80, stability: 3 }, 3)] },
-  { id: "evt_merchant_smuggle", title: "\u8D70\u79C1\u7316\u7357", description: "\u5546\u4EBA\u8D70\u79C1\u9003\u7A0E\u4E25\u91CD\uFF01", category: "politics", trigger: { minCorruption: 25 }, ...recurring(5, 20), options: [option("\u4E25\u6253\u8D70\u79C1", { gold: 60, factionSat: fr("merchants", -10), corruption: -3 }, 2), option("\u7741\u53EA\u773C\u95ED\u53EA\u773C", { corruption: 5, factionSat: fr("merchants", 5) }, 3)] },
-  { id: "evt_merchant_monopoly", title: "\u884C\u4F1A\u5784\u65AD", description: "\u5546\u4EBA\u884C\u4F1A\u5784\u65AD\u5E02\u573A\uFF01", category: "politics", trigger: { minTurn: 15 }, ...recurring(3, 35), options: [option("\u6253\u7834\u5784\u65AD", { gold: -50, factionSat: fra({ faction: "merchants", delta: -15 }, { faction: "commoners", delta: 10 }) }, 3), option("\u6536\u7A0E\u4E86\u4E8B", { gold: 80, corruption: 3 }, 2)] },
-  { id: "evt_military_coup_attempt", title: "\u5175\u53D8\u672A\u9042", description: "\u90E8\u5206\u5C06\u9886\u5BC6\u8C0B\u5175\u53D8\uFF01", category: "politics", trigger: { factionSatBelow: { faction: "military", threshold: 15 }, maxLegitimacy: 35 }, ...recurring(9, 50), options: [option("\u94C1\u8155\u9547\u538B", { gold: -100, stability: -8, factionSat: fr("military", -15) }, 2), option("\u5B89\u629A\u519B\u5FC3", { gold: -80, factionSat: fr("military", 10), stability: -3 }, 3)] },
-  { id: "evt_military_veteran", title: "\u8001\u5175\u5B89\u7F6E", description: "\u9000\u5F79\u8001\u5175\u65E0\u4EE5\u4E3A\u751F\uFF01", category: "politics", trigger: { minTurn: 12 }, ...recurring(4, 25), options: [option("\u8D50\u7530\u5B89\u7F6E", { gold: -60, factionSat: fr("military", 10), stability: 3 }, 3), option("\u4E0D\u4E88\u7406\u776C", { factionSat: fr("military", -12), stability: -3 }, 2)] },
-  { id: "evt_military_mutiny", title: "\u54D7\u53D8", description: "\u6B20\u9977\u58EB\u5175\u54D7\u53D8\uFF01", category: "politics", trigger: { factionSatBelow: { faction: "military", threshold: 10 } }, ...recurring(10, 30), options: [option("\u9547\u538B", { gold: -80, stability: -10, factionSat: fr("military", -8) }, 2), option("\u8865\u53D1\u6B20\u9977", { gold: -120, factionSat: fr("military", 15), stability: 3 }, 3)] },
-  { id: "evt_trade_embargo_hit", title: "\u8D38\u6613\u7981\u8FD0\u51B2\u51FB", description: "\u4ED6\u56FD\u5BF9\u6211\u56FD\u7981\u8FD0\uFF01", category: "economy", trigger: { minTurn: 10 }, ...recurring(5, 30), options: [option("\u81EA\u7ED9\u81EA\u8DB3", { gold: -50, stability: 3 }, 3), option("\u5BFB\u627E\u66FF\u4EE3", { gold: -80, influence: 3 }, 2)] },
-  { id: "evt_inflation", title: "\u901A\u80C0", description: "\u7269\u4EF7\u98DE\u6DA8\uFF0C\u6C11\u6028\u6CB8\u817E\uFF01", category: "economy", trigger: { minCorruption: 40 }, ...recurring(5, 25), options: [option("\u7D27\u7F29\u94F6\u6839", { gold: -80, stability: 3, corruption: -3 }, 3), option("\u653E\u4EFB\u4E0D\u7BA1", { factionSat: fr("commoners", -12), corruption: 5 }, 2)] },
-  { id: "evt_devaluation", title: "\u5E01\u503C\u5D29\u8DCC", description: "\u94F8\u5E01\u63BA\u5047\uFF0C\u5E01\u503C\u66B4\u8DCC\uFF01", category: "economy", trigger: { minCorruption: 50 }, ...recurring(4, 30), options: [option("\u6574\u987F\u5E01\u5236", { gold: -100, legitimacy: 5, corruption: -5 }, 3), option("\u501F\u673A\u725F\u5229", { gold: 150, corruption: 8, factionSat: fr("merchants", -10) }, 2)] },
-  { id: "evt_resource_shortage", title: "\u8D44\u6E90\u77ED\u7F3A", description: "\u94C1\u77FF\u6728\u6750\u4E25\u91CD\u4E0D\u8DB3\uFF01", category: "economy", trigger: { minTurn: 8 }, ...recurring(4, 25), options: [option("\u9AD8\u4EF7\u91C7\u8D2D", { gold: -80, iron: 20, wood: 20 }, 3), option("\u9650\u5236\u6D88\u8017", { factionSat: fr("military", -8), stability: -2 }, 2)] },
-  { id: "evt_caravan_arrival", title: "\u5546\u961F\u62B5\u8FBE", description: "\u8FDC\u65B9\u5546\u961F\u5E26\u6765\u73CD\u5947\u8D27\u7269\uFF01", category: "economy", trigger: { minTurn: 5, notAtWar: true }, ...recurring(4, 20), options: [option("\u8BBE\u5E02\u4EA4\u6613", { gold: 80, factionSat: fr("merchants", 8) }, 3), option("\u5F81\u6536\u5173\u7A0E", { gold: 120, factionSat: fr("merchants", -5) }, 2)] },
-  { id: "evt_bank_loan", title: "\u94B1\u5E84\u501F\u8D37", description: "\u94B1\u5E84\u613F\u501F\u5DE8\u6B3E\uFF01", category: "economy", trigger: { minTurn: 10 }, ...recurring(3, 40), options: [option("\u63A5\u53D7\u501F\u8D37", { gold: 300, corruption: 5 }, 3), option("\u5A49\u62D2", { legitimacy: 3 }, 2)] },
-  { id: "evt_market_crash", title: "\u5E02\u5D29", description: "\u5E02\u573A\u6050\u614C\uFF0C\u7269\u4EF7\u66B4\u8DCC\uFF01", category: "economy", trigger: { minTurn: 15 }, ...recurring(3, 50), options: [option("\u6284\u5E95\u6536\u8D2D", { gold: -150, stability: -5 }, 2), option("\u7A33\u5B9A\u5E02\u4EF7", { gold: -80, stability: 5 }, 3)] },
-  { id: "evt_frontline_victory", title: "\u524D\u7EBF\u5927\u6377", description: "\u6211\u519B\u5927\u7834\u654C\u519B\uFF01", category: "military", trigger: { atWar: true }, ...recurring(6, 10), options: [option("\u4E58\u80DC\u8FFD\u51FB", { gold: -50, factionSat: fr("military", 12), stability: 5 }, 2), option("\u89C1\u597D\u5C31\u6536", { legitimacy: 5, factionSat: fr("military", -3) }, 3)] },
-  { id: "evt_siege", title: "\u56F4\u57CE", description: "\u654C\u519B\u56F4\u56F0\u6211\u65B9\u57CE\u6C60\uFF01", category: "military", trigger: { atWar: true }, ...recurring(7, 15), options: [option("\u6B7B\u5B88\u5F85\u63F4", { food: -80, gold: -40, stability: 3 }, 3), option("\u7A81\u56F4", { gold: -60, stability: -5, factionSat: fr("military", 5) }, 2)] },
-  { id: "evt_deserter", title: "\u9003\u5175", description: "\u5927\u6279\u58EB\u5175\u9003\u4EA1\uFF01", category: "military", trigger: { minWarExhaustion: 50 }, ...recurring(6, 20), options: [option("\u4E25\u60E9\u9003\u5175", { factionSat: fr("military", 5), stability: -3 }, 2), option("\u6539\u5584\u5F85\u9047", { gold: -80, factionSat: fr("military", 10) }, 3)] },
-  { id: "evt_conscription_resistance", title: "\u6297\u5F81", description: "\u6C11\u4F17\u6297\u62D2\u5F81\u5175\uFF01", category: "military", trigger: { minTurn: 8 }, ...recurring(5, 20), options: [option("\u5F3A\u5236\u5F81\u5175", { factionSat: fr("commoners", -15), stability: -5 }, 2), option("\u51CF\u5C11\u5F81\u989D", { factionSat: fr("commoners", 8), stability: 2 }, 3)] },
-  { id: "evt_war_profit", title: "\u6218\u4E89\u8D22", description: "\u519B\u9700\u65FA\u76DB\uFF0C\u5546\u4EBA\u53D1\u6218\u4E89\u8D22\uFF01", category: "military", trigger: { atWar: true, minTurn: 10 }, ...recurring(3, 25), options: [option("\u5F81\u6536\u6218\u4E89\u7A0E", { gold: 100, factionSat: fr("merchants", -8) }, 2), option("\u9F13\u52B1\u4F9B\u5E94", { gold: 50, factionSat: fr("merchants", 5) }, 3)] },
-  { id: "evt_alliance_proposal", title: "\u540C\u76DF\u9080\u8BF7", description: "\u4ED6\u56FD\u63D0\u8BAE\u7ED3\u76DF\uFF01", category: "diplomacy", trigger: { notAtWar: true, minTurn: 8 }, ...recurring(5, 25), options: [option("\u540C\u610F\u7ED3\u76DF", { influence: 10, legitimacy: 3 }, 3), option("\u5A49\u62D2", { influence: -3 }, 2)] },
-  { id: "evt_treaty_break", title: "\u6BC1\u7EA6", description: "\u76DF\u56FD\u5355\u65B9\u9762\u6495\u6BC1\u6761\u7EA6\uFF01", category: "diplomacy", trigger: { minTurn: 15 }, ...recurring(4, 30), options: [option("\u5F3A\u70C8\u6297\u8BAE", { legitimacy: 5, stability: -3 }, 2), option("\u5FCD\u6C14\u541E\u58F0", { legitimacy: -8, factionSat: fr("nobles", -10) }, 3)] },
-  { id: "evt_hostage_return", title: "\u8D28\u5B50\u5F52\u8FD8", description: "\u4ED6\u56FD\u5F52\u8FD8\u4EBA\u8D28\uFF01", category: "diplomacy", trigger: { minTurn: 20, notAtWar: true }, ...recurring(3, 40), options: [option("\u5584\u5F85\u5F52\u56FD", { legitimacy: 5, stability: 3 }, 3), option("\u51B7\u5F85", { factionSat: fr("nobles", -5) }, 2)] },
-  { id: "evt_pirate_attack", title: "\u6D77\u76D7\u88AD\u51FB", description: "\u6D77\u76D7\u52AB\u63A0\u6CBF\u6D77\uFF01", category: "diplomacy", trigger: { minTurn: 8 }, ...recurring(5, 20), options: [option("\u51FA\u5175\u527F\u706D", { gold: -60, factionSat: fr("military", 8), stability: 3 }, 3), option("\u62DB\u5B89", { gold: -30, corruption: 5 }, 2)] },
-  { id: "evt_tribute_demand", title: "\u7D22\u8D21", description: "\u5F3A\u56FD\u8981\u6C42\u8FDB\u8D21\uFF01", category: "diplomacy", trigger: { minTurn: 12 }, ...recurring(4, 30), options: [option("\u5FCD\u8FB1\u8FDB\u8D21", { gold: -100, legitimacy: -5, stability: -3 }, 3), option("\u62D2\u7EDD", { legitimacy: 8, stability: -5 }, 2)] },
-  { id: "evt_cultural_exchange", title: "\u6587\u5316\u4EA4\u6D41", description: "\u4ED6\u56FD\u5B66\u8005\u6765\u8BBF\u4EA4\u6D41\uFF01", category: "diplomacy", trigger: { notAtWar: true, minTurn: 10 }, ...recurring(3, 30), options: [option("\u70ED\u70C8\u6B22\u8FCE", { sciPt: 8, influence: 5, gold: -30 }, 3), option("\u8C28\u614E\u5BF9\u5F85", { sciPt: 3 }, 2)] },
-  { id: "evt_heresy", title: "\u5F02\u7AEF", description: "\u5F02\u7AEF\u6559\u6D3E\u5174\u8D77\uFF01", category: "religion", trigger: { minTurn: 10, maxStability: 50 }, ...recurring(5, 25), options: [option("\u9547\u538B\u5F02\u7AEF", { stability: -5, factionSat: fr("clergy", 10), legitimacy: 3 }, 2), option("\u5BBD\u5BB9\u5BF9\u5F85", { factionSat: fr("clergy", -12), stability: 3 }, 3)] },
-  { id: "evt_holy_war_call", title: "\u5723\u6218\u53F7\u53EC", description: "\u5B97\u6559\u9886\u8896\u53F7\u53EC\u5723\u6218\uFF01", category: "religion", trigger: { minTurn: 20 }, ...recurring(3, 50), options: [option("\u54CD\u5E94\u53F7\u53EC", { factionSat: fr("clergy", 15), stability: -5, legitimacy: 5 }, 2), option("\u62D2\u7EDD", { factionSat: fr("clergy", -15), stability: 3 }, 3)] },
-  { id: "evt_shrine_miracle", title: "\u795E\u8FF9", description: "\u795E\u6BBF\u73B0\u5F02\u8C61\uFF0C\u4FE1\u5F92\u8702\u62E5\uFF01", category: "religion", trigger: { minTurn: 15, minStability: 40 }, ...recurring(2, 60), options: [option("\u5927\u8086\u5BA3\u626C", { legitimacy: 8, factionSat: fr("clergy", 12), influence: 5 }, 3), option("\u4F4E\u8C03\u5904\u7406", { legitimacy: 2 }, 2)] },
-  { id: "evt_monastery_land", title: "\u5BFA\u9662\u5360\u5730", description: "\u5BFA\u9662\u5E7F\u5360\u826F\u7530\uFF01", category: "religion", trigger: { minTurn: 12, minCorruption: 20 }, ...recurring(4, 30), options: [option("\u6CA1\u6536\u8FD8\u7530", { food: 50, factionSat: fr("clergy", -15), legitimacy: -3 }, 3), option("\u7EF4\u6301\u73B0\u72B6", { factionSat: fr("clergy", 5), corruption: 3 }, 2)] },
-  { id: "evt_tech_academy", title: "\u5B66\u5E9C\u4E89\u9E23", description: "\u5404\u5B66\u6D3E\u6FC0\u70C8\u8BBA\u6218\uFF01", category: "science", trigger: { minTurn: 10, techLevelAbove: { branch: "admin", level: 2 } }, ...recurring(3, 30), options: [option("\u8D44\u52A9\u7814\u7A76", { gold: -60, sciPt: 10, factionSat: fr("nobles", -5) }, 3), option("\u9650\u5236\u4E89\u8BBA", { stability: 3, sciPt: -3 }, 2)] },
-  { id: "evt_tech_leak", title: "\u6280\u672F\u5916\u6D41", description: "\u6838\u5FC3\u673A\u5BC6\u88AB\u4ED6\u56FD\u7A83\u53D6\uFF01", category: "science", trigger: { minTurn: 15 }, ...recurring(3, 40), options: [option("\u8FFD\u67E5\u5185\u9B3C", { gold: -50, stability: -3 }, 3), option("\u52A0\u901F\u7814\u53D1", { gold: -80, sciPt: 8 }, 2)] },
-  { id: "evt_tech_craft_guild", title: "\u5DE5\u5320\u884C\u4F1A", description: "\u5DE5\u5320\u7EC4\u7EC7\u884C\u4F1A\u4FDD\u62A4\u79D8\u65B9\uFF01", category: "science", trigger: { minTurn: 8 }, ...recurring(3, 30), options: [option("\u652F\u6301\u884C\u4F1A", { gold: -30, sciPt: 5, factionSat: fr("merchants", 5) }, 3), option("\u6253\u7834\u5784\u65AD", { sciPt: -2, factionSat: fr("merchants", -8) }, 2)] },
-  { id: "evt_tech_invention", title: "\u53D1\u660E", description: "\u5DE5\u5320\u53D1\u660E\u65B0\u5DE5\u5177\uFF01", category: "science", trigger: { techLevelAbove: { branch: "agri", level: 2 } }, ...recurring(3, 35), options: [option("\u63A8\u5E7F\u4F7F\u7528", { gold: -40, food: 30, sciPt: 3 }, 3), option("\u4FDD\u5B88\u79D8\u5BC6", { sciPt: 5, influence: 2 }, 2)] },
-  { id: "evt_granary_rot", title: "\u7CAE\u4ED3\u9709\u53D8", description: "\u50A8\u7CAE\u5927\u91CF\u9709\u53D8\uFF01", category: "crisis", trigger: { minTurn: 10 }, ...recurring(4, 30), options: [option("\u7D27\u6025\u6E05\u7406", { food: -80, gold: -30 }, 3), option("\u542C\u4E4B\u4EFB\u4E4B", { food: -150, stability: -5 }, 2)] },
-  { id: "evt_road_bandit", title: "\u8DEF\u532A", description: "\u76D7\u532A\u76D8\u8E1E\u8981\u9053\uFF01", category: "crisis", trigger: { maxStability: 45 }, ...recurring(5, 20), options: [option("\u6D3E\u5175\u6E05\u527F", { gold: -40, stability: 5, factionSat: fr("military", 5) }, 3), option("\u7ED5\u9053", { gold: -20, factionSat: fr("merchants", -5) }, 2)] },
-  { id: "evt_pop_plague", title: "\u65F6\u75AB", description: "\u75AB\u75C5\u5728\u90FD\u57CE\u8513\u5EF6\uFF01", category: "population", trigger: { minTurn: 15 }, ...recurring(5, 30), options: [option("\u5C01\u57CE\u9694\u79BB", { gold: -80, population: -100, stability: -3 }, 3), option("\u653E\u4EFB", { population: -300, stability: -8 }, 2)] },
-  { id: "evt_pop_festival", title: "\u4E07\u6C11\u540C\u5E86", description: "\u56FD\u6CF0\u6C11\u5B89\uFF0C\u4E07\u6C11\u6B22\u5E86\uFF01", category: "population", trigger: { minStability: 60, notAtWar: true, minTurn: 10 }, ...recurring(3, 30), options: [option("\u5927\u8D66\u5929\u4E0B", { gold: -50, stability: 8, legitimacy: 5, factionSat: fr("commoners", 10) }, 3), option("\u7167\u5E38", { stability: 2 }, 2)] },
-  { id: "evt_opp_relic", title: "\u4F20\u8BF4\u5723\u7269\u73B0\u4E16", description: "\u4F20\u8BF4\u5723\u7269\u88AB\u53D1\u6398\uFF01", category: "opportunity", trigger: { minTurn: 20 }, ...recurring(2, 60), options: [option("\u4F9B\u5949\u5C55\u793A", { gold: -30, legitimacy: 10, factionSat: fr("clergy", 15), influence: 8 }, 3), option("\u79D8\u85CF", { legitimacy: 3 }, 2)] },
-  { id: "evt_opp_annex", title: "\u90BB\u56FD\u5185\u4E71", description: "\u90BB\u56FD\u9677\u5165\u5185\u4E71\uFF0C\u6709\u673A\u53EF\u4E58\uFF01", category: "opportunity", trigger: { minTurn: 15, notAtWar: true }, ...recurring(3, 40), options: [option("\u8D81\u865A\u800C\u5165", { gold: -100, stability: -5, influence: 10 }, 2), option("\u9759\u89C2\u5176\u53D8", { stability: 3 }, 3)] },
-  { id: "evt_opp_trade_monopoly", title: "\u72EC\u5360\u5546\u8DEF", description: "\u7ADE\u4E89\u5BF9\u624B\u9000\u51FA\uFF0C\u5546\u8DEF\u72EC\u5360\uFF01", category: "opportunity", trigger: { notAtWar: true, minTurn: 12 }, ...recurring(2, 40), options: [option("\u5927\u4E3E\u6269\u5F20", { gold: 150, factionSat: fr("merchants", 12) }, 3), option("\u7A33\u624E\u7A33\u6253", { gold: 60, stability: 3 }, 2)] },
-  { id: "evt_opp_goldmine", title: "\u91D1\u77FF\u53D1\u73B0", description: "\u63A2\u77FF\u8005\u53D1\u73B0\u5927\u91D1\u77FF\uFF01", category: "opportunity", trigger: { minTurn: 20 }, ...recurring(2, 50), options: [option("\u5168\u529B\u5F00\u91C7", { gold: 300, corruption: 8, factionSat: fr("nobles", 10) }, 3), option("\u9002\u5EA6\u5F00\u91C7", { gold: 100, corruption: 3 }, 2)] },
-  { id: "evt_culture_propaganda", title: "\u6587\u5316\u8F93\u51FA", description: "\u4ED6\u56FD\u4EF0\u6155\u6211\u56FD\u6587\u5316\uFF01", category: "culture", trigger: { minTurn: 15, notAtWar: true, minStability: 50 }, ...recurring(3, 30), options: [option("\u79EF\u6781\u63A8\u5E7F", { gold: -40, influence: 12, legitimacy: 3 }, 3), option("\u6765\u8005\u4E0D\u62D2", { influence: 5 }, 2)] },
-  { id: "evt_culture_decay", title: "\u6587\u5316\u8870\u843D", description: "\u6587\u8109\u65AD\u7EDD\uFF0C\u793C\u5D29\u4E50\u574F\uFF01", category: "culture", trigger: { maxStability: 30 }, ...recurring(5, 25), options: [option("\u5174\u5B66\u91CD\u6559", { gold: -80, stability: 5, legitimacy: 3 }, 3), option("\u542C\u4E4B\u4EFB\u4E4B", { legitimacy: -5, factionSat: fr("nobles", -8) }, 2)] },
+  defineEvent("evt_locust", "\u8757\u707E", "\u8757\u866B\u8FC7\u5883\uFF0C\u5BF8\u8349\u4E0D\u751F\uFF01", "crisis", fromTurn(8), recurring(4, 35), [option("\u7EC4\u7EC7\u706D\u8757", { gold: -60, food: -80, stability: 3 }, 3), option("\u7948\u5929\u6C42\u96E8", { food: -120, legitimacy: -3 }, 2)]),
+  defineEvent("evt_flood", "\u6D2A\u6D9D", "\u66B4\u96E8\u6210\u707E\uFF0C\u826F\u7530\u88AB\u6DF9\uFF01", "crisis", fromTurn(6), recurring(5, 30), [option("\u7B51\u5824\u6551\u707E", { gold: -100, food: -60, stability: 4 }, 3), option("\u8F6C\u79FB\u9AD8\u5730", { food: -40, population: -80 }, 2)]),
+  defineEvent("evt_blight", "\u75AB\u75C5\u4FB5\u88AD\u5E84\u7A3C", "\u4F5C\u7269\u5927\u9762\u79EF\u67AF\u840E\uFF01", "crisis", fromTurn(10), recurring(3, 40), [option("\u711A\u7530\u9632\u75AB", { food: -150, stability: -3 }, 2), option("\u5BFB\u6C42\u826F\u79CD", { gold: -50, food: -80 }, 3)]),
+  defineEvent("evt_hail", "\u51B0\u96F9", "\u7A81\u964D\u51B0\u96F9\uFF0C\u6BC1\u574F\u5E84\u7A3C\uFF01", "crisis", {}, recurring(3, 50), [option("\u5F00\u4ED3\u8D48\u6D4E", { food: -60, gold: -40, stability: 5 }, 3), option("\u81EA\u529B\u66F4\u751F", { food: -100, stability: -3 }, 2)]),
+  defineEvent("evt_famine_riot", "\u9965\u6C11\u66B4\u52A8", "\u9965\u997F\u7684\u6C11\u4F17\u51B2\u51FB\u7CAE\u4ED3\uFF01", "crisis", { maxFoodRatio: 0.4 }, recurring(8, 20), [option("\u9547\u538B", { gold: -40, stability: -5, factionSat: militaryReaction(5) }, 2), option("\u653E\u7CAE\u5B89\u629A", { food: -100, stability: 5, factionSat: commonersReaction(10) }, 3)]),
+  defineEvent("evt_wolf_plague", "\u517D\u75AB", "\u7272\u755C\u5927\u6279\u6B7B\u4EA1\uFF01", "crisis", fromTurn(12), recurring(3, 40), [option("\u9694\u79BB\u711A\u70E7", { food: -50, gold: -30 }, 3), option("\u6C42\u533B\u95EE\u836F", { gold: -60, food: -30 }, 2)]),
+  defineEvent("evt_noble_exile", "\u8D35\u65CF\u6D41\u4EA1", "\u5931\u52BF\u8D35\u65CF\u9003\u4EA1\u4ED6\u56FD\uFF01", "politics", { maxLegitimacy: 30 }, recurring(4, 30), [option("\u901A\u7F09\u8FFD\u56DE", { gold: -50, legitimacy: 3 }, 2), option("\u4EFB\u5176\u53BB\u7559", { factionSat: noblesReaction(-8), stability: 2 }, 3)]),
+  defineEvent("evt_noble_marriage", "\u8D35\u65CF\u8054\u59FB", "\u4E24\u5927\u8D35\u65CF\u5BB6\u65CF\u8054\u59FB\uFF0C\u52BF\u529B\u5750\u5927\uFF01", "politics", fromTurn(10), recurring(3, 35), [option("\u8D50\u5A5A\u652F\u6301", { gold: -40, factionSat: noblesReaction(12), legitimacy: 3 }, 3), option("\u4ECE\u4E2D\u4F5C\u6897", { factionSat: noblesReaction(-10), stability: -3 }, 2)]),
+  defineEvent("evt_noble_disinherit", "\u593A\u7235", "\u8D35\u65CF\u5B50\u5F1F\u88AB\u593A\u7235\uFF0C\u5F15\u53D1\u4E89\u8BAE\uFF01", "politics", fromTurn(8), recurring(4, 25), [option("\u7EF4\u6301\u539F\u5224", { factionSat: noblesReaction(-12), legitimacy: 5 }, 2), option("\u6062\u590D\u7235\u4F4D", { factionSat: noblesReaction(8), gold: -60 }, 3)]),
+  defineEvent("evt_faction_civil_war", "\u6D3E\u7CFB\u5185\u6218", "\u4E24\u5927\u6D3E\u7CFB\u516C\u5F00\u51B2\u7A81\uFF01", "politics", { maxStability: 35 }, recurring(7, 20), [option("\u652F\u6301\u4E00\u65B9", { stability: -8, legitimacy: -5 }, 2), option("\u8C03\u505C", { gold: -80, stability: 3 }, 3)]),
+  defineEvent("evt_merchant_smuggle", "\u8D70\u79C1\u7316\u7357", "\u5546\u4EBA\u8D70\u79C1\u9003\u7A0E\u4E25\u91CD\uFF01", "politics", { minCorruption: 25 }, recurring(5, 20), [option("\u4E25\u6253\u8D70\u79C1", { gold: 60, factionSat: fr("merchants", -10), corruption: -3 }, 2), option("\u7741\u53EA\u773C\u95ED\u53EA\u773C", { corruption: 5, factionSat: fr("merchants", 5) }, 3)]),
+  defineEvent("evt_merchant_monopoly", "\u884C\u4F1A\u5784\u65AD", "\u5546\u4EBA\u884C\u4F1A\u5784\u65AD\u5E02\u573A\uFF01", "politics", fromTurn(15), recurring(3, 35), [option("\u6253\u7834\u5784\u65AD", { gold: -50, factionSat: fra({ faction: "merchants", delta: -15 }, { faction: "commoners", delta: 10 }) }, 3), option("\u6536\u7A0E\u4E86\u4E8B", { gold: 80, corruption: 3 }, 2)]),
+  defineEvent("evt_military_coup_attempt", "\u5175\u53D8\u672A\u9042", "\u90E8\u5206\u5C06\u9886\u5BC6\u8C0B\u5175\u53D8\uFF01", "politics", { factionSatBelow: { faction: "military", threshold: 15 }, maxLegitimacy: 35 }, recurring(9, 50), [option("\u94C1\u8155\u9547\u538B", { gold: -100, stability: -8, factionSat: militaryReaction(-15) }, 2), option("\u5B89\u629A\u519B\u5FC3", { gold: -80, factionSat: militaryReaction(10), stability: -3 }, 3)]),
+  defineEvent("evt_military_veteran", "\u8001\u5175\u5B89\u7F6E", "\u9000\u5F79\u8001\u5175\u65E0\u4EE5\u4E3A\u751F\uFF01", "politics", fromTurn(12), recurring(4, 25), [option("\u8D50\u7530\u5B89\u7F6E", { gold: -60, factionSat: militaryReaction(10), stability: 3 }, 3), option("\u4E0D\u4E88\u7406\u776C", { factionSat: militaryReaction(-12), stability: -3 }, 2)]),
+  defineEvent("evt_military_mutiny", "\u54D7\u53D8", "\u6B20\u9977\u58EB\u5175\u54D7\u53D8\uFF01", "politics", { factionSatBelow: { faction: "military", threshold: 10 } }, recurring(10, 30), [option("\u9547\u538B", { gold: -80, stability: -10, factionSat: militaryReaction(-8) }, 2), option("\u8865\u53D1\u6B20\u9977", { gold: -120, factionSat: militaryReaction(15), stability: 3 }, 3)]),
+  defineEvent("evt_trade_embargo_hit", "\u8D38\u6613\u7981\u8FD0\u51B2\u51FB", "\u4ED6\u56FD\u5BF9\u6211\u56FD\u7981\u8FD0\uFF01", "economy", fromTurn(10), recurring(5, 30), [option("\u81EA\u7ED9\u81EA\u8DB3", { gold: -50, stability: 3 }, 3), option("\u5BFB\u627E\u66FF\u4EE3", { gold: -80, influence: 3 }, 2)]),
+  defineEvent("evt_inflation", "\u901A\u80C0", "\u7269\u4EF7\u98DE\u6DA8\uFF0C\u6C11\u6028\u6CB8\u817E\uFF01", "economy", { minCorruption: 40 }, recurring(5, 25), [option("\u7D27\u7F29\u94F6\u6839", { gold: -80, stability: 3, corruption: -3 }, 3), option("\u653E\u4EFB\u4E0D\u7BA1", { factionSat: commonersReaction(-12), corruption: 5 }, 2)]),
+  defineEvent("evt_devaluation", "\u5E01\u503C\u5D29\u8DCC", "\u94F8\u5E01\u63BA\u5047\uFF0C\u5E01\u503C\u66B4\u8DCC\uFF01", "economy", { minCorruption: 50 }, recurring(4, 30), [option("\u6574\u987F\u5E01\u5236", { gold: -100, legitimacy: 5, corruption: -5 }, 3), option("\u501F\u673A\u725F\u5229", { gold: 150, corruption: 8, factionSat: fr("merchants", -10) }, 2)]),
+  defineEvent("evt_resource_shortage", "\u8D44\u6E90\u77ED\u7F3A", "\u94C1\u77FF\u6728\u6750\u4E25\u91CD\u4E0D\u8DB3\uFF01", "economy", fromTurn(8), recurring(4, 25), [option("\u9AD8\u4EF7\u91C7\u8D2D", { gold: -80, iron: 20, wood: 20 }, 3), option("\u9650\u5236\u6D88\u8017", { factionSat: militaryReaction(-8), stability: -2 }, 2)]),
+  defineEvent("evt_caravan_arrival", "\u5546\u961F\u62B5\u8FBE", "\u8FDC\u65B9\u5546\u961F\u5E26\u6765\u73CD\u5947\u8D27\u7269\uFF01", "economy", fromTurn(5, { notAtWar: true }), recurring(4, 20), [option("\u8BBE\u5E02\u4EA4\u6613", { gold: 80, factionSat: fr("merchants", 8) }, 3), option("\u5F81\u6536\u5173\u7A0E", { gold: 120, factionSat: fr("merchants", -5) }, 2)]),
+  defineEvent("evt_bank_loan", "\u94B1\u5E84\u501F\u8D37", "\u94B1\u5E84\u613F\u501F\u5DE8\u6B3E\uFF01", "economy", fromTurn(10), recurring(3, 40), [option("\u63A5\u53D7\u501F\u8D37", { gold: 300, corruption: 5 }, 3), option("\u5A49\u62D2", { legitimacy: 3 }, 2)]),
+  defineEvent("evt_market_crash", "\u5E02\u5D29", "\u5E02\u573A\u6050\u614C\uFF0C\u7269\u4EF7\u66B4\u8DCC\uFF01", "economy", fromTurn(15), recurring(3, 50), [option("\u6284\u5E95\u6536\u8D2D", { gold: -150, stability: -5 }, 2), option("\u7A33\u5B9A\u5E02\u4EF7", { gold: -80, stability: 5 }, 3)]),
+  defineEvent("evt_frontline_victory", "\u524D\u7EBF\u5927\u6377", "\u6211\u519B\u5927\u7834\u654C\u519B\uFF01", "military", { atWar: true }, recurring(6, 10), [option("\u4E58\u80DC\u8FFD\u51FB", { gold: -50, factionSat: militaryReaction(12), stability: 5 }, 2), option("\u89C1\u597D\u5C31\u6536", { legitimacy: 5, factionSat: militaryReaction(-3) }, 3)]),
+  defineEvent("evt_siege", "\u56F4\u57CE", "\u654C\u519B\u56F4\u56F0\u6211\u65B9\u57CE\u6C60\uFF01", "military", { atWar: true }, recurring(7, 15), [option("\u6B7B\u5B88\u5F85\u63F4", { food: -80, gold: -40, stability: 3 }, 3), option("\u7A81\u56F4", { gold: -60, stability: -5, factionSat: militaryReaction(5) }, 2)]),
+  defineEvent("evt_deserter", "\u9003\u5175", "\u5927\u6279\u58EB\u5175\u9003\u4EA1\uFF01", "military", { minWarExhaustion: 50 }, recurring(6, 20), [option("\u4E25\u60E9\u9003\u5175", { factionSat: militaryReaction(5), stability: -3 }, 2), option("\u6539\u5584\u5F85\u9047", { gold: -80, factionSat: militaryReaction(10) }, 3)]),
+  defineEvent("evt_conscription_resistance", "\u6297\u5F81", "\u6C11\u4F17\u6297\u62D2\u5F81\u5175\uFF01", "military", fromTurn(8), recurring(5, 20), [option("\u5F3A\u5236\u5F81\u5175", { factionSat: commonersReaction(-15), stability: -5 }, 2), option("\u51CF\u5C11\u5F81\u989D", { factionSat: commonersReaction(8), stability: 2 }, 3)]),
+  defineEvent("evt_war_profit", "\u6218\u4E89\u8D22", "\u519B\u9700\u65FA\u76DB\uFF0C\u5546\u4EBA\u53D1\u6218\u4E89\u8D22\uFF01", "military", { atWar: true, minTurn: 10 }, recurring(3, 25), [option("\u5F81\u6536\u6218\u4E89\u7A0E", { gold: 100, factionSat: fr("merchants", -8) }, 2), option("\u9F13\u52B1\u4F9B\u5E94", { gold: 50, factionSat: fr("merchants", 5) }, 3)]),
+  defineEvent("evt_alliance_proposal", "\u540C\u76DF\u9080\u8BF7", "\u4ED6\u56FD\u63D0\u8BAE\u7ED3\u76DF\uFF01", "diplomacy", { notAtWar: true, minTurn: 8 }, recurring(5, 25), [option("\u540C\u610F\u7ED3\u76DF", { influence: 10, legitimacy: 3 }, 3), option("\u5A49\u62D2", { influence: -3 }, 2)]),
+  defineEvent("evt_treaty_break", "\u6BC1\u7EA6", "\u76DF\u56FD\u5355\u65B9\u9762\u6495\u6BC1\u6761\u7EA6\uFF01", "diplomacy", fromTurn(15), recurring(4, 30), [option("\u5F3A\u70C8\u6297\u8BAE", { legitimacy: 5, stability: -3 }, 2), option("\u5FCD\u6C14\u541E\u58F0", { legitimacy: -8, factionSat: noblesReaction(-10) }, 3)]),
+  defineEvent("evt_hostage_return", "\u8D28\u5B50\u5F52\u8FD8", "\u4ED6\u56FD\u5F52\u8FD8\u4EBA\u8D28\uFF01", "diplomacy", fromTurn(20, { notAtWar: true }), recurring(3, 40), [option("\u5584\u5F85\u5F52\u56FD", { legitimacy: 5, stability: 3 }, 3), option("\u51B7\u5F85", { factionSat: noblesReaction(-5) }, 2)]),
+  defineEvent("evt_pirate_attack", "\u6D77\u76D7\u88AD\u51FB", "\u6D77\u76D7\u52AB\u63A0\u6CBF\u6D77\uFF01", "diplomacy", fromTurn(8), recurring(5, 20), [option("\u51FA\u5175\u527F\u706D", { gold: -60, factionSat: militaryReaction(8), stability: 3 }, 3), option("\u62DB\u5B89", { gold: -30, corruption: 5 }, 2)]),
+  defineEvent("evt_tribute_demand", "\u7D22\u8D21", "\u5F3A\u56FD\u8981\u6C42\u8FDB\u8D21\uFF01", "diplomacy", fromTurn(12), recurring(4, 30), [option("\u5FCD\u8FB1\u8FDB\u8D21", { gold: -100, legitimacy: -5, stability: -3 }, 3), option("\u62D2\u7EDD", { legitimacy: 8, stability: -5 }, 2)]),
+  defineEvent("evt_cultural_exchange", "\u6587\u5316\u4EA4\u6D41", "\u4ED6\u56FD\u5B66\u8005\u6765\u8BBF\u4EA4\u6D41\uFF01", "diplomacy", { notAtWar: true, minTurn: 10 }, recurring(3, 30), [option("\u70ED\u70C8\u6B22\u8FCE", { sciPt: 8, influence: 5, gold: -30 }, 3), option("\u8C28\u614E\u5BF9\u5F85", { sciPt: 3 }, 2)]),
+  defineEvent("evt_heresy", "\u5F02\u7AEF", "\u5F02\u7AEF\u6559\u6D3E\u5174\u8D77\uFF01", "religion", fromTurn(10, { maxStability: 50 }), recurring(5, 25), [option("\u9547\u538B\u5F02\u7AEF", { stability: -5, factionSat: fr("clergy", 10), legitimacy: 3 }, 2), option("\u5BBD\u5BB9\u5BF9\u5F85", { factionSat: fr("clergy", -12), stability: 3 }, 3)]),
+  defineEvent("evt_holy_war_call", "\u5723\u6218\u53F7\u53EC", "\u5B97\u6559\u9886\u8896\u53F7\u53EC\u5723\u6218\uFF01", "religion", fromTurn(20), recurring(3, 50), [option("\u54CD\u5E94\u53F7\u53EC", { factionSat: fr("clergy", 15), stability: -5, legitimacy: 5 }, 2), option("\u62D2\u7EDD", { factionSat: fr("clergy", -15), stability: 3 }, 3)]),
+  defineEvent("evt_shrine_miracle", "\u795E\u8FF9", "\u795E\u6BBF\u73B0\u5F02\u8C61\uFF0C\u4FE1\u5F92\u8702\u62E5\uFF01", "religion", fromTurn(15, { minStability: 40 }), recurring(2, 60), [option("\u5927\u8086\u5BA3\u626C", { legitimacy: 8, factionSat: fr("clergy", 12), influence: 5 }, 3), option("\u4F4E\u8C03\u5904\u7406", { legitimacy: 2 }, 2)]),
+  defineEvent("evt_monastery_land", "\u5BFA\u9662\u5360\u5730", "\u5BFA\u9662\u5E7F\u5360\u826F\u7530\uFF01", "religion", fromTurn(12, { minCorruption: 20 }), recurring(4, 30), [option("\u6CA1\u6536\u8FD8\u7530", { food: 50, factionSat: fr("clergy", -15), legitimacy: -3 }, 3), option("\u7EF4\u6301\u73B0\u72B6", { factionSat: fr("clergy", 5), corruption: 3 }, 2)]),
+  defineEvent("evt_tech_academy", "\u5B66\u5E9C\u4E89\u9E23", "\u5404\u5B66\u6D3E\u6FC0\u70C8\u8BBA\u6218\uFF01", "science", { minTurn: 10, techLevelAbove: { branch: "admin", level: 2 } }, recurring(3, 30), [option("\u8D44\u52A9\u7814\u7A76", { gold: -60, sciPt: 10, factionSat: noblesReaction(-5) }, 3), option("\u9650\u5236\u4E89\u8BBA", { stability: 3, sciPt: -3 }, 2)]),
+  defineEvent("evt_tech_leak", "\u6280\u672F\u5916\u6D41", "\u6838\u5FC3\u673A\u5BC6\u88AB\u4ED6\u56FD\u7A83\u53D6\uFF01", "science", fromTurn(15), recurring(3, 40), [option("\u8FFD\u67E5\u5185\u9B3C", { gold: -50, stability: -3 }, 3), option("\u52A0\u901F\u7814\u53D1", { gold: -80, sciPt: 8 }, 2)]),
+  defineEvent("evt_tech_craft_guild", "\u5DE5\u5320\u884C\u4F1A", "\u5DE5\u5320\u7EC4\u7EC7\u884C\u4F1A\u4FDD\u62A4\u79D8\u65B9\uFF01", "science", fromTurn(8), recurring(3, 30), [option("\u652F\u6301\u884C\u4F1A", { gold: -30, sciPt: 5, factionSat: fr("merchants", 5) }, 3), option("\u6253\u7834\u5784\u65AD", { sciPt: -2, factionSat: fr("merchants", -8) }, 2)]),
+  defineEvent("evt_tech_invention", "\u53D1\u660E", "\u5DE5\u5320\u53D1\u660E\u65B0\u5DE5\u5177\uFF01", "science", { techLevelAbove: { branch: "agri", level: 2 } }, recurring(3, 35), [option("\u63A8\u5E7F\u4F7F\u7528", { gold: -40, food: 30, sciPt: 3 }, 3), option("\u4FDD\u5B88\u79D8\u5BC6", { sciPt: 5, influence: 2 }, 2)]),
+  defineEvent("evt_granary_rot", "\u7CAE\u4ED3\u9709\u53D8", "\u50A8\u7CAE\u5927\u91CF\u9709\u53D8\uFF01", "crisis", fromTurn(10), recurring(4, 30), [option("\u7D27\u6025\u6E05\u7406", { food: -80, gold: -30 }, 3), option("\u542C\u4E4B\u4EFB\u4E4B", { food: -150, stability: -5 }, 2)]),
+  defineEvent("evt_road_bandit", "\u8DEF\u532A", "\u76D7\u532A\u76D8\u8E1E\u8981\u9053\uFF01", "crisis", { maxStability: 45 }, recurring(5, 20), [option("\u6D3E\u5175\u6E05\u527F", { gold: -40, stability: 5, factionSat: militaryReaction(5) }, 3), option("\u7ED5\u9053", { gold: -20, factionSat: fr("merchants", -5) }, 2)]),
+  defineEvent("evt_pop_plague", "\u65F6\u75AB", "\u75AB\u75C5\u5728\u90FD\u57CE\u8513\u5EF6\uFF01", "population", fromTurn(15), recurring(5, 30), [option("\u5C01\u57CE\u9694\u79BB", { gold: -80, population: -100, stability: -3 }, 3), option("\u653E\u4EFB", { population: -300, stability: -8 }, 2)]),
+  defineEvent("evt_pop_festival", "\u4E07\u6C11\u540C\u5E86", "\u56FD\u6CF0\u6C11\u5B89\uFF0C\u4E07\u6C11\u6B22\u5E86\uFF01", "population", { minStability: 60, notAtWar: true, minTurn: 10 }, recurring(3, 30), [option("\u5927\u8D66\u5929\u4E0B", { gold: -50, stability: 8, legitimacy: 5, factionSat: commonersReaction(10) }, 3), option("\u7167\u5E38", { stability: 2 }, 2)]),
+  defineEvent("evt_opp_relic", "\u4F20\u8BF4\u5723\u7269\u73B0\u4E16", "\u4F20\u8BF4\u5723\u7269\u88AB\u53D1\u6398\uFF01", "opportunity", fromTurn(20), recurring(2, 60), [option("\u4F9B\u5949\u5C55\u793A", { gold: -30, legitimacy: 10, factionSat: fr("clergy", 15), influence: 8 }, 3), option("\u79D8\u85CF", { legitimacy: 3 }, 2)]),
+  defineEvent("evt_opp_annex", "\u90BB\u56FD\u5185\u4E71", "\u90BB\u56FD\u9677\u5165\u5185\u4E71\uFF0C\u6709\u673A\u53EF\u4E58\uFF01", "opportunity", fromTurn(15, { notAtWar: true }), recurring(3, 40), [option("\u8D81\u865A\u800C\u5165", { gold: -100, stability: -5, influence: 10 }, 2), option("\u9759\u89C2\u5176\u53D8", { stability: 3 }, 3)]),
+  defineEvent("evt_opp_trade_monopoly", "\u72EC\u5360\u5546\u8DEF", "\u7ADE\u4E89\u5BF9\u624B\u9000\u51FA\uFF0C\u5546\u8DEF\u72EC\u5360\uFF01", "opportunity", { notAtWar: true, minTurn: 12 }, recurring(2, 40), [option("\u5927\u4E3E\u6269\u5F20", { gold: 150, factionSat: fr("merchants", 12) }, 3), option("\u7A33\u624E\u7A33\u6253", { gold: 60, stability: 3 }, 2)]),
+  defineEvent("evt_opp_goldmine", "\u91D1\u77FF\u53D1\u73B0", "\u63A2\u77FF\u8005\u53D1\u73B0\u5927\u91D1\u77FF\uFF01", "opportunity", fromTurn(20), recurring(2, 50), [option("\u5168\u529B\u5F00\u91C7", { gold: 300, corruption: 8, factionSat: noblesReaction(10) }, 3), option("\u9002\u5EA6\u5F00\u91C7", { gold: 100, corruption: 3 }, 2)]),
+  defineEvent("evt_culture_propaganda", "\u6587\u5316\u8F93\u51FA", "\u4ED6\u56FD\u4EF0\u6155\u6211\u56FD\u6587\u5316\uFF01", "culture", fromTurn(15, { notAtWar: true, minStability: 50 }), recurring(3, 30), [option("\u79EF\u6781\u63A8\u5E7F", { gold: -40, influence: 12, legitimacy: 3 }, 3), option("\u6765\u8005\u4E0D\u62D2", { influence: 5 }, 2)]),
+  defineEvent("evt_culture_decay", "\u6587\u5316\u8870\u843D", "\u6587\u8109\u65AD\u7EDD\uFF0C\u793C\u5D29\u4E50\u574F\uFF01", "culture", { maxStability: 30 }, recurring(5, 25), [option("\u5174\u5B66\u91CD\u6559", { gold: -80, stability: 5, legitimacy: 3 }, 3), option("\u542C\u4E4B\u4EFB\u4E4B", { legitimacy: -5, factionSat: noblesReaction(-8) }, 2)]),
   // ── B8: 政体切换反扑事件（3 个，仅 govTransitionActive 窗口内可触发）──
-  { id: "evt_gov_nobles_plot", title: "\u65E7\u8D35\u65CF\u5BC6\u8C0B\u590D\u8F9F", description: "\u5931\u53BB\u7279\u6743\u7684\u65E7\u8D35\u65CF\u6697\u4E2D\u5BC6\u8C0B\uFF0C\u4F01\u56FE\u590D\u8F9F\u65E7\u5236\uFF01", category: "politics", trigger: { govTransitionActive: true }, ...recurring(10, 5), options: [option("\u94C1\u8155\u9547\u538B", { gold: -100, stability: -8, factionSat: fr("nobles", -20), legitimacy: 5 }, 2), option("\u5B89\u629A\u59A5\u534F", { gold: -50, factionSat: fr("nobles", 15), legitimacy: -8 }, 3)] },
-  { id: "evt_gov_republican_push", title: "\u5171\u548C\u6D3E\u903C\u5BAB", description: "\u5171\u548C\u6D3E\u501F\u65B0\u653F\u4E4B\u673A\u8981\u6C42\u6269\u5927\u8BAE\u4F1A\u6743\u529B\uFF01", category: "politics", trigger: { govTransitionActive: true }, ...recurring(8, 5), options: [option("\u987A\u5E94\u6269\u6743", { legitimacy: -5, stability: 5, factionSat: fr("merchants", 12) }, 3), option("\u575A\u5B88\u738B\u6743", { stability: -10, factionSat: fr("merchants", -15), legitimacy: 3 }, 2)] },
-  { id: "evt_gov_clergy_backlash", title: "\u6559\u58EB\u53CD\u6251", description: "\u5931\u52BF\u7684\u6559\u58EB\u717D\u52A8\u4FE1\u4F17\uFF0C\u6307\u65B0\u653F\u4E3A\u5F02\u7AEF\uFF01", category: "religion", trigger: { govTransitionActive: true }, ...recurring(8, 5), options: [option("\u653F\u6559\u5206\u79BB", { gold: -80, stability: -5, factionSat: fr("clergy", -18), legitimacy: 5 }, 2), option("\u62C9\u62E2\u6559\u58EB", { gold: -40, factionSat: fr("clergy", 10), legitimacy: -3 }, 3)] },
+  defineEvent("evt_gov_nobles_plot", "\u65E7\u8D35\u65CF\u5BC6\u8C0B\u590D\u8F9F", "\u5931\u53BB\u7279\u6743\u7684\u65E7\u8D35\u65CF\u6697\u4E2D\u5BC6\u8C0B\uFF0C\u4F01\u56FE\u590D\u8F9F\u65E7\u5236\uFF01", "politics", { govTransitionActive: true }, recurring(10, 5), [option("\u94C1\u8155\u9547\u538B", { gold: -100, stability: -8, factionSat: noblesReaction(-20), legitimacy: 5 }, 2), option("\u5B89\u629A\u59A5\u534F", { gold: -50, factionSat: noblesReaction(15), legitimacy: -8 }, 3)]),
+  defineEvent("evt_gov_republican_push", "\u5171\u548C\u6D3E\u903C\u5BAB", "\u5171\u548C\u6D3E\u501F\u65B0\u653F\u4E4B\u673A\u8981\u6C42\u6269\u5927\u8BAE\u4F1A\u6743\u529B\uFF01", "politics", { govTransitionActive: true }, recurring(8, 5), [option("\u987A\u5E94\u6269\u6743", { legitimacy: -5, stability: 5, factionSat: fr("merchants", 12) }, 3), option("\u575A\u5B88\u738B\u6743", { stability: -10, factionSat: fr("merchants", -15), legitimacy: 3 }, 2)]),
+  defineEvent("evt_gov_clergy_backlash", "\u6559\u58EB\u53CD\u6251", "\u5931\u52BF\u7684\u6559\u58EB\u717D\u52A8\u4FE1\u4F17\uFF0C\u6307\u65B0\u653F\u4E3A\u5F02\u7AEF\uFF01", "religion", { govTransitionActive: true }, recurring(8, 5), [option("\u653F\u6559\u5206\u79BB", { gold: -80, stability: -5, factionSat: fr("clergy", -18), legitimacy: 5 }, 2), option("\u62C9\u62E2\u6559\u58EB", { gold: -40, factionSat: fr("clergy", 10), legitimacy: -3 }, 3)]),
   // ── D1 扩充：+97 事件到 300，每类 +10 + 5 链 15 事件 ──
   // crisis +10
-  { id: "evt_d1_flood", title: "\u6D2A\u6C34\u6CDB\u6EE5", description: "\u66B4\u96E8\u6210\u707E\uFF0C\u6CB3\u6C34\u6CDB\u6EE5\u3002", category: "crisis", trigger: { minTurn: 5 }, ...recurring(5, 25), options: [option("\u7B51\u5824\u6551\u707E", { gold: -80, stability: 3 }, 3), option("\u4EFB\u5176\u81EA\u7136", { food: -40, stability: -5 }, 2)] },
-  { id: "evt_d1_fire", title: "\u5927\u706B", description: "\u57CE\u4E2D\u5927\u706B\uFF0C\u8FDE\u70E7\u6570\u574A\u3002", category: "crisis", trigger: { minTurn: 6 }, ...recurring(4, 35), options: [option("\u5168\u529B\u6251\u6551", { gold: -70, stability: 3 }, 3), option("\u62A2\u6551\u8D22\u7269", { gold: -20, stability: -4 }, 2)] },
-  { id: "evt_d1_famine_locust", title: "\u8757\u540E\u9965\u8352", description: "\u8757\u707E\u4E4B\u540E\u7CAE\u4ED3\u7A7A\u865A\u3002", category: "crisis", trigger: { maxFoodRatio: 0.5 }, ...recurring(6, 20), options: [option("\u5916\u8D2D\u7CAE\u98DF", { gold: -100, food: 80 }, 3), option("\u52D2\u7D27\u8170\u5E26", { food: -30, factionSat: fr("commoners", -10) }, 2)] },
-  { id: "evt_d1_epidemic", title: "\u75AB\u75C5", description: "\u57CE\u4E2D\u75AB\u75C5\u6D41\u884C\u3002", category: "crisis", trigger: { minTurn: 12 }, ...recurring(5, 40), options: [option("\u9694\u79BB\u6551\u6CBB", { gold: -90, population: -50, stability: 3 }, 3), option("\u4E0D\u7BA1\u4E0D\u95EE", { population: -200, stability: -8 }, 1)] },
-  { id: "evt_d1_riot", title: "\u6C11\u53D8", description: "\u6C11\u4F17\u805A\u4F17\u95F9\u4E8B\uFF0C\u51B2\u51FB\u5E9C\u8859\u3002", category: "crisis", trigger: { maxStability: 30 }, ...recurring(7, 15), options: [option("\u5F39\u538B", { gold: -50, stability: -3, factionSat: fr("military", 5) }, 2), option("\u7B54\u5E94\u8BC9\u6C42", { gold: -80, stability: 5, factionSat: fr("commoners", 10) }, 3)] },
-  { id: "evt_d1_collapse", title: "\u5EFA\u7B51\u574D\u584C", description: "\u5E74\u4E45\u5931\u4FEE\u7684\u5EFA\u7B51\u574D\u584C\u3002", category: "crisis", trigger: { minTurn: 10 }, ...recurring(3, 30), options: [option("\u91CD\u5EFA", { gold: -100, stability: 2 }, 3), option("\u6682\u7F6E", { stability: -3 }, 2)] },
-  { id: "evt_d1_invasion_raid", title: "\u86EE\u65CF\u52AB\u63A0", description: "\u86EE\u65CF\u9A91\u5175\u52AB\u63A0\u8FB9\u5883\uFF01", category: "crisis", trigger: { minTurn: 8 }, ...recurring(5, 20), options: [option("\u51FA\u51FB", { gold: -60, factionSat: fr("military", 8), stability: 3 }, 3), option("\u575A\u58C1\u6E05\u91CE", { food: -30, gold: -30 }, 2)] },
-  { id: "evt_d1_starvation", title: "\u9965\u9991", description: "\u7CAE\u5C3D\u6C11\u9965\uFF0C\u997F\u6B8D\u8F7D\u9053\u3002", category: "crisis", trigger: { maxFoodRatio: 0.4 }, ...recurring(8, 15), options: [option("\u5F00\u4ED3", { food: -80, stability: 4 }, 3), option("\u52A0\u7A0E\u8D2D\u7CAE", { gold: -50, factionSat: fr("commoners", -15) }, 1)] },
-  { id: "evt_d1_unrest_spread", title: "\u9A9A\u4E71\u8513\u5EF6", description: "\u4E00\u7701\u9A9A\u4E71\u8513\u5EF6\u90BB\u7701\u3002", category: "crisis", trigger: { maxStability: 35 }, ...recurring(6, 18), options: [option("\u6D3E\u5175\u9547\u538B", { gold: -70, factionSat: fr("military", 6) }, 2), option("\u5B89\u629A", { gold: -100, stability: 5 }, 3)] },
+  defineEvent("evt_d1_flood", "\u6D2A\u6C34\u6CDB\u6EE5", "\u66B4\u96E8\u6210\u707E\uFF0C\u6CB3\u6C34\u6CDB\u6EE5\u3002", "crisis", fromTurn(5), recurring(5, 25), [option("\u7B51\u5824\u6551\u707E", { gold: -80, stability: 3 }, 3), option("\u4EFB\u5176\u81EA\u7136", { food: -40, stability: -5 }, 2)]),
+  defineEvent("evt_d1_fire", "\u5927\u706B", "\u57CE\u4E2D\u5927\u706B\uFF0C\u8FDE\u70E7\u6570\u574A\u3002", "crisis", fromTurn(6), recurring(4, 35), [option("\u5168\u529B\u6251\u6551", { gold: -70, stability: 3 }, 3), option("\u62A2\u6551\u8D22\u7269", { gold: -20, stability: -4 }, 2)]),
+  defineEvent("evt_d1_famine_locust", "\u8757\u540E\u9965\u8352", "\u8757\u707E\u4E4B\u540E\u7CAE\u4ED3\u7A7A\u865A\u3002", "crisis", { maxFoodRatio: 0.5 }, recurring(6, 20), [option("\u5916\u8D2D\u7CAE\u98DF", { gold: -100, food: 80 }, 3), option("\u52D2\u7D27\u8170\u5E26", { food: -30, factionSat: commonersReaction(-10) }, 2)]),
+  defineEvent("evt_d1_epidemic", "\u75AB\u75C5", "\u57CE\u4E2D\u75AB\u75C5\u6D41\u884C\u3002", "crisis", fromTurn(12), recurring(5, 40), [option("\u9694\u79BB\u6551\u6CBB", { gold: -90, population: -50, stability: 3 }, 3), option("\u4E0D\u7BA1\u4E0D\u95EE", { population: -200, stability: -8 }, 1)]),
+  defineEvent("evt_d1_riot", "\u6C11\u53D8", "\u6C11\u4F17\u805A\u4F17\u95F9\u4E8B\uFF0C\u51B2\u51FB\u5E9C\u8859\u3002", "crisis", { maxStability: 30 }, recurring(7, 15), [option("\u5F39\u538B", { gold: -50, stability: -3, factionSat: militaryReaction(5) }, 2), option("\u7B54\u5E94\u8BC9\u6C42", { gold: -80, stability: 5, factionSat: commonersReaction(10) }, 3)]),
+  defineEvent("evt_d1_collapse", "\u5EFA\u7B51\u574D\u584C", "\u5E74\u4E45\u5931\u4FEE\u7684\u5EFA\u7B51\u574D\u584C\u3002", "crisis", fromTurn(10), recurring(3, 30), [option("\u91CD\u5EFA", { gold: -100, stability: 2 }, 3), option("\u6682\u7F6E", { stability: -3 }, 2)]),
+  defineEvent("evt_d1_invasion_raid", "\u86EE\u65CF\u52AB\u63A0", "\u86EE\u65CF\u9A91\u5175\u52AB\u63A0\u8FB9\u5883\uFF01", "crisis", fromTurn(8), recurring(5, 20), [option("\u51FA\u51FB", { gold: -60, factionSat: militaryReaction(8), stability: 3 }, 3), option("\u575A\u58C1\u6E05\u91CE", { food: -30, gold: -30 }, 2)]),
+  defineEvent("evt_d1_starvation", "\u9965\u9991", "\u7CAE\u5C3D\u6C11\u9965\uFF0C\u997F\u6B8D\u8F7D\u9053\u3002", "crisis", { maxFoodRatio: 0.4 }, recurring(8, 15), [option("\u5F00\u4ED3", { food: -80, stability: 4 }, 3), option("\u52A0\u7A0E\u8D2D\u7CAE", { gold: -50, factionSat: commonersReaction(-15) }, 1)]),
+  defineEvent("evt_d1_unrest_spread", "\u9A9A\u4E71\u8513\u5EF6", "\u4E00\u7701\u9A9A\u4E71\u8513\u5EF6\u90BB\u7701\u3002", "crisis", { maxStability: 35 }, recurring(6, 18), [option("\u6D3E\u5175\u9547\u538B", { gold: -70, factionSat: militaryReaction(6) }, 2), option("\u5B89\u629A", { gold: -100, stability: 5 }, 3)]),
   // politics +10
-  { id: "evt_d1_court_intrigue", title: "\u5BAB\u5EF7\u9634\u8C0B", description: "\u540E\u5BAB\u4E0E\u671D\u81E3\u6697\u4E2D\u52FE\u7ED3\u3002", category: "politics", trigger: { minTurn: 10 }, ...recurring(4, 30), options: [option("\u5F7B\u67E5", { gold: -50, legitimacy: 5, factionSat: fr("nobles", -8) }, 3), option("\u88C5\u4F5C\u4E0D\u77E5", { legitimacy: -5, corruption: 5 }, 2)] },
-  { id: "evt_d1_minister_dismiss", title: "\u7F62\u76F8", description: "\u5BB0\u76F8\u5931\u804C\uFF0C\u671D\u91CE\u5F39\u52BE\u3002", category: "politics", trigger: { minCorruption: 40 }, ...recurring(5, 25), options: [option("\u7F62\u514D", { legitimacy: 3, stability: -3, factionSat: fr("nobles", -10) }, 3), option("\u7559\u4EFB", { corruption: 5, legitimacy: -5 }, 1)] },
-  { id: "evt_d1_faction_feud", title: "\u6D3E\u7CFB\u503E\u8F67", description: "\u4E24\u5927\u6D3E\u7CFB\u516C\u5F00\u5BF9\u7ACB\u3002", category: "politics", trigger: { minTurn: 8 }, ...recurring(5, 20), options: [option("\u5C45\u4E2D\u8C03\u505C", { gold: -40, stability: 3 }, 3), option("\u652F\u6301\u4E00\u65B9", { stability: -5, legitimacy: -3 }, 2)] },
-  { id: "evt_d1_edict", title: "\u8BCF\u4EE4\u98CE\u6CE2", description: "\u65B0\u8BCF\u5F15\u53D1\u671D\u91CE\u4E89\u8BAE\u3002", category: "politics", trigger: { minTurn: 12 }, ...recurring(4, 25), options: [option("\u575A\u6301", { legitimacy: 5, stability: -5 }, 2), option("\u6536\u56DE", { legitimacy: -8, stability: 3 }, 3)] },
-  { id: "evt_d1_tax_revolt", title: "\u6297\u7A0E", description: "\u67D0\u7701\u62D2\u4E0D\u7EB3\u7A0E\u3002", category: "politics", trigger: { maxStability: 40 }, ...recurring(6, 20), options: [option("\u6B66\u529B\u50AC\u7A0E", { gold: 30, stability: -8, factionSat: fr("commoners", -12) }, 1), option("\u51CF\u514D", { gold: -50, stability: 5 }, 3)] },
-  { id: "evt_d1_audit", title: "\u5BA1\u8BA1", description: "\u5BA1\u8BA1\u53D1\u73B0\u8D26\u76EE\u4E8F\u7A7A\u3002", category: "politics", trigger: { minCorruption: 30 }, ...recurring(4, 30), options: [option("\u8FFD\u7F34", { gold: 60, corruption: -5, factionSat: fr("nobles", -8) }, 3), option("\u4E0D\u4E86\u4E86\u4E4B", { corruption: 3 }, 2)] },
-  { id: "evt_d1_promotion", title: "\u64E2\u5347", description: "\u529F\u81E3\u8BF7\u8D4F\u3002", category: "politics", trigger: { minTurn: 10, minStability: 40 }, ...recurring(3, 25), options: [option("\u91CD\u8D4F", { gold: -80, legitimacy: 5, factionSat: fr("nobles", 8) }, 3), option("\u8584\u8D4F", { factionSat: fr("nobles", -5) }, 2)] },
-  { id: "evt_d1_law_dispute", title: "\u5F8B\u6CD5\u4E89\u8BAE", description: "\u65B0\u5F8B\u5F15\u53D1\u6CD5\u7406\u4E89\u8BAE\u3002", category: "politics", trigger: { minTurn: 15 }, ...recurring(4, 30), options: [option("\u4FEE\u8BA2", { gold: -60, legitimacy: 3 }, 3), option("\u7EF4\u6301", { stability: -3 }, 2)] },
-  { id: "evt_d1_generalissimo", title: "\u5C06\u6743\u8FC7\u91CD", description: "\u5927\u5C06\u6743\u503E\u671D\u91CE\u3002", category: "politics", trigger: { minTurn: 20 }, ...recurring(5, 40), options: [option("\u524A\u6743", { factionSat: fr("military", -15), stability: 3 }, 3), option("\u7EB5\u5BB9", { legitimacy: -8, corruption: 5 }, 1)] },
-  { id: "evt_d1_reform_backlash", title: "\u6539\u9769\u53CD\u5F39", description: "\u65E7\u52BF\u529B\u53CD\u6251\u65B0\u653F\u3002", category: "politics", trigger: { minTurn: 15 }, ...recurring(6, 25), options: [option("\u575A\u6301\u6539\u9769", { stability: -8, legitimacy: 5 }, 2), option("\u59A5\u534F", { stability: 3, legitimacy: -5 }, 3)] },
+  defineEvent("evt_d1_court_intrigue", "\u5BAB\u5EF7\u9634\u8C0B", "\u540E\u5BAB\u4E0E\u671D\u81E3\u6697\u4E2D\u52FE\u7ED3\u3002", "politics", fromTurn(10), recurring(4, 30), [option("\u5F7B\u67E5", { gold: -50, legitimacy: 5, factionSat: noblesReaction(-8) }, 3), option("\u88C5\u4F5C\u4E0D\u77E5", { legitimacy: -5, corruption: 5 }, 2)]),
+  defineEvent("evt_d1_minister_dismiss", "\u7F62\u76F8", "\u5BB0\u76F8\u5931\u804C\uFF0C\u671D\u91CE\u5F39\u52BE\u3002", "politics", { minCorruption: 40 }, recurring(5, 25), [option("\u7F62\u514D", { legitimacy: 3, stability: -3, factionSat: noblesReaction(-10) }, 3), option("\u7559\u4EFB", { corruption: 5, legitimacy: -5 }, 1)]),
+  defineEvent("evt_d1_faction_feud", "\u6D3E\u7CFB\u503E\u8F67", "\u4E24\u5927\u6D3E\u7CFB\u516C\u5F00\u5BF9\u7ACB\u3002", "politics", fromTurn(8), recurring(5, 20), [option("\u5C45\u4E2D\u8C03\u505C", { gold: -40, stability: 3 }, 3), option("\u652F\u6301\u4E00\u65B9", { stability: -5, legitimacy: -3 }, 2)]),
+  defineEvent("evt_d1_edict", "\u8BCF\u4EE4\u98CE\u6CE2", "\u65B0\u8BCF\u5F15\u53D1\u671D\u91CE\u4E89\u8BAE\u3002", "politics", fromTurn(12), recurring(4, 25), [option("\u575A\u6301", { legitimacy: 5, stability: -5 }, 2), option("\u6536\u56DE", { legitimacy: -8, stability: 3 }, 3)]),
+  defineEvent("evt_d1_tax_revolt", "\u6297\u7A0E", "\u67D0\u7701\u62D2\u4E0D\u7EB3\u7A0E\u3002", "politics", { maxStability: 40 }, recurring(6, 20), [option("\u6B66\u529B\u50AC\u7A0E", { gold: 30, stability: -8, factionSat: commonersReaction(-12) }, 1), option("\u51CF\u514D", { gold: -50, stability: 5 }, 3)]),
+  defineEvent("evt_d1_audit", "\u5BA1\u8BA1", "\u5BA1\u8BA1\u53D1\u73B0\u8D26\u76EE\u4E8F\u7A7A\u3002", "politics", { minCorruption: 30 }, recurring(4, 30), [option("\u8FFD\u7F34", { gold: 60, corruption: -5, factionSat: noblesReaction(-8) }, 3), option("\u4E0D\u4E86\u4E86\u4E4B", { corruption: 3 }, 2)]),
+  defineEvent("evt_d1_promotion", "\u64E2\u5347", "\u529F\u81E3\u8BF7\u8D4F\u3002", "politics", fromTurn(10, { minStability: 40 }), recurring(3, 25), [option("\u91CD\u8D4F", { gold: -80, legitimacy: 5, factionSat: noblesReaction(8) }, 3), option("\u8584\u8D4F", { factionSat: noblesReaction(-5) }, 2)]),
+  defineEvent("evt_d1_law_dispute", "\u5F8B\u6CD5\u4E89\u8BAE", "\u65B0\u5F8B\u5F15\u53D1\u6CD5\u7406\u4E89\u8BAE\u3002", "politics", fromTurn(15), recurring(4, 30), [option("\u4FEE\u8BA2", { gold: -60, legitimacy: 3 }, 3), option("\u7EF4\u6301", { stability: -3 }, 2)]),
+  defineEvent("evt_d1_generalissimo", "\u5C06\u6743\u8FC7\u91CD", "\u5927\u5C06\u6743\u503E\u671D\u91CE\u3002", "politics", fromTurn(20), recurring(5, 40), [option("\u524A\u6743", { factionSat: militaryReaction(-15), stability: 3 }, 3), option("\u7EB5\u5BB9", { legitimacy: -8, corruption: 5 }, 1)]),
+  defineEvent("evt_d1_reform_backlash", "\u6539\u9769\u53CD\u5F39", "\u65E7\u52BF\u529B\u53CD\u6251\u65B0\u653F\u3002", "politics", fromTurn(15), recurring(6, 25), [option("\u575A\u6301\u6539\u9769", { stability: -8, legitimacy: 5 }, 2), option("\u59A5\u534F", { stability: 3, legitimacy: -5 }, 3)]),
   // economy +10
-  { id: "evt_d1_depression", title: "\u8427\u6761", description: "\u5546\u4E1A\u8427\u6761\uFF0C\u5E02\u573A\u51B7\u6E05\u3002", category: "economy", trigger: { minTurn: 15, notAtWar: true }, ...recurring(4, 35), options: [option("\u523A\u6FC0", { gold: -120, factionSat: fr("merchants", 10) }, 3), option("\u7B49\u5F85\u590D\u82CF", { gold: -20, factionSat: fr("merchants", -8) }, 2)] },
-  { id: "evt_d1_coinage", title: "\u5E01\u5236\u6539\u9769", description: "\u94B1\u5E01\u8D2C\u503C\u5F15\u53D1\u6DF7\u4E71\u3002", category: "economy", trigger: { minTurn: 18 }, ...recurring(4, 40), options: [option("\u6574\u987F\u5E01\u5236", { gold: -150, stability: 5, corruption: -5 }, 3), option("\u653E\u4EFB", { factionSat: fr("merchants", -10) }, 2)] },
-  { id: "evt_d1_harvest_tax", title: "\u79CB\u6536\u5F81\u7A0E", description: "\u4E30\u6536\u4E4B\u5E74\u8BE5\u5F81\u591A\u5C11\uFF1F", category: "economy", trigger: { minTurn: 5 }, ...recurring(5, 15), options: [option("\u91CD\u7A0E", { gold: 120, factionSat: fr("commoners", -10) }, 2), option("\u8584\u7A0E", { gold: 50, factionSat: fr("commoners", 8) }, 3)] },
-  { id: "evt_d1_trade_disrupt", title: "\u5546\u8DEF\u963B\u65AD", description: "\u5546\u8DEF\u88AB\u532A\u5F92\u963B\u65AD\u3002", category: "economy", trigger: { minTurn: 10 }, ...recurring(4, 20), options: [option("\u6E05\u527F", { gold: -60, factionSat: fr("merchants", 10) }, 3), option("\u7ED5\u9053", { gold: -20, factionSat: fr("merchants", -5) }, 2)] },
-  { id: "evt_d1_usury", title: "\u9AD8\u5229\u8D37", description: "\u5BCC\u5546\u653E\u9AD8\u5229\u8D37\u76D8\u5265\u767E\u59D3\u3002", category: "economy", trigger: { minCorruption: 25 }, ...recurring(4, 30), options: [option("\u9650\u5236\u5229\u7387", { gold: -30, factionSat: fra({ faction: "commoners", delta: 10 }, { faction: "merchants", delta: -8 }) }, 3), option("\u653E\u4EFB", { corruption: 3 }, 2)] },
-  { id: "evt_d1_grain_store", title: "\u7CAE\u50A8", description: "\u7CAE\u50A8\u662F\u5426\u5145\u5B9E\uFF1F", category: "economy", trigger: { minTurn: 8 }, ...recurring(3, 20), options: [option("\u5E7F\u50A8", { gold: -80, food: 100, stability: 3 }, 3), option("\u5C11\u50A8", { gold: 20, food: -20 }, 2)] },
-  { id: "evt_d1_market_tax", title: "\u5E02\u7A0E", description: "\u662F\u5426\u63D0\u9AD8\u5E02\u573A\u7A0E\uFF1F", category: "economy", trigger: { minTurn: 6 }, ...recurring(4, 20), options: [option("\u63D0\u9AD8", { gold: 80, factionSat: fr("merchants", -10) }, 2), option("\u7EF4\u6301", { factionSat: fr("merchants", 5) }, 3)] },
-  { id: "evt_d1_labor_short", title: "\u5DE5\u7A0B\u52B3\u529B\u77ED\u7F3A", description: "\u5174\u5EFA\u5927\u5DE5\u7A0B\u52B3\u529B\u4E0D\u8DB3\u3002", category: "economy", trigger: { minTurn: 12 }, ...recurring(3, 25), options: [option("\u5F81\u5F79", { factionSat: fr("commoners", -10), stability: -3 }, 2), option("\u52DF\u5DE5", { gold: -100 }, 3)] },
+  defineEvent("evt_d1_depression", "\u8427\u6761", "\u5546\u4E1A\u8427\u6761\uFF0C\u5E02\u573A\u51B7\u6E05\u3002", "economy", fromTurn(15, { notAtWar: true }), recurring(4, 35), [option("\u523A\u6FC0", { gold: -120, factionSat: fr("merchants", 10) }, 3), option("\u7B49\u5F85\u590D\u82CF", { gold: -20, factionSat: fr("merchants", -8) }, 2)]),
+  defineEvent("evt_d1_coinage", "\u5E01\u5236\u6539\u9769", "\u94B1\u5E01\u8D2C\u503C\u5F15\u53D1\u6DF7\u4E71\u3002", "economy", fromTurn(18), recurring(4, 40), [option("\u6574\u987F\u5E01\u5236", { gold: -150, stability: 5, corruption: -5 }, 3), option("\u653E\u4EFB", { factionSat: fr("merchants", -10) }, 2)]),
+  defineEvent("evt_d1_harvest_tax", "\u79CB\u6536\u5F81\u7A0E", "\u4E30\u6536\u4E4B\u5E74\u8BE5\u5F81\u591A\u5C11\uFF1F", "economy", fromTurn(5), recurring(5, 15), [option("\u91CD\u7A0E", { gold: 120, factionSat: commonersReaction(-10) }, 2), option("\u8584\u7A0E", { gold: 50, factionSat: commonersReaction(8) }, 3)]),
+  defineEvent("evt_d1_trade_disrupt", "\u5546\u8DEF\u963B\u65AD", "\u5546\u8DEF\u88AB\u532A\u5F92\u963B\u65AD\u3002", "economy", fromTurn(10), recurring(4, 20), [option("\u6E05\u527F", { gold: -60, factionSat: fr("merchants", 10) }, 3), option("\u7ED5\u9053", { gold: -20, factionSat: fr("merchants", -5) }, 2)]),
+  defineEvent("evt_d1_usury", "\u9AD8\u5229\u8D37", "\u5BCC\u5546\u653E\u9AD8\u5229\u8D37\u76D8\u5265\u767E\u59D3\u3002", "economy", { minCorruption: 25 }, recurring(4, 30), [option("\u9650\u5236\u5229\u7387", { gold: -30, factionSat: fra({ faction: "commoners", delta: 10 }, { faction: "merchants", delta: -8 }) }, 3), option("\u653E\u4EFB", { corruption: 3 }, 2)]),
+  defineEvent("evt_d1_grain_store", "\u7CAE\u50A8", "\u7CAE\u50A8\u662F\u5426\u5145\u5B9E\uFF1F", "economy", fromTurn(8), recurring(3, 20), [option("\u5E7F\u50A8", { gold: -80, food: 100, stability: 3 }, 3), option("\u5C11\u50A8", { gold: 20, food: -20 }, 2)]),
+  defineEvent("evt_d1_market_tax", "\u5E02\u7A0E", "\u662F\u5426\u63D0\u9AD8\u5E02\u573A\u7A0E\uFF1F", "economy", fromTurn(6), recurring(4, 20), [option("\u63D0\u9AD8", { gold: 80, factionSat: fr("merchants", -10) }, 2), option("\u7EF4\u6301", { factionSat: fr("merchants", 5) }, 3)]),
+  defineEvent("evt_d1_labor_short", "\u5DE5\u7A0B\u52B3\u529B\u77ED\u7F3A", "\u5174\u5EFA\u5927\u5DE5\u7A0B\u52B3\u529B\u4E0D\u8DB3\u3002", "economy", fromTurn(12), recurring(3, 25), [option("\u5F81\u5F79", { factionSat: commonersReaction(-10), stability: -3 }, 2), option("\u52DF\u5DE5", { gold: -100 }, 3)]),
   // military +10
-  { id: "evt_d1_general_die", title: "\u540D\u5C06\u9668\u843D", description: "\u4E00\u4EE3\u540D\u5C06\u75C5\u901D\u3002", category: "military", trigger: { minTurn: 20 }, ...recurring(4, 50), options: [option("\u539A\u846C", { gold: -60, legitimacy: 3, factionSat: fr("military", 8) }, 3), option("\u7B80\u846C", { factionSat: fr("military", -5) }, 2)] },
-  { id: "evt_d1_border_warn", title: "\u8FB9\u8B66", description: "\u8FB9\u62A5\u9891\u4F20\uFF0C\u654C\u56FD\u5F02\u52A8\u3002", category: "military", trigger: { minTurn: 8 }, ...recurring(5, 20), options: [option("\u589E\u5175", { gold: -80, factionSat: fr("military", 5) }, 3), option("\u89C2\u671B", { stability: -3 }, 2)] },
-  { id: "evt_d1_conscript_wave", title: "\u5F81\u5175", description: "\u662F\u5426\u5927\u89C4\u6A21\u5F81\u5175\uFF1F", category: "military", trigger: { atWar: true }, ...recurring(6, 15), options: [option("\u5927\u5F81", { factionSat: fra({ faction: "commoners", delta: -15 }, { faction: "military", delta: 10 }) }, 2), option("\u5C0F\u5F81", { factionSat: fr("military", 3) }, 3)] },
-  { id: "evt_d1_supply_cut", title: "\u8865\u7ED9\u7EBF\u65AD", description: "\u524D\u7EBF\u8865\u7ED9\u88AB\u5207\u65AD\uFF01", category: "military", trigger: { atWar: true, minTurn: 5 }, ...recurring(6, 20), options: [option("\u6253\u901A", { gold: -100, factionSat: fr("military", 8) }, 3), option("\u5C31\u5730\u5F81\u7CAE", { factionSat: fr("commoners", -12), stability: -5 }, 1)] },
-  { id: "evt_d1_veteran_return", title: "\u8001\u5175\u5F52\u4E61", description: "\u6218\u540E\u8001\u5175\u5F52\u4E61\u5B89\u7F6E\u3002", category: "military", trigger: { minTurn: 15 }, ...recurring(3, 30), options: [option("\u6388\u7530", { gold: -100, factionSat: fra({ faction: "military", delta: 12 }, { faction: "commoners", delta: 5 }) }, 3), option("\u4E0D\u7BA1", { factionSat: fr("military", -10), stability: -3 }, 2)] },
-  { id: "evt_d1_fortify", title: "\u7B51\u57CE", description: "\u662F\u5426\u52A0\u56FA\u57CE\u9632\uFF1F", category: "military", trigger: { minTurn: 10 }, ...recurring(3, 30), options: [option("\u5927\u5174", { gold: -120, stability: 5 }, 3), option("\u5C0F\u4FEE", { gold: -30 }, 2)] },
-  { id: "evt_d1_alliance_call", title: "\u76DF\u53CB\u6C42\u63F4", description: "\u76DF\u56FD\u906D\u5165\u4FB5\u6C42\u63F4\u3002", category: "military", trigger: { minTurn: 12, notAtWar: true }, ...recurring(4, 25), options: [option("\u51FA\u5175", { gold: -100, factionSat: fr("military", 8), influence: 5 }, 3), option("\u5A49\u62D2", { influence: -8 }, 2)] },
-  { id: "evt_d1_pirate", title: "\u6D77\u76D7", description: "\u6D77\u76D7\u88AD\u6270\u6CBF\u6D77\uFF01", category: "military", trigger: { minTurn: 10 }, ...recurring(4, 25), options: [option("\u527F\u706D", { gold: -80, factionSat: fr("military", 6) }, 3), option("\u62DB\u5B89", { gold: -40, corruption: 4 }, 2)] },
-  { id: "evt_d1_war_debt", title: "\u6218\u503A", description: "\u6218\u4E89\u8017\u8D39\u5DE8\u5927\uFF0C\u56FD\u5E93\u544A\u6025\u3002", category: "military", trigger: { atWar: true, minTurn: 8 }, ...recurring(5, 20), options: [option("\u52A0\u7A0E\u507F\u503A", { gold: 80, factionSat: fr("commoners", -12) }, 2), option("\u4E3E\u503A", { gold: 100, corruption: 5 }, 3)] },
+  defineEvent("evt_d1_general_die", "\u540D\u5C06\u9668\u843D", "\u4E00\u4EE3\u540D\u5C06\u75C5\u901D\u3002", "military", fromTurn(20), recurring(4, 50), [option("\u539A\u846C", { gold: -60, legitimacy: 3, factionSat: militaryReaction(8) }, 3), option("\u7B80\u846C", { factionSat: militaryReaction(-5) }, 2)]),
+  defineEvent("evt_d1_border_warn", "\u8FB9\u8B66", "\u8FB9\u62A5\u9891\u4F20\uFF0C\u654C\u56FD\u5F02\u52A8\u3002", "military", fromTurn(8), recurring(5, 20), [option("\u589E\u5175", { gold: -80, factionSat: militaryReaction(5) }, 3), option("\u89C2\u671B", { stability: -3 }, 2)]),
+  defineEvent("evt_d1_conscript_wave", "\u5F81\u5175", "\u662F\u5426\u5927\u89C4\u6A21\u5F81\u5175\uFF1F", "military", { atWar: true }, recurring(6, 15), [option("\u5927\u5F81", { factionSat: fra({ faction: "commoners", delta: -15 }, { faction: "military", delta: 10 }) }, 2), option("\u5C0F\u5F81", { factionSat: militaryReaction(3) }, 3)]),
+  defineEvent("evt_d1_supply_cut", "\u8865\u7ED9\u7EBF\u65AD", "\u524D\u7EBF\u8865\u7ED9\u88AB\u5207\u65AD\uFF01", "military", { atWar: true, minTurn: 5 }, recurring(6, 20), [option("\u6253\u901A", { gold: -100, factionSat: militaryReaction(8) }, 3), option("\u5C31\u5730\u5F81\u7CAE", { factionSat: commonersReaction(-12), stability: -5 }, 1)]),
+  defineEvent("evt_d1_veteran_return", "\u8001\u5175\u5F52\u4E61", "\u6218\u540E\u8001\u5175\u5F52\u4E61\u5B89\u7F6E\u3002", "military", fromTurn(15), recurring(3, 30), [option("\u6388\u7530", { gold: -100, factionSat: fra({ faction: "military", delta: 12 }, { faction: "commoners", delta: 5 }) }, 3), option("\u4E0D\u7BA1", { factionSat: militaryReaction(-10), stability: -3 }, 2)]),
+  defineEvent("evt_d1_fortify", "\u7B51\u57CE", "\u662F\u5426\u52A0\u56FA\u57CE\u9632\uFF1F", "military", fromTurn(10), recurring(3, 30), [option("\u5927\u5174", { gold: -120, stability: 5 }, 3), option("\u5C0F\u4FEE", { gold: -30 }, 2)]),
+  defineEvent("evt_d1_alliance_call", "\u76DF\u53CB\u6C42\u63F4", "\u76DF\u56FD\u906D\u5165\u4FB5\u6C42\u63F4\u3002", "military", fromTurn(12, { notAtWar: true }), recurring(4, 25), [option("\u51FA\u5175", { gold: -100, factionSat: militaryReaction(8), influence: 5 }, 3), option("\u5A49\u62D2", { influence: -8 }, 2)]),
+  defineEvent("evt_d1_pirate", "\u6D77\u76D7", "\u6D77\u76D7\u88AD\u6270\u6CBF\u6D77\uFF01", "military", fromTurn(10), recurring(4, 25), [option("\u527F\u706D", { gold: -80, factionSat: militaryReaction(6) }, 3), option("\u62DB\u5B89", { gold: -40, corruption: 4 }, 2)]),
+  defineEvent("evt_d1_war_debt", "\u6218\u503A", "\u6218\u4E89\u8017\u8D39\u5DE8\u5927\uFF0C\u56FD\u5E93\u544A\u6025\u3002", "military", { atWar: true, minTurn: 8 }, recurring(5, 20), [option("\u52A0\u7A0E\u507F\u503A", { gold: 80, factionSat: commonersReaction(-12) }, 2), option("\u4E3E\u503A", { gold: 100, corruption: 5 }, 3)]),
   // diplomacy +10
-  { id: "evt_d1_envoy_gift", title: "\u4F7F\u8282\u732E\u793C", description: "\u5916\u56FD\u4F7F\u8282\u5E26\u6765\u539A\u793C\u3002", category: "diplomacy", trigger: { minTurn: 8, notAtWar: true }, ...recurring(3, 25), options: [option("\u56DE\u793C", { gold: -50, influence: 8 }, 3), option("\u6536\u4E0B", { gold: 30, influence: -3 }, 2)] },
-  { id: "evt_d1_marriage", title: "\u8054\u59FB", description: "\u90BB\u56FD\u63D0\u8BAE\u8054\u59FB\u7ED3\u76DF\u3002", category: "diplomacy", trigger: { minTurn: 10, notAtWar: true }, ...recurring(4, 40), options: [option("\u5E94\u5141", { gold: -80, influence: 15, legitimacy: 3 }, 3), option("\u62D2\u7EDD", { influence: -8 }, 2)] },
-  { id: "evt_d1_trade_pact", title: "\u5546\u7EA6", description: "\u90BB\u56FD\u63D0\u8BAE\u7B7E\u8BA2\u5546\u7EA6\u3002", category: "diplomacy", trigger: { minTurn: 8, notAtWar: true }, ...recurring(4, 30), options: [option("\u7B7E\u8BA2", { gold: 60, influence: 5, factionSat: fr("merchants", 10) }, 3), option("\u89C2\u671B", { factionSat: fr("merchants", -5) }, 2)] },
-  { id: "evt_d1_insult", title: "\u53D7\u8FB1", description: "\u90BB\u56FD\u4F7F\u8282\u51FA\u8A00\u4E0D\u900A\u3002", category: "diplomacy", trigger: { minTurn: 12 }, ...recurring(4, 20), options: [option("\u6297\u8BAE", { influence: -5, stability: 3 }, 2), option("\u5FCD\u8BA9", { legitimacy: -3 }, 3)] },
-  { id: "evt_d1_refugee_return", title: "\u9063\u8FD4", description: "\u90BB\u56FD\u8981\u6C42\u9063\u8FD4\u6D41\u6C11\u3002", category: "diplomacy", trigger: { minTurn: 15 }, ...recurring(3, 30), options: [option("\u9063\u8FD4", { influence: 5, stability: -3 }, 3), option("\u62D2\u7EDD", { influence: -8 }, 2)] },
-  { id: "evt_d1_embassy", title: "\u8BBE\u4F7F\u9986", description: "\u662F\u5426\u5728\u5404\u56FD\u8BBE\u4F7F\u9986\uFF1F", category: "diplomacy", trigger: { minTurn: 12, notAtWar: true }, ...recurring(3, 40), options: [option("\u8BBE\u7ACB", { gold: -100, influence: 12 }, 3), option("\u6682\u7F13", { influence: -3 }, 2)] },
-  { id: "evt_d1_hostage", title: "\u8D28\u5B50", description: "\u90BB\u56FD\u9001\u8D28\u5B50\u4EE5\u6C42\u548C\u3002", category: "diplomacy", trigger: { minTurn: 15 }, ...recurring(3, 50), options: [option("\u63A5\u53D7", { influence: 10, stability: -3 }, 3), option("\u62D2\u7EDD", { influence: -5 }, 2)] },
-  { id: "evt_d1_summit", title: "\u4F1A\u76DF", description: "\u8BF8\u56FD\u63D0\u8BAE\u4F1A\u76DF\u3002", category: "diplomacy", trigger: { minTurn: 20, notAtWar: true }, ...recurring(3, 60), options: [option("\u4E3B\u76DF", { gold: -150, influence: 20, legitimacy: 5 }, 3), option("\u5217\u5E2D", { influence: 5 }, 2)] },
-  { id: "evt_d1_spy_caught", title: "\u7EC6\u4F5C", description: "\u6293\u83B7\u90BB\u56FD\u7EC6\u4F5C\u3002", category: "diplomacy", trigger: { minTurn: 10 }, ...recurring(4, 25), options: [option("\u5904\u6B7B", { influence: -5, stability: 3 }, 2), option("\u9063\u8FD4", { influence: 3 }, 3)] },
-  { id: "evt_d1_trade_war", title: "\u5546\u6218", description: "\u90BB\u56FD\u5BF9\u6211\u52A0\u5F81\u5173\u7A0E\u3002", category: "diplomacy", trigger: { minTurn: 15 }, ...recurring(4, 30), options: [option("\u53CD\u5236", { gold: -50, factionSat: fr("merchants", -8) }, 2), option("\u8C08\u5224", { gold: -30, influence: 5 }, 3)] },
+  defineEvent("evt_d1_envoy_gift", "\u4F7F\u8282\u732E\u793C", "\u5916\u56FD\u4F7F\u8282\u5E26\u6765\u539A\u793C\u3002", "diplomacy", fromTurn(8, { notAtWar: true }), recurring(3, 25), [option("\u56DE\u793C", { gold: -50, influence: 8 }, 3), option("\u6536\u4E0B", { gold: 30, influence: -3 }, 2)]),
+  defineEvent("evt_d1_marriage", "\u8054\u59FB", "\u90BB\u56FD\u63D0\u8BAE\u8054\u59FB\u7ED3\u76DF\u3002", "diplomacy", fromTurn(10, { notAtWar: true }), recurring(4, 40), [option("\u5E94\u5141", { gold: -80, influence: 15, legitimacy: 3 }, 3), option("\u62D2\u7EDD", { influence: -8 }, 2)]),
+  defineEvent("evt_d1_trade_pact", "\u5546\u7EA6", "\u90BB\u56FD\u63D0\u8BAE\u7B7E\u8BA2\u5546\u7EA6\u3002", "diplomacy", fromTurn(8, { notAtWar: true }), recurring(4, 30), [option("\u7B7E\u8BA2", { gold: 60, influence: 5, factionSat: fr("merchants", 10) }, 3), option("\u89C2\u671B", { factionSat: fr("merchants", -5) }, 2)]),
+  defineEvent("evt_d1_insult", "\u53D7\u8FB1", "\u90BB\u56FD\u4F7F\u8282\u51FA\u8A00\u4E0D\u900A\u3002", "diplomacy", fromTurn(12), recurring(4, 20), [option("\u6297\u8BAE", { influence: -5, stability: 3 }, 2), option("\u5FCD\u8BA9", { legitimacy: -3 }, 3)]),
+  defineEvent("evt_d1_refugee_return", "\u9063\u8FD4", "\u90BB\u56FD\u8981\u6C42\u9063\u8FD4\u6D41\u6C11\u3002", "diplomacy", fromTurn(15), recurring(3, 30), [option("\u9063\u8FD4", { influence: 5, stability: -3 }, 3), option("\u62D2\u7EDD", { influence: -8 }, 2)]),
+  defineEvent("evt_d1_embassy", "\u8BBE\u4F7F\u9986", "\u662F\u5426\u5728\u5404\u56FD\u8BBE\u4F7F\u9986\uFF1F", "diplomacy", fromTurn(12, { notAtWar: true }), recurring(3, 40), [option("\u8BBE\u7ACB", { gold: -100, influence: 12 }, 3), option("\u6682\u7F13", { influence: -3 }, 2)]),
+  defineEvent("evt_d1_hostage", "\u8D28\u5B50", "\u90BB\u56FD\u9001\u8D28\u5B50\u4EE5\u6C42\u548C\u3002", "diplomacy", fromTurn(15), recurring(3, 50), [option("\u63A5\u53D7", { influence: 10, stability: -3 }, 3), option("\u62D2\u7EDD", { influence: -5 }, 2)]),
+  defineEvent("evt_d1_summit", "\u4F1A\u76DF", "\u8BF8\u56FD\u63D0\u8BAE\u4F1A\u76DF\u3002", "diplomacy", fromTurn(20, { notAtWar: true }), recurring(3, 60), [option("\u4E3B\u76DF", { gold: -150, influence: 20, legitimacy: 5 }, 3), option("\u5217\u5E2D", { influence: 5 }, 2)]),
+  defineEvent("evt_d1_spy_caught", "\u7EC6\u4F5C", "\u6293\u83B7\u90BB\u56FD\u7EC6\u4F5C\u3002", "diplomacy", fromTurn(10), recurring(4, 25), [option("\u5904\u6B7B", { influence: -5, stability: 3 }, 2), option("\u9063\u8FD4", { influence: 3 }, 3)]),
+  defineEvent("evt_d1_trade_war", "\u5546\u6218", "\u90BB\u56FD\u5BF9\u6211\u52A0\u5F81\u5173\u7A0E\u3002", "diplomacy", fromTurn(15), recurring(4, 30), [option("\u53CD\u5236", { gold: -50, factionSat: fr("merchants", -8) }, 2), option("\u8C08\u5224", { gold: -30, influence: 5 }, 3)]),
   // religion +10
-  { id: "evt_d1_shrine_build", title: "\u7ACB\u7960", description: "\u662F\u5426\u4E3A\u529F\u81E3\u7ACB\u7960\uFF1F", category: "religion", trigger: { minTurn: 15, minStability: 40 }, ...recurring(3, 40), options: [option("\u7ACB\u7960", { gold: -80, legitimacy: 5, factionSat: fr("clergy", 8) }, 3), option("\u4E0D\u7ACB", { factionSat: fr("clergy", -5) }, 2)] },
-  { id: "evt_d1_omen", title: "\u5929\u8C61", description: "\u5F02\u8C61\u5F15\u53D1\u6050\u614C\u3002", category: "religion", trigger: { minTurn: 8 }, ...recurring(4, 30), options: [option("\u796D\u7940", { gold: -50, legitimacy: 5, stability: 3 }, 3), option("\u4E0D\u7406", { stability: -5 }, 2)] },
-  { id: "evt_d1_conversion", title: "\u6539\u5B97", description: "\u90E8\u5206\u6C11\u4F17\u6539\u4FE1\u5F02\u6559\u3002", category: "religion", trigger: { minTurn: 15, provinceCultureDiff: true }, ...recurring(4, 35), options: [option("\u4F20\u6559", { gold: -60, factionSat: fr("clergy", 10) }, 3), option("\u5BBD\u5BB9", { stability: 3, factionSat: fr("clergy", -8) }, 2)] },
-  { id: "evt_d1_temple_fire", title: "\u5BFA\u5E99\u706B\u707E", description: "\u4E3B\u5BFA\u5E99\u5931\u706B\u3002", category: "religion", trigger: { minTurn: 10 }, ...recurring(3, 40), options: [option("\u91CD\u5EFA", { gold: -100, factionSat: fr("clergy", 12) }, 3), option("\u6682\u7F6E", { factionSat: fr("clergy", -10) }, 2)] },
-  { id: "evt_d1_festival", title: "\u5B97\u6559\u8282", description: "\u76DB\u5927\u5B97\u6559\u8282\u65E5\u5C06\u81F3\u3002", category: "religion", trigger: { minTurn: 8, notAtWar: true }, ...recurring(3, 20), options: [option("\u5927\u529E", { gold: -70, stability: 5, factionSat: fr("clergy", 10) }, 3), option("\u7B80\u529E", { factionSat: fr("clergy", -5) }, 2)] },
-  { id: "evt_d1_sacrilege", title: "\u4EB5\u6E0E", description: "\u6709\u4EBA\u4EB5\u6E0E\u795E\u5E99\u3002", category: "religion", trigger: { minTurn: 12 }, ...recurring(3, 30), options: [option("\u4E25\u60E9", { factionSat: fr("clergy", 12), stability: -3 }, 2), option("\u5BBD\u6055", { factionSat: fr("clergy", -10) }, 3)] },
-  { id: "evt_d1_prophecy", title: "\u9884\u8A00", description: "\u5DEB\u5E08\u9884\u8A00\u56FD\u8FD0\u3002", category: "religion", trigger: { minTurn: 18 }, ...recurring(3, 50), options: [option("\u4FE1\u4E4B", { gold: -40, legitimacy: -3 }, 2), option("\u65A5\u4E4B", { factionSat: fr("clergy", -8), stability: 3 }, 3)] },
-  { id: "evt_d1_donation", title: "\u6350\u8D60", description: "\u5BCC\u5546\u6350\u8D60\u5BFA\u5E99\u3002", category: "religion", trigger: { minTurn: 12, notAtWar: true }, ...recurring(2, 30), options: [option("\u9F13\u52B1", { factionSat: fra({ faction: "clergy", delta: 8 }, { faction: "merchants", delta: 5 }) }, 3), option("\u8BFE\u7A0E", { gold: 40, factionSat: fr("clergy", -8) }, 2)] },
-  { id: "evt_d1_relic", title: "\u5723\u7269", description: "\u53D1\u73B0\u5723\u7269\u3002", category: "religion", trigger: { minTurn: 20 }, ...recurring(2, 60), options: [option("\u4F9B\u5949", { gold: -50, legitimacy: 8, factionSat: fr("clergy", 15) }, 3), option("\u79D8\u85CF", { legitimacy: 3 }, 2)] },
+  defineEvent("evt_d1_shrine_build", "\u7ACB\u7960", "\u662F\u5426\u4E3A\u529F\u81E3\u7ACB\u7960\uFF1F", "religion", fromTurn(15, { minStability: 40 }), recurring(3, 40), [option("\u7ACB\u7960", { gold: -80, legitimacy: 5, factionSat: fr("clergy", 8) }, 3), option("\u4E0D\u7ACB", { factionSat: fr("clergy", -5) }, 2)]),
+  defineEvent("evt_d1_omen", "\u5929\u8C61", "\u5F02\u8C61\u5F15\u53D1\u6050\u614C\u3002", "religion", fromTurn(8), recurring(4, 30), [option("\u796D\u7940", { gold: -50, legitimacy: 5, stability: 3 }, 3), option("\u4E0D\u7406", { stability: -5 }, 2)]),
+  defineEvent("evt_d1_conversion", "\u6539\u5B97", "\u90E8\u5206\u6C11\u4F17\u6539\u4FE1\u5F02\u6559\u3002", "religion", fromTurn(15, { provinceCultureDiff: true }), recurring(4, 35), [option("\u4F20\u6559", { gold: -60, factionSat: fr("clergy", 10) }, 3), option("\u5BBD\u5BB9", { stability: 3, factionSat: fr("clergy", -8) }, 2)]),
+  defineEvent("evt_d1_temple_fire", "\u5BFA\u5E99\u706B\u707E", "\u4E3B\u5BFA\u5E99\u5931\u706B\u3002", "religion", fromTurn(10), recurring(3, 40), [option("\u91CD\u5EFA", { gold: -100, factionSat: fr("clergy", 12) }, 3), option("\u6682\u7F6E", { factionSat: fr("clergy", -10) }, 2)]),
+  defineEvent("evt_d1_festival", "\u5B97\u6559\u8282", "\u76DB\u5927\u5B97\u6559\u8282\u65E5\u5C06\u81F3\u3002", "religion", fromTurn(8, { notAtWar: true }), recurring(3, 20), [option("\u5927\u529E", { gold: -70, stability: 5, factionSat: fr("clergy", 10) }, 3), option("\u7B80\u529E", { factionSat: fr("clergy", -5) }, 2)]),
+  defineEvent("evt_d1_sacrilege", "\u4EB5\u6E0E", "\u6709\u4EBA\u4EB5\u6E0E\u795E\u5E99\u3002", "religion", fromTurn(12), recurring(3, 30), [option("\u4E25\u60E9", { factionSat: fr("clergy", 12), stability: -3 }, 2), option("\u5BBD\u6055", { factionSat: fr("clergy", -10) }, 3)]),
+  defineEvent("evt_d1_prophecy", "\u9884\u8A00", "\u5DEB\u5E08\u9884\u8A00\u56FD\u8FD0\u3002", "religion", fromTurn(18), recurring(3, 50), [option("\u4FE1\u4E4B", { gold: -40, legitimacy: -3 }, 2), option("\u65A5\u4E4B", { factionSat: fr("clergy", -8), stability: 3 }, 3)]),
+  defineEvent("evt_d1_donation", "\u6350\u8D60", "\u5BCC\u5546\u6350\u8D60\u5BFA\u5E99\u3002", "religion", fromTurn(12, { notAtWar: true }), recurring(2, 30), [option("\u9F13\u52B1", { factionSat: fra({ faction: "clergy", delta: 8 }, { faction: "merchants", delta: 5 }) }, 3), option("\u8BFE\u7A0E", { gold: 40, factionSat: fr("clergy", -8) }, 2)]),
+  defineEvent("evt_d1_relic", "\u5723\u7269", "\u53D1\u73B0\u5723\u7269\u3002", "religion", fromTurn(20), recurring(2, 60), [option("\u4F9B\u5949", { gold: -50, legitimacy: 8, factionSat: fr("clergy", 15) }, 3), option("\u79D8\u85CF", { legitimacy: 3 }, 2)]),
   // science +10
-  { id: "evt_d1_academy", title: "\u4E66\u9662", description: "\u5B66\u8005\u8BF7\u7ACB\u4E66\u9662\u3002", category: "science", trigger: { minTurn: 15, techLevelAbove: { branch: "admin", level: 2 } }, ...recurring(3, 40), options: [option("\u6279\u51C6", { gold: -100, sciPt: 20, legitimacy: 3 }, 3), option("\u5A49\u62D2", { sciPt: -3 }, 2)] },
-  { id: "evt_d1_scholar_invite", title: "\u62DB\u8D24", description: "\u5F02\u56FD\u8D24\u624D\u6765\u6295\u3002", category: "science", trigger: { minTurn: 12, notAtWar: true }, ...recurring(3, 30), options: [option("\u91CD\u7528", { gold: -60, sciPt: 12, factionSat: fr("nobles", -5) }, 3), option("\u4E0D\u7528", { sciPt: -2 }, 2)] },
-  { id: "evt_d1_experiment", title: "\u5B9E\u9A8C", description: "\u5B66\u8005\u8BF7\u6C42\u505A\u5371\u9669\u5B9E\u9A8C\u3002", category: "science", trigger: { minTurn: 15, techLevelAbove: { branch: "agri", level: 2 } }, ...recurring(3, 35), options: [option("\u5141\u8BB8", { sciPt: 15, stability: -3 }, 3), option("\u7981\u6B62", { sciPt: -5, factionSat: fr("clergy", 5) }, 2)] },
-  { id: "evt_d1_translation", title: "\u8BD1\u4E66", description: "\u662F\u5426\u7FFB\u8BD1\u5F02\u56FD\u5178\u7C4D\uFF1F", category: "science", trigger: { minTurn: 18, notAtWar: true }, ...recurring(3, 40), options: [option("\u7FFB\u8BD1", { gold: -80, sciPt: 10, influence: 5 }, 3), option("\u4E0D\u8BD1", { sciPt: -2 }, 2)] },
-  { id: "evt_d1_observation", title: "\u89C2\u6D4B", description: "\u5929\u6587\u5B66\u5BB6\u8BF7\u6C42\u5EFA\u89C2\u8C61\u53F0\u3002", category: "science", trigger: { minTurn: 20, techLevelAbove: { branch: "culture", level: 2 } }, ...recurring(2, 50), options: [option("\u5174\u5EFA", { gold: -120, sciPt: 20, legitimacy: 5 }, 3), option("\u7F13\u8BAE", { sciPt: -3 }, 2)] },
-  { id: "evt_d1_medicine", title: "\u533B\u672F", description: "\u540D\u533B\u732E\u4E0A\u65B0\u533B\u672F\u3002", category: "science", trigger: { minTurn: 15, techLevelAbove: { branch: "admin", level: 2 } }, ...recurring(3, 35), options: [option("\u63A8\u5E7F", { gold: -60, population: 100, stability: 3 }, 3), option("\u89C2\u671B", {}, 2)] },
-  { id: "evt_d1_engineering", title: "\u5DE5\u7A0B", description: "\u5DE5\u7A0B\u5E08\u732E\u65B0\u6CD5\u3002", category: "science", trigger: { minTurn: 18, techLevelAbove: { branch: "admin", level: 3 } }, ...recurring(2, 40), options: [option("\u91C7\u7528", { gold: -80, sciPt: 8 }, 3), option("\u4E0D\u7528", {}, 2)] },
-  { id: "evt_d1_philosophy", title: "\u54F2\u5B66", description: "\u54F2\u5B66\u5BB6\u63D0\u51FA\u65B0\u8BF4\u3002", category: "science", trigger: { minTurn: 20, techLevelAbove: { branch: "culture", level: 3 } }, ...recurring(2, 50), options: [option("\u8868\u5F70", { gold: -30, sciPt: 10, legitimacy: 3 }, 3), option("\u7981\u7EDD", { stability: -5, factionSat: fr("clergy", 8) }, 1)] },
-  { id: "evt_d1_archive", title: "\u6863\u6848", description: "\u662F\u5426\u6574\u7406\u56FD\u5BB6\u6863\u6848\uFF1F", category: "science", trigger: { minTurn: 15 }, ...recurring(2, 40), options: [option("\u6574\u7406", { gold: -50, sciPt: 8, legitimacy: 3 }, 3), option("\u4E0D\u7406", {}, 2)] },
+  defineEvent("evt_d1_academy", "\u4E66\u9662", "\u5B66\u8005\u8BF7\u7ACB\u4E66\u9662\u3002", "science", { minTurn: 15, techLevelAbove: { branch: "admin", level: 2 } }, recurring(3, 40), [option("\u6279\u51C6", { gold: -100, sciPt: 20, legitimacy: 3 }, 3), option("\u5A49\u62D2", { sciPt: -3 }, 2)]),
+  defineEvent("evt_d1_scholar_invite", "\u62DB\u8D24", "\u5F02\u56FD\u8D24\u624D\u6765\u6295\u3002", "science", fromTurn(12, { notAtWar: true }), recurring(3, 30), [option("\u91CD\u7528", { gold: -60, sciPt: 12, factionSat: noblesReaction(-5) }, 3), option("\u4E0D\u7528", { sciPt: -2 }, 2)]),
+  defineEvent("evt_d1_experiment", "\u5B9E\u9A8C", "\u5B66\u8005\u8BF7\u6C42\u505A\u5371\u9669\u5B9E\u9A8C\u3002", "science", { minTurn: 15, techLevelAbove: { branch: "agri", level: 2 } }, recurring(3, 35), [option("\u5141\u8BB8", { sciPt: 15, stability: -3 }, 3), option("\u7981\u6B62", { sciPt: -5, factionSat: fr("clergy", 5) }, 2)]),
+  defineEvent("evt_d1_translation", "\u8BD1\u4E66", "\u662F\u5426\u7FFB\u8BD1\u5F02\u56FD\u5178\u7C4D\uFF1F", "science", fromTurn(18, { notAtWar: true }), recurring(3, 40), [option("\u7FFB\u8BD1", { gold: -80, sciPt: 10, influence: 5 }, 3), option("\u4E0D\u8BD1", { sciPt: -2 }, 2)]),
+  defineEvent("evt_d1_observation", "\u89C2\u6D4B", "\u5929\u6587\u5B66\u5BB6\u8BF7\u6C42\u5EFA\u89C2\u8C61\u53F0\u3002", "science", { minTurn: 20, techLevelAbove: { branch: "culture", level: 2 } }, recurring(2, 50), [option("\u5174\u5EFA", { gold: -120, sciPt: 20, legitimacy: 5 }, 3), option("\u7F13\u8BAE", { sciPt: -3 }, 2)]),
+  defineEvent("evt_d1_medicine", "\u533B\u672F", "\u540D\u533B\u732E\u4E0A\u65B0\u533B\u672F\u3002", "science", { minTurn: 15, techLevelAbove: { branch: "admin", level: 2 } }, recurring(3, 35), [option("\u63A8\u5E7F", { gold: -60, population: 100, stability: 3 }, 3), option("\u89C2\u671B", {}, 2)]),
+  defineEvent("evt_d1_engineering", "\u5DE5\u7A0B", "\u5DE5\u7A0B\u5E08\u732E\u65B0\u6CD5\u3002", "science", { minTurn: 18, techLevelAbove: { branch: "admin", level: 3 } }, recurring(2, 40), [option("\u91C7\u7528", { gold: -80, sciPt: 8 }, 3), option("\u4E0D\u7528", {}, 2)]),
+  defineEvent("evt_d1_philosophy", "\u54F2\u5B66", "\u54F2\u5B66\u5BB6\u63D0\u51FA\u65B0\u8BF4\u3002", "science", { minTurn: 20, techLevelAbove: { branch: "culture", level: 3 } }, recurring(2, 50), [option("\u8868\u5F70", { gold: -30, sciPt: 10, legitimacy: 3 }, 3), option("\u7981\u7EDD", { stability: -5, factionSat: fr("clergy", 8) }, 1)]),
+  defineEvent("evt_d1_archive", "\u6863\u6848", "\u662F\u5426\u6574\u7406\u56FD\u5BB6\u6863\u6848\uFF1F", "science", fromTurn(15), recurring(2, 40), [option("\u6574\u7406", { gold: -50, sciPt: 8, legitimacy: 3 }, 3), option("\u4E0D\u7406", {}, 2)]),
   // opportunity +10
-  { id: "evt_d1_talent", title: "\u8D24\u624D", description: "\u5728\u91CE\u8D24\u624D\u6C42\u4ED5\u3002", category: "opportunity", trigger: { minTurn: 8, minStability: 30 }, ...recurring(3, 25), options: [option("\u7834\u683C", { gold: -40, legitimacy: 5, factionSat: fr("nobles", -5) }, 3), option("\u5FAA\u4F8B", {}, 2)] },
-  { id: "evt_d1_land_claim", title: "\u65E0\u4E3B\u4E4B\u5730", description: "\u8FB9\u5883\u53D1\u73B0\u65E0\u4E3B\u6C83\u571F\u3002", category: "opportunity", trigger: { minTurn: 12, notAtWar: true }, ...recurring(3, 40), options: [option("\u5360\u9886", { gold: -60, stability: 3 }, 3), option("\u653E\u5F03", {}, 2)] },
-  { id: "evt_d1_ancient", title: "\u53E4\u8FF9", description: "\u53D1\u73B0\u53E4\u4EE3\u9057\u8FF9\u3002", category: "opportunity", trigger: { minTurn: 15 }, ...recurring(2, 50), options: [option("\u53D1\u6398", { gold: -50, sciPt: 10, legitimacy: 3 }, 3), option("\u4FDD\u62A4", { influence: 3 }, 2)] },
-  { id: "evt_d1_alliance_offer", title: "\u6765\u6295", description: "\u5C0F\u56FD\u6C42\u4E3A\u9644\u5EB8\u3002", category: "opportunity", trigger: { minTurn: 15, notAtWar: true }, ...recurring(3, 40), options: [option("\u63A5\u53D7", { gold: -80, influence: 15, stability: -3 }, 3), option("\u62D2\u7EDD", { influence: -3 }, 2)] },
-  { id: "evt_d1_reform_open", title: "\u6539\u9769\u826F\u673A", description: "\u6C11\u5FC3\u53EF\u7528\uFF0C\u6539\u9769\u826F\u673A\u3002", category: "opportunity", trigger: { minTurn: 18, minStability: 50 }, ...recurring(3, 50), options: [option("\u63A8\u884C", { gold: -100, legitimacy: 8, stability: -5 }, 3), option("\u7F13\u8BAE", {}, 2)] },
-  { id: "evt_d1_feast", title: "\u76DB\u5BB4", description: "\u662F\u5426\u4E3E\u529E\u76DB\u5BB4\u5F70\u663E\u56FD\u529B\uFF1F", category: "opportunity", trigger: { minTurn: 12, minStability: 40 }, ...recurring(3, 30), options: [option("\u5927\u529E", { gold: -100, influence: 12, legitimacy: 3 }, 3), option("\u7B80\u529E", { gold: -20 }, 2)] },
-  { id: "evt_d1_tribute", title: "\u671D\u8D21", description: "\u5C0F\u56FD\u6765\u671D\u8D21\u3002", category: "opportunity", trigger: { minTurn: 15, notAtWar: true }, ...recurring(3, 40), options: [option("\u539A\u8D4F", { gold: -80, influence: 15 }, 3), option("\u8584\u8D4F", { gold: -20, influence: 3 }, 2)] },
-  { id: "evt_d1_explorer", title: "\u63A2\u9669", description: "\u63A2\u9669\u5BB6\u8BF7\u7F28\u8FDC\u5F81\u3002", category: "opportunity", trigger: { minTurn: 20 }, ...recurring(2, 50), options: [option("\u8D44\u52A9", { gold: -120, influence: 10, sciPt: 5 }, 3), option("\u4E0D\u5141", {}, 2)] },
-  { id: "evt_d1_census", title: "\u666E\u67E5", description: "\u662F\u5426\u666E\u67E5\u4EBA\u53E3\uFF1F", category: "opportunity", trigger: { minTurn: 10 }, ...recurring(3, 40), options: [option("\u666E\u67E5", { gold: 20, corruption: -3 }, 3), option("\u4E0D\u67E5", {}, 2)] },
-  { id: "evt_d1_diplomat", title: "\u7EB5\u6A2A", description: "\u7EB5\u6A2A\u5BB6\u6765\u6295\u3002", category: "opportunity", trigger: { minTurn: 15, notAtWar: true }, ...recurring(2, 40), options: [option("\u91CD\u7528", { gold: -50, influence: 12 }, 3), option("\u4E0D\u7528", {}, 2)] },
+  defineEvent("evt_d1_talent", "\u8D24\u624D", "\u5728\u91CE\u8D24\u624D\u6C42\u4ED5\u3002", "opportunity", fromTurn(8, { minStability: 30 }), recurring(3, 25), [option("\u7834\u683C", { gold: -40, legitimacy: 5, factionSat: noblesReaction(-5) }, 3), option("\u5FAA\u4F8B", {}, 2)]),
+  defineEvent("evt_d1_land_claim", "\u65E0\u4E3B\u4E4B\u5730", "\u8FB9\u5883\u53D1\u73B0\u65E0\u4E3B\u6C83\u571F\u3002", "opportunity", fromTurn(12, { notAtWar: true }), recurring(3, 40), [option("\u5360\u9886", { gold: -60, stability: 3 }, 3), option("\u653E\u5F03", {}, 2)]),
+  defineEvent("evt_d1_ancient", "\u53E4\u8FF9", "\u53D1\u73B0\u53E4\u4EE3\u9057\u8FF9\u3002", "opportunity", fromTurn(15), recurring(2, 50), [option("\u53D1\u6398", { gold: -50, sciPt: 10, legitimacy: 3 }, 3), option("\u4FDD\u62A4", { influence: 3 }, 2)]),
+  defineEvent("evt_d1_alliance_offer", "\u6765\u6295", "\u5C0F\u56FD\u6C42\u4E3A\u9644\u5EB8\u3002", "opportunity", fromTurn(15, { notAtWar: true }), recurring(3, 40), [option("\u63A5\u53D7", { gold: -80, influence: 15, stability: -3 }, 3), option("\u62D2\u7EDD", { influence: -3 }, 2)]),
+  defineEvent("evt_d1_reform_open", "\u6539\u9769\u826F\u673A", "\u6C11\u5FC3\u53EF\u7528\uFF0C\u6539\u9769\u826F\u673A\u3002", "opportunity", fromTurn(18, { minStability: 50 }), recurring(3, 50), [option("\u63A8\u884C", { gold: -100, legitimacy: 8, stability: -5 }, 3), option("\u7F13\u8BAE", {}, 2)]),
+  defineEvent("evt_d1_feast", "\u76DB\u5BB4", "\u662F\u5426\u4E3E\u529E\u76DB\u5BB4\u5F70\u663E\u56FD\u529B\uFF1F", "opportunity", fromTurn(12, { minStability: 40 }), recurring(3, 30), [option("\u5927\u529E", { gold: -100, influence: 12, legitimacy: 3 }, 3), option("\u7B80\u529E", { gold: -20 }, 2)]),
+  defineEvent("evt_d1_tribute", "\u671D\u8D21", "\u5C0F\u56FD\u6765\u671D\u8D21\u3002", "opportunity", fromTurn(15, { notAtWar: true }), recurring(3, 40), [option("\u539A\u8D4F", { gold: -80, influence: 15 }, 3), option("\u8584\u8D4F", { gold: -20, influence: 3 }, 2)]),
+  defineEvent("evt_d1_explorer", "\u63A2\u9669", "\u63A2\u9669\u5BB6\u8BF7\u7F28\u8FDC\u5F81\u3002", "opportunity", fromTurn(20), recurring(2, 50), [option("\u8D44\u52A9", { gold: -120, influence: 10, sciPt: 5 }, 3), option("\u4E0D\u5141", {}, 2)]),
+  defineEvent("evt_d1_census", "\u666E\u67E5", "\u662F\u5426\u666E\u67E5\u4EBA\u53E3\uFF1F", "opportunity", fromTurn(10), recurring(3, 40), [option("\u666E\u67E5", { gold: 20, corruption: -3 }, 3), option("\u4E0D\u67E5", {}, 2)]),
+  defineEvent("evt_d1_diplomat", "\u7EB5\u6A2A", "\u7EB5\u6A2A\u5BB6\u6765\u6295\u3002", "opportunity", fromTurn(15, { notAtWar: true }), recurring(2, 40), [option("\u91CD\u7528", { gold: -50, influence: 12 }, 3), option("\u4E0D\u7528", {}, 2)]),
   // culture +10
-  { id: "evt_d1_poet", title: "\u8BD7\u4EBA", description: "\u8457\u540D\u8BD7\u4EBA\u6765\u6E38\u3002", category: "culture", trigger: { minTurn: 10, minStability: 30 }, ...recurring(3, 30), options: [option("\u6B3E\u5F85", { gold: -30, influence: 8, legitimacy: 3 }, 3), option("\u4E0D\u89C1", {}, 2)] },
-  { id: "evt_d1_art", title: "\u827A\u672F", description: "\u827A\u672F\u5BB6\u8BF7\u8D5E\u52A9\u3002", category: "culture", trigger: { minTurn: 12, minStability: 40 }, ...recurring(3, 30), options: [option("\u8D5E\u52A9", { gold: -50, influence: 8 }, 3), option("\u5A49\u62D2", {}, 2)] },
-  { id: "evt_d1_history", title: "\u4FEE\u53F2", description: "\u662F\u5426\u4FEE\u56FD\u53F2\uFF1F", category: "culture", trigger: { minTurn: 15 }, ...recurring(3, 50), options: [option("\u4FEE\u53F2", { gold: -80, legitimacy: 8, influence: 5 }, 3), option("\u7F13\u8BAE", {}, 2)] },
-  { id: "evt_d1_etiquette", title: "\u793C\u5236", description: "\u662F\u5426\u9769\u65B0\u793C\u5236\uFF1F", category: "culture", trigger: { minTurn: 18 }, ...recurring(3, 40), options: [option("\u9769\u65B0", { gold: -60, legitimacy: 5, stability: -3 }, 3), option("\u5B88\u65E7", {}, 2)] },
-  { id: "evt_d1_architecture", title: "\u5EFA\u7B51", description: "\u65B0\u5EFA\u7B51\u98CE\u683C\u6D41\u884C\u3002", category: "culture", trigger: { minTurn: 15, techLevelAbove: { branch: "admin", level: 2 } }, ...recurring(2, 40), options: [option("\u91C7\u7528", { gold: -80, influence: 8 }, 3), option("\u4E0D\u7528", {}, 2)] },
-  { id: "evt_d1_music", title: "\u96C5\u4E50", description: "\u662F\u5426\u6574\u7406\u96C5\u4E50\uFF1F", category: "culture", trigger: { minTurn: 12, minStability: 40 }, ...recurring(2, 40), options: [option("\u6574\u7406", { gold: -40, legitimacy: 5, factionSat: fr("clergy", 5) }, 3), option("\u4E0D\u7406", {}, 2)] },
-  { id: "evt_d1_fashion", title: "\u670D\u9970", description: "\u65B0\u670D\u9970\u98CE\u683C\u5174\u8D77\u3002", category: "culture", trigger: { minTurn: 15 }, ...recurring(2, 40), options: [option("\u63A8\u5E7F", { gold: -30, influence: 5 }, 3), option("\u7981\u7EDD", { stability: -3 }, 2)] },
-  { id: "evt_d1_language", title: "\u6587\u5B57", description: "\u662F\u5426\u7EDF\u4E00\u6587\u5B57\uFF1F", category: "culture", trigger: { minTurn: 20, techLevelAbove: { branch: "admin", level: 3 } }, ...recurring(3, 60), options: [option("\u7EDF\u4E00", { gold: -100, legitimacy: 10, stability: -5 }, 3), option("\u4E0D\u7EDF", {}, 2)] },
-  { id: "evt_d1_festival_art", title: "\u827A\u672F\u8282", description: "\u662F\u5426\u4E3E\u529E\u827A\u672F\u8282\uFF1F", category: "culture", trigger: { minTurn: 12, notAtWar: true, minStability: 40 }, ...recurring(3, 30), options: [option("\u4E3E\u529E", { gold: -60, influence: 10, stability: 3 }, 3), option("\u4E0D\u529E", {}, 2)] },
-  { id: "evt_d1_legend", title: "\u4F20\u5947", description: "\u6C11\u95F4\u6D41\u4F20\u672C\u671D\u4F20\u5947\u3002", category: "culture", trigger: { minTurn: 18, minStability: 50 }, ...recurring(2, 50), options: [option("\u9F13\u52B1", { legitimacy: 5, influence: 5 }, 3), option("\u7981\u7EDD", { stability: -3 }, 2)] },
+  defineEvent("evt_d1_poet", "\u8BD7\u4EBA", "\u8457\u540D\u8BD7\u4EBA\u6765\u6E38\u3002", "culture", fromTurn(10, { minStability: 30 }), recurring(3, 30), [option("\u6B3E\u5F85", { gold: -30, influence: 8, legitimacy: 3 }, 3), option("\u4E0D\u89C1", {}, 2)]),
+  defineEvent("evt_d1_art", "\u827A\u672F", "\u827A\u672F\u5BB6\u8BF7\u8D5E\u52A9\u3002", "culture", fromTurn(12, { minStability: 40 }), recurring(3, 30), [option("\u8D5E\u52A9", { gold: -50, influence: 8 }, 3), option("\u5A49\u62D2", {}, 2)]),
+  defineEvent("evt_d1_history", "\u4FEE\u53F2", "\u662F\u5426\u4FEE\u56FD\u53F2\uFF1F", "culture", fromTurn(15), recurring(3, 50), [option("\u4FEE\u53F2", { gold: -80, legitimacy: 8, influence: 5 }, 3), option("\u7F13\u8BAE", {}, 2)]),
+  defineEvent("evt_d1_etiquette", "\u793C\u5236", "\u662F\u5426\u9769\u65B0\u793C\u5236\uFF1F", "culture", fromTurn(18), recurring(3, 40), [option("\u9769\u65B0", { gold: -60, legitimacy: 5, stability: -3 }, 3), option("\u5B88\u65E7", {}, 2)]),
+  defineEvent("evt_d1_architecture", "\u5EFA\u7B51", "\u65B0\u5EFA\u7B51\u98CE\u683C\u6D41\u884C\u3002", "culture", { minTurn: 15, techLevelAbove: { branch: "admin", level: 2 } }, recurring(2, 40), [option("\u91C7\u7528", { gold: -80, influence: 8 }, 3), option("\u4E0D\u7528", {}, 2)]),
+  defineEvent("evt_d1_music", "\u96C5\u4E50", "\u662F\u5426\u6574\u7406\u96C5\u4E50\uFF1F", "culture", fromTurn(12, { minStability: 40 }), recurring(2, 40), [option("\u6574\u7406", { gold: -40, legitimacy: 5, factionSat: fr("clergy", 5) }, 3), option("\u4E0D\u7406", {}, 2)]),
+  defineEvent("evt_d1_fashion", "\u670D\u9970", "\u65B0\u670D\u9970\u98CE\u683C\u5174\u8D77\u3002", "culture", fromTurn(15), recurring(2, 40), [option("\u63A8\u5E7F", { gold: -30, influence: 5 }, 3), option("\u7981\u7EDD", { stability: -3 }, 2)]),
+  defineEvent("evt_d1_language", "\u6587\u5B57", "\u662F\u5426\u7EDF\u4E00\u6587\u5B57\uFF1F", "culture", { minTurn: 20, techLevelAbove: { branch: "admin", level: 3 } }, recurring(3, 60), [option("\u7EDF\u4E00", { gold: -100, legitimacy: 10, stability: -5 }, 3), option("\u4E0D\u7EDF", {}, 2)]),
+  defineEvent("evt_d1_festival_art", "\u827A\u672F\u8282", "\u662F\u5426\u4E3E\u529E\u827A\u672F\u8282\uFF1F", "culture", fromTurn(12, { notAtWar: true, minStability: 40 }), recurring(3, 30), [option("\u4E3E\u529E", { gold: -60, influence: 10, stability: 3 }, 3), option("\u4E0D\u529E", {}, 2)]),
+  defineEvent("evt_d1_legend", "\u4F20\u5947", "\u6C11\u95F4\u6D41\u4F20\u672C\u671D\u4F20\u5947\u3002", "culture", fromTurn(18, { minStability: 50 }), recurring(2, 50), [option("\u9F13\u52B1", { legitimacy: 5, influence: 5 }, 3), option("\u7981\u7EDD", { stability: -3 }, 2)]),
   // population +7
-  { id: "evt_d1_migration", title: "\u8FC1\u5F99", description: "\u90E8\u5206\u6C11\u4F17\u6B32\u8FC1\u5F99\u4ED6\u4E61\u3002", category: "population", trigger: { minTurn: 10, maxStability: 40 }, ...recurring(4, 25), options: [option("\u633D\u7559", { gold: -50, stability: 3 }, 3), option("\u4EFB\u5176", { population: -200 }, 2)] },
-  { id: "evt_d1_birth_boom", title: "\u5A74\u513F\u6F6E", description: "\u4ECA\u5E74\u51FA\u751F\u7387\u5927\u589E\u3002", category: "population", trigger: { minTurn: 8, minStability: 50 }, ...recurring(3, 30), options: [option("\u9F13\u52B1", { gold: -40, population: 200 }, 3), option("\u4E0D\u7BA1", { population: 100 }, 2)] },
-  { id: "evt_d1_plague_death", title: "\u75AB\u540E", description: "\u75AB\u75C5\u540E\u4EBA\u53E3\u9AA4\u51CF\u3002", category: "population", trigger: { minTurn: 15 }, ...recurring(4, 40), options: [option("\u4F11\u517B", { gold: -60, population: 100, stability: 3 }, 3), option("\u4E0D\u7BA1", { population: -100 }, 2)] },
-  { id: "evt_d1_labor_demand", title: "\u52B3\u529B", description: "\u767E\u4E1A\u5174\u65FA\u52B3\u529B\u4E0D\u8DB3\u3002", category: "population", trigger: { minTurn: 12, minStability: 50 }, ...recurring(3, 30), options: [option("\u62DB\u629A", { gold: -50, population: 150 }, 3), option("\u4E0D\u52A0", {}, 2)] },
-  { id: "evt_d1_urban", title: "\u57CE\u5E02\u5316", description: "\u6C11\u4F17\u6D8C\u5165\u57CE\u5E02\u3002", category: "population", trigger: { minTurn: 15, minStability: 40 }, ...recurring(3, 30), options: [option("\u5B89\u7F6E", { gold: -80, stability: 3, factionSat: fr("commoners", 8) }, 3), option("\u4E0D\u7BA1", { stability: -3, corruption: 3 }, 2)] },
-  { id: "evt_d1_emigration", title: "\u5916\u6D41", description: "\u6C11\u4F17\u5916\u6D41\u4ED6\u56FD\u3002", category: "population", trigger: { minTurn: 12, maxStability: 35 }, ...recurring(4, 25), options: [option("\u963B\u6B62", { gold: -40, stability: -3 }, 2), option("\u4EFB\u5176", { population: -150, influence: -3 }, 3)] },
-  { id: "evt_d1_clan", title: "\u5B97\u65CF", description: "\u5927\u5B97\u65CF\u517C\u5E76\u5C0F\u6237\u3002", category: "population", trigger: { minTurn: 15, minCorruption: 30 }, ...recurring(3, 35), options: [option("\u6291\u5236", { gold: -50, factionSat: fra({ faction: "nobles", delta: -10 }, { faction: "commoners", delta: 8 }) }, 3), option("\u4E0D\u7BA1", { corruption: 3 }, 2)] },
+  defineEvent("evt_d1_migration", "\u8FC1\u5F99", "\u90E8\u5206\u6C11\u4F17\u6B32\u8FC1\u5F99\u4ED6\u4E61\u3002", "population", fromTurn(10, { maxStability: 40 }), recurring(4, 25), [option("\u633D\u7559", { gold: -50, stability: 3 }, 3), option("\u4EFB\u5176", { population: -200 }, 2)]),
+  defineEvent("evt_d1_birth_boom", "\u5A74\u513F\u6F6E", "\u4ECA\u5E74\u51FA\u751F\u7387\u5927\u589E\u3002", "population", fromTurn(8, { minStability: 50 }), recurring(3, 30), [option("\u9F13\u52B1", { gold: -40, population: 200 }, 3), option("\u4E0D\u7BA1", { population: 100 }, 2)]),
+  defineEvent("evt_d1_plague_death", "\u75AB\u540E", "\u75AB\u75C5\u540E\u4EBA\u53E3\u9AA4\u51CF\u3002", "population", fromTurn(15), recurring(4, 40), [option("\u4F11\u517B", { gold: -60, population: 100, stability: 3 }, 3), option("\u4E0D\u7BA1", { population: -100 }, 2)]),
+  defineEvent("evt_d1_labor_demand", "\u52B3\u529B", "\u767E\u4E1A\u5174\u65FA\u52B3\u529B\u4E0D\u8DB3\u3002", "population", fromTurn(12, { minStability: 50 }), recurring(3, 30), [option("\u62DB\u629A", { gold: -50, population: 150 }, 3), option("\u4E0D\u52A0", {}, 2)]),
+  defineEvent("evt_d1_urban", "\u57CE\u5E02\u5316", "\u6C11\u4F17\u6D8C\u5165\u57CE\u5E02\u3002", "population", fromTurn(15, { minStability: 40 }), recurring(3, 30), [option("\u5B89\u7F6E", { gold: -80, stability: 3, factionSat: commonersReaction(8) }, 3), option("\u4E0D\u7BA1", { stability: -3, corruption: 3 }, 2)]),
+  defineEvent("evt_d1_emigration", "\u5916\u6D41", "\u6C11\u4F17\u5916\u6D41\u4ED6\u56FD\u3002", "population", fromTurn(12, { maxStability: 35 }), recurring(4, 25), [option("\u963B\u6B62", { gold: -40, stability: -3 }, 2), option("\u4EFB\u5176", { population: -150, influence: -3 }, 3)]),
+  defineEvent("evt_d1_clan", "\u5B97\u65CF", "\u5927\u5B97\u65CF\u517C\u5E76\u5C0F\u6237\u3002", "population", fromTurn(15, { minCorruption: 30 }), recurring(3, 35), [option("\u6291\u5236", { gold: -50, factionSat: fra({ faction: "nobles", delta: -10 }, { faction: "commoners", delta: 8 }) }, 3), option("\u4E0D\u7BA1", { corruption: 3 }, 2)]),
   // ── D1 事件链 11-15（5 链 × 3 事件 = 15 事件）──
   // 链 11：蛮族入侵链——预警→入侵→和或战
-  { id: "evt_chain_barbarian_1", title: "\u86EE\u65CF\u96C6\u7ED3", description: "\u8FB9\u62A5\uFF1A\u86EE\u65CF\u4E8E\u585E\u5916\u96C6\u7ED3\uFF0C\u4F3C\u6709\u5357\u4E0B\u4E4B\u610F\uFF01", category: "military", trigger: { minTurn: 12 }, ...recurring(5, 80), options: [
-    option("\u589E\u5175\u6212\u5907", { gold: -80, factionSat: fr("military", 5), triggerEvent: "evt_chain_barbarian_2" }, 3),
-    option("\u9063\u4F7F\u63A2\u865A\u5B9E", { gold: -30, influence: -3, triggerEvent: "evt_chain_barbarian_2" }, 2)
-  ] },
-  { id: "evt_chain_barbarian_2", title: "\u86EE\u65CF\u5357\u4E0B", description: "\u86EE\u65CF\u94C1\u9A91\u5357\u4E0B\uFF0C\u8FDE\u9677\u6570\u9547\uFF01", category: "military", trigger: { minTurn: 13 }, ...followUp, options: [
-    option("\u4E3B\u529B\u51B3\u6218", { gold: -150, factionSat: fr("military", 10), stability: -5, triggerEvent: "evt_chain_barbarian_3" }, 2),
-    option("\u575A\u58C1\u6E05\u91CE", { food: -100, gold: -60, stability: -8, triggerEvent: "evt_chain_barbarian_3" }, 3)
-  ] },
-  { id: "evt_chain_barbarian_3", title: "\u86EE\u65CF\u4F59\u6CE2", description: "\u86EE\u65CF\u9000\u53BB\uFF0C\u8FB9\u5883\u6B8B\u7834\u3002", category: "military", trigger: { minTurn: 14 }, ...followUp, options: [
-    option("\u91CD\u5EFA\u8FB9\u5883", { gold: -120, stability: 5, factionSat: fr("commoners", 8) }, 3),
-    option("\u6682\u7F6E", { stability: -3, influence: -5 }, 2)
-  ] },
+  defineEvent(
+    "evt_chain_barbarian_1",
+    "\u86EE\u65CF\u96C6\u7ED3",
+    "\u8FB9\u62A5\uFF1A\u86EE\u65CF\u4E8E\u585E\u5916\u96C6\u7ED3\uFF0C\u4F3C\u6709\u5357\u4E0B\u4E4B\u610F\uFF01",
+    "military",
+    fromTurn(12),
+    recurring(5, 80),
+    [
+      option("\u589E\u5175\u6212\u5907", { gold: -80, factionSat: militaryReaction(5), triggerEvent: "evt_chain_barbarian_2" }, 3),
+      option("\u9063\u4F7F\u63A2\u865A\u5B9E", { gold: -30, influence: -3, triggerEvent: "evt_chain_barbarian_2" }, 2)
+    ]
+  ),
+  defineEvent(
+    "evt_chain_barbarian_2",
+    "\u86EE\u65CF\u5357\u4E0B",
+    "\u86EE\u65CF\u94C1\u9A91\u5357\u4E0B\uFF0C\u8FDE\u9677\u6570\u9547\uFF01",
+    "military",
+    fromTurn(13),
+    followUp,
+    [
+      option("\u4E3B\u529B\u51B3\u6218", { gold: -150, factionSat: militaryReaction(10), stability: -5, triggerEvent: "evt_chain_barbarian_3" }, 2),
+      option("\u575A\u58C1\u6E05\u91CE", { food: -100, gold: -60, stability: -8, triggerEvent: "evt_chain_barbarian_3" }, 3)
+    ]
+  ),
+  defineEvent(
+    "evt_chain_barbarian_3",
+    "\u86EE\u65CF\u4F59\u6CE2",
+    "\u86EE\u65CF\u9000\u53BB\uFF0C\u8FB9\u5883\u6B8B\u7834\u3002",
+    "military",
+    fromTurn(14),
+    followUp,
+    [
+      option("\u91CD\u5EFA\u8FB9\u5883", { gold: -120, stability: 5, factionSat: commonersReaction(8) }, 3),
+      option("\u6682\u7F6E", { stability: -3, influence: -5 }, 2)
+    ]
+  ),
   // 链 12：继位内战链——驾崩→争位→内战或和解
-  { id: "evt_chain_succession_1", title: "\u541B\u4E3B\u9A7E\u5D29", description: "\u541B\u4E3B\u7A81\u7136\u9A7E\u5D29\uFF0C\u672A\u7ACB\u592A\u5B50\uFF01", category: "politics", trigger: { minTurn: 25 }, ...oneTime(6, 100), options: [
-    option("\u7ACB\u957F\u5B50", { legitimacy: 5, stability: -5, triggerEvent: "evt_chain_succession_2" }, 3),
-    option("\u62E9\u8D24\u7ACB", { legitimacy: -5, stability: -8, factionSat: fr("nobles", -10), triggerEvent: "evt_chain_succession_2" }, 2)
-  ] },
-  { id: "evt_chain_succession_2", title: "\u8BF8\u738B\u4E89\u4F4D", description: "\u8BF8\u738B\u5B50\u5404\u7ACB\u515A\u7FBD\uFF0C\u671D\u91CE\u5206\u88C2\uFF01", category: "politics", trigger: { minTurn: 26 }, ...followUp, options: [
-    option("\u5F3A\u529B\u9547\u538B", { gold: -100, stability: -10, factionSat: fr("military", 8), triggerEvent: "evt_chain_succession_3" }, 2),
-    option("\u8C08\u5224\u548C\u89E3", { gold: -150, legitimacy: -8, stability: 3, triggerEvent: "evt_chain_succession_3" }, 3)
-  ] },
-  { id: "evt_chain_succession_3", title: "\u5185\u6218\u7ED3\u675F", description: "\u4E89\u4F4D\u4E4B\u4E89\u7EC8\u89C1\u5206\u6653\u3002", category: "politics", trigger: { minTurn: 27 }, ...followUp, options: [
-    option("\u5927\u8D66\u5929\u4E0B", { gold: -80, legitimacy: 10, stability: 8 }, 3),
-    option("\u6E05\u7B97\u65E7\u8D26", { gold: -40, legitimacy: 5, factionSat: fr("nobles", -15) }, 2)
-  ] },
+  defineEvent(
+    "evt_chain_succession_1",
+    "\u541B\u4E3B\u9A7E\u5D29",
+    "\u541B\u4E3B\u7A81\u7136\u9A7E\u5D29\uFF0C\u672A\u7ACB\u592A\u5B50\uFF01",
+    "politics",
+    fromTurn(25),
+    oneTime(6, 100),
+    [
+      option("\u7ACB\u957F\u5B50", { legitimacy: 5, stability: -5, triggerEvent: "evt_chain_succession_2" }, 3),
+      option("\u62E9\u8D24\u7ACB", { legitimacy: -5, stability: -8, factionSat: noblesReaction(-10), triggerEvent: "evt_chain_succession_2" }, 2)
+    ]
+  ),
+  defineEvent(
+    "evt_chain_succession_2",
+    "\u8BF8\u738B\u4E89\u4F4D",
+    "\u8BF8\u738B\u5B50\u5404\u7ACB\u515A\u7FBD\uFF0C\u671D\u91CE\u5206\u88C2\uFF01",
+    "politics",
+    fromTurn(26),
+    followUp,
+    [
+      option("\u5F3A\u529B\u9547\u538B", { gold: -100, stability: -10, factionSat: militaryReaction(8), triggerEvent: "evt_chain_succession_3" }, 2),
+      option("\u8C08\u5224\u548C\u89E3", { gold: -150, legitimacy: -8, stability: 3, triggerEvent: "evt_chain_succession_3" }, 3)
+    ]
+  ),
+  defineEvent(
+    "evt_chain_succession_3",
+    "\u5185\u6218\u7ED3\u675F",
+    "\u4E89\u4F4D\u4E4B\u4E89\u7EC8\u89C1\u5206\u6653\u3002",
+    "politics",
+    fromTurn(27),
+    followUp,
+    [
+      option("\u5927\u8D66\u5929\u4E0B", { gold: -80, legitimacy: 10, stability: 8 }, 3),
+      option("\u6E05\u7B97\u65E7\u8D26", { gold: -40, legitimacy: 5, factionSat: noblesReaction(-15) }, 2)
+    ]
+  ),
   // 链 13：商业革命链——新兴→繁荣→泡沫或稳固
-  { id: "evt_chain_commerce_1", title: "\u5546\u56E2\u5174\u8D77", description: "\u65B0\u5174\u5546\u56E2\u52BF\u529B\u5927\u589E\uFF0C\u8981\u6C42\u66F4\u591A\u7279\u6743\uFF01", category: "economy", trigger: { minTurn: 15, notAtWar: true, techLevelAbove: { branch: "admin", level: 2 } }, ...recurring(4, 80), options: [
-    option("\u6388\u4E88\u7279\u6743", { gold: 100, factionSat: fra({ faction: "merchants", delta: 12 }, { faction: "nobles", delta: -8 }), triggerEvent: "evt_chain_commerce_2" }, 3),
-    option("\u9650\u5236", { gold: -20, factionSat: fr("merchants", -10), triggerEvent: "evt_chain_commerce_2" }, 2)
-  ] },
-  { id: "evt_chain_commerce_2", title: "\u5546\u4E1A\u7E41\u8363", description: "\u5546\u4E1A\u7A7A\u524D\u7E41\u8363\uFF0C\u91D1\u5E01\u5982\u96E8\uFF01", category: "economy", trigger: { minTurn: 16 }, ...followUp, options: [
-    option("\u5927\u4E3E\u5F81\u7A0E", { gold: 200, factionSat: fr("merchants", -12), triggerEvent: "evt_chain_commerce_3" }, 2),
-    option("\u8F7B\u7A0E\u4FC3\u5546", { gold: 80, factionSat: fr("merchants", 10), stability: 3, triggerEvent: "evt_chain_commerce_3" }, 3)
-  ] },
-  { id: "evt_chain_commerce_3", title: "\u5546\u6F6E\u4F59\u6CE2", description: "\u5546\u4E1A\u6D6A\u6F6E\u540E\uFF0C\u7ECF\u6D4E\u683C\u5C40\u5DF2\u53D8\u3002", category: "economy", trigger: { minTurn: 17 }, ...followUp, options: [
-    option("\u89C4\u8303\u5E02\u573A", { gold: -60, corruption: -5, factionSat: fr("merchants", 5) }, 3),
-    option("\u653E\u4EFB", { corruption: 8, gold: 50 }, 2)
-  ] },
+  defineEvent(
+    "evt_chain_commerce_1",
+    "\u5546\u56E2\u5174\u8D77",
+    "\u65B0\u5174\u5546\u56E2\u52BF\u529B\u5927\u589E\uFF0C\u8981\u6C42\u66F4\u591A\u7279\u6743\uFF01",
+    "economy",
+    { minTurn: 15, notAtWar: true, techLevelAbove: { branch: "admin", level: 2 } },
+    recurring(4, 80),
+    [
+      option("\u6388\u4E88\u7279\u6743", { gold: 100, factionSat: fra({ faction: "merchants", delta: 12 }, { faction: "nobles", delta: -8 }), triggerEvent: "evt_chain_commerce_2" }, 3),
+      option("\u9650\u5236", { gold: -20, factionSat: fr("merchants", -10), triggerEvent: "evt_chain_commerce_2" }, 2)
+    ]
+  ),
+  defineEvent(
+    "evt_chain_commerce_2",
+    "\u5546\u4E1A\u7E41\u8363",
+    "\u5546\u4E1A\u7A7A\u524D\u7E41\u8363\uFF0C\u91D1\u5E01\u5982\u96E8\uFF01",
+    "economy",
+    fromTurn(16),
+    followUp,
+    [
+      option("\u5927\u4E3E\u5F81\u7A0E", { gold: 200, factionSat: fr("merchants", -12), triggerEvent: "evt_chain_commerce_3" }, 2),
+      option("\u8F7B\u7A0E\u4FC3\u5546", { gold: 80, factionSat: fr("merchants", 10), stability: 3, triggerEvent: "evt_chain_commerce_3" }, 3)
+    ]
+  ),
+  defineEvent(
+    "evt_chain_commerce_3",
+    "\u5546\u6F6E\u4F59\u6CE2",
+    "\u5546\u4E1A\u6D6A\u6F6E\u540E\uFF0C\u7ECF\u6D4E\u683C\u5C40\u5DF2\u53D8\u3002",
+    "economy",
+    fromTurn(17),
+    followUp,
+    [
+      option("\u89C4\u8303\u5E02\u573A", { gold: -60, corruption: -5, factionSat: fr("merchants", 5) }, 3),
+      option("\u653E\u4EFB", { corruption: 8, gold: 50 }, 2)
+    ]
+  ),
   // 链 14：宗教改革链——异端→分裂→宽容或镇压
-  { id: "evt_chain_reform_1", title: "\u5B97\u6559\u5F02\u7AEF", description: "\u65B0\u6559\u6D3E\u5174\u8D77\uFF0C\u6311\u6218\u65E7\u6559\u6743\u5A01\uFF01", category: "religion", trigger: { minTurn: 18, techLevelAbove: { branch: "culture", level: 2 } }, ...recurring(4, 100), options: [
-    option("\u9547\u538B", { gold: -80, factionSat: fr("clergy", 12), stability: -5, triggerEvent: "evt_chain_reform_2" }, 2),
-    option("\u5BB9\u5FCD", { factionSat: fr("clergy", -15), stability: 3, triggerEvent: "evt_chain_reform_2" }, 3)
-  ] },
-  { id: "evt_chain_reform_2", title: "\u5B97\u6559\u5206\u88C2", description: "\u6559\u6D3E\u5BF9\u7ACB\u5168\u56FD\u52A8\u8361\uFF01", category: "religion", trigger: { minTurn: 19 }, ...followUp, options: [
-    option("\u5B9A\u4E00\u5C0A", { gold: -150, legitimacy: 8, stability: -10, factionSat: fr("clergy", 15), triggerEvent: "evt_chain_reform_3" }, 2),
-    option("\u5BBD\u5BB9\u5E76\u7ACB", { gold: -50, stability: 5, legitimacy: -5, factionSat: fr("clergy", -10), triggerEvent: "evt_chain_reform_3" }, 3)
-  ] },
-  { id: "evt_chain_reform_3", title: "\u6559\u4E89\u7EC8\u5C40", description: "\u5B97\u6559\u4E4B\u4E89\u6682\u544A\u6BB5\u843D\u3002", category: "religion", trigger: { minTurn: 20 }, ...followUp, options: [
-    option("\u91CD\u5EFA\u6559\u6743", { gold: -100, legitimacy: 5, factionSat: fr("clergy", 10) }, 3),
-    option("\u653F\u6559\u5206\u79BB", { gold: -50, stability: 5, factionSat: fr("clergy", -8) }, 2)
-  ] },
+  defineEvent(
+    "evt_chain_reform_1",
+    "\u5B97\u6559\u5F02\u7AEF",
+    "\u65B0\u6559\u6D3E\u5174\u8D77\uFF0C\u6311\u6218\u65E7\u6559\u6743\u5A01\uFF01",
+    "religion",
+    { minTurn: 18, techLevelAbove: { branch: "culture", level: 2 } },
+    recurring(4, 100),
+    [
+      option("\u9547\u538B", { gold: -80, factionSat: fr("clergy", 12), stability: -5, triggerEvent: "evt_chain_reform_2" }, 2),
+      option("\u5BB9\u5FCD", { factionSat: fr("clergy", -15), stability: 3, triggerEvent: "evt_chain_reform_2" }, 3)
+    ]
+  ),
+  defineEvent(
+    "evt_chain_reform_2",
+    "\u5B97\u6559\u5206\u88C2",
+    "\u6559\u6D3E\u5BF9\u7ACB\u5168\u56FD\u52A8\u8361\uFF01",
+    "religion",
+    fromTurn(19),
+    followUp,
+    [
+      option("\u5B9A\u4E00\u5C0A", { gold: -150, legitimacy: 8, stability: -10, factionSat: fr("clergy", 15), triggerEvent: "evt_chain_reform_3" }, 2),
+      option("\u5BBD\u5BB9\u5E76\u7ACB", { gold: -50, stability: 5, legitimacy: -5, factionSat: fr("clergy", -10), triggerEvent: "evt_chain_reform_3" }, 3)
+    ]
+  ),
+  defineEvent(
+    "evt_chain_reform_3",
+    "\u6559\u4E89\u7EC8\u5C40",
+    "\u5B97\u6559\u4E4B\u4E89\u6682\u544A\u6BB5\u843D\u3002",
+    "religion",
+    fromTurn(20),
+    followUp,
+    [
+      option("\u91CD\u5EFA\u6559\u6743", { gold: -100, legitimacy: 5, factionSat: fr("clergy", 10) }, 3),
+      option("\u653F\u6559\u5206\u79BB", { gold: -50, stability: 5, factionSat: fr("clergy", -8) }, 2)
+    ]
+  ),
   // 链 15：瘟疫大流行链——潜伏→爆发→余波或根治
-  { id: "evt_chain_pandemic_1", title: "\u75AB\u75C5\u6F5C\u4F0F", description: "\u8FDC\u56FD\u75AB\u75C5\u4F20\u5165\uFF0C\u592A\u533B\u594F\u8BF7\u9632\u8303\uFF01", category: "crisis", trigger: { minTurn: 22 }, ...oneTime(5, 120), options: [
-    option("\u4E25\u9632\u8F93\u5165", { gold: -100, stability: 3, triggerEvent: "evt_chain_pandemic_2" }, 3),
-    option("\u89C2\u671B", { triggerEvent: "evt_chain_pandemic_2" }, 2)
-  ] },
-  { id: "evt_chain_pandemic_2", title: "\u5927\u75AB\u7206\u53D1", description: "\u75AB\u75C5\u5168\u56FD\u8513\u5EF6\uFF0C\u6B7B\u8005\u751A\u4F17\uFF01", category: "crisis", trigger: { minTurn: 23 }, ...followUp, options: [
-    option("\u5C01\u57CE\u6551\u6CBB", { gold: -200, population: -300, stability: -8, factionSat: fr("clergy", 8), triggerEvent: "evt_chain_pandemic_3" }, 3),
-    option("\u7948\u7977", { population: -500, stability: -15, legitimacy: -8, triggerEvent: "evt_chain_pandemic_3" }, 1)
-  ] },
-  { id: "evt_chain_pandemic_3", title: "\u75AB\u540E\u91CD\u5EFA", description: "\u5927\u75AB\u7EC8\u4E8E\u9000\u53BB\uFF0C\u767E\u5E9F\u5F85\u5174\u3002", category: "crisis", trigger: { minTurn: 24 }, ...followUp, options: [
-    option("\u4F11\u517B\u751F\u606F", { gold: -150, population: 200, stability: 8, legitimacy: 5 }, 3),
-    option("\u52A0\u7A0E\u91CD\u5EFA", { gold: 100, factionSat: fr("commoners", -15), stability: -5 }, 2)
-  ] },
+  defineEvent(
+    "evt_chain_pandemic_1",
+    "\u75AB\u75C5\u6F5C\u4F0F",
+    "\u8FDC\u56FD\u75AB\u75C5\u4F20\u5165\uFF0C\u592A\u533B\u594F\u8BF7\u9632\u8303\uFF01",
+    "crisis",
+    fromTurn(22),
+    oneTime(5, 120),
+    [
+      option("\u4E25\u9632\u8F93\u5165", { gold: -100, stability: 3, triggerEvent: "evt_chain_pandemic_2" }, 3),
+      option("\u89C2\u671B", { triggerEvent: "evt_chain_pandemic_2" }, 2)
+    ]
+  ),
+  defineEvent(
+    "evt_chain_pandemic_2",
+    "\u5927\u75AB\u7206\u53D1",
+    "\u75AB\u75C5\u5168\u56FD\u8513\u5EF6\uFF0C\u6B7B\u8005\u751A\u4F17\uFF01",
+    "crisis",
+    fromTurn(23),
+    followUp,
+    [
+      option("\u5C01\u57CE\u6551\u6CBB", { gold: -200, population: -300, stability: -8, factionSat: fr("clergy", 8), triggerEvent: "evt_chain_pandemic_3" }, 3),
+      option("\u7948\u7977", { population: -500, stability: -15, legitimacy: -8, triggerEvent: "evt_chain_pandemic_3" }, 1)
+    ]
+  ),
+  defineEvent(
+    "evt_chain_pandemic_3",
+    "\u75AB\u540E\u91CD\u5EFA",
+    "\u5927\u75AB\u7EC8\u4E8E\u9000\u53BB\uFF0C\u767E\u5E9F\u5F85\u5174\u3002",
+    "crisis",
+    fromTurn(24),
+    followUp,
+    [
+      option("\u4F11\u517B\u751F\u606F", { gold: -150, population: 200, stability: 8, legitimacy: 5 }, 3),
+      option("\u52A0\u7A0E\u91CD\u5EFA", { gold: 100, factionSat: commonersReaction(-15), stability: -5 }, 2)
+    ]
+  ),
   // ── population 扩充 +10（21→31，增强人口系统事件多样性）──
-  { id: "evt_pop_aging", title: "\u8006\u8001\u589E\u591A", description: "\u533B\u672F\u6E10\u8FDB\uFF0C\u8006\u5BFF\u589E\u591A\uFF0C\u8D61\u517B\u4E4B\u8BAE\u8D77\uFF01", category: "population", trigger: { minTurn: 20, techLevelAbove: { branch: "admin", level: 2 } }, ...recurring(3, 40), options: [option("\u8BBE\u517B\u6D4E\u9662", { gold: -70, stability: 4, factionSat: fr("commoners", 10) }, 3), option("\u65CF\u517B\u4E3A\u4E3B", { stability: 1, factionSat: fr("nobles", 5) }, 2)] },
-  { id: "evt_pop_orphan", title: "\u5B64\u513F\u6D41\u79BB", description: "\u6218\u4E71\u540E\u5B64\u513F\u6D41\u79BB\u9053\u65C1\uFF0C\u58EB\u6C11\u8BF7\u547D\uFF01", category: "population", trigger: { minTurn: 12, atWar: true }, ...recurring(4, 30), options: [option("\u5B98\u8BBE\u6148\u5E7C\u5C40", { gold: -60, population: 80, stability: 5, factionSat: fr("clergy", 8) }, 3), option("\u6C11\u95F4\u6536\u517B", { population: 40, stability: 1 }, 2)] },
-  { id: "evt_pop_refugee_return", title: "\u6D41\u6C11\u5F52\u4E61", description: "\u6545\u571F\u5B89\u9756\uFF0C\u6614\u65E5\u6D41\u6C11\u7EB7\u7EB7\u5F52\u4E61\uFF01", category: "population", trigger: { minTurn: 18, notAtWar: true, minStability: 50 }, ...recurring(3, 40), options: [option("\u5B98\u52A9\u5F52\u8015", { gold: -50, population: 150, food: 30, efficiency: 2 }, 3), option("\u542C\u5176\u81EA\u4FBF", { population: 80 }, 2)] },
-  { id: "evt_pop_conscription_backlash", title: "\u5F81\u4E01\u6028\u58F0", description: "\u8FDE\u5E74\u5F81\u5175\uFF0C\u4E61\u91CE\u4E01\u58EE\u532E\u4E4F\uFF0C\u6C11\u6028\u6E10\u8D77\uFF01", category: "population", trigger: { minTurn: 10, atWar: true, maxStability: 50 }, ...recurring(5, 25), options: [option("\u51CF\u514D\u6765\u5E74\u5F81\u53D1", { gold: -40, stability: 5, factionSat: fr("commoners", 12) }, 3), option("\u4E25\u4EE4\u50AC\u5F81", { stability: -8, factionSat: fr("commoners", -15), population: -100 }, 1)] },
-  { id: "evt_pop_market_town", title: "\u5E02\u9547\u5174\u8D77", description: "\u4EA4\u901A\u8981\u51B2\u5E02\u9547\u81EA\u53D1\u5174\u8D77\uFF0C\u5546\u8D3E\u4E91\u96C6\uFF01", category: "population", trigger: { minTurn: 14, minStability: 45, techLevelAbove: { branch: "admin", level: 1 } }, ...recurring(3, 35), options: [option("\u8BBE\u5B98\u6CBB\u7406", { gold: -40, efficiency: 3, factionSat: fr("merchants", 10), corruption: -2 }, 3), option("\u4EFB\u5176\u81EA\u6D41", { gold: 30, corruption: 4 }, 2)] },
-  { id: "evt_pop_famine_migration", title: "\u5C31\u98DF\u6D41\u79FB", description: "\u5317\u7701\u5927\u65F1\uFF0C\u9965\u6C11\u5C31\u98DF\u5357\u4E0B\uFF0C\u7EB7\u81F3\u6C93\u6765\uFF01", category: "population", trigger: { minTurn: 12, maxStability: 45 }, ...recurring(5, 30), options: [option("\u5F00\u4ED3\u8D48\u6D4E", { gold: -80, food: -60, population: 200, stability: 4 }, 3), option("\u95ED\u5883\u62D2\u4E4B", { stability: -5, influence: -5, factionSat: fr("commoners", -10) }, 2)] },
-  { id: "evt_pop_noble_exodus", title: "\u8D35\u80C4\u5F99\u907F", description: "\u653F\u5C40\u52A8\u8361\uFF0C\u90E8\u5206\u8D35\u80C4\u643A\u5BB6\u5357\u8FC1\u90BB\u90A6\uFF01", category: "population", trigger: { minTurn: 15, maxStability: 40 }, ...recurring(4, 35), options: [option("\u539A\u793C\u633D\u7559", { gold: -100, legitimacy: 5, factionSat: fr("nobles", 12) }, 3), option("\u4EFB\u5176\u53BB\u7559", { population: -80, influence: -5, factionSat: fr("nobles", -10) }, 2)] },
-  { id: "evt_pop_scholar_return", title: "\u6E38\u5B66\u5F52\u4E61", description: "\u6614\u65E5\u6E38\u5B66\u4E4B\u58EB\u5B66\u6210\u5F52\u56FD\uFF0C\u6B32\u6548\u529B\u5E99\u5802\uFF01", category: "population", trigger: { minTurn: 16, techLevelAbove: { branch: "admin", level: 2 } }, ...recurring(3, 40), options: [option("\u91CF\u624D\u5F55\u7528", { gold: -40, sciPt: 20, efficiency: 3, factionSat: fr("clergy", 8) }, 3), option("\u5F85\u7F3A\u5019\u8865", { sciPt: 5, stability: 1 }, 2)] },
-  { id: "evt_pop_border_trade", title: "\u8FB9\u6C11\u4E92\u5E02", description: "\u8FB9\u6C11\u8D8A\u754C\u4E92\u5E02\uFF0C\u5B98\u5E9C\u67E5\u5426\u4E24\u96BE\uFF01", category: "population", trigger: { minTurn: 10, notAtWar: true }, ...recurring(3, 30), options: [option("\u8BBE\u69B7\u573A\u89C4\u8303", { gold: 60, factionSat: fr("merchants", 10), efficiency: 2 }, 3), option("\u4E25\u7981\u8D8A\u754C", { gold: -20, stability: 2, factionSat: fr("merchants", -8) }, 2)] },
-  { id: "evt_pop_overcrowding", title: "\u4EBA\u7A20\u5730\u72ED", description: "\u6838\u5FC3\u7701\u4EFD\u4EBA\u7A20\u5730\u72ED\uFF0C\u751F\u8BA1\u65E5\u8E59\uFF01", category: "population", trigger: { minTurn: 22, minStability: 50 }, ...recurring(4, 40), options: [option("\u79FB\u6C11\u5B9E\u8FB9", { gold: -100, population: 100, stability: 4, efficiency: 2 }, 3), option("\u7CBE\u8015\u7EC6\u4F5C", { gold: -50, food: 40, sciPt: 5 }, 2)] }
+  defineEvent("evt_pop_aging", "\u8006\u8001\u589E\u591A", "\u533B\u672F\u6E10\u8FDB\uFF0C\u8006\u5BFF\u589E\u591A\uFF0C\u8D61\u517B\u4E4B\u8BAE\u8D77\uFF01", "population", { minTurn: 20, techLevelAbove: { branch: "admin", level: 2 } }, recurring(3, 40), [option("\u8BBE\u517B\u6D4E\u9662", { gold: -70, stability: 4, factionSat: commonersReaction(10) }, 3), option("\u65CF\u517B\u4E3A\u4E3B", { stability: 1, factionSat: noblesReaction(5) }, 2)]),
+  defineEvent("evt_pop_orphan", "\u5B64\u513F\u6D41\u79BB", "\u6218\u4E71\u540E\u5B64\u513F\u6D41\u79BB\u9053\u65C1\uFF0C\u58EB\u6C11\u8BF7\u547D\uFF01", "population", fromTurn(12, { atWar: true }), recurring(4, 30), [option("\u5B98\u8BBE\u6148\u5E7C\u5C40", { gold: -60, population: 80, stability: 5, factionSat: fr("clergy", 8) }, 3), option("\u6C11\u95F4\u6536\u517B", { population: 40, stability: 1 }, 2)]),
+  defineEvent("evt_pop_refugee_return", "\u6D41\u6C11\u5F52\u4E61", "\u6545\u571F\u5B89\u9756\uFF0C\u6614\u65E5\u6D41\u6C11\u7EB7\u7EB7\u5F52\u4E61\uFF01", "population", fromTurn(18, { notAtWar: true, minStability: 50 }), recurring(3, 40), [option("\u5B98\u52A9\u5F52\u8015", { gold: -50, population: 150, food: 30, efficiency: 2 }, 3), option("\u542C\u5176\u81EA\u4FBF", { population: 80 }, 2)]),
+  defineEvent("evt_pop_conscription_backlash", "\u5F81\u4E01\u6028\u58F0", "\u8FDE\u5E74\u5F81\u5175\uFF0C\u4E61\u91CE\u4E01\u58EE\u532E\u4E4F\uFF0C\u6C11\u6028\u6E10\u8D77\uFF01", "population", fromTurn(10, { atWar: true, maxStability: 50 }), recurring(5, 25), [option("\u51CF\u514D\u6765\u5E74\u5F81\u53D1", { gold: -40, stability: 5, factionSat: commonersReaction(12) }, 3), option("\u4E25\u4EE4\u50AC\u5F81", { stability: -8, factionSat: commonersReaction(-15), population: -100 }, 1)]),
+  defineEvent("evt_pop_market_town", "\u5E02\u9547\u5174\u8D77", "\u4EA4\u901A\u8981\u51B2\u5E02\u9547\u81EA\u53D1\u5174\u8D77\uFF0C\u5546\u8D3E\u4E91\u96C6\uFF01", "population", { minTurn: 14, minStability: 45, techLevelAbove: { branch: "admin", level: 1 } }, recurring(3, 35), [option("\u8BBE\u5B98\u6CBB\u7406", { gold: -40, efficiency: 3, factionSat: fr("merchants", 10), corruption: -2 }, 3), option("\u4EFB\u5176\u81EA\u6D41", { gold: 30, corruption: 4 }, 2)]),
+  defineEvent("evt_pop_famine_migration", "\u5C31\u98DF\u6D41\u79FB", "\u5317\u7701\u5927\u65F1\uFF0C\u9965\u6C11\u5C31\u98DF\u5357\u4E0B\uFF0C\u7EB7\u81F3\u6C93\u6765\uFF01", "population", fromTurn(12, { maxStability: 45 }), recurring(5, 30), [option("\u5F00\u4ED3\u8D48\u6D4E", { gold: -80, food: -60, population: 200, stability: 4 }, 3), option("\u95ED\u5883\u62D2\u4E4B", { stability: -5, influence: -5, factionSat: commonersReaction(-10) }, 2)]),
+  defineEvent("evt_pop_noble_exodus", "\u8D35\u80C4\u5F99\u907F", "\u653F\u5C40\u52A8\u8361\uFF0C\u90E8\u5206\u8D35\u80C4\u643A\u5BB6\u5357\u8FC1\u90BB\u90A6\uFF01", "population", fromTurn(15, { maxStability: 40 }), recurring(4, 35), [option("\u539A\u793C\u633D\u7559", { gold: -100, legitimacy: 5, factionSat: noblesReaction(12) }, 3), option("\u4EFB\u5176\u53BB\u7559", { population: -80, influence: -5, factionSat: noblesReaction(-10) }, 2)]),
+  defineEvent("evt_pop_scholar_return", "\u6E38\u5B66\u5F52\u4E61", "\u6614\u65E5\u6E38\u5B66\u4E4B\u58EB\u5B66\u6210\u5F52\u56FD\uFF0C\u6B32\u6548\u529B\u5E99\u5802\uFF01", "population", { minTurn: 16, techLevelAbove: { branch: "admin", level: 2 } }, recurring(3, 40), [option("\u91CF\u624D\u5F55\u7528", { gold: -40, sciPt: 20, efficiency: 3, factionSat: fr("clergy", 8) }, 3), option("\u5F85\u7F3A\u5019\u8865", { sciPt: 5, stability: 1 }, 2)]),
+  defineEvent("evt_pop_border_trade", "\u8FB9\u6C11\u4E92\u5E02", "\u8FB9\u6C11\u8D8A\u754C\u4E92\u5E02\uFF0C\u5B98\u5E9C\u67E5\u5426\u4E24\u96BE\uFF01", "population", fromTurn(10, { notAtWar: true }), recurring(3, 30), [option("\u8BBE\u69B7\u573A\u89C4\u8303", { gold: 60, factionSat: fr("merchants", 10), efficiency: 2 }, 3), option("\u4E25\u7981\u8D8A\u754C", { gold: -20, stability: 2, factionSat: fr("merchants", -8) }, 2)]),
+  defineEvent("evt_pop_overcrowding", "\u4EBA\u7A20\u5730\u72ED", "\u6838\u5FC3\u7701\u4EFD\u4EBA\u7A20\u5730\u72ED\uFF0C\u751F\u8BA1\u65E5\u8E59\uFF01", "population", fromTurn(22, { minStability: 50 }), recurring(4, 40), [option("\u79FB\u6C11\u5B9E\u8FB9", { gold: -100, population: 100, stability: 4, efficiency: 2 }, 3), option("\u7CBE\u8015\u7EC6\u4F5C", { gold: -50, food: 40, sciPt: 5 }, 2)])
 ];
 var EVENT_BY_ID = Object.fromEntries(
   EVENTS.map((e) => [e.id, e])
@@ -3772,6 +4235,683 @@ var TERRAIN_COMBAT_MOD = {
   ocean: 1,
   island: 1
 };
+
+// src/data/policies.ts
+var POLICIES = [
+  {
+    id: "land_privilege",
+    name: "\u8D35\u65CF\u571F\u5730\u7279\u6743",
+    description: "\u4FDD\u969C\u8D35\u65CF\u571F\u5730\u6743\u76CA\uFF0C\u63D0\u8D35\u65CF\u6EE1\u610F\u5EA6\uFF0C\u4F46\u884C\u653F\u80FD\u529B\u4E0B\u964D\u3002",
+    costAction: 1,
+    costGold: 50,
+    allowedGovernments: ["monarchy", "empire"],
+    effects: { efficiencyMod: -5 },
+    factionReaction: { nobles: 15, merchants: -5, commoners: -10 }
+  },
+  {
+    id: "royal_tax",
+    name: "\u738B\u5BB6\u7A0E",
+    description: "\u738B\u5BA4\u76F4\u8F96\u7A0E\u6536\uFF0C\u6548\u7387\u5347\u4F46\u6C11\u5FC3\u964D\u3002",
+    costAction: 1,
+    costGold: 80,
+    allowedGovernments: ["monarchy", "empire"],
+    effects: { taxEffMod: 1.1, stabilityMod: -3 },
+    factionReaction: { nobles: 5, merchants: -5, commoners: -10 }
+  },
+  {
+    id: "free_trade",
+    name: "\u81EA\u7531\u8D38\u6613",
+    description: "\u653E\u5BBD\u8D38\u6613\u7BA1\u5236\uFF0C\u8D38\u6613\u6536\u5165\u4E0E\u5546\u4EBA\u6EE1\u610F\u5EA6\u5347\u3002",
+    costAction: 1,
+    costGold: 100,
+    allowedGovernments: ["republic", "empire"],
+    effects: { influenceMod: 3 },
+    factionReaction: { merchants: 20, nobles: -5, commoners: 5 }
+  },
+  {
+    id: "civic_reform",
+    name: "\u516C\u6C11\u6539\u9769",
+    description: "\u6269\u5927\u516C\u6C11\u6743\uFF0C\u6C11\u4F17\u6EE1\u610F\u5EA6\u5347\uFF0C\u4F46\u8D35\u65CF\u4E0D\u6EE1\u3002",
+    costAction: 2,
+    costGold: 200,
+    allowedGovernments: ["republic"],
+    effects: { stabilityMod: 5, popGrowthMod: 1.05 },
+    factionReaction: { nobles: -15, commoners: 20, merchants: 5 }
+  },
+  {
+    id: "state_religion",
+    name: "\u56FD\u6559\u7ACB\u56FD",
+    description: "\u786E\u7ACB\u56FD\u6559\uFF0C\u795E\u804C\u6EE1\u610F\u5EA6\u4E0E\u5408\u6CD5\u6027\u5347\uFF0C\u4F46\u5F02\u6559\u5730\u533A\u53DB\u4E71\u5347\u3002",
+    costAction: 1,
+    costGold: 100,
+    allowedGovernments: ["theocracy", "monarchy"],
+    effects: { stabilityMod: 3, influenceMod: 5 },
+    factionReaction: { clergy: 25, nobles: 5, commoners: -5 }
+  },
+  {
+    id: "holy_war",
+    name: "\u5723\u6218",
+    description: "\u5BF9\u5F02\u6559\u56FD\u5BA3\u6218\u52A0\u6210\uFF0C\u519B\u65B9\u4E0E\u795E\u804C\u6EE1\u610F\u5EA6\u5347\uFF0C\u4F46\u5916\u4EA4\u6076\u5316\u3002",
+    costAction: 1,
+    costGold: 150,
+    allowedGovernments: ["theocracy"],
+    effects: { combatMod: 1.1, mobilizationMod: 1.2 },
+    factionReaction: { military: 15, clergy: 15, merchants: -15, commoners: -10 }
+  },
+  {
+    id: "martial_law",
+    name: "\u6212\u4E25\u4EE4",
+    description: "\u5F3A\u5316\u9547\u538B\uFF0C\u53DB\u4E71\u98CE\u9669\u964D\uFF0C\u4F46\u6C11\u5FC3\u4E0E\u5916\u4EA4\u964D\u3002",
+    costAction: 1,
+    costGold: 80,
+    allowedGovernments: ["junta", "empire"],
+    effects: { stabilityMod: 5, efficiencyMod: 5, influenceMod: -3 },
+    factionReaction: { military: 10, commoners: -15, merchants: -10 }
+  },
+  {
+    id: "conscription",
+    name: "\u5168\u6C11\u5F81\u5175",
+    description: "\u5F81\u5175\u901F\u5EA6\u5927\u5E45\u63D0\u5347\uFF0C\u4F46\u6C11\u4F17\u6EE1\u610F\u5EA6\u964D\u3002",
+    costAction: 1,
+    costGold: 100,
+    allowedGovernments: ["junta", "empire", "monarchy"],
+    effects: { mobilizationMod: 1.3 },
+    factionReaction: { military: 15, commoners: -15, merchants: -5 }
+  },
+  {
+    id: "centralization",
+    name: "\u4E2D\u592E\u96C6\u6743",
+    description: "\u96C6\u6743\u884C\u653F\uFF0C\u7A0E\u6536\u4E0E\u884C\u653F\u80FD\u529B\u5347\uFF0C\u4F46\u5730\u65B9\u53DB\u4E71\u5347\u3002",
+    costAction: 2,
+    costGold: 200,
+    allowedGovernments: ["empire", "monarchy"],
+    effects: { taxEffMod: 1.1, efficiencyMod: 10, assimilationMod: 2 },
+    factionReaction: { nobles: -10, merchants: -5, commoners: -5 }
+  },
+  {
+    id: "imperial_tax",
+    name: "\u5E1D\u56FD\u7A0E",
+    description: "\u884C\u7701\u91CD\u7A0E\uFF0C\u56FD\u5E93\u5347\u4F46\u5730\u65B9\u4E0D\u6EE1\u3002",
+    costAction: 1,
+    costGold: 120,
+    allowedGovernments: ["empire"],
+    effects: { taxEffMod: 1.15, stabilityMod: -5 },
+    factionReaction: { nobles: 5, merchants: -10, commoners: -15 }
+  },
+  {
+    id: "anti_corruption",
+    name: "\u53CD\u8150\u6539\u9769",
+    description: "\u5F3A\u529B\u53CD\u8150\uFF0C\u8150\u8D25\u5927\u964D\u4F46\u8D35\u65CF\u4E0D\u6EE1\u3002\u9700\u884C\u653F\u79D1\u6280 Lv3\u3002",
+    costAction: 2,
+    costGold: 300,
+    allowedGovernments: [],
+    effects: { corruptionMod: -15, efficiencyMod: 10 },
+    factionReaction: { nobles: -20, merchants: 10, commoners: 10 },
+    prereqTech: "admin_lv3"
+  },
+  {
+    id: "welfare",
+    name: "\u798F\u5229\u653F\u7B56",
+    description: "\u5B89\u629A\u6C11\u4F17\uFF0C\u6EE1\u610F\u5EA6\u4E0E\u4EBA\u53E3\u589E\u957F\u5347\uFF0C\u4F46\u56FD\u5E93\u8D1F\u62C5\u3002",
+    costAction: 1,
+    costGold: 150,
+    allowedGovernments: [],
+    effects: { popGrowthMod: 1.1, stabilityMod: 3, taxRateMod: -0.02 },
+    factionReaction: { commoners: 20, nobles: -10, merchants: -5 }
+  },
+  // ── B 扩展：13 个新政策 ──
+  { id: "education_reform", name: "\u6559\u80B2\u6539\u9769", description: "\u5E7F\u8BBE\u5B66\u5BAB\uFF0C\u63D0\u5347\u79D1\u7814\u4E0E\u540C\u5316\u3002", costAction: 2, costGold: 200, allowedGovernments: [], effects: { assimilationMod: 5, efficiencyMod: 3 }, factionReaction: { clergy: -8, commoners: 8 }, prereqTech: "admin_lv3" },
+  { id: "merchant_guild", name: "\u5546\u56E2\u7279\u8BB8", description: "\u6388\u4E88\u5546\u56E2\u4E13\u8425\u6743\uFF0C\u8D38\u6613\u5347\u4F46\u8D35\u65CF\u4E0D\u6EE1\u3002", costAction: 1, costGold: 120, allowedGovernments: ["republic", "merchant_republic", "monarchy"], effects: { taxEffMod: 1.08 }, factionReaction: { merchants: 18, nobles: -12 } },
+  { id: "land_reform", name: "\u5747\u7530\u4EE4", description: "\u91CD\u65B0\u5206\u914D\u571F\u5730\uFF0C\u6C11\u4F17\u5927\u60A6\u4F46\u8D35\u65CF\u53CD\u5F39\u3002", costAction: 2, costGold: 180, allowedGovernments: ["empire", "monarchy", "republic"], effects: { popGrowthMod: 1.08, stabilityMod: 5 }, factionReaction: { commoners: 25, nobles: -25 } },
+  { id: "toleration", name: "\u5B97\u6559\u5BBD\u5BB9", description: "\u5BBD\u5BB9\u5F02\u6559\uFF0C\u964D\u51B2\u7A81\u4F46\u795E\u804C\u4E0D\u6EE1\u3002", costAction: 1, costGold: 100, allowedGovernments: [], effects: { stabilityMod: 3, assimilationMod: 8 }, factionReaction: { clergy: -20, commoners: 5 } },
+  { id: "civil_service_exam", name: "\u79D1\u4E3E\u5236", description: "\u4EE5\u8003\u8BD5\u9009\u62D4\u5B98\u540F\uFF0C\u884C\u653F\u5927\u5347\u3002\u9700\u884C\u653F Lv3\u3002", costAction: 2, costGold: 250, allowedGovernments: ["empire", "monarchy"], effects: { efficiencyMod: 15, corruptionMod: -8 }, factionReaction: { nobles: -18, commoners: 10 }, prereqTech: "admin_lv3" },
+  { id: "military_reform", name: "\u519B\u4E8B\u6539\u9769", description: "\u91CD\u7EC4\u519B\u5236\uFF0C\u6218\u6597\u529B\u5347\u4F46\u8017\u91D1\u3002", costAction: 2, costGold: 200, allowedGovernments: ["empire", "monarchy", "junta"], effects: { combatMod: 1.15, mobilizationMod: 1.2 }, factionReaction: { military: 20, commoners: -8 } },
+  { id: "naval_expansion", name: "\u6269\u5F20\u8230\u961F", description: "\u5927\u529B\u53D1\u5C55\u6D77\u519B\uFF0C\u6D77\u4E0A\u8D38\u6613\u4E0E\u6218\u529B\u5347\u3002", costAction: 2, costGold: 180, allowedGovernments: ["republic", "merchant_republic", "empire"], effects: { influenceMod: 1.1, combatMod: 1.1 }, factionReaction: { military: 12, merchants: 10 } },
+  { id: "agrarian_reform", name: "\u519C\u672C\u653F\u7B56", description: "\u4EBA\u53E3\u589E\u957F\u52A0\u5FEB 6%\uFF0C\u7A0E\u7387\u964D\u4F4E 1 \u4E2A\u767E\u5206\u70B9\u3002", costAction: 1, costGold: 100, allowedGovernments: ["empire", "monarchy"], effects: { popGrowthMod: 1.06, taxRateMod: -0.01 }, factionReaction: { commoners: 12, merchants: -15 } },
+  { id: "infrastructure_plan", name: "\u57FA\u5EFA\u632F\u5174", description: "\u5168\u56FD\u4FEE\u8DEF\u5EFA\u6865\uFF0C\u884C\u653F\u4E0E\u8D38\u6613\u5347\u3002\u9700\u884C\u653F Lv2\u3002", costAction: 2, costGold: 220, allowedGovernments: [], effects: { efficiencyMod: 8, taxEffMod: 1.05 }, factionReaction: { commoners: 8, merchants: 8 }, prereqTech: "admin_lv2" },
+  { id: "census", name: "\u7F16\u6237\u9F50\u6C11", description: "\u666E\u67E5\u4EBA\u53E3\uFF0C\u7A0E\u6536\u6548\u7387\u5347\u3002\u9700\u884C\u653F Lv2\u3002", costAction: 1, costGold: 150, allowedGovernments: ["empire", "monarchy"], effects: { taxEffMod: 1.1, efficiencyMod: 5 }, factionReaction: { nobles: -8 }, prereqTech: "admin_lv2" },
+  { id: "diplomatic_corps", name: "\u5916\u4EA4\u4F7F\u56E2", description: "\u8BBE\u7ACB\u4E13\u804C\u5916\u4EA4\u673A\u6784\uFF0C\u5F71\u54CD\u529B\u4EA7\u51FA\u5347\u3002", costAction: 1, costGold: 130, allowedGovernments: [], effects: { influenceMod: 1.15 }, factionReaction: { nobles: 5, merchants: 5 } },
+  { id: "cultural_patronage", name: "\u6587\u5316\u8D5E\u52A9", description: "\u8D5E\u52A9\u827A\u672F\u5B66\u672F\uFF0C\u5A01\u671B\u4E0E\u540C\u5316\u5347\u3002", costAction: 1, costGold: 110, allowedGovernments: [], effects: { influenceMod: 1.08, assimilationMod: 3 }, factionReaction: { clergy: 5, commoners: 3 } },
+  { id: "succession_law", name: "\u7EE7\u627F\u6CD5", description: "\u786E\u7ACB\u7EE7\u627F\u987A\u5E8F\uFF0C\u5408\u6CD5\u6027\u5927\u5347\u4F46\u9650\u5236\u541B\u4E3B\u3002", costAction: 2, costGold: 200, allowedGovernments: ["monarchy", "empire"], effects: { stabilityMod: 8 }, factionReaction: { nobles: 15, military: -5 } },
+  // ── D2 扩充：4 个质变政策，绑定 Lv5 科技解锁 ──
+  { id: "crop_rotation", name: "\u8F6E\u4F5C\u653F\u7B56", description: "\u79D1\u5B66\u8F6E\u4F5C\u517B\u5730\uFF0C\u7CAE\u4EA7 +15%\u3002\u9700\u519C\u4E1A Lv5\u3002", costAction: 2, costGold: 280, allowedGovernments: [], effects: { foodOutputMod: 1.15 }, factionReaction: { commoners: 15, nobles: -5 }, prereqTech: "agri_lv5" },
+  { id: "total_mobilization", name: "\u603B\u52A8\u5458", description: "\u5168\u56FD\u52A8\u5458\uFF0C\u5F81\u5175 \xD72 \u4F46\u538C\u6218 +15\u3002\u9700\u519B\u4E8B Lv5\u3002", costAction: 3, costGold: 350, allowedGovernments: ["empire", "junta", "monarchy"], effects: { mobilizationMod: 2 }, factionReaction: { military: 25, commoners: -20 }, prereqTech: "mil_lv5" },
+  { id: "civil_service_reform", name: "\u79D1\u4E3E\u6539\u9769", description: "\u6DF1\u5316\u79D1\u4E3E\uFF0C\u8150\u8D25 -10\u3001\u884C\u653F +10\u3002\u9700\u884C\u653F Lv5\u3002", costAction: 3, costGold: 320, allowedGovernments: ["empire", "monarchy", "republic"], effects: { corruptionMod: -10, efficiencyMod: 10 }, factionReaction: { nobles: -22, commoners: 12, clergy: 5 }, prereqTech: "admin_lv5" },
+  { id: "cultural_export", name: "\u6587\u5316\u8F93\u51FA", description: "\u5411\u8BF8\u90A6\u8F93\u51FA\u6587\u5316\uFF0C\u5F71\u54CD\u529B +25%\u3001\u5916\u4EA4 +10\u3002\u9700\u6587\u5316 Lv5\u3002", costAction: 2, costGold: 260, allowedGovernments: [], effects: { influenceMod: 1.25, assimilationMod: 8 }, factionReaction: { clergy: 8, commoners: 5 }, prereqTech: "culture_lv5" }
+];
+var POLICY_BY_ID = Object.fromEntries(
+  POLICIES.map((p) => [p.id, p])
+);
+
+// src/data/laws.ts
+var LAWS = [
+  // ── 民法类（civil）── 关乎产权、婚姻、契约
+  {
+    id: "law_civil_code",
+    name: "\u6210\u6587\u6CD5\u5178",
+    category: "civil",
+    description: "\u9881\u5E03\u6210\u6587\u6CD5\uFF0C\u660E\u793A\u5F8B\u4EE4\uFF0C\u9650\u5236\u5B98\u540F\u64C5\u6743\u3002",
+    costGold: 120,
+    allowedGovernments: [],
+    prereqAdminLevel: 2,
+    effects: { corruptionMod: -5, stabilityMod: 5, legitimacyMod: 8, efficiencyMod: 3 },
+    factionReaction: { nobles: -10, commoners: 12, merchants: 8 }
+  },
+  {
+    id: "law_land_reform",
+    name: "\u571F\u5730\u6539\u9769",
+    category: "civil",
+    description: "\u9650\u5236\u8D35\u65CF\u5360\u5730\uFF0C\u91CD\u5206\u571F\u5730\u4E8E\u519C\u6C11\u3002",
+    costGold: 200,
+    allowedGovernments: ["republic", "monarchy", "empire", "theocracy"],
+    prereqAdminLevel: 3,
+    conflictsWith: ["law_noble_privilege"],
+    effects: { stabilityMod: 3, efficiencyMod: 5, taxEffMod: 1.05, unrestReduction: 1 },
+    factionReaction: { nobles: -20, commoners: 18, merchants: 5 }
+  },
+  {
+    id: "law_noble_privilege",
+    name: "\u8D35\u65CF\u7279\u6743\u6CD5",
+    category: "civil",
+    description: "\u4EE5\u6CD5\u5F8B\u56FA\u5316\u8D35\u65CF\u7279\u6743\uFF0C\u6362\u53D6\u5176\u652F\u6301\u3002",
+    costGold: 80,
+    allowedGovernments: ["monarchy", "empire", "feudal"],
+    prereqAdminLevel: 1,
+    conflictsWith: ["law_land_reform", "law_equal_tax"],
+    effects: { stabilityMod: 4, legitimacyMod: 5, efficiencyMod: -3, corruptionMod: 3 },
+    factionReaction: { nobles: 20, commoners: -10, merchants: -5 }
+  },
+  {
+    id: "law_equal_tax",
+    name: "\u5747\u7A0E\u6CD5",
+    category: "civil",
+    description: "\u8D35\u65CF\u5546\u4EBA\u4E00\u4F53\u7EB3\u7A0E\uFF0C\u5E9F\u9664\u514D\u7A0E\u7279\u6743\u3002",
+    costGold: 150,
+    allowedGovernments: ["republic", "empire", "theocracy"],
+    prereqAdminLevel: 3,
+    conflictsWith: ["law_noble_privilege"],
+    effects: { taxEffMod: 1.1, corruptionMod: -3, efficiencyMod: 4 },
+    factionReaction: { nobles: -15, merchants: -8, commoners: 10 }
+  },
+  // ── 刑法类（criminal）── 关乎治安、刑罚
+  {
+    id: "law_strict_punishment",
+    name: "\u4E25\u5211\u5CFB\u6CD5",
+    category: "criminal",
+    description: "\u91CD\u5211\u60E9\u6CBB\u76D7\u532A\u53DB\u4E71\uFF0C\u9707\u6151\u5730\u65B9\u3002",
+    costGold: 60,
+    allowedGovernments: [],
+    prereqAdminLevel: 1,
+    effects: { stabilityMod: 3, efficiencyMod: 2, unrestReduction: 2, rebellionReduction: 3 },
+    factionReaction: { military: 8, commoners: -8, nobles: 3 }
+  },
+  {
+    id: "law_mercy_policy",
+    name: "\u5BBD\u5211\u7701\u7F5A",
+    category: "criminal",
+    description: "\u51CF\u8F7B\u5211\u7F5A\uFF0C\u4EE5\u4EC1\u653F\u6536\u4EBA\u5FC3\u3002",
+    costGold: 50,
+    allowedGovernments: ["republic", "theocracy", "monarchy"],
+    prereqAdminLevel: 2,
+    conflictsWith: ["law_strict_punishment"],
+    effects: { stabilityMod: 5, legitimacyMod: 3, efficiencyMod: -2 },
+    factionReaction: { commoners: 12, clergy: 8, military: -6 }
+  },
+  {
+    id: "law_conscription",
+    name: "\u5F81\u5175\u6CD5",
+    category: "criminal",
+    description: "\u4F9D\u6CD5\u5F3A\u5236\u5F81\u5175\uFF0C\u6269\u5145\u519B\u529B\u3002",
+    costGold: 100,
+    allowedGovernments: [],
+    prereqAdminLevel: 2,
+    effects: { efficiencyMod: 3, stabilityMod: -2, unrestReduction: -1 },
+    factionReaction: { military: 15, commoners: -12, nobles: 3 }
+  },
+  {
+    id: "law_anti_corruption",
+    name: "\u53CD\u8150\u5F8B",
+    category: "criminal",
+    description: "\u4E25\u60E9\u8D2A\u58A8\uFF0C\u8BBE\u76D1\u5BDF\u4E4B\u804C\u3002",
+    costGold: 180,
+    allowedGovernments: [],
+    prereqAdminLevel: 3,
+    effects: { corruptionMod: -10, efficiencyMod: 5, stabilityMod: 2 },
+    factionReaction: { nobles: -12, merchants: 5, commoners: 10 }
+  },
+  // ── 行政法类（administrative）── 关乎官僚、地方、税收
+  {
+    id: "law_civil_service",
+    name: "\u79D1\u4E3E\u8003\u7EE9\u6CD5",
+    category: "administrative",
+    description: "\u4EE5\u8003\u8BD5\u9009\u5B98\uFF0C\u6253\u7834\u4E16\u88AD\u3002",
+    costGold: 150,
+    allowedGovernments: ["empire", "republic", "monarchy"],
+    prereqAdminLevel: 3,
+    effects: { efficiencyMod: 8, corruptionMod: -4, legitimacyMod: 4 },
+    factionReaction: { nobles: -15, clergy: 5, scholars: 15 }
+  },
+  {
+    id: "law_decentralization",
+    name: "\u5730\u65B9\u81EA\u6CBB\u6CD5",
+    category: "administrative",
+    description: "\u653E\u6743\u5730\u65B9\uFF0C\u51CF\u8F7B\u4E2D\u592E\u8D1F\u62C5\u3002",
+    costGold: 100,
+    allowedGovernments: ["republic", "feudal", "tribal"],
+    prereqAdminLevel: 2,
+    conflictsWith: ["law_centralization"],
+    effects: { efficiencyMod: -3, stabilityMod: 4, taxEffMod: 0.97, unrestReduction: 1 },
+    factionReaction: { nobles: 10, commoners: 5, merchants: 3 }
+  },
+  {
+    id: "law_centralization",
+    name: "\u4E2D\u592E\u96C6\u6743\u6CD5",
+    category: "administrative",
+    description: "\u6536\u5F52\u5730\u65B9\u6743\u529B\u4E8E\u4E2D\u592E\u3002",
+    costGold: 200,
+    allowedGovernments: ["empire", "monarchy", "theocracy", "military"],
+    prereqAdminLevel: 3,
+    conflictsWith: ["law_decentralization"],
+    effects: { efficiencyMod: 6, taxEffMod: 1.04, stabilityMod: -2 },
+    factionReaction: { nobles: -8, military: 8, commoners: -3 }
+  },
+  {
+    id: "law_trade_regulation",
+    name: "\u5546\u5F8B",
+    category: "administrative",
+    description: "\u89C4\u8303\u5E02\u573A\uFF0C\u4FDD\u62A4\u5951\u7EA6\u3002",
+    costGold: 120,
+    allowedGovernments: [],
+    prereqAdminLevel: 2,
+    effects: { taxEffMod: 1.03, efficiencyMod: 2, corruptionMod: -2 },
+    factionReaction: { merchants: 15, nobles: -3, commoners: 3 }
+  },
+  // ── D4 扩充：+8 法律到 20 ──
+  // 民法 +3
+  {
+    id: "law_marriage_reform",
+    name: "\u5A5A\u59FB\u6539\u9769\u6CD5",
+    category: "civil",
+    description: "\u653E\u5BBD\u5A5A\u59FB\u9650\u5236\uFF0C\u4FDD\u62A4\u5973\u6027\u8D22\u4EA7\uFF0C\u63D0\u5347\u6C11\u4F17\u8BA4\u540C\u3002",
+    costGold: 90,
+    allowedGovernments: [],
+    prereqAdminLevel: 2,
+    effects: { stabilityMod: 4, legitimacyMod: 3, unrestReduction: 1 },
+    factionReaction: { commoners: 10, clergy: -8, nobles: -3 }
+  },
+  {
+    id: "law_contract_enforcement",
+    name: "\u5951\u7EA6\u6267\u884C\u6CD5",
+    category: "civil",
+    description: "\u5F3A\u5316\u5951\u7EA6\u6548\u529B\uFF0C\u5546\u4E1A\u7EA0\u7EB7\u6709\u6CD5\u53EF\u4F9D\u3002",
+    costGold: 110,
+    allowedGovernments: [],
+    prereqAdminLevel: 2,
+    effects: { taxEffMod: 1.04, corruptionMod: -3, efficiencyMod: 2 },
+    factionReaction: { merchants: 18, nobles: -5, commoners: 2 }
+  },
+  {
+    id: "law_eminent_domain",
+    name: "\u5F81\u6536\u6CD5",
+    category: "civil",
+    description: "\u56FD\u5BB6\u53EF\u5F81\u7528\u79C1\u5730\u5EFA\u516C\u5171\u8BBE\u65BD\uFF0C\u8D35\u65CF\u53CD\u5F39\u4F46\u884C\u653F\u5347\u3002",
+    costGold: 140,
+    allowedGovernments: ["empire", "republic", "monarchy"],
+    prereqAdminLevel: 3,
+    conflictsWith: ["law_noble_privilege"],
+    effects: { efficiencyMod: 6, taxEffMod: 1.03, stabilityMod: -2 },
+    factionReaction: { nobles: -18, commoners: 5, merchants: 3 }
+  },
+  // 刑法 +2
+  {
+    id: "law_prison_reform",
+    name: "\u72F1\u653F\u6539\u9769",
+    category: "criminal",
+    description: "\u6539\u5584\u72F1\u653F\uFF0C\u51CF\u5C11\u51A4\u72F1\uFF0C\u6C11\u5FC3\u5347\u4F46\u9707\u6151\u964D\u3002",
+    costGold: 80,
+    allowedGovernments: [],
+    prereqAdminLevel: 2,
+    conflictsWith: ["law_strict_punishment"],
+    effects: { stabilityMod: 4, legitimacyMod: 4, rebellionReduction: -1 },
+    factionReaction: { commoners: 10, clergy: 6, military: -5 }
+  },
+  {
+    id: "law_border_control",
+    name: "\u8FB9\u9632\u7BA1\u5236\u6CD5",
+    category: "criminal",
+    description: "\u4E25\u63A7\u8FB9\u5883\uFF0C\u9632\u95F4\u8C0D\u6E17\u900F\uFF0C\u6CBB\u5B89\u5347\u4F46\u8D38\u6613\u964D\u3002",
+    costGold: 100,
+    allowedGovernments: [],
+    prereqAdminLevel: 2,
+    effects: { stabilityMod: 3, efficiencyMod: 3, rebellionReduction: 2 },
+    factionReaction: { military: 12, merchants: -10, nobles: 3 }
+  },
+  // 行政法 +3
+  {
+    id: "law_census_registration",
+    name: "\u7F16\u6237\u9F50\u6C11\u6CD5",
+    category: "administrative",
+    description: "\u666E\u67E5\u4EBA\u53E3\u6237\u7C4D\uFF0C\u7A0E\u6536\u6548\u7387\u5927\u5347\u4F46\u8D35\u65CF\u62B5\u5236\u3002",
+    costGold: 160,
+    allowedGovernments: ["empire", "monarchy", "republic"],
+    prereqAdminLevel: 3,
+    effects: { taxEffMod: 1.08, efficiencyMod: 6, corruptionMod: -4 },
+    factionReaction: { nobles: -12, merchants: 5, commoners: 3 }
+  },
+  {
+    id: "law_merchant_guild_charter",
+    name: "\u5546\u56E2\u7279\u8BB8\u6CD5",
+    category: "administrative",
+    description: "\u6388\u4E88\u5546\u56E2\u4E13\u8425\u7279\u6743\uFF0C\u8D38\u6613\u5347\u4F46\u5C0F\u5546\u6237\u4E0D\u6EE1\u3002",
+    costGold: 130,
+    allowedGovernments: ["republic", "monarchy", "empire"],
+    prereqAdminLevel: 2,
+    conflictsWith: ["law_equal_tax"],
+    effects: { taxEffMod: 1.05, corruptionMod: 3, efficiencyMod: 2 },
+    factionReaction: { merchants: 15, nobles: 5, commoners: -8 }
+  },
+  {
+    id: "law_religious_tolerance",
+    name: "\u5B97\u6559\u5BBD\u5BB9\u6CD5",
+    category: "administrative",
+    description: "\u5BBD\u5BB9\u5F02\u6559\uFF0C\u964D\u51B2\u7A81\u4F46\u795E\u804C\u4E0D\u6EE1\u3002",
+    costGold: 120,
+    allowedGovernments: [],
+    prereqAdminLevel: 2,
+    conflictsWith: ["law_strict_punishment"],
+    effects: { stabilityMod: 4, efficiencyMod: 3, unrestReduction: 2 },
+    factionReaction: { clergy: -18, commoners: 8, merchants: 5 }
+  }
+];
+var LAW_BY_ID = Object.fromEntries(
+  LAWS.map((l) => [l.id, l])
+);
+var LAW_IDS = LAWS.map((l) => l.id);
+var LAW_COUNT = LAWS.length;
+var LAWS_BY_CATEGORY = {
+  civil: LAWS.filter((l) => l.category === "civil"),
+  criminal: LAWS.filter((l) => l.category === "criminal"),
+  administrative: LAWS.filter((l) => l.category === "administrative")
+};
+
+// src/engine/politics.ts
+function settlePolitics(nation, state, provs = provincesOf(nation.id, state.provinces)) {
+  const fw = factionWeightedSat(nation.factions);
+  const avgUnrest = provs.length ? provs.reduce((s, p) => s + p.unrest, 0) / provs.length : 0;
+  const rebellionProvCount = provs.filter((p) => p.rebellionRisk >= 100).length;
+  const dStab = stabilityDelta(
+    nation.government.legitimacy,
+    fw.weighted,
+    fw.totalPower,
+    avgUnrest,
+    nation.warExhaustion,
+    rebellionProvCount
+  );
+  let finalDelta = dStab;
+  if (nation.civilWar?.active) {
+    finalDelta -= 3;
+  }
+  const stab = nation.government.stability;
+  const atWar2 = nation.civilWar?.active;
+  if (stab < 40) {
+    finalDelta = Math.max(finalDelta, atWar2 ? 2 : 5);
+  } else if (stab < 60) {
+    finalDelta = Math.max(finalDelta, atWar2 ? 1 : 3);
+  } else if (stab < 75) {
+    finalDelta = Math.max(finalDelta, atWar2 ? 0 : 1.5);
+  } else {
+    finalDelta = Math.max(finalDelta, -2);
+  }
+  nation.government.stability = clamp(nation.government.stability + finalDelta, 0, 100);
+  const reformShockTurns = nation.activePolicies.filter(
+    (p) => state.turn - p.enactedTurn < 3
+  ).length > 0 ? 1 : 0;
+  const dLegit = legitimacyDelta(fw.avgSat, nation.government.corruption, nation.warExhaustion, reformShockTurns);
+  nation.government.legitimacy = clamp(nation.government.legitimacy + dLegit, 0, 100);
+  nation.government.legitimacy = clamp(nation.government.legitimacy + nation.tech.culture * 0.3, 0, 100);
+  const hasAntiCorruption = nation.activePolicies.some((p) => p.policyId === "anti_corruption");
+  let corruptionDelta;
+  if (hasAntiCorruption) {
+    corruptionDelta = -1;
+  } else if (nation.government.stability >= 70) {
+    corruptionDelta = -0.2;
+  } else if (nation.government.stability >= 50) {
+    corruptionDelta = 0.1;
+  } else {
+    corruptionDelta = 0.4;
+  }
+  nation.government.corruption = clamp(nation.government.corruption + corruptionDelta, 0, 100);
+  const cm = nationalCharacterMods(nation.activeCharacterBonuses);
+  if (cm.stabilityMod) nation.government.stability = clamp(nation.government.stability + cm.stabilityMod, 0, 100);
+  if (cm.legitimacyMod) nation.government.legitimacy = clamp(nation.government.legitimacy + cm.legitimacyMod, 0, 100);
+  if (cm.efficiencyMod) nation.government.efficiency = clamp(nation.government.efficiency + cm.efficiencyMod, 0, 100);
+  if (cm.corruptionMod) nation.government.corruption = clamp(nation.government.corruption + cm.corruptionMod, 0, 100);
+  const factionSatMap = { nobles: cm.noblesSat, merchants: cm.merchantsSat, military: cm.militarySat, commoners: cm.commonersSat, clergy: cm.clergySat };
+  for (const f of nation.factions) {
+    const delta = factionSatMap[f.id];
+    if (delta) f.satisfaction = clamp(f.satisfaction + delta * 0.1, 0, 100);
+  }
+  const govDef = GOVERNMENTS[nation.government.type];
+  if (govDef?.perTurn) {
+    const pt = govDef.perTurn;
+    if (pt.legitimacy) nation.government.legitimacy = clamp(nation.government.legitimacy + pt.legitimacy, 0, 100);
+    if (pt.stability) nation.government.stability = clamp(nation.government.stability + pt.stability, 0, 100);
+    if (pt.efficiency) nation.government.efficiency = clamp(nation.government.efficiency + pt.efficiency, 0, 100);
+    if (pt.corruption) nation.government.corruption = clamp(nation.government.corruption + pt.corruption, 0, 100);
+    if (pt.factionSat) {
+      const fsMap = pt.factionSat;
+      for (const f of nation.factions) {
+        const d = fsMap[f.id];
+        if (d) f.satisfaction = clamp(f.satisfaction + d, 0, 100);
+      }
+    }
+  }
+  return { stabilityDelta: dStab, legitimacyDelta: dLegit };
+}
+function canEnactPolicy(nation, policyId) {
+  const def = POLICIES.find((p) => p.id === policyId);
+  if (!def) return { ok: false, reason: "\u653F\u7B56\u4E0D\u5B58\u5728" };
+  if (nation.activePolicies.some((p) => p.policyId === policyId)) {
+    return { ok: false, reason: "\u5DF2\u63A8\u884C" };
+  }
+  if (def.allowedGovernments.length > 0 && !def.allowedGovernments.includes(nation.government.type)) {
+    return { ok: false, reason: "\u653F\u4F53\u4E0D\u5141\u8BB8" };
+  }
+  if (def.prereqTech && !hasTech(nation, def.prereqTech)) {
+    return { ok: false, reason: "\u7F3A\u5C11\u524D\u7F6E\u79D1\u6280" };
+  }
+  if (nation.resources.gold < def.costGold) return { ok: false, reason: "\u91D1\u4E0D\u8DB3" };
+  return { ok: true };
+}
+function enactPolicy(nation, policyId, state) {
+  const eligibility = canEnactPolicy(nation, policyId);
+  if (!eligibility.ok) return eligibility;
+  const def = POLICIES.find((p) => p.id === policyId);
+  nation.resources.gold -= def.costGold;
+  nation.activePolicies.push({ policyId, enactedTurn: state.turn });
+  if (def.effects.corruptionMod) nation.government.corruption = clamp(nation.government.corruption + def.effects.corruptionMod, 0, 100);
+  if (def.effects.stabilityMod) nation.government.stability = clamp(nation.government.stability + def.effects.stabilityMod, 0, 100);
+  if (def.effects.efficiencyMod) nation.government.efficiency = clamp(nation.government.efficiency + def.effects.efficiencyMod, 0, 100);
+  if (def.effects.taxRateMod) nation.taxRate = clamp(nation.taxRate + (def.effects.taxRateMod ?? 0), 0, 0.5);
+  nation.policyMods = derivePolicyMods(nation, def.effects.assimilationMod);
+  for (const [fid, delta] of Object.entries(def.factionReaction)) {
+    const f = nation.factions.find((x) => x.id === fid);
+    if (f) f.satisfaction = clamp(f.satisfaction + delta, 0, 100);
+  }
+  return { ok: true };
+}
+function hasTech(nation, techId) {
+  const match = /^(agri|mil|admin|culture)_lv(\d+)$/.exec(techId);
+  if (!match) return false;
+  const branch = match[1];
+  return nation.tech[branch] >= Number(match[2]);
+}
+function derivePolicyMods(nation, addedAssimilation = 0) {
+  const mods = {};
+  for (const active of nation.activePolicies) {
+    const effects = POLICIES.find((policy) => policy.id === active.policyId)?.effects;
+    if (!effects) continue;
+    if (effects.taxEffMod) mods.taxEffMod = (mods.taxEffMod ?? 1) * effects.taxEffMod;
+    if (effects.combatMod) mods.combatMod = (mods.combatMod ?? 1) * effects.combatMod;
+    if (effects.mobilizationMod) mods.mobilizationMod = (mods.mobilizationMod ?? 1) * effects.mobilizationMod;
+    if (effects.foodOutputMod) mods.foodOutputMod = (mods.foodOutputMod ?? 1) * effects.foodOutputMod;
+    if (effects.popGrowthMod) mods.popGrowthMod = (mods.popGrowthMod ?? 1) * effects.popGrowthMod;
+    if (effects.influenceMod) {
+      const influenceMultiplier = Math.abs(effects.influenceMod) >= 2 ? 1 + effects.influenceMod / 100 : effects.influenceMod;
+      mods.influenceMod = (mods.influenceMod ?? 1) * influenceMultiplier;
+    }
+    if (effects.assimilationMod) mods.assimilationMod = (mods.assimilationMod ?? 0) + effects.assimilationMod;
+  }
+  const saved = nation.policyMods?.assimilationMod;
+  if (saved !== void 0 && Number.isFinite(saved)) {
+    mods.assimilationMod = Math.max(mods.assimilationMod ?? 0, saved + addedAssimilation);
+  }
+  return mods;
+}
+function enactLaw(nation, lawId, state) {
+  const def = LAWS.find((l) => l.id === lawId);
+  if (!def) return { ok: false, reason: "\u6CD5\u5F8B\u4E0D\u5B58\u5728" };
+  if (nation.activeLaws.some((l) => l.lawId === lawId)) return { ok: false, reason: "\u5DF2\u63A8\u884C" };
+  if (def.allowedGovernments.length > 0 && !def.allowedGovernments.includes(nation.government.type)) {
+    return { ok: false, reason: "\u653F\u4F53\u4E0D\u5141\u8BB8" };
+  }
+  if (nation.tech.admin < def.prereqAdminLevel) return { ok: false, reason: `\u9700\u884C\u653FLv${def.prereqAdminLevel}` };
+  if (def.conflictsWith) {
+    for (const c of def.conflictsWith) {
+      if (nation.activeLaws.some((l) => l.lawId === c)) {
+        return { ok: false, reason: `\u4E0E\u5DF2\u63A8\u884C\u7684 ${LAWS.find((x) => x.id === c)?.name ?? c} \u51B2\u7A81` };
+      }
+    }
+  }
+  if (nation.resources.gold < def.costGold) return { ok: false, reason: "\u91D1\u4E0D\u8DB3" };
+  nation.resources.gold -= def.costGold;
+  nation.activeLaws.push({ lawId, enactedTurn: state.turn });
+  const e = def.effects;
+  if (e.corruptionMod) nation.government.corruption = clamp(nation.government.corruption + e.corruptionMod, 0, 100);
+  if (e.stabilityMod) nation.government.stability = clamp(nation.government.stability + e.stabilityMod, 0, 100);
+  if (e.efficiencyMod) nation.government.efficiency = clamp(nation.government.efficiency + e.efficiencyMod, 0, 100);
+  if (e.legitimacyMod) nation.government.legitimacy = clamp(nation.government.legitimacy + e.legitimacyMod, 0, 100);
+  if (e.taxEffMod && e.taxEffMod !== 1) nation.government.efficiency = clamp(nation.government.efficiency * e.taxEffMod, 0, 100);
+  for (const f of nation.factions) {
+    const delta = def.factionReaction[f.id];
+    if (delta) f.satisfaction = clamp(f.satisfaction + delta, 0, 100);
+  }
+  return { ok: true };
+}
+function lawPerTurnEffects(nation, provs) {
+  applyLawPerTurnEffectFinals(provs, lawPerTurnEffectsPure(nation, provs));
+}
+function applyLawPerTurnEffectFinals(provs, finals) {
+  const byId = new Map(provs.map((p) => [p.id, p]));
+  for (const [provId, final] of Object.entries(finals)) {
+    const p = byId.get(provId);
+    if (!p) continue;
+    if (final.unrest !== void 0) p.unrest = final.unrest;
+    if (final.rebellionRisk !== void 0) p.rebellionRisk = final.rebellionRisk;
+  }
+}
+function lawPerTurnEffectsPure(nation, provs) {
+  const finals = {};
+  for (const al of nation.activeLaws) {
+    const def = LAWS.find((l) => l.id === al.lawId);
+    if (!def) continue;
+    const e = def.effects;
+    if (e.unrestReduction) {
+      for (const p of provs) {
+        const cur = finals[p.id]?.unrest ?? p.unrest;
+        finals[p.id] = { ...finals[p.id], unrest: clamp(cur - e.unrestReduction, 0, 100) };
+      }
+    }
+    if (e.rebellionReduction) {
+      for (const p of provs) {
+        const cur = finals[p.id]?.rebellionRisk ?? p.rebellionRisk;
+        finals[p.id] = { ...finals[p.id], rebellionRisk: clamp(cur - e.rebellionReduction, 0, 100) };
+      }
+    }
+  }
+  return finals;
+}
+function maxManageableProvinces(nation) {
+  return maxProvinces(
+    nation.tech.admin,
+    nation.government.efficiency,
+    nation.activeCharacterBonuses.includes("centralization"),
+    nation.tier
+  );
+}
+function overExtensionPenalty(nation, provinceCount) {
+  const max = maxManageableProvinces(nation);
+  const over = Math.max(0, provinceCount - max);
+  return { taxEffLoss: over * 0.05, stabilityLoss: over * 2 };
+}
+function settlePoliticsPure(nation, state, provs = provincesOf(nation.id, state.provinces)) {
+  const fw = factionWeightedSat(nation.factions);
+  const avgUnrest = provs.length ? provs.reduce((s, p) => s + p.unrest, 0) / provs.length : 0;
+  const rebellionProvCount = provs.filter((p) => p.rebellionRisk >= 100).length;
+  const dStab = stabilityDelta(
+    nation.government.legitimacy,
+    fw.weighted,
+    fw.totalPower,
+    avgUnrest,
+    nation.warExhaustion,
+    rebellionProvCount
+  );
+  let finalDelta = dStab;
+  if (nation.civilWar?.active) finalDelta -= 3;
+  const stab = nation.government.stability;
+  const atWar2 = nation.civilWar?.active;
+  if (stab < 40) finalDelta = Math.max(finalDelta, atWar2 ? 2 : 5);
+  else if (stab < 60) finalDelta = Math.max(finalDelta, atWar2 ? 1 : 3);
+  else if (stab < 75) finalDelta = Math.max(finalDelta, atWar2 ? 0 : 1.5);
+  else finalDelta = Math.max(finalDelta, -2);
+  let finalStab = clamp(nation.government.stability + finalDelta, 0, 100);
+  const reformShockTurns = nation.activePolicies.filter((p) => state.turn - p.enactedTurn < 3).length > 0 ? 1 : 0;
+  const dLegit = legitimacyDelta(fw.avgSat, nation.government.corruption, nation.warExhaustion, reformShockTurns);
+  let finalLegit = clamp(nation.government.legitimacy + dLegit, 0, 100);
+  finalLegit = clamp(finalLegit + nation.tech.culture * 0.3, 0, 100);
+  const hasAntiCorruption = nation.activePolicies.some((p) => p.policyId === "anti_corruption");
+  let corruptionDelta;
+  if (hasAntiCorruption) corruptionDelta = -1;
+  else if (finalStab >= 70) corruptionDelta = -0.2;
+  else if (finalStab >= 50) corruptionDelta = 0.1;
+  else corruptionDelta = 0.4;
+  let finalCorruption = clamp(nation.government.corruption + corruptionDelta, 0, 100);
+  let finalEfficiency = nation.government.efficiency;
+  const cm = nationalCharacterMods(nation.activeCharacterBonuses);
+  if (cm.stabilityMod) finalStab = clamp(finalStab + cm.stabilityMod, 0, 100);
+  if (cm.legitimacyMod) finalLegit = clamp(finalLegit + cm.legitimacyMod, 0, 100);
+  if (cm.efficiencyMod) finalEfficiency = clamp(finalEfficiency + cm.efficiencyMod, 0, 100);
+  if (cm.corruptionMod) finalCorruption = clamp(finalCorruption + cm.corruptionMod, 0, 100);
+  const factionSatFinal = {};
+  const factionSatMap = { nobles: cm.noblesSat, merchants: cm.merchantsSat, military: cm.militarySat, commoners: cm.commonersSat, clergy: cm.clergySat };
+  for (const f of nation.factions) {
+    let sat = f.satisfaction;
+    const d = factionSatMap[f.id];
+    if (d) sat = clamp(sat + d * 0.1, 0, 100);
+    factionSatFinal[f.id] = sat;
+  }
+  const govDef = GOVERNMENTS[nation.government.type];
+  if (govDef?.perTurn) {
+    const pt = govDef.perTurn;
+    if (pt.legitimacy) finalLegit = clamp(finalLegit + pt.legitimacy, 0, 100);
+    if (pt.stability) finalStab = clamp(finalStab + pt.stability, 0, 100);
+    if (pt.efficiency) finalEfficiency = clamp(finalEfficiency + pt.efficiency, 0, 100);
+    if (pt.corruption) finalCorruption = clamp(finalCorruption + pt.corruption, 0, 100);
+    if (pt.factionSat) {
+      const fsMap = pt.factionSat;
+      for (const f of nation.factions) {
+        const d = fsMap[f.id];
+        if (d) factionSatFinal[f.id] = clamp(factionSatFinal[f.id] + d, 0, 100);
+      }
+    }
+  }
+  return {
+    stabilityDelta: dStab,
+    legitimacyDelta: dLegit,
+    govFinal: { stability: finalStab, legitimacy: finalLegit, corruption: finalCorruption, efficiency: finalEfficiency },
+    factionSatFinal
+  };
+}
 
 // src/data/buildings.ts
 var BUILDINGS = {
@@ -4404,6 +5544,82 @@ var LENGTH_MOD = {
   long: 1.6
 };
 
+// src/engine/tradeNetwork.ts
+var contracts = [
+  {
+    id: "grain_import",
+    name: "\u7CAE\u98DF\u8F93\u5165\u7EBF",
+    description: "\u8FD0\u56DE\u53E3\u7CAE\uFF0C\u517C\u6536\u6CBF\u9014\u5546\u7A0E\u3002",
+    costGold: 80,
+    prereqAdminLevel: 1,
+    length: "short",
+    yield: { gold: 15, food: 30, influence: 1 }
+  },
+  {
+    id: "grain_export",
+    name: "\u7CAE\u98DF\u8F93\u51FA\u7EBF",
+    description: "\u6BCF\u5E74\u4EA4\u4ED8\u7CAE\u50A8\uFF0C\u6362\u53D6\u8D27\u6B3E\u4E0E\u5F71\u54CD\u529B\u3002",
+    costGold: 120,
+    prereqAdminLevel: 1,
+    length: "medium",
+    yield: { gold: 50, food: -45, influence: 3 }
+  }
+];
+function connect(contract, start, end) {
+  return { ...contract, id: [contract.id, start, end].join(":"), endpoints: [start, end] };
+}
+function tradeRouteById(id) {
+  if (Object.prototype.hasOwnProperty.call(TRADE_ROUTE_BY_ID, id)) return TRADE_ROUTE_BY_ID[id];
+  if (typeof id !== "string") return;
+  const parts = id.split(":");
+  if (parts.length !== 3 || !parts[1] || !parts[2] || parts[1] === parts[2]) return;
+  const contract = contracts.find((entry) => entry.id === parts[0]);
+  return contract && connect(contract, parts[1], parts[2]);
+}
+function marketRank(province) {
+  const coastal = province.terrain === "coast" || province.terrain === "island";
+  return Number(coastal) * 2 + Number(province.isCapital);
+}
+function tradeOffers(state, nation) {
+  if (state.provinces.p01) return TRADE_ROUTES;
+  const markets = /* @__PURE__ */ new Map();
+  for (const p of Object.values(state.provinces)) {
+    if (p.terrain === "ocean") continue;
+    const previous = markets.get(p.ownerId);
+    if (!previous || marketRank(p) > marketRank(previous) || marketRank(p) === marketRank(previous) && p.id < previous.id) {
+      markets.set(p.ownerId, p);
+    }
+  }
+  const home = markets.get(nation.id);
+  if (!home) return [];
+  const distance = (p) => (p.x - home.x) ** 2 + (p.y - home.y) ** 2;
+  const contacts = new Map(state.relations.filter((r) => r.from === nation.id).map((r) => [r.to, r]));
+  const marketsAbroad = [...markets.values()].filter((p) => contacts.has(p.ownerId) && state.nations[p.ownerId] && !state.nations[p.ownerId].defeated);
+  const accessible = (p) => {
+    const r = contacts.get(p.ownerId);
+    return Number(r.treaty === "trade" || r.treaty === "alliance" || r.treaty === "none" && r.relation >= 0);
+  };
+  marketsAbroad.sort((a, b) => accessible(b) - accessible(a) || distance(a) - distance(b) || a.id.localeCompare(b.id));
+  const pactPartners = new Set(state.diplomaticAccords.filter((a) => a.agenda === "security" && a.expiresTurn >= state.turn && (a.partyA === nation.id || a.partyB === nation.id)).map((a) => a.partyA === nation.id ? a.partyB : a.partyA));
+  return marketsAbroad.filter((port, i) => i < 3 || pactPartners.has(port.ownerId)).flatMap((port) => contracts.map((contract) => connect(contract, home.id, port.id)));
+}
+function routeAccessBlocker(def, state, nation) {
+  const [start, end] = def.endpoints.map((id) => state.provinces[id]);
+  if (!start || !end) return "\u8DEF\u7EBF\u7AEF\u70B9\u7701\u4EFD\u4E0D\u5B58\u5728";
+  if (!def.id.includes(":")) return start.ownerId === nation.id || end.ownerId === nation.id ? null : "\u4E24\u7AEF\u5747\u4E0D\u5F52\u672C\u56FD";
+  if (start.ownerId !== nation.id) return "\u8D77\u8FD0\u5730\u5DF2\u6613\u4E3B";
+  if (end.ownerId === nation.id) return null;
+  const relation = state.relations.find((r) => r.from === nation.id && r.to === end.ownerId);
+  if (state.nations[end.ownerId]?.defeated || !relation || !["trade", "alliance"].includes(relation.treaty)) return "\u9700\u4E0E\u5BF9\u65B9\u7B7E\u8BA2\u8D38\u6613\u534F\u5B9A";
+  return null;
+}
+function operatingRoutes(nation, state) {
+  return (nation.activeTradeRoutes ?? []).flatMap((entry) => {
+    const def = tradeRouteById(entry.routeId);
+    return def && !nation.embargoedRoutes?.includes(def.id) && !routeAccessBlocker(def, state, nation) ? [def] : [];
+  });
+}
+
 // src/engine/economy.ts
 function computeBuildingYield(buildingDefId, level, terrain) {
   const totals = { gold: 0, food: 0, wood: 0, iron: 0, sciPt: 0, adminPt: 0, influence: 0, supply: 0 };
@@ -4437,18 +5653,25 @@ function settleEconomyPure(nation, state, provs = provincesOf(nation.id, state.p
   let taxIncome = 0, foodProduced = 0;
   let wood = 0, iron = 0, scholars = 0;
   let dInfluence = 0;
+  const harvests = [];
   const taxEff = (1 + nation.tech.admin * 0.06) * (nation.policyMods?.taxEffMod ?? 1);
   for (const p of provs) {
     const peasants = p.classes.find((c) => c.classId === "peasants")?.count ?? 0;
     scholars += p.classes.find((c) => c.classId === "scholars")?.count ?? 0;
     const farms = p.buildings.filter((b) => b.defId === "farm").length;
-    foodProduced += computeFood({
+    const field = {
       agriBase: p.agriBase,
       peasantCount: peasants,
       terrain: p.terrain,
       agriLv: nation.tech.agri,
       farmCount: farms
-    });
+    };
+    const harvest = computeFood(field);
+    foodProduced += harvest;
+    if (p.priorAgriBase !== void 0) {
+      const gain = harvest - computeFood({ ...field, agriBase: p.priorAgriBase });
+      harvests.push({ provinceId: p.id, food: gain * (nation.policyMods?.foodOutputMod ?? 1) });
+    }
     taxIncome += computeTax({
       population: p.population,
       baseTaxRate: nation.taxRate,
@@ -4462,7 +5685,7 @@ function settleEconomyPure(nation, state, provs = provincesOf(nation.id, state.p
   }
   const buildingYields = computeBuildingYields(provs);
   const buildingIncome = buildingYields.gold;
-  foodProduced += buildingYields.food;
+  foodProduced = (foodProduced + buildingYields.food) * (nation.policyMods?.foodOutputMod ?? 1);
   wood += buildingYields.wood;
   iron += buildingYields.iron;
   dInfluence += buildingYields.influence;
@@ -4488,36 +5711,59 @@ function settleEconomyPure(nation, state, provs = provincesOf(nation.id, state.p
     tradeDepSafety: Math.max(0.5, tradeDepSafety)
   });
   const govDef = GOVERNMENTS[nation.government.type];
-  const govTradeMod = govDef?.perTurn?.tradeMod ?? 1;
-  const routeTradeMod = govTradeMod * tradeMod;
-  let routeInfluence = 0;
-  for (const ar of nation.activeTradeRoutes) {
-    const def = TRADE_ROUTE_BY_ID[ar.routeId];
-    if (!def) continue;
-    if (nation.embargoedRoutes?.includes(ar.routeId)) continue;
-    const ep1 = state.provinces[def.endpoints[0]];
-    const ep2 = state.provinces[def.endpoints[1]];
-    if (!ep1 || !ep2) continue;
-    const owns1 = ep1.ownerId === nation.id;
-    const owns2 = ep2.ownerId === nation.id;
-    if (!owns1 && !owns2) continue;
-    const mod = LENGTH_MOD[def.length] * routeTradeMod;
-    tradeIncome += def.yield.gold * mod;
-    routeInfluence += def.yield.influence;
-    foodProduced += def.yield.food ?? 0;
-  }
+  const shipments = [];
   const armySize2 = nation.army.reduce((s, a) => s + a.size, 0);
   const milCostMult = nation.tier === "D" ? 0.25 : 0.5;
   const militaryExpense = armySize2 * milCostMult;
-  const income = netTax + tradeIncome + buildingIncome;
   const subsidy = nation.tier === "D" ? 8 : 0;
+  const totalPop = provs.reduce((s, p) => s + p.population, 0);
+  const foodMilConsume = nation.tier === "D" ? armySize2 * 0.1 : totalPop < 50 ? 0 : armySize2 * 0.5;
+  const civilianRations = totalPop * 0.1;
+  const foodConsumed = foodMilConsume + civilianRations;
+  const routes = operatingRoutes(nation, state);
+  const imports = routes.reduce((sum, def) => sum + Math.max(0, def.yield.food ?? 0), 0);
+  foodProduced += imports;
+  const receipts = foodProduced + subsidy;
+  let routeInfluence = 0, exports = 0;
+  for (const def of routes) {
+    const yields = tradeRouteYield(def, nation);
+    if (yields.food < 0) {
+      const available = Math.max(0, Math.floor(nation.resources.food + receipts - foodConsumed - exports));
+      const delivered = Math.min(available, -yields.food);
+      const fulfilled = delivered / -yields.food;
+      yields.food = -delivered;
+      yields.gold *= fulfilled;
+      yields.influence = Math.floor(yields.influence * fulfilled);
+      exports += delivered;
+    }
+    tradeIncome += yields.gold;
+    routeInfluence += yields.influence;
+    const opening = nation.activeTradeRoutes.find((r) => r.routeId === def.id);
+    shipments.push({ routeId: def.id, ...yields, opened: opening?.establishedTurn === state.turn - 1 });
+  }
+  let contract;
+  const agreement = nation.grainContract;
+  if (agreement) {
+    const partner = state.nations[agreement.partnerId];
+    const atWar2 = relations.some((r) => r.from === nation.id && r.to === agreement.partnerId && r.treaty === "war");
+    const trading = partner && !partner.defeated && !atWar2;
+    const available = Math.max(0, Math.floor(nation.resources.food + receipts - foodConsumed - exports));
+    const delivered = trading ? Math.min(available, agreement.quantity) : 0;
+    contract = {
+      partnerId: agreement.partnerId,
+      food: -delivered,
+      gold: 2 * delivered,
+      yearsLeft: trading ? Math.max(0, agreement.yearsLeft - 1) : 0
+    };
+    tradeIncome += contract.gold;
+    exports += delivered;
+  }
+  const income = netTax + tradeIncome + buildingIncome;
   const dGold = income + Math.round(income * (cm.goldMod ?? 0) / 100) + subsidy - militaryExpense;
   dInfluence += routeInfluence + nation.tech.culture * 0.5 * (nation.policyMods?.influenceMod ?? 1);
   const researchProduced = computeSciPt(scholars, 0, false) + buildingYields.sciPt;
   const finalAdminPt = 3 + Math.floor(nation.government.efficiency / 25) + buildingYields.adminPt;
-  const totalPop = provs.reduce((s, p) => s + p.population, 0);
-  const foodMilConsume = nation.tier === "D" ? armySize2 * 0.1 : totalPop < 50 ? 0 : armySize2 * 0.5;
-  const foodConsumed = foodMilConsume + totalPop * 0.1;
+  const netFood = receipts - foodConsumed - exports;
   return {
     taxIncome,
     tradeIncome,
@@ -4528,6 +5774,15 @@ function settleEconomyPure(nation, state, provs = provincesOf(nation.id, state.p
     foodConsumed,
     woodProduced: wood,
     ironProduced: iron,
+    ...shipments.length || harvests.length || contract ? { economicReturns: { ...contract && { contract }, routes: shipments, harvests, grainBalance: netFood } } : {},
+    grain: {
+      exports,
+      receipts,
+      civilianRations,
+      armyRations: foodMilConsume,
+      net: netFood,
+      shortageExpected: nation.resources.food + netFood < totalPop * 0.4
+    },
     delta: {
       gold: Math.max(-50 - nation.resources.gold, dGold),
       wood,
@@ -4537,11 +5792,16 @@ function settleEconomyPure(nation, state, provs = provincesOf(nation.id, state.p
       // 覆写转 delta
       sciPt: Math.round(researchProduced * (cm.sciPtMod ?? 1) * (govDef?.perTurn?.sciPtMod ?? 1)),
       supply: buildingYields.supply,
-      food: subsidy + foodProduced - foodConsumed
+      food: netFood
     }
   };
 }
 function applyEconomyResult(nation, result) {
+  const contract = result.economicReturns?.contract;
+  if (contract && nation.grainContract) {
+    if (contract.yearsLeft === 0) delete nation.grainContract;
+    else nation.grainContract = { ...nation.grainContract, yearsLeft: contract.yearsLeft };
+  }
   nation.resources.gold += result.delta.gold;
   nation.resources.food += result.delta.food;
   nation.resources.wood += result.delta.wood;
@@ -4551,21 +5811,27 @@ function applyEconomyResult(nation, result) {
   nation.resources.sciPt += result.delta.sciPt;
   nation.resources.supply += result.delta.supply;
 }
+function openingBlocker(nation, def, state) {
+  if (nation.activeTradeRoutes.some((r) => r.routeId === def.id)) return "\u5DF2\u5EFA\u7ACB";
+  const blocked = routeAccessBlocker(def, state, nation);
+  if (blocked) return blocked;
+  if (nation.tech.admin < def.prereqAdminLevel) return `\u9700\u884C\u653FLv${def.prereqAdminLevel}`;
+  return nation.resources.gold < def.costGold ? "\u91D1\u4E0D\u8DB3" : null;
+}
 function establishTradeRoute(nation, routeId, state) {
-  const def = TRADE_ROUTE_BY_ID[routeId];
+  const def = tradeOffers(state, nation).find((r) => r.id === routeId);
   if (!def) return { ok: false, reason: "\u8DEF\u7EBF\u4E0D\u5B58\u5728" };
-  if (nation.activeTradeRoutes.some((r) => r.routeId === routeId)) return { ok: false, reason: "\u5DF2\u5EFA\u7ACB" };
-  if (nation.tech.admin < def.prereqAdminLevel) return { ok: false, reason: `\u9700\u884C\u653FLv${def.prereqAdminLevel}` };
-  const ep1 = state.provinces[def.endpoints[0]];
-  const ep2 = state.provinces[def.endpoints[1]];
-  if (!ep1 || !ep2) return { ok: false, reason: "\u8DEF\u7EBF\u7AEF\u70B9\u7701\u4EFD\u4E0D\u5B58\u5728" };
-  const owns1 = ep1.ownerId === nation.id;
-  const owns2 = ep2.ownerId === nation.id;
-  if (!owns1 && !owns2) return { ok: false, reason: "\u8DEF\u7EBF\u4E24\u7AEF\u5747\u4E0D\u5F52\u672C\u56FD" };
-  if (nation.resources.gold < def.costGold) return { ok: false, reason: "\u91D1\u4E0D\u8DB3" };
+  const blocker = openingBlocker(nation, def, state);
+  if (blocker) return { ok: false, reason: blocker };
   nation.resources.gold -= def.costGold;
   nation.activeTradeRoutes.push({ routeId, establishedTurn: state.turn });
   return { ok: true, routeName: def.name };
+}
+function tradeRouteYield(def, nation) {
+  const government = nation && GOVERNMENTS[nation.government.type];
+  const character = nation && nationalCharacterMods(nation.activeCharacterBonuses);
+  const multiplier = LENGTH_MOD[def.length] * (government?.perTurn?.tradeMod ?? 1) * (character?.tradeMod ?? 1);
+  return { gold: def.yield.gold * multiplier, influence: def.yield.influence, food: def.yield.food ?? 0 };
 }
 function canAfford(nation, gold, wood = 0, iron = 0) {
   return nation.resources.gold >= gold && nation.resources.wood >= wood && nation.resources.iron >= iron;
@@ -4589,7 +5855,7 @@ var CLASS_INTEREST = {
 function settlePopulation(nation, provinces, foodShortage, tradeFree, atWar2, warWonRecent) {
   const result = settlePopulationPure(nation, provinces, foodShortage, tradeFree, atWar2, warWonRecent);
   for (const p of provinces) {
-    p.population += result.popDelta[p.id];
+    setProvincePopulation(p, p.population + result.popDelta[p.id]);
     for (const group of p.classes) group.satisfaction += result.classSatDelta[p.id][group.classId];
   }
   for (const faction of nation.factions) faction.satisfaction = result.factionSatFinal[faction.id] ?? faction.satisfaction;
@@ -4628,7 +5894,7 @@ function settlePopulationPure(nation, provinces, foodShortage, tradeFree, atWar2
       plague: false,
       growthMod
     });
-    const newPop = Math.max(10, Math.round(p.population + delta));
+    const newPop = p.terrain === "ocean" ? 0 : Math.max(10, Math.round(p.population + delta));
     popDelta[p.id] = newPop - p.population;
     totalGrowth += popDelta[p.id];
     const satDelta = {};
@@ -4667,682 +5933,6 @@ function settlePopulationPure(nation, provinces, foodShortage, tradeFree, atWar2
     factionSatFinal[factionId] = clamp(current2 + (avgSum / cnt - current2) * 0.3, 0, 100);
   }
   return { totalGrowth, classSatChanges, popDelta, classSatDelta, factionSatFinal };
-}
-
-// src/data/policies.ts
-var POLICIES = [
-  {
-    id: "land_privilege",
-    name: "\u8D35\u65CF\u571F\u5730\u7279\u6743",
-    description: "\u4FDD\u969C\u8D35\u65CF\u571F\u5730\u6743\u76CA\uFF0C\u63D0\u8D35\u65CF\u6EE1\u610F\u5EA6\uFF0C\u4F46\u884C\u653F\u80FD\u529B\u4E0B\u964D\u3002",
-    costAction: 1,
-    costGold: 50,
-    allowedGovernments: ["monarchy", "empire"],
-    effects: { efficiencyMod: -5 },
-    factionReaction: { nobles: 15, merchants: -5, commoners: -10 }
-  },
-  {
-    id: "royal_tax",
-    name: "\u738B\u5BB6\u7A0E",
-    description: "\u738B\u5BA4\u76F4\u8F96\u7A0E\u6536\uFF0C\u6548\u7387\u5347\u4F46\u6C11\u5FC3\u964D\u3002",
-    costAction: 1,
-    costGold: 80,
-    allowedGovernments: ["monarchy", "empire"],
-    effects: { taxEffMod: 1.1, stabilityMod: -3 },
-    factionReaction: { nobles: 5, merchants: -5, commoners: -10 }
-  },
-  {
-    id: "free_trade",
-    name: "\u81EA\u7531\u8D38\u6613",
-    description: "\u653E\u5BBD\u8D38\u6613\u7BA1\u5236\uFF0C\u8D38\u6613\u6536\u5165\u4E0E\u5546\u4EBA\u6EE1\u610F\u5EA6\u5347\u3002",
-    costAction: 1,
-    costGold: 100,
-    allowedGovernments: ["republic", "empire"],
-    effects: { influenceMod: 3 },
-    factionReaction: { merchants: 20, nobles: -5, commoners: 5 }
-  },
-  {
-    id: "civic_reform",
-    name: "\u516C\u6C11\u6539\u9769",
-    description: "\u6269\u5927\u516C\u6C11\u6743\uFF0C\u6C11\u4F17\u6EE1\u610F\u5EA6\u5347\uFF0C\u4F46\u8D35\u65CF\u4E0D\u6EE1\u3002",
-    costAction: 2,
-    costGold: 200,
-    allowedGovernments: ["republic"],
-    effects: { stabilityMod: 5, popGrowthMod: 1.05 },
-    factionReaction: { nobles: -15, commoners: 20, merchants: 5 }
-  },
-  {
-    id: "state_religion",
-    name: "\u56FD\u6559\u7ACB\u56FD",
-    description: "\u786E\u7ACB\u56FD\u6559\uFF0C\u795E\u804C\u6EE1\u610F\u5EA6\u4E0E\u5408\u6CD5\u6027\u5347\uFF0C\u4F46\u5F02\u6559\u5730\u533A\u53DB\u4E71\u5347\u3002",
-    costAction: 1,
-    costGold: 100,
-    allowedGovernments: ["theocracy", "monarchy"],
-    effects: { stabilityMod: 3, influenceMod: 5 },
-    factionReaction: { clergy: 25, nobles: 5, commoners: -5 }
-  },
-  {
-    id: "holy_war",
-    name: "\u5723\u6218",
-    description: "\u5BF9\u5F02\u6559\u56FD\u5BA3\u6218\u52A0\u6210\uFF0C\u519B\u65B9\u4E0E\u795E\u804C\u6EE1\u610F\u5EA6\u5347\uFF0C\u4F46\u5916\u4EA4\u6076\u5316\u3002",
-    costAction: 1,
-    costGold: 150,
-    allowedGovernments: ["theocracy"],
-    effects: { combatMod: 1.1, mobilizationMod: 1.2 },
-    factionReaction: { military: 15, clergy: 15, merchants: -15, commoners: -10 }
-  },
-  {
-    id: "martial_law",
-    name: "\u6212\u4E25\u4EE4",
-    description: "\u5F3A\u5316\u9547\u538B\uFF0C\u53DB\u4E71\u98CE\u9669\u964D\uFF0C\u4F46\u6C11\u5FC3\u4E0E\u5916\u4EA4\u964D\u3002",
-    costAction: 1,
-    costGold: 80,
-    allowedGovernments: ["junta", "empire"],
-    effects: { stabilityMod: 5, efficiencyMod: 5, influenceMod: -3 },
-    factionReaction: { military: 10, commoners: -15, merchants: -10 }
-  },
-  {
-    id: "conscription",
-    name: "\u5168\u6C11\u5F81\u5175",
-    description: "\u5F81\u5175\u901F\u5EA6\u5927\u5E45\u63D0\u5347\uFF0C\u4F46\u6C11\u4F17\u6EE1\u610F\u5EA6\u964D\u3002",
-    costAction: 1,
-    costGold: 100,
-    allowedGovernments: ["junta", "empire", "monarchy"],
-    effects: { mobilizationMod: 1.3 },
-    factionReaction: { military: 15, commoners: -15, merchants: -5 }
-  },
-  {
-    id: "centralization",
-    name: "\u4E2D\u592E\u96C6\u6743",
-    description: "\u96C6\u6743\u884C\u653F\uFF0C\u7A0E\u6536\u4E0E\u884C\u653F\u80FD\u529B\u5347\uFF0C\u4F46\u5730\u65B9\u53DB\u4E71\u5347\u3002",
-    costAction: 2,
-    costGold: 200,
-    allowedGovernments: ["empire", "monarchy"],
-    effects: { taxEffMod: 1.1, efficiencyMod: 10, assimilationMod: 2 },
-    factionReaction: { nobles: -10, merchants: -5, commoners: -5 }
-  },
-  {
-    id: "imperial_tax",
-    name: "\u5E1D\u56FD\u7A0E",
-    description: "\u884C\u7701\u91CD\u7A0E\uFF0C\u56FD\u5E93\u5347\u4F46\u5730\u65B9\u4E0D\u6EE1\u3002",
-    costAction: 1,
-    costGold: 120,
-    allowedGovernments: ["empire"],
-    effects: { taxEffMod: 1.15, stabilityMod: -5 },
-    factionReaction: { nobles: 5, merchants: -10, commoners: -15 }
-  },
-  {
-    id: "anti_corruption",
-    name: "\u53CD\u8150\u6539\u9769",
-    description: "\u5F3A\u529B\u53CD\u8150\uFF0C\u8150\u8D25\u5927\u964D\u4F46\u8D35\u65CF\u4E0D\u6EE1\u3002\u9700\u884C\u653F\u79D1\u6280 Lv3\u3002",
-    costAction: 2,
-    costGold: 300,
-    allowedGovernments: [],
-    effects: { corruptionMod: -15, efficiencyMod: 10 },
-    factionReaction: { nobles: -20, merchants: 10, commoners: 10 },
-    prereqTech: "admin_lv3"
-  },
-  {
-    id: "welfare",
-    name: "\u798F\u5229\u653F\u7B56",
-    description: "\u5B89\u629A\u6C11\u4F17\uFF0C\u6EE1\u610F\u5EA6\u4E0E\u4EBA\u53E3\u589E\u957F\u5347\uFF0C\u4F46\u56FD\u5E93\u8D1F\u62C5\u3002",
-    costAction: 1,
-    costGold: 150,
-    allowedGovernments: [],
-    effects: { popGrowthMod: 1.1, stabilityMod: 3, taxRateMod: -0.02 },
-    factionReaction: { commoners: 20, nobles: -10, merchants: -5 }
-  },
-  // ── B 扩展：13 个新政策 ──
-  { id: "education_reform", name: "\u6559\u80B2\u6539\u9769", description: "\u5E7F\u8BBE\u5B66\u5BAB\uFF0C\u63D0\u5347\u79D1\u7814\u4E0E\u540C\u5316\u3002", costAction: 2, costGold: 200, allowedGovernments: [], effects: { assimilationMod: 5, efficiencyMod: 3 }, factionReaction: { clergy: -8, commoners: 8 }, prereqTech: "admin_lv3" },
-  { id: "merchant_guild", name: "\u5546\u56E2\u7279\u8BB8", description: "\u6388\u4E88\u5546\u56E2\u4E13\u8425\u6743\uFF0C\u8D38\u6613\u5347\u4F46\u8D35\u65CF\u4E0D\u6EE1\u3002", costAction: 1, costGold: 120, allowedGovernments: ["republic", "merchant_republic", "monarchy"], effects: { taxEffMod: 1.08 }, factionReaction: { merchants: 18, nobles: -12 } },
-  { id: "land_reform", name: "\u5747\u7530\u4EE4", description: "\u91CD\u65B0\u5206\u914D\u571F\u5730\uFF0C\u6C11\u4F17\u5927\u60A6\u4F46\u8D35\u65CF\u53CD\u5F39\u3002", costAction: 2, costGold: 180, allowedGovernments: ["empire", "monarchy", "republic"], effects: { popGrowthMod: 1.08, stabilityMod: 5 }, factionReaction: { commoners: 25, nobles: -25 } },
-  { id: "toleration", name: "\u5B97\u6559\u5BBD\u5BB9", description: "\u5BBD\u5BB9\u5F02\u6559\uFF0C\u964D\u51B2\u7A81\u4F46\u795E\u804C\u4E0D\u6EE1\u3002", costAction: 1, costGold: 100, allowedGovernments: [], effects: { stabilityMod: 3, assimilationMod: 8 }, factionReaction: { clergy: -20, commoners: 5 } },
-  { id: "civil_service_exam", name: "\u79D1\u4E3E\u5236", description: "\u4EE5\u8003\u8BD5\u9009\u62D4\u5B98\u540F\uFF0C\u884C\u653F\u5927\u5347\u3002\u9700\u884C\u653F Lv3\u3002", costAction: 2, costGold: 250, allowedGovernments: ["empire", "monarchy"], effects: { efficiencyMod: 15, corruptionMod: -8 }, factionReaction: { nobles: -18, commoners: 10 }, prereqTech: "admin_lv3" },
-  { id: "military_reform", name: "\u519B\u4E8B\u6539\u9769", description: "\u91CD\u7EC4\u519B\u5236\uFF0C\u6218\u6597\u529B\u5347\u4F46\u8017\u91D1\u3002", costAction: 2, costGold: 200, allowedGovernments: ["empire", "monarchy", "junta"], effects: { combatMod: 1.15, mobilizationMod: 1.2 }, factionReaction: { military: 20, commoners: -8 } },
-  { id: "naval_expansion", name: "\u6269\u5F20\u8230\u961F", description: "\u5927\u529B\u53D1\u5C55\u6D77\u519B\uFF0C\u6D77\u4E0A\u8D38\u6613\u4E0E\u6218\u529B\u5347\u3002", costAction: 2, costGold: 180, allowedGovernments: ["republic", "merchant_republic", "empire"], effects: { influenceMod: 1.1, combatMod: 1.1 }, factionReaction: { military: 12, merchants: 10 } },
-  { id: "agrarian_reform", name: "\u519C\u672C\u653F\u7B56", description: "\u91CD\u519C\u6291\u5546\uFF0C\u7CAE\u4EA7\u5347\u4F46\u8D38\u6613\u964D\u3002", costAction: 1, costGold: 100, allowedGovernments: ["empire", "monarchy"], effects: { popGrowthMod: 1.06, taxRateMod: -0.01 }, factionReaction: { commoners: 12, merchants: -15 } },
-  { id: "infrastructure_plan", name: "\u57FA\u5EFA\u632F\u5174", description: "\u5168\u56FD\u4FEE\u8DEF\u5EFA\u6865\uFF0C\u884C\u653F\u4E0E\u8D38\u6613\u5347\u3002\u9700\u884C\u653F Lv2\u3002", costAction: 2, costGold: 220, allowedGovernments: [], effects: { efficiencyMod: 8, taxEffMod: 1.05 }, factionReaction: { commoners: 8, merchants: 8 }, prereqTech: "admin_lv2" },
-  { id: "census", name: "\u7F16\u6237\u9F50\u6C11", description: "\u666E\u67E5\u4EBA\u53E3\uFF0C\u7A0E\u6536\u6548\u7387\u5347\u3002\u9700\u884C\u653F Lv2\u3002", costAction: 1, costGold: 150, allowedGovernments: ["empire", "monarchy"], effects: { taxEffMod: 1.1, efficiencyMod: 5 }, factionReaction: { nobles: -8 }, prereqTech: "admin_lv2" },
-  { id: "diplomatic_corps", name: "\u5916\u4EA4\u4F7F\u56E2", description: "\u8BBE\u7ACB\u4E13\u804C\u5916\u4EA4\u673A\u6784\uFF0C\u5F71\u54CD\u529B\u4EA7\u51FA\u5347\u3002", costAction: 1, costGold: 130, allowedGovernments: [], effects: { influenceMod: 1.15 }, factionReaction: { nobles: 5, merchants: 5 } },
-  { id: "cultural_patronage", name: "\u6587\u5316\u8D5E\u52A9", description: "\u8D5E\u52A9\u827A\u672F\u5B66\u672F\uFF0C\u5A01\u671B\u4E0E\u540C\u5316\u5347\u3002", costAction: 1, costGold: 110, allowedGovernments: [], effects: { influenceMod: 1.08, assimilationMod: 3 }, factionReaction: { clergy: 5, commoners: 3 } },
-  { id: "succession_law", name: "\u7EE7\u627F\u6CD5", description: "\u786E\u7ACB\u7EE7\u627F\u987A\u5E8F\uFF0C\u5408\u6CD5\u6027\u5927\u5347\u4F46\u9650\u5236\u541B\u4E3B\u3002", costAction: 2, costGold: 200, allowedGovernments: ["monarchy", "empire"], effects: { stabilityMod: 8 }, factionReaction: { nobles: 15, military: -5 } },
-  // ── D2 扩充：4 个质变政策，绑定 Lv5 科技解锁 ──
-  { id: "crop_rotation", name: "\u8F6E\u4F5C\u653F\u7B56", description: "\u79D1\u5B66\u8F6E\u4F5C\u517B\u5730\uFF0C\u7CAE\u4EA7 +15%\u3002\u9700\u519C\u4E1A Lv5\u3002", costAction: 2, costGold: 280, allowedGovernments: [], effects: { popGrowthMod: 1.15 }, factionReaction: { commoners: 15, nobles: -5 }, prereqTech: "agri_lv5" },
-  { id: "total_mobilization", name: "\u603B\u52A8\u5458", description: "\u5168\u56FD\u52A8\u5458\uFF0C\u5F81\u5175 \xD72 \u4F46\u538C\u6218 +15\u3002\u9700\u519B\u4E8B Lv5\u3002", costAction: 3, costGold: 350, allowedGovernments: ["empire", "junta", "monarchy"], effects: { mobilizationMod: 2 }, factionReaction: { military: 25, commoners: -20 }, prereqTech: "mil_lv5" },
-  { id: "civil_service_reform", name: "\u79D1\u4E3E\u6539\u9769", description: "\u6DF1\u5316\u79D1\u4E3E\uFF0C\u8150\u8D25 -10\u3001\u884C\u653F +10\u3002\u9700\u884C\u653F Lv5\u3002", costAction: 3, costGold: 320, allowedGovernments: ["empire", "monarchy", "republic"], effects: { corruptionMod: -10, efficiencyMod: 10 }, factionReaction: { nobles: -22, commoners: 12, clergy: 5 }, prereqTech: "admin_lv5" },
-  { id: "cultural_export", name: "\u6587\u5316\u8F93\u51FA", description: "\u5411\u8BF8\u90A6\u8F93\u51FA\u6587\u5316\uFF0C\u5F71\u54CD\u529B +25%\u3001\u5916\u4EA4 +10\u3002\u9700\u6587\u5316 Lv5\u3002", costAction: 2, costGold: 260, allowedGovernments: [], effects: { influenceMod: 1.25, assimilationMod: 8 }, factionReaction: { clergy: 8, commoners: 5 }, prereqTech: "culture_lv5" }
-];
-var POLICY_BY_ID = Object.fromEntries(
-  POLICIES.map((p) => [p.id, p])
-);
-
-// src/data/laws.ts
-var LAWS = [
-  // ── 民法类（civil）── 关乎产权、婚姻、契约
-  {
-    id: "law_civil_code",
-    name: "\u6210\u6587\u6CD5\u5178",
-    category: "civil",
-    description: "\u9881\u5E03\u6210\u6587\u6CD5\uFF0C\u660E\u793A\u5F8B\u4EE4\uFF0C\u9650\u5236\u5B98\u540F\u64C5\u6743\u3002",
-    costGold: 120,
-    allowedGovernments: [],
-    prereqAdminLevel: 2,
-    effects: { corruptionMod: -5, stabilityMod: 5, legitimacyMod: 8, efficiencyMod: 3 },
-    factionReaction: { nobles: -10, commoners: 12, merchants: 8 }
-  },
-  {
-    id: "law_land_reform",
-    name: "\u571F\u5730\u6539\u9769",
-    category: "civil",
-    description: "\u9650\u5236\u8D35\u65CF\u5360\u5730\uFF0C\u91CD\u5206\u571F\u5730\u4E8E\u519C\u6C11\u3002",
-    costGold: 200,
-    allowedGovernments: ["republic", "monarchy", "empire", "theocracy"],
-    prereqAdminLevel: 3,
-    conflictsWith: ["law_noble_privilege"],
-    effects: { stabilityMod: 3, efficiencyMod: 5, taxEffMod: 1.05, unrestReduction: 1 },
-    factionReaction: { nobles: -20, commoners: 18, merchants: 5 }
-  },
-  {
-    id: "law_noble_privilege",
-    name: "\u8D35\u65CF\u7279\u6743\u6CD5",
-    category: "civil",
-    description: "\u4EE5\u6CD5\u5F8B\u56FA\u5316\u8D35\u65CF\u7279\u6743\uFF0C\u6362\u53D6\u5176\u652F\u6301\u3002",
-    costGold: 80,
-    allowedGovernments: ["monarchy", "empire", "feudal"],
-    prereqAdminLevel: 1,
-    conflictsWith: ["law_land_reform", "law_equal_tax"],
-    effects: { stabilityMod: 4, legitimacyMod: 5, efficiencyMod: -3, corruptionMod: 3 },
-    factionReaction: { nobles: 20, commoners: -10, merchants: -5 }
-  },
-  {
-    id: "law_equal_tax",
-    name: "\u5747\u7A0E\u6CD5",
-    category: "civil",
-    description: "\u8D35\u65CF\u5546\u4EBA\u4E00\u4F53\u7EB3\u7A0E\uFF0C\u5E9F\u9664\u514D\u7A0E\u7279\u6743\u3002",
-    costGold: 150,
-    allowedGovernments: ["republic", "empire", "theocracy"],
-    prereqAdminLevel: 3,
-    conflictsWith: ["law_noble_privilege"],
-    effects: { taxEffMod: 1.1, corruptionMod: -3, efficiencyMod: 4 },
-    factionReaction: { nobles: -15, merchants: -8, commoners: 10 }
-  },
-  // ── 刑法类（criminal）── 关乎治安、刑罚
-  {
-    id: "law_strict_punishment",
-    name: "\u4E25\u5211\u5CFB\u6CD5",
-    category: "criminal",
-    description: "\u91CD\u5211\u60E9\u6CBB\u76D7\u532A\u53DB\u4E71\uFF0C\u9707\u6151\u5730\u65B9\u3002",
-    costGold: 60,
-    allowedGovernments: [],
-    prereqAdminLevel: 1,
-    effects: { stabilityMod: 3, efficiencyMod: 2, unrestReduction: 2, rebellionReduction: 3 },
-    factionReaction: { military: 8, commoners: -8, nobles: 3 }
-  },
-  {
-    id: "law_mercy_policy",
-    name: "\u5BBD\u5211\u7701\u7F5A",
-    category: "criminal",
-    description: "\u51CF\u8F7B\u5211\u7F5A\uFF0C\u4EE5\u4EC1\u653F\u6536\u4EBA\u5FC3\u3002",
-    costGold: 50,
-    allowedGovernments: ["republic", "theocracy", "monarchy"],
-    prereqAdminLevel: 2,
-    conflictsWith: ["law_strict_punishment"],
-    effects: { stabilityMod: 5, legitimacyMod: 3, efficiencyMod: -2 },
-    factionReaction: { commoners: 12, clergy: 8, military: -6 }
-  },
-  {
-    id: "law_conscription",
-    name: "\u5F81\u5175\u6CD5",
-    category: "criminal",
-    description: "\u4F9D\u6CD5\u5F3A\u5236\u5F81\u5175\uFF0C\u6269\u5145\u519B\u529B\u3002",
-    costGold: 100,
-    allowedGovernments: [],
-    prereqAdminLevel: 2,
-    effects: { efficiencyMod: 3, stabilityMod: -2, unrestReduction: -1 },
-    factionReaction: { military: 15, commoners: -12, nobles: 3 }
-  },
-  {
-    id: "law_anti_corruption",
-    name: "\u53CD\u8150\u5F8B",
-    category: "criminal",
-    description: "\u4E25\u60E9\u8D2A\u58A8\uFF0C\u8BBE\u76D1\u5BDF\u4E4B\u804C\u3002",
-    costGold: 180,
-    allowedGovernments: [],
-    prereqAdminLevel: 3,
-    effects: { corruptionMod: -10, efficiencyMod: 5, stabilityMod: 2 },
-    factionReaction: { nobles: -12, merchants: 5, commoners: 10 }
-  },
-  // ── 行政法类（administrative）── 关乎官僚、地方、税收
-  {
-    id: "law_civil_service",
-    name: "\u79D1\u4E3E\u8003\u7EE9\u6CD5",
-    category: "administrative",
-    description: "\u4EE5\u8003\u8BD5\u9009\u5B98\uFF0C\u6253\u7834\u4E16\u88AD\u3002",
-    costGold: 150,
-    allowedGovernments: ["empire", "republic", "monarchy"],
-    prereqAdminLevel: 3,
-    effects: { efficiencyMod: 8, corruptionMod: -4, legitimacyMod: 4 },
-    factionReaction: { nobles: -15, clergy: 5, scholars: 15 }
-  },
-  {
-    id: "law_decentralization",
-    name: "\u5730\u65B9\u81EA\u6CBB\u6CD5",
-    category: "administrative",
-    description: "\u653E\u6743\u5730\u65B9\uFF0C\u51CF\u8F7B\u4E2D\u592E\u8D1F\u62C5\u3002",
-    costGold: 100,
-    allowedGovernments: ["republic", "feudal", "tribal"],
-    prereqAdminLevel: 2,
-    conflictsWith: ["law_centralization"],
-    effects: { efficiencyMod: -3, stabilityMod: 4, taxEffMod: 0.97, unrestReduction: 1 },
-    factionReaction: { nobles: 10, commoners: 5, merchants: 3 }
-  },
-  {
-    id: "law_centralization",
-    name: "\u4E2D\u592E\u96C6\u6743\u6CD5",
-    category: "administrative",
-    description: "\u6536\u5F52\u5730\u65B9\u6743\u529B\u4E8E\u4E2D\u592E\u3002",
-    costGold: 200,
-    allowedGovernments: ["empire", "monarchy", "theocracy", "military"],
-    prereqAdminLevel: 3,
-    conflictsWith: ["law_decentralization"],
-    effects: { efficiencyMod: 6, taxEffMod: 1.04, stabilityMod: -2 },
-    factionReaction: { nobles: -8, military: 8, commoners: -3 }
-  },
-  {
-    id: "law_trade_regulation",
-    name: "\u5546\u5F8B",
-    category: "administrative",
-    description: "\u89C4\u8303\u5E02\u573A\uFF0C\u4FDD\u62A4\u5951\u7EA6\u3002",
-    costGold: 120,
-    allowedGovernments: [],
-    prereqAdminLevel: 2,
-    effects: { taxEffMod: 1.03, efficiencyMod: 2, corruptionMod: -2 },
-    factionReaction: { merchants: 15, nobles: -3, commoners: 3 }
-  },
-  // ── D4 扩充：+8 法律到 20 ──
-  // 民法 +3
-  {
-    id: "law_marriage_reform",
-    name: "\u5A5A\u59FB\u6539\u9769\u6CD5",
-    category: "civil",
-    description: "\u653E\u5BBD\u5A5A\u59FB\u9650\u5236\uFF0C\u4FDD\u62A4\u5973\u6027\u8D22\u4EA7\uFF0C\u63D0\u5347\u6C11\u4F17\u8BA4\u540C\u3002",
-    costGold: 90,
-    allowedGovernments: [],
-    prereqAdminLevel: 2,
-    effects: { stabilityMod: 4, legitimacyMod: 3, unrestReduction: 1 },
-    factionReaction: { commoners: 10, clergy: -8, nobles: -3 }
-  },
-  {
-    id: "law_contract_enforcement",
-    name: "\u5951\u7EA6\u6267\u884C\u6CD5",
-    category: "civil",
-    description: "\u5F3A\u5316\u5951\u7EA6\u6548\u529B\uFF0C\u5546\u4E1A\u7EA0\u7EB7\u6709\u6CD5\u53EF\u4F9D\u3002",
-    costGold: 110,
-    allowedGovernments: [],
-    prereqAdminLevel: 2,
-    effects: { taxEffMod: 1.04, corruptionMod: -3, efficiencyMod: 2 },
-    factionReaction: { merchants: 18, nobles: -5, commoners: 2 }
-  },
-  {
-    id: "law_eminent_domain",
-    name: "\u5F81\u6536\u6CD5",
-    category: "civil",
-    description: "\u56FD\u5BB6\u53EF\u5F81\u7528\u79C1\u5730\u5EFA\u516C\u5171\u8BBE\u65BD\uFF0C\u8D35\u65CF\u53CD\u5F39\u4F46\u884C\u653F\u5347\u3002",
-    costGold: 140,
-    allowedGovernments: ["empire", "republic", "monarchy"],
-    prereqAdminLevel: 3,
-    conflictsWith: ["law_noble_privilege"],
-    effects: { efficiencyMod: 6, taxEffMod: 1.03, stabilityMod: -2 },
-    factionReaction: { nobles: -18, commoners: 5, merchants: 3 }
-  },
-  // 刑法 +2
-  {
-    id: "law_prison_reform",
-    name: "\u72F1\u653F\u6539\u9769",
-    category: "criminal",
-    description: "\u6539\u5584\u72F1\u653F\uFF0C\u51CF\u5C11\u51A4\u72F1\uFF0C\u6C11\u5FC3\u5347\u4F46\u9707\u6151\u964D\u3002",
-    costGold: 80,
-    allowedGovernments: [],
-    prereqAdminLevel: 2,
-    conflictsWith: ["law_strict_punishment"],
-    effects: { stabilityMod: 4, legitimacyMod: 4, rebellionReduction: -1 },
-    factionReaction: { commoners: 10, clergy: 6, military: -5 }
-  },
-  {
-    id: "law_border_control",
-    name: "\u8FB9\u9632\u7BA1\u5236\u6CD5",
-    category: "criminal",
-    description: "\u4E25\u63A7\u8FB9\u5883\uFF0C\u9632\u95F4\u8C0D\u6E17\u900F\uFF0C\u6CBB\u5B89\u5347\u4F46\u8D38\u6613\u964D\u3002",
-    costGold: 100,
-    allowedGovernments: [],
-    prereqAdminLevel: 2,
-    effects: { stabilityMod: 3, efficiencyMod: 3, rebellionReduction: 2 },
-    factionReaction: { military: 12, merchants: -10, nobles: 3 }
-  },
-  // 行政法 +3
-  {
-    id: "law_census_registration",
-    name: "\u7F16\u6237\u9F50\u6C11\u6CD5",
-    category: "administrative",
-    description: "\u666E\u67E5\u4EBA\u53E3\u6237\u7C4D\uFF0C\u7A0E\u6536\u6548\u7387\u5927\u5347\u4F46\u8D35\u65CF\u62B5\u5236\u3002",
-    costGold: 160,
-    allowedGovernments: ["empire", "monarchy", "republic"],
-    prereqAdminLevel: 3,
-    effects: { taxEffMod: 1.08, efficiencyMod: 6, corruptionMod: -4 },
-    factionReaction: { nobles: -12, merchants: 5, commoners: 3 }
-  },
-  {
-    id: "law_merchant_guild_charter",
-    name: "\u5546\u56E2\u7279\u8BB8\u6CD5",
-    category: "administrative",
-    description: "\u6388\u4E88\u5546\u56E2\u4E13\u8425\u7279\u6743\uFF0C\u8D38\u6613\u5347\u4F46\u5C0F\u5546\u6237\u4E0D\u6EE1\u3002",
-    costGold: 130,
-    allowedGovernments: ["republic", "monarchy", "empire"],
-    prereqAdminLevel: 2,
-    conflictsWith: ["law_equal_tax"],
-    effects: { taxEffMod: 1.05, corruptionMod: 3, efficiencyMod: 2 },
-    factionReaction: { merchants: 15, nobles: 5, commoners: -8 }
-  },
-  {
-    id: "law_religious_tolerance",
-    name: "\u5B97\u6559\u5BBD\u5BB9\u6CD5",
-    category: "administrative",
-    description: "\u5BBD\u5BB9\u5F02\u6559\uFF0C\u964D\u51B2\u7A81\u4F46\u795E\u804C\u4E0D\u6EE1\u3002",
-    costGold: 120,
-    allowedGovernments: [],
-    prereqAdminLevel: 2,
-    conflictsWith: ["law_strict_punishment"],
-    effects: { stabilityMod: 4, efficiencyMod: 3, unrestReduction: 2 },
-    factionReaction: { clergy: -18, commoners: 8, merchants: 5 }
-  }
-];
-var LAW_BY_ID = Object.fromEntries(
-  LAWS.map((l) => [l.id, l])
-);
-var LAW_IDS = LAWS.map((l) => l.id);
-var LAW_COUNT = LAWS.length;
-var LAWS_BY_CATEGORY = {
-  civil: LAWS.filter((l) => l.category === "civil"),
-  criminal: LAWS.filter((l) => l.category === "criminal"),
-  administrative: LAWS.filter((l) => l.category === "administrative")
-};
-
-// src/engine/politics.ts
-function settlePolitics(nation, state, provs = provincesOf(nation.id, state.provinces)) {
-  const fw = factionWeightedSat(nation.factions);
-  const avgUnrest = provs.length ? provs.reduce((s, p) => s + p.unrest, 0) / provs.length : 0;
-  const rebellionProvCount = provs.filter((p) => p.rebellionRisk >= 100).length;
-  const dStab = stabilityDelta(
-    nation.government.legitimacy,
-    fw.weighted,
-    fw.totalPower,
-    avgUnrest,
-    nation.warExhaustion,
-    rebellionProvCount
-  );
-  let finalDelta = dStab;
-  if (nation.civilWar?.active) {
-    finalDelta -= 3;
-  }
-  const stab = nation.government.stability;
-  const atWar2 = nation.civilWar?.active;
-  if (stab < 40) {
-    finalDelta = Math.max(finalDelta, atWar2 ? 2 : 5);
-  } else if (stab < 60) {
-    finalDelta = Math.max(finalDelta, atWar2 ? 1 : 3);
-  } else if (stab < 75) {
-    finalDelta = Math.max(finalDelta, atWar2 ? 0 : 1.5);
-  } else {
-    finalDelta = Math.max(finalDelta, -2);
-  }
-  nation.government.stability = clamp(nation.government.stability + finalDelta, 0, 100);
-  const reformShockTurns = nation.activePolicies.filter(
-    (p) => state.turn - p.enactedTurn < 3
-  ).length > 0 ? 1 : 0;
-  const dLegit = legitimacyDelta(fw.avgSat, nation.government.corruption, nation.warExhaustion, reformShockTurns);
-  nation.government.legitimacy = clamp(nation.government.legitimacy + dLegit, 0, 100);
-  nation.government.legitimacy = clamp(nation.government.legitimacy + nation.tech.culture * 0.3, 0, 100);
-  const hasAntiCorruption = nation.activePolicies.some((p) => p.policyId === "anti_corruption");
-  let corruptionDelta;
-  if (hasAntiCorruption) {
-    corruptionDelta = -1;
-  } else if (nation.government.stability >= 70) {
-    corruptionDelta = -0.2;
-  } else if (nation.government.stability >= 50) {
-    corruptionDelta = 0.1;
-  } else {
-    corruptionDelta = 0.4;
-  }
-  nation.government.corruption = clamp(nation.government.corruption + corruptionDelta, 0, 100);
-  const cm = nationalCharacterMods(nation.activeCharacterBonuses);
-  if (cm.stabilityMod) nation.government.stability = clamp(nation.government.stability + cm.stabilityMod, 0, 100);
-  if (cm.legitimacyMod) nation.government.legitimacy = clamp(nation.government.legitimacy + cm.legitimacyMod, 0, 100);
-  if (cm.efficiencyMod) nation.government.efficiency = clamp(nation.government.efficiency + cm.efficiencyMod, 0, 100);
-  if (cm.corruptionMod) nation.government.corruption = clamp(nation.government.corruption + cm.corruptionMod, 0, 100);
-  const factionSatMap = { nobles: cm.noblesSat, merchants: cm.merchantsSat, military: cm.militarySat, commoners: cm.commonersSat, clergy: cm.clergySat };
-  for (const f of nation.factions) {
-    const delta = factionSatMap[f.id];
-    if (delta) f.satisfaction = clamp(f.satisfaction + delta * 0.1, 0, 100);
-  }
-  const govDef = GOVERNMENTS[nation.government.type];
-  if (govDef?.perTurn) {
-    const pt = govDef.perTurn;
-    if (pt.legitimacy) nation.government.legitimacy = clamp(nation.government.legitimacy + pt.legitimacy, 0, 100);
-    if (pt.stability) nation.government.stability = clamp(nation.government.stability + pt.stability, 0, 100);
-    if (pt.efficiency) nation.government.efficiency = clamp(nation.government.efficiency + pt.efficiency, 0, 100);
-    if (pt.corruption) nation.government.corruption = clamp(nation.government.corruption + pt.corruption, 0, 100);
-    if (pt.factionSat) {
-      const fsMap = pt.factionSat;
-      for (const f of nation.factions) {
-        const d = fsMap[f.id];
-        if (d) f.satisfaction = clamp(f.satisfaction + d, 0, 100);
-      }
-    }
-  }
-  return { stabilityDelta: dStab, legitimacyDelta: dLegit };
-}
-function canEnactPolicy(nation, policyId) {
-  const def = POLICIES.find((p) => p.id === policyId);
-  if (!def) return { ok: false, reason: "\u653F\u7B56\u4E0D\u5B58\u5728" };
-  if (nation.activePolicies.some((p) => p.policyId === policyId)) {
-    return { ok: false, reason: "\u5DF2\u63A8\u884C" };
-  }
-  if (def.allowedGovernments.length > 0 && !def.allowedGovernments.includes(nation.government.type)) {
-    return { ok: false, reason: "\u653F\u4F53\u4E0D\u5141\u8BB8" };
-  }
-  if (def.prereqTech && !hasTech(nation, def.prereqTech)) {
-    return { ok: false, reason: "\u7F3A\u5C11\u524D\u7F6E\u79D1\u6280" };
-  }
-  if (nation.resources.gold < def.costGold) return { ok: false, reason: "\u91D1\u4E0D\u8DB3" };
-  return { ok: true };
-}
-function enactPolicy(nation, policyId, state) {
-  const eligibility = canEnactPolicy(nation, policyId);
-  if (!eligibility.ok) return eligibility;
-  const def = POLICIES.find((p) => p.id === policyId);
-  nation.resources.gold -= def.costGold;
-  nation.activePolicies.push({ policyId, enactedTurn: state.turn });
-  if (def.effects.corruptionMod) nation.government.corruption = clamp(nation.government.corruption + def.effects.corruptionMod, 0, 100);
-  if (def.effects.stabilityMod) nation.government.stability = clamp(nation.government.stability + def.effects.stabilityMod, 0, 100);
-  if (def.effects.efficiencyMod) nation.government.efficiency = clamp(nation.government.efficiency + def.effects.efficiencyMod, 0, 100);
-  if (def.effects.taxRateMod) nation.taxRate = clamp(nation.taxRate + (def.effects.taxRateMod ?? 0), 0, 0.5);
-  nation.policyMods = derivePolicyMods(nation, def.effects.assimilationMod);
-  for (const [fid, delta] of Object.entries(def.factionReaction)) {
-    const f = nation.factions.find((x) => x.id === fid);
-    if (f) f.satisfaction = clamp(f.satisfaction + delta, 0, 100);
-  }
-  return { ok: true };
-}
-function hasTech(nation, techId) {
-  const match = /^(agri|mil|admin|culture)_lv(\d+)$/.exec(techId);
-  if (!match) return false;
-  const branch = match[1];
-  return nation.tech[branch] >= Number(match[2]);
-}
-function derivePolicyMods(nation, addedAssimilation = 0) {
-  const mods = {};
-  for (const active of nation.activePolicies) {
-    const effects = POLICIES.find((policy) => policy.id === active.policyId)?.effects;
-    if (!effects) continue;
-    if (effects.taxEffMod) mods.taxEffMod = (mods.taxEffMod ?? 1) * effects.taxEffMod;
-    if (effects.combatMod) mods.combatMod = (mods.combatMod ?? 1) * effects.combatMod;
-    if (effects.mobilizationMod) mods.mobilizationMod = (mods.mobilizationMod ?? 1) * effects.mobilizationMod;
-    if (effects.popGrowthMod) mods.popGrowthMod = (mods.popGrowthMod ?? 1) * effects.popGrowthMod;
-    if (effects.influenceMod) {
-      const influenceMultiplier = Math.abs(effects.influenceMod) >= 2 ? 1 + effects.influenceMod / 100 : effects.influenceMod;
-      mods.influenceMod = (mods.influenceMod ?? 1) * influenceMultiplier;
-    }
-    if (effects.assimilationMod) mods.assimilationMod = (mods.assimilationMod ?? 0) + effects.assimilationMod;
-  }
-  const saved = nation.policyMods?.assimilationMod;
-  if (saved !== void 0 && Number.isFinite(saved)) {
-    mods.assimilationMod = Math.max(mods.assimilationMod ?? 0, saved + addedAssimilation);
-  }
-  return mods;
-}
-function enactLaw(nation, lawId, state) {
-  const def = LAWS.find((l) => l.id === lawId);
-  if (!def) return { ok: false, reason: "\u6CD5\u5F8B\u4E0D\u5B58\u5728" };
-  if (nation.activeLaws.some((l) => l.lawId === lawId)) return { ok: false, reason: "\u5DF2\u63A8\u884C" };
-  if (def.allowedGovernments.length > 0 && !def.allowedGovernments.includes(nation.government.type)) {
-    return { ok: false, reason: "\u653F\u4F53\u4E0D\u5141\u8BB8" };
-  }
-  if (nation.tech.admin < def.prereqAdminLevel) return { ok: false, reason: `\u9700\u884C\u653FLv${def.prereqAdminLevel}` };
-  if (def.conflictsWith) {
-    for (const c of def.conflictsWith) {
-      if (nation.activeLaws.some((l) => l.lawId === c)) {
-        return { ok: false, reason: `\u4E0E\u5DF2\u63A8\u884C\u7684 ${LAWS.find((x) => x.id === c)?.name ?? c} \u51B2\u7A81` };
-      }
-    }
-  }
-  if (nation.resources.gold < def.costGold) return { ok: false, reason: "\u91D1\u4E0D\u8DB3" };
-  nation.resources.gold -= def.costGold;
-  nation.activeLaws.push({ lawId, enactedTurn: state.turn });
-  const e = def.effects;
-  if (e.corruptionMod) nation.government.corruption = clamp(nation.government.corruption + e.corruptionMod, 0, 100);
-  if (e.stabilityMod) nation.government.stability = clamp(nation.government.stability + e.stabilityMod, 0, 100);
-  if (e.efficiencyMod) nation.government.efficiency = clamp(nation.government.efficiency + e.efficiencyMod, 0, 100);
-  if (e.legitimacyMod) nation.government.legitimacy = clamp(nation.government.legitimacy + e.legitimacyMod, 0, 100);
-  if (e.taxEffMod && e.taxEffMod !== 1) nation.government.efficiency = clamp(nation.government.efficiency * e.taxEffMod, 0, 100);
-  for (const f of nation.factions) {
-    const delta = def.factionReaction[f.id];
-    if (delta) f.satisfaction = clamp(f.satisfaction + delta, 0, 100);
-  }
-  return { ok: true };
-}
-function lawPerTurnEffects(nation, provs) {
-  applyLawPerTurnEffectFinals(provs, lawPerTurnEffectsPure(nation, provs));
-}
-function applyLawPerTurnEffectFinals(provs, finals) {
-  const byId = new Map(provs.map((p) => [p.id, p]));
-  for (const [provId, final] of Object.entries(finals)) {
-    const p = byId.get(provId);
-    if (!p) continue;
-    if (final.unrest !== void 0) p.unrest = final.unrest;
-    if (final.rebellionRisk !== void 0) p.rebellionRisk = final.rebellionRisk;
-  }
-}
-function lawPerTurnEffectsPure(nation, provs) {
-  const finals = {};
-  for (const al of nation.activeLaws) {
-    const def = LAWS.find((l) => l.id === al.lawId);
-    if (!def) continue;
-    const e = def.effects;
-    if (e.unrestReduction) {
-      for (const p of provs) {
-        const cur = finals[p.id]?.unrest ?? p.unrest;
-        finals[p.id] = { ...finals[p.id], unrest: clamp(cur - e.unrestReduction, 0, 100) };
-      }
-    }
-    if (e.rebellionReduction) {
-      for (const p of provs) {
-        const cur = finals[p.id]?.rebellionRisk ?? p.rebellionRisk;
-        finals[p.id] = { ...finals[p.id], rebellionRisk: clamp(cur - e.rebellionReduction, 0, 100) };
-      }
-    }
-  }
-  return finals;
-}
-function maxManageableProvinces(nation) {
-  return maxProvinces(
-    nation.tech.admin,
-    nation.government.efficiency,
-    nation.activeCharacterBonuses.includes("centralization"),
-    nation.tier
-  );
-}
-function overExtensionPenalty(nation, provinceCount) {
-  const max = maxManageableProvinces(nation);
-  const over = Math.max(0, provinceCount - max);
-  return { taxEffLoss: over * 0.05, stabilityLoss: over * 2 };
-}
-function settlePoliticsPure(nation, state, provs = provincesOf(nation.id, state.provinces)) {
-  const fw = factionWeightedSat(nation.factions);
-  const avgUnrest = provs.length ? provs.reduce((s, p) => s + p.unrest, 0) / provs.length : 0;
-  const rebellionProvCount = provs.filter((p) => p.rebellionRisk >= 100).length;
-  const dStab = stabilityDelta(
-    nation.government.legitimacy,
-    fw.weighted,
-    fw.totalPower,
-    avgUnrest,
-    nation.warExhaustion,
-    rebellionProvCount
-  );
-  let finalDelta = dStab;
-  if (nation.civilWar?.active) finalDelta -= 3;
-  const stab = nation.government.stability;
-  const atWar2 = nation.civilWar?.active;
-  if (stab < 40) finalDelta = Math.max(finalDelta, atWar2 ? 2 : 5);
-  else if (stab < 60) finalDelta = Math.max(finalDelta, atWar2 ? 1 : 3);
-  else if (stab < 75) finalDelta = Math.max(finalDelta, atWar2 ? 0 : 1.5);
-  else finalDelta = Math.max(finalDelta, -2);
-  let finalStab = clamp(nation.government.stability + finalDelta, 0, 100);
-  const reformShockTurns = nation.activePolicies.filter((p) => state.turn - p.enactedTurn < 3).length > 0 ? 1 : 0;
-  const dLegit = legitimacyDelta(fw.avgSat, nation.government.corruption, nation.warExhaustion, reformShockTurns);
-  let finalLegit = clamp(nation.government.legitimacy + dLegit, 0, 100);
-  finalLegit = clamp(finalLegit + nation.tech.culture * 0.3, 0, 100);
-  const hasAntiCorruption = nation.activePolicies.some((p) => p.policyId === "anti_corruption");
-  let corruptionDelta;
-  if (hasAntiCorruption) corruptionDelta = -1;
-  else if (finalStab >= 70) corruptionDelta = -0.2;
-  else if (finalStab >= 50) corruptionDelta = 0.1;
-  else corruptionDelta = 0.4;
-  let finalCorruption = clamp(nation.government.corruption + corruptionDelta, 0, 100);
-  let finalEfficiency = nation.government.efficiency;
-  const cm = nationalCharacterMods(nation.activeCharacterBonuses);
-  if (cm.stabilityMod) finalStab = clamp(finalStab + cm.stabilityMod, 0, 100);
-  if (cm.legitimacyMod) finalLegit = clamp(finalLegit + cm.legitimacyMod, 0, 100);
-  if (cm.efficiencyMod) finalEfficiency = clamp(finalEfficiency + cm.efficiencyMod, 0, 100);
-  if (cm.corruptionMod) finalCorruption = clamp(finalCorruption + cm.corruptionMod, 0, 100);
-  const factionSatFinal = {};
-  const factionSatMap = { nobles: cm.noblesSat, merchants: cm.merchantsSat, military: cm.militarySat, commoners: cm.commonersSat, clergy: cm.clergySat };
-  for (const f of nation.factions) {
-    let sat = f.satisfaction;
-    const d = factionSatMap[f.id];
-    if (d) sat = clamp(sat + d * 0.1, 0, 100);
-    factionSatFinal[f.id] = sat;
-  }
-  const govDef = GOVERNMENTS[nation.government.type];
-  if (govDef?.perTurn) {
-    const pt = govDef.perTurn;
-    if (pt.legitimacy) finalLegit = clamp(finalLegit + pt.legitimacy, 0, 100);
-    if (pt.stability) finalStab = clamp(finalStab + pt.stability, 0, 100);
-    if (pt.efficiency) finalEfficiency = clamp(finalEfficiency + pt.efficiency, 0, 100);
-    if (pt.corruption) finalCorruption = clamp(finalCorruption + pt.corruption, 0, 100);
-    if (pt.factionSat) {
-      const fsMap = pt.factionSat;
-      for (const f of nation.factions) {
-        const d = fsMap[f.id];
-        if (d) factionSatFinal[f.id] = clamp(factionSatFinal[f.id] + d, 0, 100);
-      }
-    }
-  }
-  return {
-    stabilityDelta: dStab,
-    legitimacyDelta: dLegit,
-    govFinal: { stability: finalStab, legitimacy: finalLegit, corruption: finalCorruption, efficiency: finalEfficiency },
-    factionSatFinal
-  };
 }
 
 // src/data/terrain.ts
@@ -5793,7 +6383,7 @@ function warDeclarationBlocker(state, from, to) {
   if (!pair) return "\u7F3A\u5C11\u5916\u4EA4\u5173\u7CFB\u6570\u636E";
   if (pair.some((r) => r.treaty === "alliance")) return "\u4E0D\u80FD\u5411\u76DF\u53CB\u5BA3\u6218";
   if (pair.some((r) => r.treaty === "truce" && r.truceTurns > 0)) return "\u505C\u6218\u671F\u5185\u4E0D\u80FD\u5BA3\u6218";
-  if (hasActiveNonAggressionAccord(state, from, to)) return "\u53CC\u65B9\u4ECD\u53D7\u5143\u9996\u4F1A\u8C08\u8FBE\u6210\u7684\u4E0D\u4FB5\u72AF\u534F\u8BAE\u7EA6\u675F";
+  if (hasActiveNonAggressionAccord(state, from, to)) return "\u53CC\u65B9\u4ECD\u53D7\u4E0D\u4FB5\u72AF\u534F\u8BAE\u7EA6\u675F";
   if (state.wars.some((w) => w.attackerId === from && w.defenderId === to || w.attackerId === to && w.defenderId === from)) return "\u53CC\u65B9\u5DF2\u7ECF\u5904\u4E8E\u6218\u4E89\u4E2D";
   return null;
 }
@@ -6113,7 +6703,7 @@ function recruit(state, nation, province, count) {
   const milBonus = nation.activeCharacterBonuses.includes("militarism") ? 1.2 : 1;
   const actualCount = Math.round(count * milBonus * (nation.policyMods?.mobilizationMod ?? 1));
   if (province.population < actualCount) return { ok: false, reason: `\u4EBA\u53E3\u4E0D\u8DB3\uFF08\u5B9E\u9645\u9700 ${actualCount}\uFF09` };
-  province.population -= actualCount;
+  setProvincePopulation(province, province.population - actualCount);
   nation.resources.gold -= goldCost;
   nation.resources.supply -= supplyCost;
   let army = nation.army.find((a) => a.location === province.id);
@@ -6724,7 +7314,7 @@ function applyEffectPure(nation, effect, state, availability) {
     }
   }
   if (effect.population) {
-    const provs = provincesOf(nation.id, state.provinces);
+    const provs = provincesOf(nation.id, state.provinces).filter((p) => p.terrain !== "ocean");
     const populationDelta = Math.round(effect.population);
     if (populationDelta < 0 && provs.length > 0) {
       let remaining = -populationDelta;
@@ -6787,7 +7377,7 @@ function applyEffectResult(nation, state, result) {
   }
   for (const [provinceId, delta] of Object.entries(result.provPopDeltas)) {
     const province = state.provinces[provinceId];
-    if (province) province.population = Math.max(0, province.population + delta);
+    if (province) setProvincePopulation(province, province.population + delta);
   }
   state.pendingEvents.push(...result.newPendingEvents);
 }
@@ -7499,9 +8089,9 @@ function runAITurnPhase(state, playerId2, rng, options = {}) {
     }
     const provinces = provincesByOwner.get(nation.id) ?? [];
     if (provinces.length === 0) continue;
-    settleEconomy(nation, state, provinces, relationsBySource.get(nation.id) ?? []);
-    const totalPopulation = provinces.reduce((sum, province) => sum + province.population, 0);
-    settlePopulation(nation, provinces, nation.resources.food < totalPopulation * 0.4, true, nation.atWar, false);
+    const economy = settleEconomy(nation, state, provinces, relationsBySource.get(nation.id) ?? []);
+    for (const province of provinces) if (province.priorAgriBase !== void 0) delete province.priorAgriBase;
+    settlePopulation(nation, provinces, economy.grain.shortageExpected, true, nation.atWar, false);
     settlePolitics(nation, state, provinces);
     lawPerTurnEffects(nation, provinces);
     settleTechnology(nation, state);
@@ -7723,6 +8313,7 @@ function buildReport(nation, provs, state, prev, econ, pop, cr, events, worldEve
     nationId: nation.id,
     income: { tax: Math.round(econ.taxIncome), trade: Math.round(econ.tradeIncome), building: Math.round(econ.buildingIncome) },
     expense: { military: Math.round(econ.militaryExpense), corruption: Math.round(econ.corruptionLoss) },
+    ...econ.economicReturns && { economicReturns: econ.economicReturns },
     ...yearEndChanges(prev, state, nation.id, provs),
     popDelta: Math.round(pop.totalGrowth),
     events,
@@ -7741,8 +8332,9 @@ function settleRuler(next, playerId2) {
   const playerProvs = provincesOf(playerId2, next.provinces);
   const econPure = settleEconomyPure(player, next, playerProvs);
   applyEconomyResult(player, econPure);
+  for (const p of playerProvs) if (p.priorAgriBase !== void 0) delete p.priorAgriBase;
   const econ = econPure;
-  const foodShortage = player.resources.food < playerProvs.reduce((s, p) => s + p.population, 0) * 0.4;
+  const foodShortage = econ.grain.shortageExpected;
   const pop = settlePopulation(player, playerProvs, foodShortage, true, player.atWar, false);
   const polPure = settlePoliticsPure(player, next, playerProvs);
   player.government.stability = polPure.govFinal.stability;
@@ -8878,6 +9470,9 @@ function auditStateInvariants(state) {
     if (![province.population, province.garrison, province.unrest, province.rebellionRisk, province.loyalty, province.assimilation].every(finite)) {
       add("province-number-invalid", "error", `${province.id} \u542B NaN/Infinity\u3002`);
     }
+    if (province.classes.reduce((sum, group) => sum + group.count, 0) !== province.population) {
+      add("province-class-total", "error", `${province.id} \u7684\u9636\u5C42\u4EBA\u6570\u5408\u8BA1\u4E0E\u603B\u4EBA\u53E3\u4E0D\u7B26\u3002`);
+    }
     if (province.population < 0 || province.garrison < 0) add("province-negative", "error", `${province.id} \u542B\u8D1F\u4EBA\u53E3\u6216\u8D1F\u9A7B\u519B\u3002`);
     if ([province.unrest, province.rebellionRisk, province.loyalty, province.assimilation].some((value) => value < 0 || value > 100)) {
       add("province-range-invalid", "error", `${province.id} \u7684\u767E\u5206\u6BD4\u5B57\u6BB5\u8D8A\u754C\u3002`);
@@ -9187,16 +9782,21 @@ function improveRelationAction(state, targetId) {
     return success(`\u6539\u5584\u4E86\u4E0E ${target.name} \u7684\u5173\u7CFB`);
   });
 }
+function tradeTreatyBlocker(state, targetId) {
+  const player = state.nations[state.playerNationId];
+  const pair = peacefulRelationPair(state, player.id, targetId);
+  if (!pair || pair.some((r) => r.treaty !== "none")) return "\u65E0\u6CD5\u5EFA\u7ACB\u8D38\u6613";
+  if (pair[0].relation < 0) return "\u9700\u5148\u6539\u5584\u5173\u7CFB";
+  if (player.resources.influence < 30) return "\u5F71\u54CD\u529B\u4E0D\u8DB3";
+  return player.resources.adminPt < 1 ? "\u884C\u52A8\u70B9\u4E0D\u8DB3\uFF08\u9700 1\uFF09" : null;
+}
 function formTradeAction(state, targetId) {
   return runGameAction(state, (working, player) => {
-    const target = validForeignTarget(working, player, targetId);
-    const pair = target ? peacefulRelationPair(working, player.id, target.id) : null;
-    if (!target || !pair || pair[0].relation < 0 || pair.some((relation) => relation.treaty === "alliance" || relation.treaty === "trade")) {
-      return failure("\u65E0\u6CD5\u5EFA\u7ACB\u8D38\u6613");
-    }
-    if (player.resources.influence < 30) return failure("\u5F71\u54CD\u529B\u4E0D\u8DB3");
-    const apFailure = spendAdmin(player, 1);
-    if (apFailure) return apFailure;
+    const blocker = tradeTreatyBlocker(working, targetId);
+    if (blocker) return failure(blocker);
+    const target = working.nations[targetId];
+    const pair = relationPair(working, player.id, targetId);
+    player.resources.adminPt -= 1;
     player.resources.influence -= 30;
     for (const relation of pair) {
       relation.treaty = "trade";
@@ -9365,6 +9965,13 @@ function enactLawAction(state, lawId) {
 }
 
 // src/gameplay/actions/provinceActions.ts
+function reclamationBlocker(player, province) {
+  if (province.terrain === "ocean") return "\u6D77\u57DF\u65E0\u6CD5\u5F00\u57A6";
+  if (province.agriBase >= 12) return "\u519C\u4E1A\u57FA\u7840\u5DF2\u8FBE\u4E0A\u9650";
+  if (player.resources.gold < 60) return "\u91D1\u4E0D\u8DB3";
+  if (player.resources.adminPt < 1) return "\u884C\u52A8\u70B9\u4E0D\u8DB3\uFF08\u9700 1\uFF09";
+  return null;
+}
 function establishTradeRouteAction(state, routeId) {
   return runGameAction(state, (working, player) => {
     const apFailure = spendAdmin(player, 1);
@@ -9434,8 +10041,8 @@ function developProvinceAction(state, provinceId, kind) {
     if (province.ownerId !== player.id) return failure("\u53EA\u80FD\u5F00\u53D1\u672C\u56FD\u7701\u4EFD");
     if (!["reclaim", "garrison_deploy", "garrison_recall"].includes(kind)) return failure("\u672A\u77E5\u7701\u4EFD\u64CD\u4F5C");
     if (kind === "reclaim") {
-      if (province.agriBase >= 12) return failure("\u519C\u4E1A\u57FA\u7840\u5DF2\u8FBE\u4E0A\u9650");
-      if (player.resources.gold < 60) return failure("\u91D1\u4E0D\u8DB3");
+      const blocker = reclamationBlocker(player, province);
+      if (blocker) return failure(blocker);
     }
     const capitalArmy = player.army.find((army) => army.location === player.capital);
     if (kind === "garrison_deploy" && (!capitalArmy || capitalArmy.size < 50)) return failure("\u9996\u90FD\u519B\u961F\u4E0D\u8DB3");
@@ -9444,6 +10051,7 @@ function developProvinceAction(state, provinceId, kind) {
     if (apFailure) return apFailure;
     if (kind === "reclaim") {
       player.resources.gold -= 60;
+      province.priorAgriBase ??= province.agriBase;
       province.agriBase = Math.min(12, province.agriBase + 2);
     } else if (kind === "garrison_deploy" && capitalArmy) {
       capitalArmy.size -= 50;
@@ -9563,6 +10171,83 @@ function conveneDiplomaticSummitAction(state, targetId, agenda, stance) {
   });
 }
 
+// src/gameplay/borderPact.ts
+var RENEWAL_EVENT = "evt_eastern_renewal";
+var pactTerms = {
+  trade: { years: 5, gold: 0, reason: "\u4E24\u5E74\u5546\u8DEF\u4EA4\u5272\uFF0C\u90BB\u56FD\u613F\u514D\u6536\u793C\u91D1\u3002" },
+  peace: { years: 5, gold: 50, reason: "\u8FB9\u5883\u5B88\u7EA6\uFF0C\u90BB\u56FD\u613F\u6309\u65E7\u793C\u7EED\u7B7E\u3002" },
+  wary: { years: 3, gold: 120, reason: "\u90BB\u56FD\u4ECD\u6709\u6212\u5FC3\uFF0C\u53EA\u80AF\u7B7E\u77ED\u7EA6\u3002" }
+};
+function openingPact(state) {
+  return state.diplomaticAccords.find((a) => a.partyA === state.playerNationId && a.agenda === "security" && a.startedTurn === 0 && a.expiresTurn === 5);
+}
+function renewalBlocker(state, pending) {
+  const quote = pending.renewal;
+  const pact = openingPact(state);
+  const partner = state.nations[pending.partnerId ?? ""];
+  if (!quote || !Object.prototype.hasOwnProperty.call(pactTerms, quote.terms) || !pact || pact.id !== quote.accordId || pact.partyA !== pending.nationId || pact.partyB !== partner?.id || !partner || partner.defeated || pact.expiresTurn !== state.turn || !peacefulRelationPair(state, pact.partyA, pact.partyB)) return "\u63D0\u8BAE\u5DF2\u5931\u6548";
+  return state.nations[pending.nationId].resources.gold < pactTerms[quote.terms].gold ? "\u91D1\u4E0D\u8DB3" : null;
+}
+function renewBorderPact(state, pending) {
+  const pact = openingPact(state);
+  const { gold, years } = pactTerms[pending.renewal.terms];
+  state.nations[pact.partyA].resources.gold -= gold;
+  state.nations[pact.partyB].resources.gold += gold;
+  pact.expiresTurn += years;
+  return `\u4E0E${state.nations[pact.partyB].name}\u7EED\u7EA6${years}\u5E74\uFF0C\u793C\u91D1${gold}\u91D1\u3002`;
+}
+
+// src/gameplay/campaignDecisions.ts
+function decisionBlocker(state, pending, option2) {
+  if (pending.eventId === RENEWAL_EVENT && option2 === 0) return renewalBlocker(state, pending);
+  const needsPartner = option2 === 0 && (pending.eventId === "evt_eastern_envoy" || pending.eventId === "evt_grain_budget");
+  if (needsPartner && (!pending.partnerId || !state.nations[pending.partnerId] || state.nations[pending.partnerId].defeated || state.relations.some((r) => r.from === pending.nationId && r.to === pending.partnerId && r.treaty === "war"))) return "\u63D0\u8BAE\u5DF2\u5931\u6548";
+  if (pending.eventId !== "evt_grain_budget" || option2 === 2) return null;
+  const nation = state.nations[pending.nationId];
+  if (!nation || !pending.works) return "\u63D0\u8BAE\u5DF2\u5931\u6548";
+  if (option2 === 0) return null;
+  const place = state.provinces[pending.works.provinceId];
+  if (place?.ownerId !== nation.id || place.agriBase >= 12) return "\u63D0\u8BAE\u5DF2\u5931\u6548";
+  return nation.resources.gold < pending.works.price ? "\u91D1\u4E0D\u8DB3" : null;
+}
+function settleCampaignDecision(state, pending, option2) {
+  const nation = state.nations[pending.nationId];
+  let detail;
+  if (pending.eventId === "evt_eastern_envoy" && option2 === 0 && pending.partnerId) {
+    state.diplomaticAccords.push({
+      id: allocateEntityId(state, "accord"),
+      partyA: nation.id,
+      partyB: pending.partnerId,
+      agenda: "security",
+      strength: 1,
+      tradeYears: 0,
+      startedTurn: state.turn,
+      expiresTurn: state.turn + 5
+    });
+    recordDiplomaticIncident(state, pending.partnerId, nation.id, "alliance", 8, "\u7B7E\u4E0B\u4E94\u5E74\u7EA6\u4E66");
+  } else if (pending.eventId === RENEWAL_EVENT) {
+    if (option2 === 0) detail = renewBorderPact(state, pending);
+    else if (pending.partnerId && state.nations[pending.partnerId]) detail = `\u4E0E${state.nations[pending.partnerId].name}\u7684\u8FB9\u7EA6\u6309\u671F\u7ED3\u675F\u3002`;
+  } else if (pending.eventId === "evt_grain_budget" && pending.works && pending.partnerId) {
+    const { price, provinceId, quantity } = pending.works;
+    if (option2 === 0) nation.grainContract = { partnerId: pending.partnerId, quantity, yearsLeft: 3 };
+    if (option2 === 1) {
+      const province = state.provinces[provinceId];
+      nation.resources.gold -= price;
+      province.priorAgriBase ??= province.agriBase;
+      province.agriBase = Math.min(12, province.agriBase + 2);
+    }
+  } else if (pending.eventId !== "evt_eastern_reform" && pending.eventId !== "evt_eastern_envoy") return;
+  const event = EVENT_BY_ID[pending.eventId];
+  addChronicle(state, {
+    turn: state.turn,
+    kind: pending.eventId === "evt_eastern_envoy" || pending.eventId === RENEWAL_EVENT ? "milestone_diplomacy" : "reform",
+    actorId: nation.id,
+    title: event.title,
+    desc: detail ?? event.options[option2].text
+  });
+}
+
 // src/gameplay/pendingEventResolution.ts
 var eventUpdates = new Immer2({ autoFreeze: false });
 function pendingIndex(state, nationId, eventId) {
@@ -9572,12 +10257,13 @@ function resolvePendingEventChoice(state, nationId, eventId, optionIndex) {
   const event = EVENT_BY_ID[eventId];
   const option2 = event?.options[optionIndex];
   const index = pendingIndex(state, nationId, eventId);
-  if (!event || !option2 || !state.nations[nationId] || index < 0) {
+  if (!event || !option2 || !state.nations[nationId] || index < 0 || decisionBlocker(state, state.pendingEvents[index], optionIndex)) {
     return { state, resolved: false };
   }
   const next = eventUpdates.produce(state, (draft) => {
     draft._relMap = void 0;
     applyEffect(draft.nations[nationId], option2.effects, draft);
+    settleCampaignDecision(draft, draft.pendingEvents[index], optionIndex);
     recordEvent(draft, nationId, eventId, optionIndex);
     draft.pendingEvents.splice(index, 1);
     if (draft.pendingEventOptions?.nationId === nationId && draft.pendingEventOptions.eventId === eventId) draft.pendingEventOptions = null;
@@ -9593,6 +10279,20 @@ function resolvePendingEventChoice(state, nationId, eventId, optionIndex) {
 // scripts/shared-world-engine-entry.ts
 function prepareSharedSnapshot(state) {
   const next = { ...state, pendingEvents: validPendingEvents(state) };
+  for (const province of Object.values(state.provinces)) {
+    const oceanCapital = legacyOceanCapital(state, province);
+    if (!oceanCapital && province.classes?.length && province.classes.every((group) => group.weight !== void 0)) continue;
+    if (next.provinces === state.provinces) next.provinces = { ...state.provinces };
+    const restored = { ...province, classes: (province.classes ?? []).map((group) => ({ ...group })) };
+    if (oceanCapital) restoreCapitalTerrain(restored);
+    setProvincePopulation(restored, province.population);
+    next.provinces[province.id] = restored;
+  }
+  for (const nation of Object.values(state.nations)) {
+    if (!nation.activePolicies?.some((policy) => policy.policyId === "crop_rotation") || nation.policyMods?.foodOutputMod !== void 0) continue;
+    if (next.nations === state.nations) next.nations = { ...state.nations };
+    next.nations[nation.id] = { ...nation, policyMods: derivePolicyMods(nation) };
+  }
   const options = next.pendingEventOptions;
   if (!next.pendingEvents.some((p) => p.eventId === options?.eventId && p.nationId === options?.nationId)) next.pendingEventOptions = null;
   if (!next.sharedChronicles) {

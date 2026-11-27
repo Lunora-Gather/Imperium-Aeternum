@@ -1,6 +1,7 @@
 import { useI18n } from '../i18n';
 import { NAVIGATION_GROUPS, type NavigationTab } from '../gameplay/navigationTabs';
 import { useDialogFocus } from './useDialogFocus';
+import { LocaleSwitch } from './LocaleSwitch';
 
 interface MobileNavigationSheetProps {
   activeTab: NavigationTab;
@@ -38,6 +39,7 @@ export default function MobileNavigationSheet({ activeTab, onSelect, onClose }: 
             </section>
           ))}
         </div>
+        <div className="ia-mobile-nav-language"><LocaleSwitch /></div>
       </section>
     </div>
   );

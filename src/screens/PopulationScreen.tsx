@@ -53,7 +53,7 @@ export default function PopulationScreen() {
       </Panel>
 
       <Panel title="人口与阶层" accent>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 10, marginBottom: 12 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 130px), 1fr))', gap: 10, marginBottom: 12 }}>
           <Stat kind="core" accent="var(--food)" label="总人口" value={totalPop} />
           <Stat kind="core" accent="var(--accent)" label="省份数" value={provs.length} />
           <Stat kind="core" accent="var(--stable)" label="阶层满意" value={avgClassSat} warn={avgClassSat < 45} />
@@ -71,10 +71,10 @@ export default function PopulationScreen() {
 
       <Panel title="派系权力与满意度">
         <p className="dim" style={{ fontSize: 11, marginBottom: 10 }}>派系满意度低会增加政治事件风险。安抚消耗 30 金；长期更应通过政策和法律解决。</p>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: 10 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 260px), 1fr))', gap: 10 }}>
           {player.factions.map((f) => {
             const sat = f.satisfaction; const t = tone(sat); const color = FACTION_COLOR[f.id] ?? 'var(--border-bright)';
-            return <div key={f.id} className="ia-card" style={{ padding: 12, position: 'relative', overflow: 'hidden', border: sat < 35 ? '1px solid var(--warn)' : undefined }}><div style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: 3, background: color }} /><div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}><div><strong style={{ fontSize: 14 }}>{FACTION_LABEL[f.id] ?? f.id}</strong><Tag text={`权力 ${f.power}`} tone="info" /></div><Btn label="安抚 30金" variant="ghost" onClick={() => appeaseFaction(f.id)} disabled={player.resources.gold < 30} /></div><div style={{ display: 'flex', alignItems: 'center', gap: 8 }}><span style={{ fontSize: 11, color: 'var(--text-mute)', width: 36 }}>满意</span><div style={{ flex: 1 }}><Bar value={sat} kind="high" label={`${FACTION_LABEL[f.id] ?? f.id}满意度`} /></div><strong style={{ fontSize: 14, width: 32, textAlign: 'right', color: `var(--${t === 'danger' ? 'war' : t === 'warn' ? 'warn' : 'good'})` }}>{Math.round(sat)}</strong></div>{sat < 30 && <div className="danger" style={{ fontSize: 11, marginTop: 6 }}>⚠ 派系强烈不满</div>}{f.power > 60 && sat < 45 && <div style={{ fontSize: 11, marginTop: 4, color: 'var(--warn)' }}>高权力低满意，政治风险偏高</div>}</div>;
+            return <div key={f.id} className="ia-card" style={{ padding: 12, position: 'relative', overflow: 'hidden', border: sat < 35 ? '1px solid var(--warn)' : undefined }}><div style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: 3, background: color }} /><div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}><div><strong style={{ fontSize: 14 }}>{FACTION_LABEL[f.id] ?? f.id}</strong><Tag text={`权力 ${f.power}`} tone="info" /></div><Btn label="安抚 30金" variant="ghost" onClick={() => appeaseFaction(f.id)} disabled={player.resources.gold < 30} /></div><div style={{ display: 'flex', alignItems: 'center', gap: 8 }}><span style={{ fontSize: 11, color: 'var(--text-mute)', minWidth: 36 }}>满意</span><div style={{ flex: 1 }}><Bar value={sat} kind="high" label={`${FACTION_LABEL[f.id] ?? f.id}满意度`} /></div><strong style={{ fontSize: 14, width: 32, textAlign: 'right', color: `var(--${t === 'danger' ? 'war' : t === 'warn' ? 'warn' : 'good'})` }}>{Math.round(sat)}</strong></div>{sat < 30 && <div className="danger" style={{ fontSize: 11, marginTop: 6 }}>⚠ 派系强烈不满</div>}{f.power > 60 && sat < 45 && <div style={{ fontSize: 11, marginTop: 4, color: 'var(--warn)' }}>高权力低满意，政治风险偏高</div>}</div>;
           })}
         </div>
       </Panel>

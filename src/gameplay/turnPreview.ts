@@ -1,3 +1,4 @@
+import { grainOutlook } from './grainOutlook';
 import { operatingNet } from './reportFinances';
 // V27 下一回合预演：在玩家按下“下一回合”前，给出安全性、可能变化和保存建议。
 // 纯函数，不改 GameState，不预测随机事件结果，只基于当前状态做风险预判。
@@ -80,7 +81,10 @@ function likelyChanges(state: GameState, player?: Nation, provinces: Province[] 
 
   if (!last) items.push({ id: 'first-report', title: '将生成首份年报', body: '推进后会第一次形成财政、粮食、社会和天下大势报告。', tone: 'info', tab: 'report' });
   if (net !== null && net < 0) items.push({ id: 'gold-drop', title: '国库可能继续下降', body: `上年净收入 ${n(net)}，若不先处理经济，下一年仍可能失血。`, tone: net < -30 ? 'danger' : 'warn', tab: 'economy' });
-  if (last && last.foodDelta < 0) items.push({ id: 'food-drop', title: '粮储可能继续承压', body: `上年粮食 ${n(last.foodDelta)}，建议先检查省份生产和人口压力。`, tone: last.foodDelta < -50 ? 'danger' : 'warn', tab: 'province' });
+  if (player) {
+    const grain = grainOutlook(state, player, provinces);
+    if (grain.tone !== 'good') items.push({ id: 'food-drop', title: grain.title, body: grain.detail, tone: grain.tone, tab: 'economy' });
+  }
   if (player && player.government.stability < 40) items.push({ id: 'stability-risk', title: '低安定会放大事件风险', body: `当前安定 ${n(player.government.stability)}，连续推进可能让事件和地方风险更难控。`, tone: player.government.stability < 30 ? 'danger' : 'warn', tab: 'politics' });
   if (wars.length > 0) items.push({ id: 'war-roll', title: '战争会继续结算', body: `当前 ${wars.length} 场战争会继续消耗补给、士气和厌战。`, tone: player && player.warExhaustion > 65 ? 'danger' : 'warn', tab: 'military' });
   if (unrest.length > 0) items.push({ id: 'local-risk', title: '地方风险可能升级', body: `${unrest.length} 个省份有高不满、低忠诚或叛乱风险。`, tone: unrest.length >= 3 ? 'danger' : 'warn', tab: 'province' });

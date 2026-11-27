@@ -1,6 +1,7 @@
 // Imperium Aeternum — 事件系统 engine
 // 阶段 5b：完整实现 docs/reference/02-system-rules.md §15
 
+import { setProvincePopulation } from './provincePopulation';
 import type { GameState, Nation, Province } from '../types/game';
 import type { EventDef, EventEffect, EventTrigger, FactionReaction } from '../data/events';
 import { EVENTS, EVENT_BY_ID } from '../data/events';
@@ -266,7 +267,7 @@ export function applyEffectPure(
     }
   }
   if (effect.population) {
-    const provs = provincesOf(nation.id, state.provinces);
+    const provs = provincesOf(nation.id, state.provinces).filter(p => p.terrain !== 'ocean');
     const populationDelta = Math.round(effect.population);
     if (populationDelta < 0 && provs.length > 0) {
       let remaining = -populationDelta;
@@ -336,7 +337,7 @@ export function applyEffectResult(nation: Nation, state: GameState, result: Appl
   }
   for (const [provinceId, delta] of Object.entries(result.provPopDeltas)) {
     const province = state.provinces[provinceId];
-    if (province) province.population = Math.max(0, province.population + delta);
+    if (province) setProvincePopulation(province, province.population + delta);
   }
   state.pendingEvents.push(...result.newPendingEvents);
 }

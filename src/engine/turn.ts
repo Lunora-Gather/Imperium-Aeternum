@@ -64,7 +64,7 @@ export function nationWarnings(nation: Nation): string[] {
 
 function buildReport(
   nation: Nation, provs: Province[], state: GameState, prev: GameState,
-  econ: { taxIncome: number; tradeIncome: number; buildingIncome: number; corruptionLoss: number; militaryExpense: number; foodProduced: number; foodConsumed: number },
+  econ: ReturnType<typeof settleEconomyPure>,
   pop: { totalGrowth: number },
   cr: { rebellionTriggered: string[] },
   events: string[],
@@ -107,6 +107,7 @@ function buildReport(
     nationId: nation.id,
     income: { tax: Math.round(econ.taxIncome), trade: Math.round(econ.tradeIncome), building: Math.round(econ.buildingIncome) },
     expense: { military: Math.round(econ.militaryExpense), corruption: Math.round(econ.corruptionLoss) },
+    ...(econ.economicReturns && { economicReturns: econ.economicReturns }),
     ...yearEndChanges(prev, state, nation.id, provs),
     popDelta: Math.round(pop.totalGrowth),
     events,
@@ -151,9 +152,10 @@ function settleRuler(next: GameState, playerId: string) {
   // ── 玩家回合：6 子引擎 Pure 版本收集 deltas，合并到 next ──
   const econPure = settleEconomyPure(player, next, playerProvs);
   applyEconomyResult(player, econPure);
+  for (const p of playerProvs) if (p.priorAgriBase !== undefined) delete p.priorAgriBase;
   const econ = econPure;  // EconomyPartial extends EconomyResult，可直接传 buildReport
 
-  const foodShortage = player.resources.food < playerProvs.reduce((s, p) => s + p.population, 0) * 0.4;
+  const foodShortage = econ.grain.shortageExpected;
   const pop = settlePopulation(player, playerProvs, foodShortage, true, player.atWar, false);
 
   const polPure = settlePoliticsPure(player, next, playerProvs);

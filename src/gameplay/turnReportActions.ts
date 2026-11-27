@@ -71,7 +71,7 @@ export function buildTurnReportActions(state: GameState, context: TurnReportActi
   else if (net < -30) actions.push(action('net-loss', '财政正在失血', `本年净收入 ${Math.round(net)}，建议去经济页检查税收、贸易与军费。`, 'economy', 84));
 
   if (player.resources.food < 0) actions.push(action('food-negative', '粮储已经见底', '粮储为负会引发连锁危机，优先去省份页处理农业、人口与不满。', 'province', 94));
-  else if (r.foodDelta < -50) actions.push(action('food-loss', '粮食减产明显', '本年粮食大幅下降，建议检查农田、人口增长和省份不满。', 'province', 76));
+  else if (r.foodDelta < -50) actions.push(action('food-loss', '本年粮储下降', '可在经济页核对下年的粮食收入、居民口粮和军粮。', 'economy', 76));
 
   if (player.government.stability < 35) actions.push(action('stability-low', '安定过低', '安定过低会放大叛乱与事件风险，优先去政治页安抚派系、改善治理。', 'politics', 92));
   else if (r.stabilityDelta < -5) actions.push(action('stability-drop', '稳定正在下滑', '本年稳定度明显下降，建议检查税率、派系和近期事件影响。', 'politics', 74));

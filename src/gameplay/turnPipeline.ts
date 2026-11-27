@@ -7,6 +7,8 @@ import { detectMilestones } from '../engine/chronicle';
 import { nationWarnings, processTurn, yearEndChanges } from '../engine/turn';
 import { sanitizeTurnSnapshot } from './stateHygiene';
 import { applyAIStrategy, applyPlayerFocus } from './strategyFocus';
+import { reviewBorderPact } from './borderPact';
+import { offerGrainBudget } from './campaignDecisions';
 import { settleNationalPurpose } from './nationalPurpose';
 export { prepareGameState } from './prepareGameState';
 
@@ -27,6 +29,8 @@ export function advanceTurnPipeline(state: GameState): TurnPipelineResult {
   if (!next.victory.type) {
     const focus = applyPlayerFocus(next, next.strategyFocus ?? 'balance');
     next = applyAIStrategy(focus.state);
+    reviewBorderPact(next, state);
+    offerGrainBudget(next);
     if (focus.note) {
       notes.push(focus.note);
       if (next.lastReport) {

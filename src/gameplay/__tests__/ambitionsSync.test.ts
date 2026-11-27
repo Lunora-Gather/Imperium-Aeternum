@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { createInitialState, createWorldState } from '../../engine/init';
 import { applyAmbitionsAfterTurn, getAmbitionSnapshot, syncAmbitionMeta } from '../ambitions';
+import { tradeOffers } from '../../engine/tradeNetwork';
 import { advanceTurnPipeline } from '../turnPipeline';
 import type { GameState } from '../../types/game';
 
@@ -15,7 +16,12 @@ function establishEconomicFoundation(state: GameState): void {
     const province = owned[index % owned.length];
     province.buildings.push({ id: `victory-building-${index}`, defId: 'farm', provinceId: province.id, level: 1 });
   }
-  player(state).activeTradeRoutes = [{ routeId: 'silk_road', establishedTurn: state.turn }];
+  const route = tradeOffers(state, player(state)).find(r => state.provinces[r.endpoints[0]].ownerId === state.playerNationId)!;
+  const partnerId = state.provinces[route.endpoints[1]].ownerId;
+  for (const rel of state.relations) {
+    if ((rel.from === state.playerNationId && rel.to === partnerId) || (rel.to === state.playerNationId && rel.from === partnerId)) rel.treaty = 'trade';
+  }
+  player(state).activeTradeRoutes = [{ routeId: route.id, establishedTurn: state.turn }];
 }
 
 describe('ambition progress synchronization', () => {

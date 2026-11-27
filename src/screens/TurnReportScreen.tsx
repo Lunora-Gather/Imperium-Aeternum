@@ -1,3 +1,4 @@
+import { EconomicReturnsSummary } from '../components/EconomicReturnsSummary';
 import { registerGovernanceTranslations } from '../i18n/catalogs/governance';
 import { localizeReactTree } from '../i18n/reactTree';
 registerGovernanceTranslations();
@@ -39,7 +40,7 @@ export default function TurnReportScreen({ onContinue, readOnly = false }: { onC
 
   const stories: { txt: string; tone: 'good' | 'warn' | 'danger' | 'info' }[] = [];
   if (treasuryChange != null && treasuryChange > 0) stories.push({ txt: `国库净增 ${Math.round(treasuryChange)} 金`, tone: 'good' }); else if (treasuryChange != null && treasuryChange < 0) stories.push({ txt: `国库净减 ${Math.round(-treasuryChange)} 金`, tone: 'danger' });
-  if (r.foodDelta > 0) stories.push({ txt: `粮食增收 ${r.foodDelta}`, tone: 'good' }); else if (r.foodDelta < 0) stories.push({ txt: `粮食减产 ${-r.foodDelta}`, tone: 'warn' });
+  if (r.foodDelta > 0) stories.push({ txt: t('粮储增加 {{amount}}', { amount: r.foodDelta }), tone: 'good' }); else if (r.foodDelta < 0) stories.push({ txt: t('粮储减少 {{amount}}', { amount: -r.foodDelta }), tone: 'warn' });
   if (r.popDelta > 0) stories.push({ txt: `人口增长 +${r.popDelta}`, tone: 'good' });
   if (r.stabilityDelta > 0) stories.push({ txt: `稳定度 +${r.stabilityDelta}`, tone: 'good' }); else if (r.stabilityDelta < 0) stories.push({ txt: `稳定度 ${r.stabilityDelta}`, tone: 'warn' });
   if (r.legitimacyDelta < 0) stories.push({ txt: `合法性 ${r.legitimacyDelta}`, tone: 'warn' });
@@ -68,6 +69,7 @@ export default function TurnReportScreen({ onContinue, readOnly = false }: { onC
         {brief.opportunities.length > 0 && <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 12 }}>{brief.opportunities.slice(0, 4).map((x: StrategicItem) => <button key={x.title} className="ia-btn ia-btn--ghost" onClick={() => jumpToTab(x.tab)}><Tag text={x.title} tone={itemTone(x.tone)} /></button>)}</div>}
       </>}
       <div style={{ marginBottom: 12 }}><strong style={{ fontSize: 13, color: 'var(--text-mute)' }}>今年发生了什么</strong><div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 8 }}>{stories.length === 0 ? <span className="dim">风平浪静的一年</span> : stories.map((s, i) => <Tag key={i} text={s.txt} tone={s.tone} />)}</div></div>
+      <EconomicReturnsSummary state={state} report={r} />
       <Divider label="财政收支" />
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 12 }}><div><strong style={{ fontSize: 13, color: 'var(--good)' }}>{`收入 +${Math.round(income)}`}</strong><div style={{ fontSize: 13, marginTop: 6 }}><Row k="税收" v={r.income.tax} /><Row k="贸易" v={r.income.trade} /><Row k="建筑" v={r.income.building} /></div></div><div><strong style={{ fontSize: 13, color: 'var(--war)' }}>{`支出 −${Math.round(expense)}`}</strong><div style={{ fontSize: 13, marginTop: 6 }}><Row k="军费" v={-r.expense.military} neg /><Row k="腐败" v={-r.expense.corruption} neg /></div></div></div>
       <Row k="常规净收入" v={net} neg={net < 0} />

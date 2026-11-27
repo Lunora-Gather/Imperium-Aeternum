@@ -5,7 +5,8 @@ import { useI18n } from '../i18n';
 import { cacheSavePreview, cachedSavePreview, inspectSaveSlot, inspectStoredSlot, type SaveRecoveryPreview } from '../gameplay/saveRecovery';
 import inspectorUrl from '../gameplay/saveInspector.worker.ts?worker&url';
 import recoveryUrl from '../gameplay/saveRecovery.ts?url';
-import { clearAllSaves, snapshotSaveList, SLOT_CHANGED, SLOT_COUNT, slotStorageValue, watchOtherTabSaves } from '../store/persistence';
+import { snapshotSaveList, SLOT_CHANGED, SLOT_COUNT, slotStorageValue, watchOtherTabSaves } from '../store/persistence';
+import { clearCampaignSaves } from '../store/gameStore';
 
 interface Deletion { message: string; remove: () => void }
 
@@ -110,7 +111,7 @@ export function useSavePreviews(logMsg: (message: string) => void) {
     try {
       const snapshot = snapshotSaveList(versions);
       setDeletion({ message, remove: () => {
-        if (!clearAllSaves(snapshot)) logMsg('部分存档未能删除，请查看剩余槽位。');
+        if (!clearCampaignSaves(snapshot)) logMsg('部分存档未能删除，请查看剩余槽位。');
         rescan();
       } });
     } catch { logMsg('无法读取本地存档。'); rescan(); }

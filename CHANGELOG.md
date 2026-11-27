@@ -2,6 +2,12 @@
 
 All notable player-facing changes are recorded here. Version numbers follow semantic versioning.
 
+## [1.2.0] - 2026-11-27
+
+- Connected generated campaigns to local and foreign markets. Trade missions now require operating routes, and annual reports show actual shipments and first-harvest gains.
+- Added distinct eastern openings, a surplus-grain decision, and border pact renewal terms shaped by deliveries, trust and espionage.
+- Aligned provincial population, food budgets and trade settlement across solo saves and the authoritative shared world. Older saves retain their progress.
+
 ## [1.1.2] - 2026-11-27
 
 - Refined all four themes, including text contrast, buttons, status colors, map labels, and mobile layout.

@@ -16,7 +16,7 @@ export function Panel({ title, children, actions, accent, icon }: {
         ? 'linear-gradient(180deg, var(--bg-raised) 0%, var(--bg-panel) 100%)'
         : 'var(--bg-panel)',
       borderRadius: 'var(--radius)',
-      padding: 'var(--space-5)',
+      padding: 'var(--panel-padding, var(--space-5))',
       marginBottom: 'var(--space-5)',
       border: `1px solid ${accent ? 'var(--border-bright)' : 'var(--border)'}`,
       boxShadow: accent ? '0 6px 24px rgba(0,0,0,0.35), inset 0 1px 0 rgba(201,164,78,0.06)' : '0 2px 8px rgba(0,0,0,0.2)',
@@ -24,7 +24,7 @@ export function Panel({ title, children, actions, accent, icon }: {
     }}>
       {/* 标题行 —— display 字体 + 可选图标 + 金色细线分隔 */}
       <header style={{
-        display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+        display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap',
         marginBottom: 'var(--space-4)', gap: 'var(--space-3)',
         paddingBottom: 'var(--space-3)',
         borderBottom: '1px solid var(--border)',

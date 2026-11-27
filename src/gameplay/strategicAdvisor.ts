@@ -1,3 +1,4 @@
+import { grainOutlook } from './grainOutlook';
 import { operatingNet } from './reportFinances';
 // Strategic Advisor v1 — 帝国总参谋部
 // 统一分析财政、粮食、战争、地方、外交、科技、派系和国运阶段。
@@ -116,14 +117,14 @@ export function buildStrategicBrief(state: GameState): StrategicBrief {
   const threats = externalThreats(state, player);
   const techGap = weakestTech(player);
   const goldTrend = trend(state.history.map(netOf));
-  const foodTrend = trend(state.history.map((r) => r.foodDelta));
+  const grain = grainOutlook(state, player, provs);
   const urgent: StrategicItem[] = [];
   const opportunities: StrategicItem[] = [];
   const risks: string[] = [];
 
-  if (player.resources.food < 0 || (last && last.foodDelta < -80) || foodTrend < -45) {
-    add(urgent, { title: '粮食系统优先', body: `粮储 ${n(player.resources.food)}，粮食趋势 ${n(foodTrend)}。先保粮，别让人口和稳定一起掉。`, tab: 'economy', level: 100, tone: 'danger', reason: 'food' });
-    risks.push('粮食危机');
+  if (grain.tone !== 'good') {
+    add(urgent, { title: grain.title, body: grain.detail, tab: 'economy', level: grain.shortageExpected ? 100 : 62, tone: grain.tone, reason: 'food' });
+    risks.push(grain.title);
   }
   if (player.resources.gold < 0 || net < -80 || goldTrend < -35) {
     add(urgent, { title: '财政止血', body: `净收入 ${n(net)}，国库 ${n(player.resources.gold)}。优先调税、贸易、腐败和军费。`, tab: 'economy', level: 96, tone: 'danger', reason: 'gold' });

@@ -160,6 +160,24 @@ describe('campaign session changes', () => {
     expect(useSharedWorldSessionStore.getState().session).toBe(session);
   });
 
+  it('preserves a queued order when the player tries to open a valid local save', async () => {
+    const game = useGameStore.getState();
+    const session = useSharedWorldSessionStore.getState().session!;
+    const local = JSON.stringify({ gameState: createInitialState() });
+    vi.stubGlobal('localStorage', { getItem: () => local, setItem: vi.fn() });
+    const held = deferred<void>();
+    const polling = enqueueSharedCommand(session, () => held.promise, 'refresh');
+    const send = vi.fn().mockResolvedValue(undefined);
+    const queued = enqueueSharedCommand(session, send);
+    try {
+      expect(game.loadFromSlot(1, local)).toBe(false);
+      expect(useSharedWorldSessionStore.getState().session).toBe(session);
+    } finally { held.resolve(); await polling; await queued; }
+    expect(send).toHaveBeenCalledOnce();
+    expect(game.loadFromSlot(1, local)).toBe(true);
+    expect(useSharedWorldSessionStore.getState().session).toBeNull();
+  });
+
   it.each([false, true])('coalesces wake signals during a failed sync, stopped=%s', async (stopped) => {
     const browser = Object.assign(new EventTarget(), { setInterval: vi.fn(), clearInterval: vi.fn() });
     vi.stubGlobal('window', browser);

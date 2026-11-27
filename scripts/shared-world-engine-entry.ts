@@ -2,6 +2,9 @@ import { createWorldState } from '../src/engine/init';
 import { addChronicle, CHRONICLE_MAX, personalChronicleOwner } from '../src/engine/chronicle';
 import { validPendingEvents } from '../src/gameplay/stateHygiene';
 import { sharedNationView } from '../src/shared-world/nationView';
+import { legacyOceanCapital, restoreCapitalTerrain } from '../src/engine/worldgen';
+import { setProvincePopulation } from '../src/engine/provincePopulation';
+import { derivePolicyMods } from '../src/engine/politics';
 import { processTurn } from '../src/engine/turn';
 import type { GameState } from '../src/types/game';
 import {
@@ -18,6 +21,20 @@ export { sharedNationView };
 
 export function prepareSharedSnapshot(state: GameState): GameState {
   const next = { ...state, pendingEvents: validPendingEvents(state) };
+  for (const province of Object.values(state.provinces)) {
+    const oceanCapital = legacyOceanCapital(state, province);
+    if (!oceanCapital && province.classes?.length && province.classes.every(group => group.weight !== undefined)) continue;
+    if (next.provinces === state.provinces) next.provinces = { ...state.provinces };
+    const restored = { ...province, classes: (province.classes ?? []).map(group => ({ ...group })) };
+    if (oceanCapital) restoreCapitalTerrain(restored);
+    setProvincePopulation(restored, province.population);
+    next.provinces[province.id] = restored;
+  }
+  for (const nation of Object.values(state.nations)) {
+    if (!nation.activePolicies?.some(policy => policy.policyId === 'crop_rotation') || nation.policyMods?.foodOutputMod !== undefined) continue;
+    if (next.nations === state.nations) next.nations = { ...state.nations };
+    next.nations[nation.id] = { ...nation, policyMods: derivePolicyMods(nation) };
+  }
   const options = next.pendingEventOptions;
   if (!next.pendingEvents.some(p => p.eventId === options?.eventId && p.nationId === options?.nationId)) next.pendingEventOptions = null;
   if (!next.sharedChronicles) {

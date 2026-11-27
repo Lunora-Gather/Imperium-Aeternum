@@ -252,5 +252,5 @@ export default function MilitaryScreen() {
 }
 
 function StatRowMini({ label, value, kind }: { label: string; value: number; kind: 'high' | 'low' }) {
-  return <div style={{ display: 'grid', gridTemplateColumns: '48px 1fr 32px', gap: 6, alignItems: 'center', marginBottom: 3 }}><span style={{ fontSize: 11, color: 'var(--text-mute)' }}>{label}</span><Bar value={value} kind={kind} label={label} /><span style={{ fontSize: 11, textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{Math.round(value)}</span></div>;
+  return <div style={{ display: 'grid', gridTemplateColumns: 'minmax(62px, max-content) 1fr 32px', gap: 6, alignItems: 'center', marginBottom: 3 }}><span style={{ fontSize: 11, color: 'var(--text-mute)' }}>{label}</span><Bar value={value} kind={kind} label={label} /><span style={{ fontSize: 11, textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{Math.round(value)}</span></div>;
 }

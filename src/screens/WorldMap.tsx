@@ -8,6 +8,7 @@ import { TERRAIN_LABELS, terrainLabel } from '../data/terrain';
 import type { Terrain } from '../data/provinces';
 import type { Province } from '../types/game';
 import { useGameStore } from '../store/gameStore';
+import { tradeOffers, tradeRouteById } from '../engine/tradeNetwork';
 import { Tag, StatusDot } from '../components/ui';
 
 function nationColor(id: string, isPlayer: boolean): string {
@@ -35,7 +36,7 @@ export default function WorldMap() {
   const provs = useMemo(() => Object.values(state.provinces), [state.provinces]);
   const [hover, setHover] = useState<string | null>(null);
   const [selected, setSelected] = useState<string | null>(null);
-  const [filter, setFilter] = useState<'all' | 'player' | 'neighbors' | 'risk'>('all');
+  const [filter, setFilter] = useState<'all' | 'player' | 'neighbors' | 'risk' | 'routes'>('all');
   const [query, setQuery] = useState('');
   const selectProvince = useCallback((id: string) => {
     setHover(null);
@@ -70,6 +71,18 @@ export default function WorldMap() {
     }
     return { edges, frontier };
   }, [pid, provs, state.provinces]);
+  const tradeEdges = useMemo(() => {
+    if (filter !== 'routes' || !player) return [];
+    const lines = new Map<string, Edge>();
+    const owned = player.activeTradeRoutes.map(r => tradeRouteById(r.routeId));
+    for (const def of [...owned, ...tradeOffers(state, player)]) {
+      if (!def) continue;
+      const [a, b] = def.endpoints.map(id => state.provinces[id]);
+      if (a && b && (a.ownerId === pid || b.ownerId === pid)) lines.set(def.endpoints.join(':'), [a, b]);
+    }
+    return [...lines.values()];
+  }, [filter, pid, player, state]);
+  const tradePlaces = useMemo(() => new Set(tradeEdges.flatMap(([a, b]) => [a.id, b.id])), [tradeEdges]);
   const entries = useMemo(() => provs.map((province) => {
     const ownerName = state.nations[province.ownerId]?.name ?? '中立省份';
     const terrain = terrainLabel(province.terrain);
@@ -84,12 +97,13 @@ export default function WorldMap() {
       if (normalized && !search.includes(normalized)) return false;
       if (filter === 'player') return p.ownerId === pid;
       if (filter === 'neighbors') return frontier.has(p.id);
+      if (filter === 'routes') return tradePlaces.has(p.id);
       if (filter === 'risk') return p.ownerId === pid && (p.rebellionRisk >= 45 || p.unrest >= 40 || p.loyalty < 50);
       return true;
     });
-  }, [entries, query, filter, pid, frontier]);
+  }, [entries, query, filter, pid, frontier, tradePlaces]);
   const visibleIds = useMemo(() => new Set(visible.map(({ province }) => province.id)), [visible]);
-  const shownEdges = useMemo(() => edges.filter(([p, q]) => visibleIds.has(p.id) && visibleIds.has(q.id)), [edges, visibleIds]);
+  const shownEdges = useMemo(() => (filter === 'routes' ? tradeEdges : edges).filter(([p, q]) => visibleIds.has(p.id) && visibleIds.has(q.id)), [edges, visibleIds, filter, tradeEdges]);
   const armySizes = useMemo(() => {
     const sizes = new Map<string, number>();
     for (const army of player?.army ?? []) {
@@ -117,6 +131,7 @@ export default function WorldMap() {
           <button aria-pressed={filter === 'all'} className={filter === 'all' ? 'is-active' : ''} onClick={() => setFilter('all')}>全图</button>
           <button aria-pressed={filter === 'player'} className={filter === 'player' ? 'is-active' : ''} onClick={() => setFilter('player')}>吾土</button>
           <button aria-pressed={filter === 'neighbors'} className={filter === 'neighbors' ? 'is-active' : ''} onClick={() => setFilter('neighbors')}>边境</button>
+          <button aria-pressed={filter === 'routes'} className={filter === 'routes' ? 'is-active' : ''} onClick={() => setFilter('routes')}>商路</button>
           <button aria-pressed={filter === 'risk'} className={filter === 'risk' ? 'is-active' : ''} onClick={() => setFilter('risk')}>风险</button>
         </div>
       </header>
@@ -124,7 +139,7 @@ export default function WorldMap() {
       <div className="ia-map-layout">
         <div className="ia-map-atlas">
           <div className="ia-map-compass">N</div>
-          <ProvinceAtlas bounds={bounds} visible={visible} edges={shownEdges} pid={pid} armySizes={armySizes}
+          <ProvinceAtlas bounds={bounds} visible={visible} edges={shownEdges} trade={filter === 'routes'} pid={pid} armySizes={armySizes}
             selected={selectedId} onPreview={setHover} onSelect={selectProvince} locale={locale} />
         </div>
 
@@ -136,6 +151,7 @@ export default function WorldMap() {
             <div><span>边境点</span><strong>{frontier.size}</strong></div>
           </div>
 
+          {filter === 'routes' && <button className="ia-btn" onClick={() => jumpToTab('economy')}>管理商路</button>}
           <ProvincePicker visible={visible} selected={selectedId} onSelect={selectProvince} locale={locale} />
           {activeProv ? (
             <div className="ia-map-detail">
@@ -201,12 +217,13 @@ const ProvincePicker = memo(function ProvincePicker({ visible, selected, onSelec
 type AtlasProps = PickerProps & {
   bounds: { minX: number; minY: number; maxX: number; maxY: number };
   edges: Edge[];
+  trade: boolean;
   pid: string;
   armySizes: Map<string, number>;
   onPreview: (id: string | null) => void;
 };
 
-const ProvinceAtlas = memo(function ProvinceAtlas({ bounds, visible, edges, pid, armySizes, selected, onPreview, onSelect, locale }: AtlasProps) {
+const ProvinceAtlas = memo(function ProvinceAtlas({ bounds, visible, edges, trade, pid, armySizes, selected, onPreview, onSelect, locale }: AtlasProps) {
   const W = Math.max(320, bounds.maxX - bounds.minX);
   const H = Math.max(240, bounds.maxY - bounds.minY);
   return (
@@ -239,8 +256,8 @@ const ProvinceAtlas = memo(function ProvinceAtlas({ bounds, visible, edges, pid,
           const sameOwner = p.ownerId === q.ownerId;
           const touchesPlayer = p.ownerId === pid || q.ownerId === pid;
           return <line key={`${p.id}-${q.id}`} x1={p.x} y1={p.y} x2={q.x} y2={q.y}
-            stroke={touchesPlayer ? 'rgba(184,146,74,0.48)' : sameOwner ? 'rgba(80,72,50,0.42)' : 'rgba(130,90,64,0.22)'}
-            strokeWidth={touchesPlayer ? 1.25 : sameOwner ? 0.75 : 0.45} />;
+            stroke={trade ? 'var(--gold)' : touchesPlayer ? 'rgba(184,146,74,0.48)' : sameOwner ? 'rgba(80,72,50,0.42)' : 'rgba(130,90,64,0.22)'}
+            strokeDasharray={trade ? '6 3' : undefined} strokeWidth={trade ? 2.5 : touchesPlayer ? 1.25 : sameOwner ? 0.75 : 0.45} />;
         })}
       </g>
 

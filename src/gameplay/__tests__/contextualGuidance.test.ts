@@ -85,6 +85,9 @@ describe('contextual guidance', () => {
 
     const guidance = buildContextualGuidance(state);
 
-    expect(guidance.tips.map((x) => x.id)).toEqual(expect.arrayContaining(['food-red', 'read-report', 'chronicle-learning']));
+    expect(guidance.tips.map(x => x.id)).toEqual(expect.arrayContaining(['read-report', 'chronicle-learning']));
+    expect(guidance.tips.map(x => x.id)).not.toContain('food-red');
+    state.nations[state.playerNationId].army[0].size = 20_000;
+    expect(buildContextualGuidance(state).tips.find(x => x.id === 'food-red')).toMatchObject({ tab: 'economy', tone: 'danger' });
   });
 });

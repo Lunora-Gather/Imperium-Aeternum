@@ -5,9 +5,10 @@ import { queueCloudSaveUpload } from '../gameplay/cloudSyncCoordinator';
 import { create } from 'zustand';
 import type { GameState, Nation, StrategyFocusId, SummitAgenda, SummitStance, TurnReport } from '../types/game';
 import { createInitialState, createWorldState } from '../engine/init';
-import { hasSave, deleteSave, saveGameToSlot, loadSlotCheckpoint, slotStorageValue, deleteSlot, type ExpectedSlot, type SlotSaveResult } from './persistence';
+import { hasSave, clearAllSaves, saveGameToSlot, loadSlotCheckpoint, slotStorageValue, deleteSlot, type ExpectedSlot, type SlotSaveResult, type snapshotSaveList } from './persistence';
 import { PLAYER_ID } from '../data/nations';
 import type { PolicyId } from '../data/policies';
+import { openScenarioCouncil } from '../gameplay/campaignDecisions';
 import { advanceTurnPipeline, prepareGameState } from '../gameplay/turnPipeline';
 import {
   appeaseFactionAction,
@@ -60,6 +61,7 @@ type StoreSet = (partial: Partial<GameStore> | ((state: GameStore) => Partial<Ga
 let autoVersion: string | null = null;
 let ownsAutoSlot = false;
 const checkpoints = new WeakMap<GameState, { slot: number; stored: string }>();
+const clearedAutosaves = new WeakSet<GameState>();
 
 function beginLocalCampaign() {
   ownsAutoSlot = false;
@@ -69,9 +71,24 @@ function beginLocalCampaign() {
 function rememberCheckpoint(state: GameState, slot: number, stored: string) {
   checkpoints.set(state, { slot, stored });
   if (slot === 0) {
+    clearedAutosaves.delete(state);
     autoVersion = stored;
     ownsAutoSlot = true;
   }
+}
+
+function deleteCampaignSlot(slot: number, expected?: ExpectedSlot): boolean {
+  if (!deleteSlot(slot, expected)) return false;
+  if (slot === 0) {
+    autoVersion = null;
+    ownsAutoSlot = false;
+    clearedAutosaves.add(useGameStore.getState().state);
+  }
+  return true;
+}
+
+export function clearCampaignSaves(snapshot: ReturnType<typeof snapshotSaveList>): boolean {
+  return clearAllSaves(snapshot, deleteCampaignSlot);
 }
 
 function saveLocalSlot(get: () => GameStore, slot: number, successLabel?: string, expectedRaw?: ExpectedSlot): SlotSaveResult {
@@ -93,6 +110,10 @@ function saveLocalSlot(get: () => GameStore, slot: number, successLabel?: string
 }
 
 function restoreLocalSlot(get: () => GameStore, set: StoreSet, slot?: number, expectedStored?: string | null): boolean {
+  if (useSharedWorldSessionStore.getState().session && pendingSharedOrders() > 0) {
+    log(get, '共享操作正在提交，请等待确认后再读档。');
+    return false;
+  }
   const checkpoint = loadSlotCheckpoint(slot ?? 0, expectedStored);
   if (!checkpoint) {
     log(get, '读档失败：存档不存在或损坏');
@@ -127,6 +148,7 @@ export function checkpointBeforeUnload(): boolean {
   if (useSharedWorldSessionStore.getState().session) return pendingSharedOrders() === 0;
   try {
     if (hasCurrentCheckpoint(state)) return true;
+    if (clearedAutosaves.has(state)) return false;
     const stored = slotStorageValue(0);
     if (stored !== autoVersion || (stored !== null && (!ownsAutoSlot || state.victory.type?.startsWith('fail')))) return false;
     return saveLocalSlot(useGameStore.getState, 0, undefined, { stored }).ok;
@@ -222,6 +244,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
     }
     beginLocalCampaign();
     state.scenarioId = id;
+    openScenarioCouncil(state);
     if (id === 'challenge_survival') applyChallenge(state);
     pendingScenario = null;
     useSharedWorldSessionStore.getState().leave();
@@ -247,11 +270,11 @@ export const useGameStore = create<GameStore>((set, get) => ({
   newGame: () => get().startScenario('classic'),
   load: () => restoreLocalSlot(get, set),
   save: () => saveLocalSlot(get, 0, '已存档', { stored: autoVersion }),
-  clearSave: () => log(get, deleteSave() ? '已删档' : '删除失败，请刷新存档体检。'),
+  clearSave: () => log(get, deleteCampaignSlot(0, { stored: autoVersion }) ? '已删档' : '删除失败，请刷新存档体检。'),
   hasSave: () => hasSave(),
   saveToSlot: (slot, expectedRaw) => saveLocalSlot(get, slot, slot === 0 ? '自动存档' : `已存档到槽位 ${slot}`, expectedRaw),
   loadFromSlot: (slot, expectedStored) => restoreLocalSlot(get, set, slot, expectedStored),
-  deleteSlotSave: (slot, expectedRaw) => log(get, deleteSlot(slot, expectedRaw) ? `已删除槽位 ${slot} 存档` : '删除失败，请刷新存档体检。'),
+  deleteSlotSave: (slot, expectedRaw) => log(get, deleteCampaignSlot(slot, expectedRaw) ? `已删除槽位 ${slot} 存档` : '删除失败，请刷新存档体检。'),
   nextTurn: () => {
     const cur = get().state;
     const session = useSharedWorldSessionStore.getState().session;

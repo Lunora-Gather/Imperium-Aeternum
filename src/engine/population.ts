@@ -1,6 +1,7 @@
 // Imperium Aeternum — 人口系统 engine
 // 阶段 5b：完整实现 docs/reference/02-system-rules.md §10
 
+import { setProvincePopulation } from './provincePopulation';
 import { CLASS_IDS, type Nation, type Province, type ClassId } from '../types/game';
 import { popGrowth, classRebellionRisk } from './formulas';
 import { clamp } from '../utils/math';
@@ -33,7 +34,7 @@ export function settlePopulation(
 ): PopSettleResult {
   const result = settlePopulationPure(nation, provinces, foodShortage, tradeFree, atWar, warWonRecent);
   for (const p of provinces) {
-    p.population += result.popDelta[p.id];
+    setProvincePopulation(p, p.population + result.popDelta[p.id]);
     for (const group of p.classes) group.satisfaction += result.classSatDelta[p.id][group.classId];
   }
   for (const faction of nation.factions) faction.satisfaction = result.factionSatFinal[faction.id] ?? faction.satisfaction;
@@ -53,6 +54,8 @@ function mapClassToFaction(c: ClassId): 'nobles' | 'merchants' | 'military' | 'c
 
 // 征兵：从 peasants/workers/merchants 按比例抽 → soldiers
 export function draftFromPopulation(province: Province, count: number): { drafted: number } {
+  const sol = province.classes.find((group) => group.classId === 'soldiers');
+  if (!sol) return { drafted: 0 };
   const candidates: ClassId[] = ['peasants', 'workers', 'merchants'];
   const ratio = [0.7, 0.2, 0.1];
   let drafted = 0;
@@ -67,12 +70,14 @@ export function draftFromPopulation(province: Province, count: number): { drafte
     drafted += take;
   }
   // 加到 soldiers
-  const sol = province.classes.find((g) => g.classId === 'soldiers');
-  if (sol) sol.count += drafted;
+  sol.count += drafted;
   // 征兵降低 peasants 满意度
   const pe = province.classes.find((g) => g.classId === 'peasants');
   if (pe) pe.satisfaction = clamp(pe.satisfaction - 5, 0, 100);
-  province.population = Math.max(10, province.population - drafted);
+  // These residents change class within the province.
+  if (drafted > 0) {
+    for (const group of province.classes) group.weight = group.count;
+  }
   return { drafted };
 }
 
@@ -112,7 +117,7 @@ export function settlePopulationPure(
       atWar, plague: false,
       growthMod,
     });
-    const newPop = Math.max(10, Math.round(p.population + delta));
+    const newPop = p.terrain === 'ocean' ? 0 : Math.max(10, Math.round(p.population + delta));
     popDelta[p.id] = newPop - p.population;  // delta（原函数 p.population = newPop）
     totalGrowth += popDelta[p.id];
 

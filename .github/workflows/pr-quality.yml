@@ -105,7 +105,7 @@ jobs:
           VITE_BASE: /Imperium-Aeternum/
       - run: sudo safaridriver --enable
       - name: Smoke test the built Pages candidate
-        run: npm run test:e2e -- --preview
+        run: npm run test:e2e:safari -- --preview
       - name: Two-device cloud save recovery
         run: |
           npx playwright-core install webkit

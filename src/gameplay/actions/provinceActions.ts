@@ -4,10 +4,18 @@ import { establishTradeRoute as engineEstablishTradeRoute } from '../../engine/e
 import { addChronicle } from '../../engine/chronicle';
 import { recognizeRebelIndependence, removeRebelNations, syncWarFlags } from '../../engine/turnIntel';
 import { allocateEntityId } from '../../utils/id';
-import type { GameState, Province } from '../../types/game';
+import type { GameState, Nation, Province } from '../../types/game';
 import { clamp, failure, runGameAction, spendAdmin, success } from './actionCore';
 
 export type ProvinceDevelopmentKind = 'reclaim' | 'garrison_deploy' | 'garrison_recall' | 'neutral_negotiate' | 'neutral_colonize' | 'neutral_occupy';
+
+export function reclamationBlocker(player: Nation, province: Province): string | null {
+  if (province.terrain === 'ocean') return '海域无法开垦';
+  if (province.agriBase >= 12) return '农业基础已达上限';
+  if (player.resources.gold < 60) return '金不足';
+  if (player.resources.adminPt < 1) return '行动点不足（需 1）';
+  return null;
+}
 
 export function establishTradeRouteAction(state: GameState, routeId: string) {
   return runGameAction(state, (working, player) => {
@@ -86,8 +94,8 @@ export function developProvinceAction(state: GameState, provinceId: string, kind
     if (province.ownerId !== player.id) return failure('只能开发本国省份');
     if (!['reclaim', 'garrison_deploy', 'garrison_recall'].includes(kind)) return failure('未知省份操作');
     if (kind === 'reclaim') {
-      if (province.agriBase >= 12) return failure('农业基础已达上限');
-      if (player.resources.gold < 60) return failure('金不足');
+      const blocker = reclamationBlocker(player, province);
+      if (blocker) return failure(blocker);
     }
     const capitalArmy = player.army.find((army) => army.location === player.capital);
     if (kind === 'garrison_deploy' && (!capitalArmy || capitalArmy.size < 50)) return failure('首都军队不足');
@@ -97,6 +105,7 @@ export function developProvinceAction(state: GameState, provinceId: string, kind
 
     if (kind === 'reclaim') {
       player.resources.gold -= 60;
+      province.priorAgriBase ??= province.agriBase;
       province.agriBase = Math.min(12, province.agriBase + 2);
     } else if (kind === 'garrison_deploy' && capitalArmy) {
       capitalArmy.size -= 50;

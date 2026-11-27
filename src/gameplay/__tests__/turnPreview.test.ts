@@ -56,7 +56,7 @@ describe('turn preview', () => {
     expect(preview.saveAdvice.tab).toBe('save');
   });
 
-  it('uses last report trends to explain likely next-turn changes', () => {
+  it('distinguishes last year’s finances from the current ration budget', () => {
     const state = createInitialState();
     state.lastReport = {
       turn: 2,
@@ -79,7 +79,15 @@ describe('turn preview', () => {
 
     const preview = buildTurnPreview(state);
 
-    expect(preview.likelyChanges.map((x) => x.id)).toEqual(expect.arrayContaining(['gold-drop', 'food-drop']));
+    expect(preview.likelyChanges.map(x => x.id)).toContain('gold-drop');
+    expect(preview.likelyChanges.map(x => x.id)).not.toContain('food-drop');
+
+    const player = state.nations[state.playerNationId];
+    player.army[0].size = 20_000;
+    player.resources.food = 100_000;
+    expect(buildTurnPreview(state).likelyChanges.find(x => x.id === 'food-drop')).toMatchObject({ tone: 'warn', tab: 'economy' });
+    player.resources.food = 0;
+    expect(buildTurnPreview(state).likelyChanges.find(x => x.id === 'food-drop')).toMatchObject({ tone: 'danger' });
   });
 
   it('reuses supplied diagnostics and command actions for before-press guidance', () => {

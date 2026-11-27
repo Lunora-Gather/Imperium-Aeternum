@@ -23,16 +23,22 @@ export function improveRelationAction(state: GameState, targetId: string) {
   });
 }
 
+export function tradeTreatyBlocker(state: GameState, targetId: string): string | null {
+  const player = state.nations[state.playerNationId];
+  const pair = peacefulRelationPair(state, player.id, targetId);
+  if (!pair || pair.some(r => r.treaty !== 'none')) return '无法建立贸易';
+  if (pair[0].relation < 0) return '需先改善关系';
+  if (player.resources.influence < 30) return '影响力不足';
+  return player.resources.adminPt < 1 ? '行动点不足（需 1）' : null;
+}
+
 export function formTradeAction(state: GameState, targetId: string) {
   return runGameAction(state, (working, player) => {
-    const target = validForeignTarget(working, player, targetId);
-    const pair = target ? peacefulRelationPair(working, player.id, target.id) : null;
-    if (!target || !pair || pair[0].relation < 0 || pair.some((relation) => relation.treaty === 'alliance' || relation.treaty === 'trade')) {
-      return failure('无法建立贸易');
-    }
-    if (player.resources.influence < 30) return failure('影响力不足');
-    const apFailure = spendAdmin(player, 1);
-    if (apFailure) return apFailure;
+    const blocker = tradeTreatyBlocker(working, targetId);
+    if (blocker) return failure(blocker);
+    const target = working.nations[targetId];
+    const pair = relationPair(working, player.id, targetId)!;
+    player.resources.adminPt -= 1;
     player.resources.influence -= 30;
     for (const relation of pair) {
       relation.treaty = 'trade';

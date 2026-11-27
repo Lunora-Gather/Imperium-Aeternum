@@ -31,6 +31,7 @@ export type ClassId = typeof CLASS_IDS[number];
 export interface PopulationGroup {
   classId: ClassId;
   count: number;
+  weight?: number;             // Stable share, inferred from headcounts for legacy provinces
   satisfaction: number;       // 0-100
 }
 
@@ -56,6 +57,7 @@ export interface Province {
   terrain: Terrain;
   ownerId: NationId;
   isCapital: boolean;
+  priorAgriBase?: number;                  // Before reclamation awaiting its first harvest
   agriBase: number;
   culture: CultureId;
   religion: ReligionId;
@@ -140,6 +142,7 @@ export interface DiplomaticSummitRecord {
 }
 
 export interface DiplomaticAccord {
+  tradeYears?: number; // Full years of bilateral trade during the opening pact
   id: string;
   partyA: NationId;
   partyB: NationId;
@@ -232,7 +235,31 @@ export interface TriggeredEvent {
 }
 
 // ── 回合报告 ──
+export interface GrainContract {
+  partnerId: NationId;
+  quantity: number;
+  yearsLeft: number;
+}
+
+export type PactTerms = 'trade' | 'peace' | 'wary';
+
+export interface PendingDecision {
+  renewal?: { accordId: string; terms: PactTerms };
+  nationId: NationId;
+  eventId: string;
+  partnerId?: NationId;
+  works?: { provinceId: string; price: number; quantity: number };
+}
+
+export interface EconomicReturns {
+  contract?: { partnerId: string; food: number; gold: number; yearsLeft: number };
+  routes: { routeId: string; gold: number; food: number; influence: number; opened: boolean }[];
+  harvests: { provinceId: string; food: number }[];
+  grainBalance: number;
+}
+
 export interface TurnReport {
+  economicReturns?: EconomicReturns;
   turn: number;
   nationId: NationId;
   income: { tax: number; trade: number; building: number };
@@ -276,6 +303,7 @@ export interface Nation {
   army: Army[];
   activePolicies: ActivePolicy[];
   activeLaws: ActiveLaw[];          // C2: 已推行法律
+  grainContract?: GrainContract;
   activeTradeRoutes: ActiveTradeRoute[];  // C3: 已建立贸易路线
   embargoedRoutes: string[];              // E16: 禁运的贸易路线 id
   warExhaustion: number;            // 0-100
@@ -293,6 +321,7 @@ export interface Nation {
   policyMods?: {
     combatMod?: number;          // 战斗力倍率（军事改革等）
     assimilationMod?: number;    // 同化速度加成（教育改革/宗教宽容等）
+    foodOutputMod?: number;      // Domestic food production multiplier
     popGrowthMod?: number;       // 人口增长倍率（均田令/福利等）
     mobilizationMod?: number;    // 征兵速度倍率（军事改革/圣战等）
     taxEffMod?: number;          // 税收效率倍率（中央集权/编户齐民等）
@@ -406,7 +435,7 @@ export interface GameState {
   wars: War[];
   triggeredEvents: TriggeredEvent[];
   eventCooldowns: EventCooldown[];
-  pendingEvents: { nationId: NationId; eventId: string }[];  // 等待玩家选择的弹窗
+  pendingEvents: PendingDecision[];  // 等待玩家选择的弹窗
   pendingEventOptions: { nationId: NationId; eventId: string; options: { text: string; index: number }[] } | null;
   lastReport: TurnReport | null;
   history: TurnReport[];            // E10: 最近 10 回合报告（sparkline 用）

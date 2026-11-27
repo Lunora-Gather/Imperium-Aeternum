@@ -19,10 +19,10 @@
   <img alt="TypeScript strict" src="https://img.shields.io/badge/TypeScript-strict-3178c6?style=flat-square">
   <img alt="React 18" src="https://img.shields.io/badge/React-18-61dafb?style=flat-square">
   <img alt="Vite 8" src="https://img.shields.io/badge/Vite-8-646cff?style=flat-square">
-  <img alt="Release" src="https://img.shields.io/badge/release-1.1.2_stable-2f855a?style=flat-square">
+  <img alt="Release" src="https://img.shields.io/badge/release-1.2.0_stable-2f855a?style=flat-square">
 </p>
 
-当前为 **1.1.2 正式版**，支持简体中文、繁體中文和 English。无需账号即可玩完整单机，登录后可使用私有云存档、共享活版图和好友聊天。
+当前为 **1.2.0 正式版**，支持简体中文、繁體中文和 English。无需账号即可玩完整单机，登录后可使用私有云存档、共享活版图和好友聊天。
 
 ## 第一次玩
 
@@ -37,16 +37,15 @@
 - `?` 新手帮助：用 6 张短说明讲清完整循环。
 - 首局实战引导：带你实际查看经济、省份，完成存档、推进和年报复盘。
 
-## 1.1.2 更新
+## 1.2.0 更新
 
-- 大厅、选国、国政和弹窗采用四套独立主题。暗夜用暖铜，羊皮用纸页与赭墨，竹简用青玉与竖纹，水墨用冷灰与朱印。手机端可直接切换四个主题，选择会在刷新后保留。
-- 私有云存档按槽位比较版本。两台设备同时修改同一槽位时，游戏会保留本地进度，提示比较并确认覆盖。断线期间可继续在本地存档，恢复联网后重新核对。
-- 共享版图会显示国家列表加载状态和年度准备进度。重连会重新读取服务器已确认的回合和命令，避免重复提交。
-- 中文输入法按回车选词时，聊天框保留输入。发送失败后可重试，编辑中的新草稿会继续保留。
+- 在「印度洋贸易」中，打开经济页，选择邻国签约，再开通粮食输入线或输出线。地图的「商路」筛选可查看两端省份。通商使命的后两章分别需要一条、两条运营商路。
+- 「东方破晓」从田税改革开局，「东亚风云」从邻国的五年互不侵犯提案开局。原约到期时，同一邻国会根据任内商路的实际交付年数与双方关系提出续约条件；你也可以让它自然到期。富裕且和平的单人国家在第 8 至 20 年间可能遇到供粮邀约，可出售三年余粮、出资修渠或保留储备。
+- 年报列出商路实际交付和开垦后的首次增产。总览也会显示新开商路的首年回报。
 
 ## 核心体验
 
-- **长期治理**：财政、粮食、人口、安定、合法性、腐败和地方不满相互影响。
+- **长期治理**：财政、粮食、人口、安定、合法性、腐败和地方不满相互影响。经济页可提前查看粮食收入、居民口粮和军粮，开垦后会立即更新预估。
 - **有依据的决策**：行动中心、回合前检查、战争预演和顾问建议解释“现在为什么要做”。
 - **单机国家使命**：依据国家性格分配治世、通商、扩张、文明或协和路线；三章目标提供明确奖励与重开差异。
 - **单机危机链**：财政、法统、地方与长期战争危机会预警、升级并产生后果，连续恢复后也能正式化解。
@@ -126,7 +125,7 @@ npm run simulate:stability -- 50 --samples=2
 npm run simulate:long
 ```
 
-在 Mac 上可用 `npm run test:e2e -- --preview` 检查生产包，覆盖开局、回合推进、存读档、主题对比度和手机布局。首次运行需在 Safari 的「开发者」设置中启用「允许远程自动化」。
+日常调试使用后台无窗口 WebKit。首次运行 `npx playwright-core install webkit`，随后用 `npm run test:e2e` 检查开发版，或在上述发布检查构建完成后用 `npm run test:e2e -- --preview` 检查生产包。两者覆盖开局、回合推进、存读档、主题对比度和手机布局。发布流程在远程 Mac 上用 `npm run test:e2e:safari -- --preview` 复测同一套流程。
 
 双设备云存档测试使用隔离 WebKit 和本地夹具。先执行 `npx playwright-core install webkit`，再运行 `npm run test:e2e:cloud`。命令和多人断线夹具见 [维护脚本](scripts/README.md)。
 
@@ -147,9 +146,9 @@ npm run simulate:long
 | 项目 | 当前值 |
 | --- | --- |
 | 在线地址 | [lunora-gather.github.io/Imperium-Aeternum](https://lunora-gather.github.io/Imperium-Aeternum/) |
-| 版本 | `1.1.2`（stable） |
+| 版本 | `1.2.0`（stable） |
 | 主分支 | `main` |
 | 部署 | GitHub Actions → GitHub Pages |
 | 线上后端 | Appwrite Cloud |
 
-GitHub Actions 构建并测试 `main`，发布后逐文件校验线上内容。云函数的版本可在 [Appwrite 部署说明](appwrite/README.md) 中查看。版本详情见 [1.1.2 发布说明](docs/releases/release-notes-v1.1.2.md) 和 [CHANGELOG](CHANGELOG.md)。
+GitHub Actions 构建并测试 `main`，发布后逐文件校验线上内容。云函数的版本可在 [Appwrite 部署说明](appwrite/README.md) 中查看。版本详情见 [1.2.0 发布说明](docs/releases/release-notes-v1.2.0.md) 和 [CHANGELOG](CHANGELOG.md)。

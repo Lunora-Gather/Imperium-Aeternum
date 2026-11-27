@@ -451,7 +451,7 @@ export function snapshotSaveList(reviewed?: ReadonlyMap<number, string | null>) 
   return { slots, legacy: localStorage.getItem(STORAGE_KEY_BASE) };
 }
 
-export function clearAllSaves(expected?: ReturnType<typeof snapshotSaveList>): boolean {
+export function clearAllSaves(expected?: ReturnType<typeof snapshotSaveList>, removeSlot = deleteSlot): boolean {
   try {
     const { slots, legacy } = expected ?? snapshotSaveList();
     if (slots.size !== SLOT_COUNT || localStorage.getItem(STORAGE_KEY_BASE) !== legacy) return false;
@@ -460,7 +460,7 @@ export function clearAllSaves(expected?: ReturnType<typeof snapshotSaveList>): b
     }
     let cleared = true;
     for (const [slot, stored] of slots) {
-      if (stored !== null && !deleteSlot(slot, { stored })) cleared = false;
+      if (stored !== null && !removeSlot(slot, { stored })) cleared = false;
     }
     if (legacy !== null) {
       if (localStorage.getItem(STORAGE_KEY_BASE) !== legacy) return false;

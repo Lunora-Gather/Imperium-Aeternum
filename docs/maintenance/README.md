@@ -81,7 +81,7 @@ npm run rc:check
 ```
 
 `rc:check` 是合并与发布前的最终门禁，包含完整测试而非测试子集。
-`test:e2e` 使用系统 Safari 执行开局、首回合、存读档和窄屏布局检查。发布流程在构建后运行 `npm run test:e2e -- --preview`，通过 Pages 项目路径访问本次构建产物。
+`test:e2e` 使用后台无窗口 WebKit 执行开局、首回合、存读档和窄屏布局检查。发布流程在远程 Mac 上运行 `npm run test:e2e:safari -- --preview`，通过 Pages 项目路径用原生 Safari 验证本次构建产物。
 `simulate:benchmark` 将同一规模下 5 局的逐回合耗时合并，输出 min、p50、p95、max、avg 和最慢回合的位置。计时包含回合结算和待决事件处理。每局单独保留结局与体检结果。
 `simulate:long` 对经典、区域和完整世界分别执行 60 回合、2 样本的长局体检，并输出赤字、缺粮、压力密度和厌战指标；它不能替代真人体验记录。
 `check:bundle` 对入口块、App 块、最大 JS、JS 总量和 CSS 总量设置预算；`rc:check` 会在生产构建后自动执行。

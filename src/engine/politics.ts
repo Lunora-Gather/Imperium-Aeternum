@@ -182,6 +182,7 @@ export function derivePolicyMods(nation: Nation, addedAssimilation = 0): NonNull
     if (effects.taxEffMod) mods.taxEffMod = (mods.taxEffMod ?? 1) * effects.taxEffMod;
     if (effects.combatMod) mods.combatMod = (mods.combatMod ?? 1) * effects.combatMod;
     if (effects.mobilizationMod) mods.mobilizationMod = (mods.mobilizationMod ?? 1) * effects.mobilizationMod;
+    if (effects.foodOutputMod) mods.foodOutputMod = (mods.foodOutputMod ?? 1) * effects.foodOutputMod;
     if (effects.popGrowthMod) mods.popGrowthMod = (mods.popGrowthMod ?? 1) * effects.popGrowthMod;
     if (effects.influenceMod) {
       // 早期数据用 “+3/-3” 百分点，扩展数据用 “1.15” 倍率；在引擎边界统一语义。

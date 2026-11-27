@@ -9,7 +9,7 @@ import { terrainLabel } from '../data/terrain';
 import { translate, useI18n } from '../i18n';
 import { provincesOf } from '../engine/init';
 import { BUILDINGS } from '../data/buildings';
-import { bordersNation, occupationTroops } from '../gameplay/actions/provinceActions';
+import { bordersNation, occupationTroops, reclamationBlocker } from '../gameplay/actions/provinceActions';
 import { hasTech } from '../gameplay/actions/actionCore';
 import { constructionBlocker } from '../gameplay/actions/domesticActions';
 import { TECH_BY_ID } from '../data/technologies';
@@ -89,6 +89,7 @@ export default function ProvinceScreen() {
   }, [provs, provinceQuery, provinceSort, locale]);
   const prov = visibleProvs.find((p) => p.id === requestedId) ?? visibleProvs[0];
   const selected = prov?.id;
+  const reclaimBlocker = prov && reclamationBlocker(player, prov);
 
   useEffect(() => {
     if (pendingId && provs.some((p) => p.id === pendingId)) {
@@ -205,7 +206,7 @@ export default function ProvinceScreen() {
 
       {neutralFrontier.length > 0 && <Panel title={`边疆拓展（${neutralFrontier.length}）`}>
         <p className="dim" style={{ fontSize: 11, marginBottom: 8 }}>中立省份可交涉归附、移民开拓或军事占领；速度越快，后续治理压力越高。</p>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(230px, 1fr))', gap: 8 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 230px), 1fr))', gap: 8 }}>
           {neutralFrontier.map((frontier) => <div key={frontier.id} className="ia-card" style={{ padding: 10 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', gap: 6 }}><strong>{frontier.name}</strong><Tag text={`驻军 ${frontier.garrison}`} tone={frontier.garrison > 50 ? 'warn' : 'info'} /></div>
             <div className="dim" style={{ fontSize: 10, margin: '5px 0 8px' }}>{terrainLabel(frontier.terrain)} · {translate('人口')} {frontier.population} · {translate('农业')} {frontier.agriBase}</div>
@@ -215,10 +216,10 @@ export default function ProvinceScreen() {
       </Panel>}
 
       {prov && <Panel title={[translate(prov.name), prov.isCapital && `★ ${translate('首都')}`].filter(Boolean).join(' ')} accent>
-        <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr)', gap: 16 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 240px), 1fr))', gap: 16 }}>
           <div>
             <div style={{ marginBottom: 8, display: 'flex', gap: 6, flexWrap: 'wrap' }}><Tag text={terrainLabel(prov.terrain)} /><Tag text={prov.culture} tone="info" /><Tag text={prov.religion} tone="info" /><Tag text={`风险 ${riskScore(prov)}`} tone={provStatus(prov) === 'danger' ? 'danger' : provStatus(prov) === 'warn' ? 'warn' : 'info'} /></div>
-            <div style={{ display: 'flex', gap: 16, marginBottom: 10, fontSize: 13 }}><span>人口 <strong>{prov.population}</strong></span><span>驻军 <strong>{prov.garrison}</strong></span><span>建筑 <strong>{prov.buildings.length}</strong></span></div>
+            <div style={{ display: 'flex', gap: '4px 16px', flexWrap: 'wrap', marginBottom: 10, fontSize: 13 }}><span>人口 <strong>{prov.population}</strong></span><span>驻军 <strong>{prov.garrison}</strong></span><span>建筑 <strong>{prov.buildings.length}</strong></span></div>
             <StatRow label="同化" value={prov.assimilation} kind="high" />
             <StatRow label="忠诚" value={prov.loyalty} kind="high" warn={prov.loyalty < 40} />
             <StatRow label="不满" value={prov.unrest} kind="low" warn={prov.unrest > 50} />
@@ -226,7 +227,7 @@ export default function ProvinceScreen() {
           </div>
           <div>
             <strong style={{ fontSize: 13 }}>阶层</strong>
-            <div style={{ marginTop: 6 }}>{prov.classes.length === 0 ? <span className="dim">暂无阶层数据</span> : prov.classes.map((c) => <div key={c.classId} style={{ display: 'grid', gridTemplateColumns: '48px 1fr 40px', gap: 6, alignItems: 'center', marginBottom: 4 }}><span style={{ fontSize: 12, color: 'var(--text-mute)' }}>{CLASS_LABEL[c.classId] ?? c.classId}</span><Bar value={c.satisfaction} kind="high" label={`${CLASS_LABEL[c.classId] ?? c.classId}满意度`} /><span style={{ fontSize: 11, textAlign: 'right' }}>{Math.round(c.satisfaction)}</span></div>)}</div>
+            <div style={{ marginTop: 6 }}>{prov.classes.length === 0 ? <span className="dim">暂无阶层数据</span> : prov.classes.map((c) => <div key={c.classId} style={{ display: 'grid', gridTemplateColumns: 'minmax(68px, max-content) 1fr 40px', gap: 6, alignItems: 'center', marginBottom: 4 }}><span style={{ fontSize: 12, color: 'var(--text-mute)' }}>{CLASS_LABEL[c.classId] ?? c.classId}</span><Bar value={c.satisfaction} kind="high" label={`${CLASS_LABEL[c.classId] ?? c.classId}满意度`} /><span style={{ fontSize: 11, textAlign: 'right' }}>{Math.round(c.satisfaction)}</span></div>)}</div>
             <Divider />
             <strong style={{ fontSize: 13 }}>建筑</strong>
             <div style={{ marginTop: 6, display: 'flex', gap: 5, flexWrap: 'wrap' }}>
@@ -248,7 +249,7 @@ export default function ProvinceScreen() {
         <div style={{ marginTop: 10, display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}><span style={{ fontSize: 12, color: 'var(--text-mute)' }}>征兵</span><Btn label="+50" variant="ghost" onClick={() => recruit(prov.id, 50)} /><Btn label="+100" variant="ghost" onClick={() => recruit(prov.id, 100)} /><span className="dim" style={{ fontSize: 11 }}>消耗人口与补给</span></div>
 
         <Divider label="开发与驻军" />
-        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}><Btn label="开垦 +2农 (60金)" variant="ghost" onClick={() => developProvince(prov.id, 'reclaim')} disabled={player.resources.gold < 60} /><Btn label="部署驻军50" variant="ghost" onClick={() => developProvince(prov.id, 'garrison_deploy')} /><Btn label="召回驻军50" variant="ghost" onClick={() => developProvince(prov.id, 'garrison_recall')} disabled={prov.garrison < 50} /><span className="dim" style={{ fontSize: 11 }}>开垦增产 · 驻军压叛乱</span></div>
+        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}><Btn label="开垦农田（60金 · 1行动点）" variant="ghost" onClick={() => developProvince(prov.id, 'reclaim')} disabled={!!reclaimBlocker} title={reclaimBlocker ?? undefined} /><Btn label="部署驻军50" variant="ghost" onClick={() => developProvince(prov.id, 'garrison_deploy')} /><Btn label="召回驻军50" variant="ghost" onClick={() => developProvince(prov.id, 'garrison_recall')} disabled={prov.garrison < 50} /><span className="dim" style={{ fontSize: 11 }}>{reclaimBlocker ?? '开垦增产 · 驻军压叛乱'}</span></div>
         <div style={{ marginTop: 6, fontSize: 11, color: 'var(--text-dim)' }}>{`➤ 战略军队调动请至 军事页 · 农业基础 ${prov.agriBase} · 驻军 ${prov.garrison}`}</div>
       </Panel>}
     </div>

@@ -9,8 +9,11 @@ import { EVENT_BY_ID } from '../src/data/events.ts';
 import { createInitialState } from '../src/engine/init.ts';
 import { besiegeLastProvince, createBrowserWorld, worldId } from './lib/shared-world-fixture.mjs';
 import { runCampaignChecks } from './lib/safari-campaign-page.mjs';
+import { launchWebKit } from './lib/webkit-e2e.mjs';
 
-if (process.platform !== 'darwin') throw new Error('System Safari requires macOS');
+const headless = process.argv.includes('--webkit');
+const browserName = headless ? 'Headless WebKit' : 'System Safari';
+if (!headless && process.platform !== 'darwin') throw new Error('System Safari requires macOS');
 const base = '/Imperium-Aeternum/';
 const expireLease = process.argv.includes('--expire-lease');
 const names = { a: ['n01', '罗马'], b: ['n02', '维尼托联邦'] };
@@ -22,6 +25,7 @@ for (const [id, name] of Object.values(names)) world.write(id, { ...world.rows.g
 world.write('n03', { ...world.rows.get('n02'), nationId: 'n03', nationName: initial.nations.n03.name });
 const folder = await mkdtemp(join(tmpdir(), 'imperium-native-safari-'));
 const servers = [], origins = {}, entered = new Set(), passed = new Set();
+let browser;
 let local = false, synced = false, interrupted = false, held, restored = false;
 const orderReceipts = [];
 const readyReceipts = [];
@@ -73,7 +77,7 @@ async function handle(user, req, res, next) {
     if (path !== '/checks/status') record(user, path, data.visibility);
     switch (path.slice(8)) {
       case 'status': return json(res, status(user));
-      case 'local': local = true; console.log('Safari restored the selected Srivijaya campaign from slot 1 after reload.'); break;
+      case 'local': local = true; console.log(`${browserName} restored the selected Srivijaya campaign from slot 1 after reload.`); break;
       case 'entered': entered.add(user); break;
       case 'expire-lease': {
         assert(expireLease && user === 'b' && status(user).secondYearVote);
@@ -206,7 +210,12 @@ try {
     servers.push(server);
     origins[user] = 'http://127.0.0.1:' + server.httpServer.address().port;
   }
-  await promisify(execFile)('/usr/bin/open', ['-b', 'com.apple.Safari', origins.a + '/suite']);
+  if (headless) {
+    browser = await launchWebKit();
+    await browser.navigate(origins.a + '/suite');
+  } else {
+    await promisify(execFile)('/usr/bin/open', ['-b', 'com.apple.Safari', origins.a + '/suite']);
+  }
   await finished.promise;
   assert(local && restored && checkedFailedExit && world.world().turn === 3 && world.rows.get('n03').controllerUserId === 'b', 'unexpected turn or missing recovery');
   assert.deepEqual(readyReceipts.map(([user, turn,, resolved]) => [user, turn, resolved]), [
@@ -218,14 +227,15 @@ try {
   assert.equal(choicesDone.size, 2);
   assert.equal(orderReceipts.length, 2);
   assert.deepEqual(orderReceipts[1], orderReceipts[0], 'retried order was applied twice');
-  console.log('System Safari passed campaign selection, durable saves and two-ruler reconnect.');
+  console.log(`${browserName} passed campaign selection, durable saves and two-ruler reconnect.`);
 } catch (error) {
-  console.error('Safari test timeline [ms, ruler, action, detail]:', JSON.stringify(trace));
+  console.error(`${browserName} test timeline [ms, ruler, action, detail]:`, JSON.stringify(trace));
   throw error;
 } finally {
   clearTimeout(timeout);
   held?.destroy();
   delayedOrder?.destroy();
+  await browser?.close();
   await Promise.all(servers.map(s => s.close()));
   await rm(folder, { recursive: true, force: true });
 }

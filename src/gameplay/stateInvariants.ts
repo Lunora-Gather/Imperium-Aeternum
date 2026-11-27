@@ -45,6 +45,9 @@ export function auditStateInvariants(state: GameState): StateInvariantIssue[] {
     if (![province.population, province.garrison, province.unrest, province.rebellionRisk, province.loyalty, province.assimilation].every(finite)) {
       add('province-number-invalid', 'error', `${province.id} 含 NaN/Infinity。`);
     }
+    if (province.classes.reduce((sum, group) => sum + group.count, 0) !== province.population) {
+      add('province-class-total', 'error', `${province.id} 的阶层人数合计与总人口不符。`);
+    }
     if (province.population < 0 || province.garrison < 0) add('province-negative', 'error', `${province.id} 含负人口或负驻军。`);
     if ([province.unrest, province.rebellionRisk, province.loyalty, province.assimilation].some((value) => value < 0 || value > 100)) {
       add('province-range-invalid', 'error', `${province.id} 的百分比字段越界。`);

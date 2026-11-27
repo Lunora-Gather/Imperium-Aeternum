@@ -1,5 +1,6 @@
 // 待决事件的原子化结算边界：基于最新状态生成新状态，避免双击/按键重复结算。
 
+import { decisionBlocker, settleCampaignDecision } from './campaignDecisions';
 import { Immer } from 'immer';
 import type { GameState } from '../types/game';
 import { applyEffect, EVENT_BY_ID, recordEvent } from '../engine/events';
@@ -27,13 +28,14 @@ export function resolvePendingEventChoice(
   const event = EVENT_BY_ID[eventId];
   const option = event?.options[optionIndex];
   const index = pendingIndex(state, nationId, eventId);
-  if (!event || !option || !state.nations[nationId] || index < 0) {
+  if (!event || !option || !state.nations[nationId] || index < 0 || decisionBlocker(state, state.pendingEvents[index], optionIndex)) {
     return { state, resolved: false };
   }
 
   const next = eventUpdates.produce(state, (draft) => {
     draft._relMap = undefined;
     applyEffect(draft.nations[nationId], option.effects, draft);
+    settleCampaignDecision(draft, draft.pendingEvents[index], optionIndex);
     recordEvent(draft, nationId, eventId, optionIndex);
     draft.pendingEvents.splice(index, 1);
     if (draft.pendingEventOptions?.nationId === nationId && draft.pendingEventOptions.eventId === eventId) draft.pendingEventOptions = null;

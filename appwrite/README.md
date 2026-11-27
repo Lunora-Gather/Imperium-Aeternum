@@ -9,7 +9,7 @@
 - `../functions/ai-diplomacy-gateway/`：受限的 Hugging Face 元首会谈简报；只解释规则事实，不参与结算。
 - `seeds/living-world-v1.json`：首张共享版图及首批开放国家的初始化数据。
 
-日常发版按变更更新现有 Function。记录当前部署 ID，上传候选代码，确认构建成功后激活，再检查执行状态。1.1.2 涉及 `cloud-save-gateway`、`shared-world-gateway` 和 `social-gateway`。已有版图继续使用原来的数据库行、快照和国家控制权。
+日常发版按变更更新现有 Function。记录当前部署 ID，上传候选代码，确认构建成功后激活，再检查执行状态。1.2.0 更新 `shared-world-gateway` 的权威结算引擎。已有版图继续使用原来的数据库行、快照和国家控制权。
 
 新建环境时，按下列顺序初始化资源。
 

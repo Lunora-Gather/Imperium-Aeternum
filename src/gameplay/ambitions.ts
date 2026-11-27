@@ -2,6 +2,7 @@
 // 解决：世界剧本/大国开局时，旧的“7省征服胜利、2000金经济胜利”过于固定。
 // V13：把进度同步从 UI wrapper 里抽成可复用函数，避免新局、读档、回合链顺序导致右侧目标条滞后。
 
+import { operatingRoutes } from '../engine/tradeNetwork';
 import type { AmbitionMeta, GameState } from '../types/game';
 export type { AmbitionMeta } from '../types/game';
 
@@ -115,7 +116,7 @@ function economyFoundation(state: GameState, id: string): { buildings: number; b
   const owned = Object.values(state.provinces).filter((province) => province.ownerId === id);
   const buildings = owned.reduce((sum, province) => sum + province.buildings.length, 0);
   const buildingTarget = Math.max(2, Math.ceil(owned.length * 0.35));
-  const tradeRoutes = state.nations[id]?.activeTradeRoutes.length ?? 0;
+  const tradeRoutes = state.nations[id] ? operatingRoutes(state.nations[id], state).length : 0;
   return { buildings, buildingTarget, tradeRoutes, done: buildings >= buildingTarget && tradeRoutes >= 1 };
 }
 

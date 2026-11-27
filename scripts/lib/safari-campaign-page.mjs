@@ -1,4 +1,4 @@
-// Runs inside the system Safari tab, independently on each ruler's origin.
+// Runs independently on each ruler's origin.
 export async function runCampaignChecks(ruler) {
   const frame = document.querySelector('iframe');
   const game = () => frame.contentDocument;
@@ -72,6 +72,7 @@ export async function runCampaignChecks(ruler) {
     await until(() => game().querySelector('h1.ia-ruler-title')?.textContent === name, 'shared ruler ' + name);
   }
   const state = (slot) => JSON.parse(win().localStorage.getItem('imperium-aeternum-save-' + slot))?.gameState;
+  const slot = n => () => [...game().querySelectorAll('strong')].findLast(el => el.textContent === '槽位 ' + n)?.closest('.ia-card');
   const status = () => signal('status');
   const yearTwo = () => game()?.body?.innerText.includes('Anno · 2');
   try {
@@ -94,7 +95,6 @@ export async function runCampaignChecks(ruler) {
         return !option && !game().querySelector('#event-dialog-title');
       }, 'resolve local event choices');
       (await until(() => game().querySelector('[data-navigation-tab="save"]'), 'save tab')).click();
-      const slot = n => () => [...game().querySelectorAll('strong')].findLast(el => el.textContent === '槽位 ' + n)?.closest('.ia-card');
       await click('存档到此', slot(1));
       const saved = await until(() => state(1), 'manual checkpoint');
       if (saved.playerNationId !== 'n_oc_srivijaya' || saved.scenarioId !== 'w8_indianocean' || saved.strategyFocus !== 'reform' || saved.turn !== 1) throw new Error('wrong checkpoint');
@@ -188,6 +188,12 @@ export async function runCampaignChecks(ruler) {
       await signal('delay-order');
       await click('安民');
       await until(async () => (await status()).orderHeld, 'pending order before exit');
+      game().querySelector('[data-navigation-tab=save]').click();
+      await until(() => game().body.innerText.includes('共享进度由服务器保存。这里可以管理单人存档。'), 'shared save guidance');
+      await click('读档', slot(1));
+      await until(() => game().body.innerText.includes('共享操作正在提交，请等待确认后再读档。'), 'local load must wait for the pending order');
+      game().querySelector('[data-navigation-tab=dashboard]').click();
+      await until(() => game().querySelector('.ia-dash-priority-grid'), 'return to governance with the order pending');
       if (win().dispatchEvent(new (win().Event)('beforeunload', { cancelable: true }))) throw new Error('pending order allowed an unguarded refresh');
       await click('退出共享治理');
       await click('退出并返回大厅');

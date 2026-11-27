@@ -560,7 +560,7 @@ body > div[style*="position:fixed"][style*="right:8px"] {
 @media (max-width: 520px) {
   .ia-ruler-main {
     display: grid !important;
-    grid-template-columns: minmax(0, 1fr) auto !important;
+    grid-template-columns: minmax(0, 1fr) !important;
     align-items: center !important;
     gap: 6px !important;
   }
@@ -1434,6 +1434,27 @@ body > div[style*="position:fixed"][style*="right:8px"] {
   margin-bottom: 0 !important;
 }
 
+.ia-tech-row {
+  display: grid;
+  grid-template-columns: 50px minmax(0, 1fr) auto minmax(86px, max-content);
+  align-items: center;
+  gap: 8px;
+}
+
+.ia-tech-cost { text-align: right; }
+.ia-mobile-nav-language { display: none; }
+.ia-ambitions { container-type: inline-size; }
+.ia-victory-routes {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+@container (max-width: 290px) {
+  .ia-victory-routes { grid-template-columns: 1fr; }
+}
+
 .ia-military-overview-grid {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -1464,6 +1485,13 @@ body > div[style*="position:fixed"][style*="right:8px"] {
 }
 
 @media (max-width: 760px) {
+  .ia-tech-row {
+    grid-template-columns: 28px minmax(0, 1fr);
+    align-items: start;
+  }
+  .ia-tech-row > :first-child { grid-row: span 3; }
+  .ia-tech-cost { text-align: left; }
+
   .ia-screen-stack {
     gap: var(--space-4);
   }
@@ -1490,8 +1518,36 @@ body > div[style*="position:fixed"][style*="right:8px"] {
 }
 
 @media (max-width: 520px) {
+  .ia-panel { --panel-padding: 12px; }
+  .ia-mobile-nav-language { display: flex; margin-top: 12px; }
+
+  .ia-military-declare-row {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-areas:
+      "target target"
+      "relation strength"
+      "tone tone"
+      "preview declare";
+  }
+  .ia-military-declare-row > .ia-tag { justify-self: start; }
+
   .ia-military-meter-grid {
     grid-template-columns: 1fr;
     gap: 6px;
   }
 }
+
+.ia-trade-routes {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 16rem), 1fr));
+  gap: .6rem;
+}
+.ia-trade-routes article {
+  display: grid;
+  align-content: start;
+  justify-items: start;
+  gap: .4rem;
+  padding: .8rem;
+  overflow-wrap: anywhere;
+}
+.ia-trade-routes small { color: var(--text-mute); }
